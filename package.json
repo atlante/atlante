@@ -1,0 +1,19 @@
+{
+  "name": "opencode-workflow",
+  "version": "0.1.0",
+  "description": "Minimal multi-agent workflow plugin for OpenCode",
+  "type": "module",
+  "main": "plugin.ts",
+  "files": [
+    "plugin.ts",
+    "specialists/"
+  ],
+  "dependencies": {
+    "gray-matter": "^4.0.3"
+  },
+  "devDependencies": {
+    "@opencode-ai/plugin": "^1.18.2"
+  },
+  "keywords": ["opencode", "opencode-plugin", "agents", "workflow"],
+  "license": "MIT"
+}
