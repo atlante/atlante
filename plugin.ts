@@ -11,15 +11,15 @@ const OPENCODE_CONFIG_DIR =
   process.env.OPENCODE_CONFIG_DIR ??
   join(process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config"), "opencode")
 
-const BUNDLED_SPECIALISTS_DIR = join(__dirname, "specialists")
-const USER_SPECIALISTS_DIR = join(OPENCODE_CONFIG_DIR, "atlas", "specialists")
+const BUNDLED_AGENTS_DIR = join(__dirname, "agents")
+const USER_AGENTS_DIR = join(OPENCODE_CONFIG_DIR, "atlas", "agents")
 
-interface SpecialistEntry {
+interface AgentEntry {
   name: string
   config: Record<string, unknown>
 }
 
-async function loadSpecialists(dir: string): Promise<SpecialistEntry[]> {
+async function loadAgents(dir: string): Promise<AgentEntry[]> {
   let files: string[]
   try {
     files = (await readdir(dir)).filter((f) => f.endsWith(".md"))
@@ -27,7 +27,7 @@ async function loadSpecialists(dir: string): Promise<SpecialistEntry[]> {
     return []
   }
 
-  const entries: SpecialistEntry[] = []
+  const entries: AgentEntry[] = []
   for (const file of files) {
     const raw = await readFile(join(dir, file), "utf8")
     const { data, content } = matter(raw)
@@ -69,8 +69,8 @@ const plugin: Plugin = async (_input, options) => {
     config: async (cfg) => {
       cfg.agent ??= {}
 
-      const bundled = await loadSpecialists(BUNDLED_SPECIALISTS_DIR)
-      const user = await loadSpecialists(USER_SPECIALISTS_DIR)
+      const bundled = await loadAgents(BUNDLED_AGENTS_DIR)
+      const user = await loadAgents(USER_AGENTS_DIR)
 
       // Precedence: existing config > user files > bundled defaults
       const registered: string[] = []
@@ -87,7 +87,7 @@ const plugin: Plugin = async (_input, options) => {
         registered.push(entry.name)
       }
 
-      // Inject specialist roster into orchestrator prompt
+      // Inject agent roster into orchestrator prompt
       const orchestrator = cfg.agent["atlas"] as
         | { prompt?: string }
         | undefined
@@ -95,7 +95,7 @@ const plugin: Plugin = async (_input, options) => {
         const roster = registered
           .map((name) => `- ${name}`)
           .join("\n")
-        orchestrator.prompt += `\n\n## Available specialists\n\n${roster}\n\nUse the task tool with subagent_type set to the specialist name.`
+        orchestrator.prompt += `\n\n## Available agents\n\n${roster}\n\nUse the task tool with subagent_type set to the agent name.`
       }
     },
   }

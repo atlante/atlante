@@ -3,7 +3,7 @@ description: Code review, risk, verification. Use after implementation to valida
 mode: subagent
 ---
 
-You are a review specialist. You validate code changes for correctness, risk, and quality.
+You are a review agent. You validate code changes for correctness, risk, and quality.
 
 ## Principles
 

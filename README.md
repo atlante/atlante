@@ -4,7 +4,7 @@ A multi-agent plugin for [OpenCode](https://opencode.ai). One config entry, comp
 
 ## Why
 
-A single agent trying to explore, plan, build, and review in one shot loses focus. Atlas splits the work into specialists — each with a clear role, read-only or write access, and a focused context window. The orchestrator routes, specialists execute.
+A single agent trying to explore, plan, build, and review in one shot loses focus. Atlas orchestrates and splits the work into specialists — each with a clear role, read-only or write access, and a focused context window. The orchestrator routes, specialists execute.
 
 ## Flow
 
@@ -40,7 +40,7 @@ A single agent trying to explore, plan, build, and review in one shot loses focu
                         └────────────────────────────┘
 ```
 
-The common pipeline for non-trivial tasks is **explore → build → review**. The orchestrator may chain specialists or handle trivial requests directly.
+The common pipeline for non-trivial tasks is **explore → build → review**. The orchestrator may chain agents or handle trivial requests directly.
 
 ## Quick start
 
@@ -52,9 +52,9 @@ Add to your `opencode.json`:
 }
 ```
 
-The `model` option is applied to all specialists that don't define their own.
+The `model` option is applied to all agents that don't define their own.
 
-## Specialists
+## Agents
 
 | Agent | Role |
 |---|---|
@@ -65,13 +65,13 @@ The `model` option is applied to all specialists that don't define their own.
 | `atlas-plan` | Architecture, multi-step design |
 | `atlas-review` | Code review, risk, verification |
 
-## Custom specialists
+## Custom agents
 
-Drop `.md` files into `~/.config/opencode/atlas/specialists/`:
+Drop `.md` files into `~/.config/opencode/atlas/agents/`:
 
 ```markdown
 ---
-description: One sentence describing the specialist.
+description: One sentence describing the agent.
 mode: subagent
 ---
 

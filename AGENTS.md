@@ -14,7 +14,7 @@ A minimal OpenCode plugin that installs a multi-agent workflow. One npm package,
 opencode-atlas/
 ├── package.json
 ├── plugin.ts              ← config hook: discovers + registers agents
-├── specialists/           ← bundled agent definitions (.md)
+├── agents/                ← bundled agent definitions (.md)
 │   ├── atlas.md           ← orchestrator (primary mode)
 │   ├── atlas-brainstorm.md
 │   ├── atlas-explore.md
@@ -28,7 +28,7 @@ opencode-atlas/
 
 | Agent | Mode | Role |
 |---|---|---|
-| `atlas` | primary | Orchestrator — classifies tasks, delegates to specialists |
+| `atlas` | primary | Orchestrator — classifies tasks, delegates to agents |
 | `atlas-brainstorm` | subagent | Ideation, alternatives, tradeoffs |
 | `atlas-explore` | subagent | Read-only codebase reconnaissance |
 | `atlas-build` | subagent | Implementation, edits, tests |
@@ -41,21 +41,21 @@ All agents are prefixed with `atlas-` to avoid collisions with OpenCode built-in
 
 ### Extensibility
 
-Users add custom specialists by dropping `.md` files into:
+Users add custom agents by dropping `.md` files into:
 
 ```
-~/.config/opencode/atlas/specialists/
+~/.config/opencode/atlas/agents/
 ```
 
 The plugin scans both bundled and user directories at startup. User files override bundled defaults if names collide. Restart required after adding/removing files.
 
-### Specialist `.md` format
+### Agent `.md` format
 
 Standard OpenCode agent frontmatter:
 
 ```markdown
 ---
-description: One sentence describing the specialist's role.
+description: One sentence describing the agent's role.
 mode: subagent
 model: provider/model-id    ← optional, inherits plugin default
 permission:                  ← optional
@@ -63,17 +63,17 @@ permission:                  ← optional
   bash: deny
 ---
 
-(prompt body — the specialist's instructions)
+(prompt body — the agent's instructions)
 ```
 
 ## How plugin.ts works
 
 1. On startup, OpenCode calls the `config` hook with the merged config
-2. Plugin reads bundled specialists from `specialists/` (relative to package)
-3. Plugin reads user specialists from `~/.config/opencode/atlas/specialists/`
+2. Plugin reads bundled agents from `agents/` (relative to package)
+3. Plugin reads user agents from `~/.config/opencode/atlas/agents/`
 4. Merges: existing config > user files > bundled defaults
-5. Injects the specialist roster into the orchestrator's prompt
-6. If a `model` option was passed, applies it to specialists that don't have their own model set
+5. Injects the agent roster into the orchestrator's prompt
+6. If a `model` option was passed, applies it to agents that don't have their own model set
 
 ### Key dependencies
 
@@ -91,9 +91,9 @@ permission:                  ← optional
 
 ## Design decisions
 
-1. **Role-based, not domain-based** — specialists are brainstorm/explore/build/plan/review (universal roles), not frontend/backend (domains). Domain tuning happens via user overrides.
+1. **Role-based, not domain-based** — agents are brainstorm/explore/build/plan/review (universal roles), not frontend/backend (domains). Domain tuning happens via user overrides.
 
-2. **Orchestrator delegates mainly** — handles trivial one-liners directly, delegates everything else. Can chain specialists (explore → build → review).
+2. **Orchestrator delegates mainly** — handles trivial one-liners directly, delegates everything else. Can chain agents (explore → build → review).
 
 3. **Optional gates** — not enforced by default. The orchestrator decides whether to chain review after build based on task complexity. Users can add approval workflows by customizing the orchestrator prompt.
 
@@ -104,8 +104,8 @@ permission:                  ← optional
 - [ ] Test plugin with `gray-matter` dependency — confirm Bun handles it or find alternative
 - [ ] Test actual plugin loading with OpenCode
 - [ ] Decide: should orchestrator be set as `default_agent` via plugin, or user opts in?
-- [ ] Consider: should specialists have permission defaults (e.g., explore = read-only)?
-- [ ] Consider: should the plugin register an `atlas_status` tool listing available specialists?
-- [ ] Consider: orchestrator prompt templating — inject specialist names dynamically vs. rely on OpenCode's task tool descriptions
+- [ ] Consider: should agents have permission defaults (e.g., explore = read-only)?
+- [ ] Consider: should the plugin register an `atlas_status` tool listing available agents?
+- [ ] Consider: orchestrator prompt templating — inject agent names dynamically vs. rely on OpenCode's task tool descriptions
 - [ ] Add `@opencode-ai/plugin` as devDependency with correct version
 - [ ] Decide on publish strategy (npm, local file path, or both)
