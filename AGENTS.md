@@ -2,7 +2,7 @@
 
 ## What this is
 
-A minimal OpenCode plugin that installs a multi-agent workflow. One npm package, one config entry, complete agent topology.
+A minimal OpenCode plugin that installs a multi-agent workflow. One npm package, one config entry, complete agent topology and universal skills.
 
 ```json
 { "plugin": [["opencode-atlas", { "model": "provider/model-id" }]] }
@@ -13,7 +13,7 @@ A minimal OpenCode plugin that installs a multi-agent workflow. One npm package,
 ```
 opencode-atlas/
 ├── package.json
-├── plugin.ts              ← config hook: discovers + registers agents
+├── plugin.ts              ← config hook: discovers + registers agents and skills
 ├── agents/                ← bundled agent definitions (.md)
 │   ├── atlas.md           ← orchestrator (primary mode)
 │   ├── atlas-brainstorm.md
@@ -21,6 +21,11 @@ opencode-atlas/
 │   ├── atlas-build.md
 │   ├── atlas-plan.md
 │   └── atlas-review.md
+├── skills/                ← bundled universal skills
+│   ├── selecting-models/
+│   ├── writing-agents/
+│   ├── writing-instructions/
+│   └── writing-skills/
 └── AGENTS.md              ← this file
 ```
 
@@ -73,7 +78,8 @@ permission:                  ← optional
 3. Plugin reads user agents from `~/.config/opencode/atlas/agents/`
 4. Merges: existing config > user files > bundled defaults
 5. Injects the agent roster into the orchestrator's prompt
-6. If a `model` option was passed, applies it to agents that don't have their own model set
+6. Adds the bundled `skills/` directory to `config.skills.paths`
+7. If a `model` option was passed, applies it to agents that don't have their own model set
 
 ### Key dependencies
 
@@ -88,6 +94,7 @@ permission:                  ← optional
 - `permission: "allow"` needs to be `{ "*": "allow" }` for hook-inserted agents.
 - OpenCode's `task` tool resolves `subagent_type` against registered agent names. The orchestrator uses this to delegate.
 - No hot reload — config is loaded once at startup. Restart required after changes.
+- Bundled skills are discovered from the package directory through `config.skills.paths`; they are not copied into the user's global skill directory.
 
 ## Design decisions
 
@@ -95,17 +102,28 @@ permission:                  ← optional
 
 2. **Orchestrator delegates mainly** — handles trivial one-liners directly, delegates everything else. Can chain agents (explore → build → review).
 
-3. **Optional gates** — not enforced by default. The orchestrator decides whether to chain review after build based on task complexity. Users can add approval workflows by customizing the orchestrator prompt.
+3. **Configurable workflows** — the default flow remains heuristic, but users should be able to override bundled agent settings such as model, reasoning effort, and permissions; define new agents; and describe phases, expected outputs, transitions, and gates. Gates may be automatic, review-based, or approval-based.
 
-4. **Minimal by design** — no context system, no approval framework, no team features. Just agent topology. Users layer complexity on top.
+4. **Advisory before deterministic** — workflow configuration initially guides the orchestrator through prompts. It must not imply deterministic phase ordering or gate enforcement until the runtime supports it explicitly.
+
+5. **Agents and skills, not rules or memory** — Atlas provides reusable agents and skills, including guidance for writing instructions. Project rules remain subjective and user-owned; persistent memory is out of scope.
+
+6. **Common contract, distinct metadata** — agents and skills share a conceptual structure: purpose, scope, instructions, and output or verification expectations. They retain construct-specific metadata: agents own mode, model, and permissions; skills own discovery triggers and reusable procedures.
+
+7. **Explicit prompt composition** — bundled prompts may be extended through an explicit, ordered, inspectable extension or overlay mechanism. Full replacement remains possible; arbitrary `prompt` fields are not implicitly concatenated.
+
+8. **Self-aware orchestrator** — Atlas knows the plugin's topology, registration and startup behavior, available skills, and active user configuration. It uses dynamically supplied workflow guidance, delegates with structured phase prompts and handoffs, and helps developers design or revise their agent and workflow configuration when asked.
+
+9. **Minimal by design** — no context system, memory layer, approval framework, or team features by default. Users layer additional complexity on top.
 
 ## TODO
 
 - [ ] Test plugin with `gray-matter` dependency — confirm Bun handles it or find alternative
 - [ ] Test actual plugin loading with OpenCode
+- [ ] Test bundled skill discovery with OpenCode
 - [ ] Decide: should orchestrator be set as `default_agent` via plugin, or user opts in?
 - [ ] Consider: should agents have permission defaults (e.g., explore = read-only)?
 - [ ] Consider: should the plugin register an `atlas_status` tool listing available agents?
 - [ ] Consider: orchestrator prompt templating — inject agent names dynamically vs. rely on OpenCode's task tool descriptions
-- [ ] Add `@opencode-ai/plugin` as devDependency with correct version
+- [ ] Design plugin options for agent overrides, custom agents, workflow phases and gates, and explicit prompt extensions
 - [ ] Decide on publish strategy (npm, local file path, or both)
