@@ -1,0 +1,85 @@
+# opencode-atlas
+
+A multi-agent plugin for [OpenCode](https://opencode.ai). One config entry, complete agent topology.
+
+## Why
+
+A single agent trying to explore, plan, build, and review in one shot loses focus. Atlas splits the work into specialists — each with a clear role, read-only or write access, and a focused context window. The orchestrator routes, specialists execute.
+
+## Flow
+
+```
+                        ┌─────────────┐
+                        │     User     │
+                        └──────┬──────┘
+                               │
+                        ┌──────▼──────┐
+                        │    atlas     │  orchestrator
+                        │  (classify)  │
+                        └──────┬──────┘
+                               │
+              ┌────────────────┼────────────────┐
+              │                │                │
+       ┌──────▼──────┐ ┌──────▼──────┐ ┌──────▼──────┐
+       │ brainstorm   │ │   plan      │ │  explore    │
+       │ (ideate)     │ │ (design)    │ │ (recon)     │
+       └─────────────┘ └──────┬──────┘ └──────┬──────┘
+                              │                │
+                              │         ┌──────▼──────┐
+                              │         │    build     │
+                              │         │ (implement)  │
+                              │         └──────┬──────┘
+                              │                │
+                              │         ┌──────▼──────┐
+                              │         │   review     │
+                              │         │ (validate)   │
+                              │         └──────┬──────┘
+                              │                │
+                        ┌─────┴────────────────┴─────┐
+                        │        Back to user         │
+                        └────────────────────────────┘
+```
+
+The common pipeline for non-trivial tasks is **explore → build → review**. The orchestrator may chain specialists or handle trivial requests directly.
+
+## Quick start
+
+Add to your `opencode.json`:
+
+```json
+{
+  "plugin": [["opencode-atlas", { "model": "anthropic/claude-sonnet-4-6" }]]
+}
+```
+
+The `model` option is applied to all specialists that don't define their own.
+
+## Specialists
+
+| Agent | Role |
+|---|---|
+| `atlas` | Orchestrator — classifies tasks, delegates |
+| `atlas-brainstorm` | Ideation, alternatives, tradeoffs |
+| `atlas-explore` | Read-only codebase reconnaissance |
+| `atlas-build` | Implementation, edits, tests |
+| `atlas-plan` | Architecture, multi-step design |
+| `atlas-review` | Code review, risk, verification |
+
+## Custom specialists
+
+Drop `.md` files into `~/.config/opencode/atlas/specialists/`:
+
+```markdown
+---
+description: One sentence describing the specialist.
+mode: subagent
+---
+
+(your prompt here)
+```
+
+User files override bundled defaults if names collide. Restart required.
+
+## License
+
+MIT
