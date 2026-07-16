@@ -12,7 +12,13 @@ const OPENCODE_CONFIG_DIR =
   join(process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config"), "opencode")
 
 const BUNDLED_AGENTS_DIR = join(__dirname, "agents")
+const BUNDLED_SKILLS_DIR = join(__dirname, "skills")
 const USER_AGENTS_DIR = join(OPENCODE_CONFIG_DIR, "atlas", "agents")
+
+interface SkillsConfig {
+  paths?: string[]
+  urls?: string[]
+}
 
 interface AgentEntry {
   name: string
@@ -67,6 +73,13 @@ const plugin: Plugin = async (_input, options) => {
 
   return {
     config: async (cfg) => {
+      const config = cfg as typeof cfg & { skills?: SkillsConfig }
+      config.skills ??= {}
+      config.skills.paths ??= []
+      if (!config.skills.paths.includes(BUNDLED_SKILLS_DIR)) {
+        config.skills.paths.push(BUNDLED_SKILLS_DIR)
+      }
+
       cfg.agent ??= {}
 
       const bundled = await loadAgents(BUNDLED_AGENTS_DIR)

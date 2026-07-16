@@ -1,6 +1,6 @@
 # opencode-atlas
 
-A multi-agent plugin for [OpenCode](https://opencode.ai). One config entry, complete agent topology.
+A multi-agent plugin for [OpenCode](https://opencode.ai). One config entry, complete agent topology and universal skills.
 
 ## Why
 
@@ -54,6 +54,8 @@ Add to your `opencode.json`:
 
 The `model` option is applied to all agents that don't define their own.
 
+The plugin also makes its bundled skills available automatically.
+
 ## Agents
 
 | Agent | Role |
@@ -64,6 +66,17 @@ The `model` option is applied to all agents that don't define their own.
 | `atlas-build` | Implementation, edits, tests |
 | `atlas-plan` | Architecture, multi-step design |
 | `atlas-review` | Code review, risk, verification |
+
+## Skills
+
+| Skill | Purpose |
+|---|---|
+| `selecting-models` | Compare models, providers, pricing, and usage constraints |
+| `writing-agents` | Design agents, subagents, permissions, and orchestration patterns |
+| `writing-instructions` | Create scoped, precise, and safe agent instruction files |
+| `writing-skills` | Create, test, and review reusable OpenCode skills |
+
+Bundled skills are discovered through the plugin's config hook. Restart OpenCode after installing or updating the plugin.
 
 ## Custom agents
 
