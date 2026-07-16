@@ -12,7 +12,7 @@ const OPENCODE_CONFIG_DIR =
   join(process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config"), "opencode")
 
 const BUNDLED_SPECIALISTS_DIR = join(__dirname, "specialists")
-const USER_SPECIALISTS_DIR = join(OPENCODE_CONFIG_DIR, "workflow", "specialists")
+const USER_SPECIALISTS_DIR = join(OPENCODE_CONFIG_DIR, "atlas", "specialists")
 
 interface SpecialistEntry {
   name: string
@@ -88,7 +88,7 @@ const plugin: Plugin = async (_input, options) => {
       }
 
       // Inject specialist roster into orchestrator prompt
-      const orchestrator = cfg.agent["workflow"] as
+      const orchestrator = cfg.agent["atlas"] as
         | { prompt?: string }
         | undefined
       if (orchestrator?.prompt && registered.length > 0) {

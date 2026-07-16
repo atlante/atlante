@@ -1,26 +1,26 @@
-# AGENTS.md — opencode-workflow
+# AGENTS.md — opencode-atlas
 
 ## What this is
 
 A minimal OpenCode plugin that installs a multi-agent workflow. One npm package, one config entry, complete agent topology.
 
 ```json
-{ "plugin": [["opencode-workflow", { "model": "provider/model-id" }]] }
+{ "plugin": [["opencode-atlas", { "model": "provider/model-id" }]] }
 ```
 
 ## Architecture
 
 ```
-opencode-workflow/
+opencode-atlas/
 ├── package.json
 ├── plugin.ts              ← config hook: discovers + registers agents
 ├── specialists/           ← bundled agent definitions (.md)
-│   ├── workflow.md        ← orchestrator (primary mode)
-│   ├── workflow-brainstorm.md
-│   ├── workflow-explore.md
-│   ├── workflow-build.md
-│   ├── workflow-plan.md
-│   └── workflow-review.md
+│   ├── atlas.md           ← orchestrator (primary mode)
+│   ├── atlas-brainstorm.md
+│   ├── atlas-explore.md
+│   ├── atlas-build.md
+│   ├── atlas-plan.md
+│   └── atlas-review.md
 └── AGENTS.md              ← this file
 ```
 
@@ -28,23 +28,23 @@ opencode-workflow/
 
 | Agent | Mode | Role |
 |---|---|---|
-| `workflow` | primary | Orchestrator — classifies tasks, delegates to specialists |
-| `workflow-brainstorm` | subagent | Ideation, alternatives, tradeoffs |
-| `workflow-explore` | subagent | Read-only codebase reconnaissance |
-| `workflow-build` | subagent | Implementation, edits, tests |
-| `workflow-plan` | subagent | Architecture, multi-step design |
-| `workflow-review` | subagent | Code review, risk, verification |
+| `atlas` | primary | Orchestrator — classifies tasks, delegates to specialists |
+| `atlas-brainstorm` | subagent | Ideation, alternatives, tradeoffs |
+| `atlas-explore` | subagent | Read-only codebase reconnaissance |
+| `atlas-build` | subagent | Implementation, edits, tests |
+| `atlas-plan` | subagent | Architecture, multi-step design |
+| `atlas-review` | subagent | Code review, risk, verification |
 
 ### Naming convention
 
-All agents are prefixed with `workflow-` to avoid collisions with OpenCode built-ins (`build`, `plan`, `explore`). The orchestrator is just `workflow`.
+All agents are prefixed with `atlas-` to avoid collisions with OpenCode built-ins (`build`, `plan`, `explore`). The orchestrator is just `atlas`.
 
 ### Extensibility
 
 Users add custom specialists by dropping `.md` files into:
 
 ```
-~/.config/opencode/workflow/specialists/
+~/.config/opencode/atlas/specialists/
 ```
 
 The plugin scans both bundled and user directories at startup. User files override bundled defaults if names collide. Restart required after adding/removing files.
@@ -70,7 +70,7 @@ permission:                  ← optional
 
 1. On startup, OpenCode calls the `config` hook with the merged config
 2. Plugin reads bundled specialists from `specialists/` (relative to package)
-3. Plugin reads user specialists from `~/.config/opencode/workflow/specialists/`
+3. Plugin reads user specialists from `~/.config/opencode/atlas/specialists/`
 4. Merges: existing config > user files > bundled defaults
 5. Injects the specialist roster into the orchestrator's prompt
 6. If a `model` option was passed, applies it to specialists that don't have their own model set
@@ -105,7 +105,7 @@ permission:                  ← optional
 - [ ] Test actual plugin loading with OpenCode
 - [ ] Decide: should orchestrator be set as `default_agent` via plugin, or user opts in?
 - [ ] Consider: should specialists have permission defaults (e.g., explore = read-only)?
-- [ ] Consider: should the plugin register a `workflow_status` tool listing available specialists?
+- [ ] Consider: should the plugin register an `atlas_status` tool listing available specialists?
 - [ ] Consider: orchestrator prompt templating — inject specialist names dynamically vs. rely on OpenCode's task tool descriptions
 - [ ] Add `@opencode-ai/plugin` as devDependency with correct version
 - [ ] Decide on publish strategy (npm, local file path, or both)

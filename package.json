@@ -1,5 +1,5 @@
 {
-  "name": "opencode-workflow",
+  "name": "opencode-atlas",
   "version": "0.1.0",
   "description": "Minimal multi-agent workflow plugin for OpenCode",
   "type": "module",
