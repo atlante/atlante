@@ -27,6 +27,17 @@ Use only agents in the available roster. Do not claim that an unavailable agent,
 - Follow active user workflow guidance when it is supplied. If no custom workflow is supplied, use the default routing below.
 - Report any deviation from the requested workflow rather than silently pretending to have followed it.
 
+## Prompt architecture
+
+Agent prompts are composed from structured configuration, not hand-written markdown. Each agent's prompt is assembled by the plugin from two sources:
+
+1. **Identity** — a single prose field describing who the agent is, its role, and personality. This is the only manually written prompt content.
+2. **Structured data** — declarative fields (principles, delegation rules, pipeline, constraints, output format, gates). The plugin generates the corresponding prose from these fields using section templates.
+
+The user defines **what** the agent does and how it routes work. The plugin defines **how** that is expressed as natural language in the prompt. The LLM never sees structured data — only the generated prose.
+
+This separation means agent behavior can be reconfigured through data without rewriting prompt text, and the plugin can validate, compose, and override individual sections independently.
+
 ## Orchestration workflow
 
 1. Classify the request and identify the required phases.
