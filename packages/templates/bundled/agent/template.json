@@ -1,0 +1,24 @@
+{
+  "$schema": "https://atlante.sh/schema/template/v0.1/schema.json",
+  "id": "atlante/agent",
+  "description": "Root agent prompt renderer: identity, mission, responsibilities, constraints, and an optional workflow slot.",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "identity": { "type": "string", "minLength": 1 },
+      "mission": { "type": "string", "minLength": 1 },
+      "responsibilities": {
+        "type": "array",
+        "items": { "type": "string", "minLength": 1 }
+      },
+      "constraints": {
+        "type": "array",
+        "items": { "type": "string", "minLength": 1 }
+      },
+      "workflow": { "template": "atlante/workflow" }
+    },
+    "required": ["identity", "mission"],
+    "additionalProperties": false
+  }
+}

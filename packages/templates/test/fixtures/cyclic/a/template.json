@@ -1,0 +1,10 @@
+{
+  "$schema": "https://atlante.sh/schema/template/v0.1/schema.json",
+  "id": "test/a",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": { "child": { "template": "test/b" } },
+    "additionalProperties": false
+  }
+}

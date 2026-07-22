@@ -1,0 +1,20 @@
+{
+  "name": "atlante",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --build packages/*/tsconfig.json",
+    "check": "biome check .",
+    "fallow": "fallow"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.0.0",
+    "@types/bun": "latest",
+    "fallow": "^3.8.0",
+    "typescript": "^5.6.0"
+  }
+}

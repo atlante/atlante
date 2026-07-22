@@ -1,0 +1,14 @@
+{
+  "name": "@atlante/validator",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@atlante/schema": "workspace:*",
+    "@atlante/templates": "workspace:*",
+    "ajv": "^8.17.1",
+    "jsonc-parser": "^3.3.1"
+  }
+}

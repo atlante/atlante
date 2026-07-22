@@ -1,0 +1,20 @@
+{
+  "name": "@atlante/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "atlante": "./bin/atlante.ts"
+  },
+  "exports": {
+    ".": "./src/main.ts"
+  },
+  "dependencies": {
+    "@atlante/presets": "workspace:*",
+    "@atlante/schema": "workspace:*",
+    "@atlante/resolver": "workspace:*",
+    "@atlante/templates": "workspace:*",
+    "@atlante/validator": "workspace:*",
+    "commander": "^12.1.0",
+    "jsonc-parser": "^3.3.1"
+  }
+}

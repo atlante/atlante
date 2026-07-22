@@ -1,0 +1,19 @@
+{
+  "name": "@atlante/opencode-plugin",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@atlante/resolver": "workspace:*",
+    "@atlante/templates": "workspace:*",
+    "@atlante/validator": "workspace:*"
+  },
+  "peerDependencies": {
+    "@opencode-ai/plugin": "^1.18.4"
+  },
+  "devDependencies": {
+    "@opencode-ai/plugin": "^1.18.4"
+  }
+}

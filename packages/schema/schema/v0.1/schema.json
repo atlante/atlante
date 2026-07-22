@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://atlante.sh/schema/v0.1/schema.json",
+  "title": "Atlante configuration document",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "const": "https://atlante.sh/schema/v0.1/schema.json"
+    },
+    "values": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[A-Za-z_$][A-Za-z0-9_$-]*$"
+      },
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "agents": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "promptTemplate": {
+            "type": "string",
+            "minLength": 1
+          },
+          "values": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "pattern": "^[A-Za-z_$][A-Za-z0-9_$-]*$"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": {}
+      }
+    }
+  },
+  "required": ["$schema", "agents"],
+  "additionalProperties": false
+}

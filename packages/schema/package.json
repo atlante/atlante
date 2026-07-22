@@ -1,0 +1,15 @@
+{
+  "name": "@atlante/schema",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema.json": "./schema/v0.1/schema.json"
+  },
+  "scripts": {
+    "generate": "bun scripts/generate.ts"
+  },
+  "dependencies": {
+    "zod": "^4.0.0"
+  }
+}

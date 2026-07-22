@@ -1,0 +1,13 @@
+{
+  "name": "@atlante/resolver",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@atlante/schema": "workspace:*",
+    "@atlante/templates": "workspace:*",
+    "@atlante/validator": "workspace:*"
+  }
+}

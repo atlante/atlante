@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.2.x"
+      - run: bun install --frozen-lockfile
+      - run: bunx biome ci .
+      - run: bun run typecheck
+      - run: bun test
+
+      # Every test above calls the command handlers as functions, so a broken
+      # shebang, a mis-wired Commander option, or an import that only fails at
+      # process start would pass the whole suite and still ship a CLI that does
+      # not run. This exercises the binary as a user does.
+      - name: CLI smoke test
+        run: |
+          set -euo pipefail
+          project="$(mktemp -d)"
+          cli="$PWD/packages/cli/bin/atlante.ts"
+
+          bun "$cli" init "$project" --preset code-review
+          test -f "$project/atlante.jsonc"
+          grep -q '@atlante/opencode-plugin' "$project/opencode.jsonc"
+
+          bun "$cli" validate "$project"
+          bun "$cli" resolve "$project" | tee /tmp/resolved.md
+          grep -q '# Workflow' /tmp/resolved.md
+          grep -q 'my-project' /tmp/resolved.md
+
+          # A broken configuration must fail loudly rather than exit 0.
+          printf '{"$schema":"https://atlante.sh/schema/v0.1/schema.json","agents":{"a":{"identity":"x"}}}' \
+            > "$project/atlante.jsonc"
+          if bun "$cli" validate "$project"; then
+            echo "validate exited 0 on an invalid configuration" >&2
+            exit 1
+          fi

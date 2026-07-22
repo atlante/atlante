@@ -1,0 +1,12 @@
+{
+  "$schema": "https://atlante.sh/schema/template/v0.1/schema.json",
+  "id": "test/greeting",
+  "description": "A greeting used by loader tests.",
+  "inputSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": { "name": { "type": "string" } },
+    "required": ["name"],
+    "additionalProperties": false
+  }
+}

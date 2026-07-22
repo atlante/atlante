@@ -21,13 +21,13 @@ Version 0.1 includes:
 - a composable, namespaced template system (`namespace/name`) with Markdown
   rendering and variable resolution;
 - a template protocol for prompt rendering and validation;
-- global values with per-agent overrides, injected into templates via
+- global values with per-agent overrides, resolved into prompt definitions via
   `{{values.x}}`;
 - host-agent bindings whose prompt inputs are defined by templates;
 - two-level validation (document structure + template input schema);
 - deterministic prompt resolution;
 - OpenCode prompt materialization;
-- starter template instances (`atlante init --template`).
+- bundled presets (`atlante init --preset`).
 
 Version 0.1 does not include:
 
@@ -36,7 +36,7 @@ Version 0.1 does not include:
 - rules or skills;
 - LLM inference or direct agent execution;
 - Atlante runtime tools;
-- template instance export, sharing, or remote registry.
+- preset export, sharing, or remote registry.
 
 The excluded runtime capabilities remain possible future extensions of the
 design and must not be implied by the version 0.1 schema.
@@ -83,12 +83,16 @@ code is not part of the configuration format.
 - **Template slot**: a property in a composable template's `inputSchema`
   declared as `{ "template": "namespace/name" }`, indicating that the slot
   expects the rendering of another template.
-- **Template instance**: a pre-configured root-level Atlante configuration
-  bundled as a starting point for new projects; `atlante.jsonc` is the default
-  form and `atlante.json` is also supported.
-- **Values**: a flat dictionary of project-wide values (`project`,
-  `constraints`, `language`) in the document root, injectable into templates via
-  `{{values.x}}`.
+- **Preset**: a pre-configured root-level Atlante configuration bundled as a
+  starting point for new projects; `atlante.jsonc` is the default form and
+  `atlante.json` is also supported. A preset carries a manifest declaring a
+  versioned `$schema` and a `namespace/name` `id`, so presets can later be
+  distributed by third parties on the same terms as templates. A preset is a
+  document, not a renderer, which is what distinguishes it from a **template**.
+- **Values**: a flat dictionary of project-wide string values (`project`,
+  `language`) in the document root, referenced from a prompt definition via
+  `{{values.x}}` and resolved into it before rendering. Values are never
+  passed to a template.
 - **Adapter**: the host-specific component that translates resolved Atlante
   artifacts into host configuration.
 
@@ -117,17 +121,17 @@ dictionary. Its top-level shape is:
 {
   "$schema": "https://atlante.sh/schema/v0.1/schema.json",
 
-  // Global values — resolved and injected into templates
+  // Global values — resolved into prompt definitions before rendering
   "values": {
     "project": "my-project",
-    "constraints": ["Constraint one."],
+    "language": "TypeScript",
   },
 
   // Agent bindings — host-agent-ID → prompt definition
   "agents": {
     "workflow-agent": {
       "values": {
-        "constraints": ["Workflow-agent-specific constraint."],
+        "scope": "Workflow-agent-specific constraint.",
       },
       // Prompt fields are defined by the selected template's inputSchema.
       "promptTemplate": "provider/template",
@@ -160,15 +164,13 @@ interpreting them. The schema document MUST identify itself with a versioned
 
 ### 4.2 Values
 
-`values` MUST be an object. Keys are value names; values MAY be strings, arrays
-of strings, or objects. Values are project-wide and are injected into templates
-via `{{values.key}}` variable resolution.
-
-Values are resolved before template rendering. The resolver MUST make all global
-values available to every template. An agent definition MAY contain a `values`
-object for local overrides. The resolver MUST merge local values over global
-values by key; a local value replaces the global value with the same key for
-that agent only. Objects are replaced as values and MUST NOT be deep-merged.
+`values` MUST be a flat dictionary whose values are strings. Value names MUST
+match `[A-Za-z_$][A-Za-z0-9_$-]*` and are referenced directly via
+`{{values.key}}`; value names do not represent nested paths. Values are
+project-wide and are resolved into prompt definitions via these references. An
+agent definition MAY contain a `values` object for local overrides. The resolver
+MUST merge local values over global values by key; a local value replaces the
+global value with the same key for that agent only.
 
 ### 4.3 Agent map
 
@@ -199,7 +201,7 @@ contract is divided across four layers:
 3. `@atlante/validator` applies structural checks on the document and semantic
    checks on templates, including reference validity and template input schema
    validation;
-4. `@atlante/schema-resolver` normalizes the document into a structured,
+4. `@atlante/resolver` normalizes the document into a structured,
    host-independent model, renders templates with resolved values, and produces
    artifact descriptors.
 
@@ -269,11 +271,27 @@ implementation concern as long as the composition semantics are preserved.
 
 ### 6.4 Variable resolution
 
-Templates receive resolved values from the document's global `values` dictionary
-and the agent's local `values` dictionary. The resolver MUST resolve all
-`{{values.key}}` references before rendering. Per-agent overrides take
-precedence over global values for that agent, using the key-by-key merge defined
-in §4.2.
+Values are resolved into the prompt definition before rendering, not exposed to
+templates. The resolver MUST merge global and per-agent values, then MUST
+replace every `{{values.key}}` reference appearing in the prompt definition with
+the resolved value, before the selected template is rendered. Per-agent
+overrides take precedence over global values for that agent, using the
+key-by-key merge defined in §4.2.
+
+A template MUST NOT receive the `values` dictionary. A template's input contract
+is its `inputSchema` and nothing else: because `values` is a free-form,
+user-authored dictionary whose keys the schema does not define, a template that
+read from it would produce output determined by data no schema can validate,
+defeating the two-level validation model of §8 and allowing a template to depend
+silently on undocumented conventions in a user's document.
+
+Replacement MUST substitute, MUST NOT evaluate. Only `{{values.key}}`
+references are replaced; all other content in the prompt definition, including
+text that resembles other template syntax, MUST be preserved verbatim and MUST
+NOT cause an error. A values-like construct with an unsupported key syntax, or a
+`{{values.key}}` reference whose key is not present in the merged values, is
+invalid and MUST be diagnosed before rendering. This constraint does not apply
+to a template's own renderer source, which is a genuine template.
 
 ### 6.5 Agent prompt rendering
 
@@ -363,12 +381,14 @@ commands, or arbitrary project code.
 
 The resolver MUST:
 
-1. validate the document (structural + template-level);
+1. operate only on a document that has already passed structural validation,
+   and perform template-level validation itself, refusing to render when either
+   level reports an error;
 2. resolve global `values` and per-agent overrides;
 3. load the selected template for each agent binding, using the configured
    default when `promptTemplate` is omitted;
-4. render each bound prompt using the resolved template, injecting resolved
-   values;
+4. substitute resolved `{{values.x}}` references into the prompt definition,
+   then render it with the selected template;
 5. produce one agent artifact descriptor per binding;
 6. preserve host-agent IDs in every descriptor.
 
@@ -398,11 +418,21 @@ The v1 implementation SHOULD preserve these package responsibilities:
 - `@atlante/validator`: document structural validation (references, required
   fields, types) and template-level validation (manifest correctness, input
   schema compliance, composition acyclicity);
-- `@atlante/schema-resolver`: normalization, template composition, value
+- `@atlante/resolver`: normalization, template composition, value
   resolution, and host-independent artifact descriptors;
+- `@atlante/presets`: versioned preset-manifest schema; preset loading and the
+  bundled presets themselves;
 - `@atlante/opencode-plugin`: OpenCode materialization and future runtime;
 - `@atlante/cli`: validation, resolution, materialization, and
-  `atlante init --template` entry points.
+  `atlante init --preset` entry points.
+
+`@atlante/templates` and `@atlante/presets` are the two content packages and
+MUST remain leaves of the dependency graph: neither depends on any other Atlante
+package. `@atlante/presets` therefore loads and exposes presets but MUST NOT
+validate them — a preset is an Atlante document, so validating it belongs to the
+validator and to whoever consumes the preset. Keeping both content packages
+dependency-free is what allows third parties to distribute templates and presets
+without depending on the core.
 
 An adapter MUST receive resolved descriptors and MUST NOT contain a separate
 execution branch for each renderer.
@@ -410,28 +440,28 @@ execution branch for each renderer.
 ## 11. OpenCode Adapter Profile
 
 The OpenCode adapter is the first host integration. Version 0.1 defines its
-prompt materialization responsibilities and starter template support. Runtime
+prompt materialization responsibilities and preset support. Runtime
 execution and state management are outside this specification.
 
 The adapter MUST treat the Atlante configuration as the only source of truth for
 prompts. Users SHOULD not maintain a competing prompt in OpenCode agent
 configuration.
 
-### 11.1 Starter template instances
+### 11.1 Presets
 
-`atlante init --template <name>` scaffolds a project with a pre-configured
-`atlante.jsonc` from a bundled template instance. Version 0.1 MUST include at
-least one starter instance. Instance names and contents are implementation
+`atlante init --preset <name>` scaffolds a project with a pre-configured
+`atlante.jsonc` from a bundled preset. Version 0.1 MUST include at
+least one preset. Preset names and contents are implementation
 concerns and are not defined by this specification.
 
-A template instance is a valid root-level Atlante configuration bundled with
+A preset is a valid root-level Atlante configuration bundled with
 optional metadata (name, description, version). The default serialized form is
 `atlante.jsonc`; `atlante.json` is also valid. The validator MUST validate
-template instances against the same schema and template constraints as
-user-authored configurations. Template instances MUST use only templates
+presets against the same schema and template constraints as
+user-authored configurations. Presets MUST use only templates
 distributed with the selected template package and MUST be self-contained.
 
-The `atlante init` command without `--template` SHOULD generate a minimal
+The `atlante init` command without `--preset` SHOULD generate a minimal
 default configuration.
 
 ## 12. Compatibility and Evolution
@@ -472,7 +502,7 @@ Future versions MAY add:
 - user-defined prompt templates and third-party template authoring;
 - prompt extension namespaces;
 - runtime tools and state;
-- template instance export, sharing, and remote registry;
+- preset export, sharing, and remote registry;
 - rules and skills.
 
 These additions MUST preserve the distinction between Atlante-owned prompt
@@ -485,11 +515,11 @@ Version 0.1 is complete when a conforming implementation can:
 1. validate minimal `atlante.jsonc` and `atlante.json` documents;
 2. reject missing references and invalid template references;
 3. validate template manifests and their input schemas;
-4. resolve global values and per-agent overrides into templates;
+4. resolve global values and per-agent overrides into prompt definitions;
 5. render a deterministic prompt from structured agent values using the selected
    template;
 6. create a missing OpenCode agent with host defaults;
 7. replace an existing agent prompt while preserving host-owned fields;
 8. report a warning when a non-empty host prompt is replaced;
-9. scaffold a project from a bundled template instance via
-   `atlante init --template`.
+9. scaffold a project from a bundled preset via
+   `atlante init --preset`.

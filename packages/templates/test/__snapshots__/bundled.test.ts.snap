@@ -1,0 +1,39 @@
+// Bun Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`bundled templates render a full agent prompt 1`] = `
+"# Identity
+
+You are a code reviewer.
+
+# Mission
+
+Find defects before they merge.
+
+# Responsibilities
+
+- Read the diff.
+- Report findings.
+
+# Constraints
+
+- Never edit files.
+
+# Workflow
+
+Follow these steps in order.
+
+- Read the diff.
+- Report findings.
+"
+`;
+
+exports[`bundled templates render a minimal agent prompt without optional sections 1`] = `
+"# Identity
+
+You are an assistant.
+
+# Mission
+
+Help.
+"
+`;

@@ -1,0 +1,5 @@
+{
+  "$schema": "https://atlante.sh/schema/preset/v0.1/schema.json",
+  "id": "atlante/code-review",
+  "description": "A reviewer agent with an explicit review workflow."
+}
