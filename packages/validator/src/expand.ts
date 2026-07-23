@@ -104,8 +104,6 @@ function deepMerge(
   return result;
 }
 
-
-
 /**
  * Recursively expands extends chains for the document level.
  */

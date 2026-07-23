@@ -153,10 +153,7 @@ export function loadCliResources(target: string): LoadedCliResources {
   }
 
   const presetLoader = createBundledPresetLoader();
-  const expanded = expandDocument(
-    parsed.overlay,
-    presetLoader,
-  );
+  const expanded = expandDocument(parsed.overlay, presetLoader);
   return {
     document: expanded.document,
     path: config.path,

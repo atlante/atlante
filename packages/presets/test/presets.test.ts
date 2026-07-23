@@ -28,9 +28,7 @@ afterEach(() => {
 
 describe("bundled presets", () => {
   test("lists the bundled presets", () => {
-    expect(listPresets().presets.map(presetName).sort()).toEqual([
-      "starter",
-    ]);
+    expect(listPresets().presets.map(presetName).sort()).toEqual(["starter"]);
   });
 
   test("every manifest declares the versioned schema and a namespaced id", () => {
