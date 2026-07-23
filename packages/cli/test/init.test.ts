@@ -61,7 +61,8 @@ describe("runInit", () => {
     const dir = tempDir();
     expect(await runInit(dir, { preset: "code-review" })).toBe(0);
     const text = readFileSync(join(dir, "atlante.jsonc"), "utf8");
-    expect(text).toContain("Find defects");
+    expect(text).toContain("atlante/code-review");
+    expect(text).toContain("extends");
     expect(await runValidate(dir)).toBe(0);
   });
 

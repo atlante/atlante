@@ -89,3 +89,13 @@ export const valuesMapSchema = safeRecord(
 
 export type Value = z.infer<typeof valueSchema>;
 export type ValuesMap = z.infer<typeof valuesMapSchema>;
+
+/**
+ * Overlay values map — allows `null` for tombstoning inherited values.
+ * Expanded into a canonical ValuesMap by stripping null entries during merge.
+ */
+export const valuesMapOverlaySchema = safeRecord(
+  z.string().regex(VALUE_KEY_PATTERN),
+  z.union([z.string(), z.null()]),
+);
+export type ValuesMapOverlay = z.infer<typeof valuesMapOverlaySchema>;

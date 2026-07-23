@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ValuesMapOverlay } from "./values.ts";
 import { safeRecord, valuesMapSchema } from "./values.ts";
 
 export const SCHEMA_URI = "https://atlante.sh/schema/v0.1/schema.json";
@@ -49,6 +50,7 @@ export const agentBindingSchema = z
     return output as AgentBindingOutput;
   });
 
+/** Canonical document — after expansion, no `extends` or tombstone `null`s. */
 export const atlanteDocumentSchema = z.strictObject({
   $schema: z.literal(SCHEMA_URI),
   values: valuesMapSchema.optional(),
@@ -58,3 +60,27 @@ export const atlanteDocumentSchema = z.strictObject({
 export type AgentBinding = z.infer<typeof agentBindingSchema>;
 
 export type AtlanteDocument = z.infer<typeof atlanteDocumentSchema>;
+
+// ---------------------------------------------------------------------------
+// Overlay types — used during expansion before canonical validation
+// ---------------------------------------------------------------------------
+
+/** An agent binding in an overlay document: allows `extends` and `null` tombstones. */
+export type AgentBindingOverlay = {
+  promptTemplate?: string | null;
+  values?: ValuesMapOverlay;
+  extends?: string;
+  [key: string]: unknown;
+};
+
+/** Agents map in an overlay document: values can be `null` (tombstone). */
+export type AgentsOverlay = Record<string, AgentBindingOverlay | null>;
+
+/** Raw overlay document before expansion: allows `extends` and tombstone `null`s.
+ * `agents` is optional — it can be inherited from a preset. */
+export type AtlanteDocumentOverlay = {
+  $schema: string;
+  extends?: string;
+  values?: ValuesMapOverlay;
+  agents?: AgentsOverlay;
+};

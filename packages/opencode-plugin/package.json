@@ -6,6 +6,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@atlante/presets": "workspace:*",
     "@atlante/resolver": "workspace:*",
     "@atlante/templates": "workspace:*",
     "@atlante/validator": "workspace:*"

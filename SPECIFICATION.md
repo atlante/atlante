@@ -89,6 +89,12 @@ code is not part of the configuration format.
   versioned `$schema` and a `namespace/name` `id`, so presets can later be
   distributed by third parties on the same terms as templates. A preset is a
   document, not a renderer, which is what distinguishes it from a **template**.
+- **Extends**: an optional field at the document or agent level that references
+  a preset by its `namespace/name` id. When present, the referenced preset's
+  configuration is loaded, expanded recursively, and merged with the local
+  configuration using JSON Merge Patch semantics. The local layer always takes
+  precedence. `extends` is consumed during expansion and never reaches the
+  resolved document or rendered prompt.
 - **Values**: a flat dictionary of project-wide string values (`project`,
   `language`) in the document root, referenced from a prompt definition via
   `{{values.x}}` and resolved into it before rendering. Values are never
@@ -447,22 +453,76 @@ The adapter MUST treat the Atlante configuration as the only source of truth for
 prompts. Users SHOULD not maintain a competing prompt in OpenCode agent
 configuration.
 
-### 11.1 Presets
+### 11.1 Preset inheritance
 
-`atlante init --preset <name>` scaffolds a project with a pre-configured
-`atlante.jsonc` from a bundled preset. Version 0.1 MUST include at
-least one preset. Preset names and contents are implementation
-concerns and are not defined by this specification.
+`atlante init` scaffolds a project configuration that extends a bundled preset
+via the `extends` field. The generated configuration is minimal — it carries
+only the document `$schema`, the `extends` reference, and overrides for
+project-specific values.
 
-A preset is a valid root-level Atlante configuration bundled with
-optional metadata (name, description, version). The default serialized form is
-`atlante.jsonc`; `atlante.json` is also valid. The validator MUST validate
-presets against the same schema and template constraints as
-user-authored configurations. Presets MUST use only templates
-distributed with the selected template package and MUST be self-contained.
+```jsonc
+{
+  "$schema": "https://atlante.sh/schema/v0.1/schema.json",
+  "extends": "atlante/starter",
+  "values": {
+    "project": "my-project"
+  }
+}
+```
 
-The `atlante init` command without `--preset` SHOULD generate a minimal
-default configuration.
+`atlante init --preset <name>` generates a configuration extending the named
+preset. The `extends` field names a preset by its full `namespace/name` id.
+
+#### Override semantics
+
+Preset inheritance uses JSON Merge Patch semantics with the local layer always
+taking precedence:
+
+- An absent property preserves the inherited value.
+- Scalars replace inherited values.
+- Objects merge recursively by key.
+- Arrays replace inherited arrays completely.
+- `values` merge by key; agent-local values override document-level values.
+- `agents` merge by agent ID; new IDs are added and existing IDs are
+  recursively overridden.
+- `null` removes an inherited property, value entry, or agent binding.
+  Tombstones are consumed during expansion and MUST NOT reach the canonical
+  resolved document.
+- `extends` is consumed during expansion and MUST NOT be passed to a prompt
+  template.
+- A local override MUST NOT switch the `promptTemplate` of an inherited agent
+  binding.
+
+#### Validation and resolution
+
+The implementation MUST apply one shared expansion path before validation and
+resolution:
+
+1. Parse the local document as an overlay that may contain `extends` and
+   tombstone `null` values.
+2. Load and recursively expand referenced presets, detecting inheritance cycles.
+3. Merge inherited and local layers according to the override semantics above.
+4. Produce a canonical document without `extends` or tombstones.
+5. Run the existing document, value, composition, and template-input validation
+   against that canonical document.
+6. Resolve and render exactly as for a non-inherited configuration.
+
+Diagnostics MUST identify the local JSON Pointer and preset chain for at least:
+
+- unknown preset IDs;
+- a document preset used as an agent preset or vice versa;
+- an agent preset used with an incompatible template;
+- inheritance cycles;
+- depth limits exceeded.
+
+The validator package MUST NOT depend directly on bundled presets. A preset
+loader or registry MUST be injected so that CLI and host adapters can provide
+built-in or, later, plugin-contributed presets through the same path.
+
+Version 0.1 MUST include the `atlante/starter` preset as the default
+initialization target. The starter preset MUST provide at least a guide
+agent and a build agent. Specialized presets such as `atlante/code-review`
+MAY remain available as alternatives.
 
 ## 12. Compatibility and Evolution
 

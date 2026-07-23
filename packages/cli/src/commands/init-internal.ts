@@ -42,18 +42,13 @@ function bareConfig(projectName: string): string {
   return `{
   "$schema": "${SCHEMA_URI}",
 
-  // Project-wide values. Reference them from any string below as {{values.x}};
-  // the resolver substitutes them before the template is rendered.
+  // Extend the bundled starter preset. You can override any value or agent
+  // below; your local configuration takes precedence over the inherited one.
+  "extends": "atlante/starter",
+
+  // Override project-wide values from the preset.
   "values": {
     "project": ${JSON.stringify(projectName)},
-  },
-
-  // Each key is a host-agent ID owned by the harness.
-  "agents": {
-    "build": {
-      "identity": "You are a software engineer working on {{values.project}}.",
-      "mission": "Implement changes the user asks for, and nothing more.",
-    },
   },
 }
 `;
@@ -246,21 +241,36 @@ export async function runInitWithDependencies(
 
     let contents: string;
     if (options.preset) {
-      const preset = readPreset(options.preset);
-      if (!preset) {
-        const { presets, errors } = listPresets();
-        for (const loadError of errors) {
-          console.error(
-            `warning: ${loadError.directory}: ${loadError.message}`,
-          );
-        }
+      const { presets, errors } = listPresets();
+      for (const loadError of errors) {
+        console.error(`warning: ${loadError.directory}: ${loadError.message}`);
+      }
+      const manifest = presets.find((m) => presetName(m) === options.preset);
+      if (!manifest) {
         const known = presets.map(presetName).join(", ");
         console.error(
           `error: unknown preset "${options.preset}"; available: ${known}`,
         );
         return 1;
       }
-      contents = preset;
+      // Verify the preset document actually exists.
+      const name = presetName(manifest);
+      if (!readPreset(name)) {
+        console.error(
+          `error: preset "${manifest.id}" manifest found but document is missing or unreadable`,
+        );
+        return 1;
+      }
+      // Generate a minimal config that extends the selected preset.
+      contents = JSON.stringify(
+        {
+          $schema: SCHEMA_URI,
+          extends: manifest.id,
+          values: { project: basename(directory) },
+        },
+        null,
+        2,
+      );
     } else {
       contents = bareConfig(basename(directory));
     }
