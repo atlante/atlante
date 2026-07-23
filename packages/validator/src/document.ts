@@ -13,10 +13,12 @@ function positionOf(text: string, offset: number) {
   return { line: lines.length, column: (lines.at(-1)?.length ?? 0) + 1 };
 }
 
-export function validateDocumentText(
+/** Shared filename validation + JSON parse pipeline used by both
+ *  validateDocumentText and parseDocumentOverlay. */
+function parseConfigSource(
   text: string,
   sourcePath: string,
-): { document?: AtlanteDocument; diagnostics: Diagnostic[] } {
+): { raw?: unknown; diagnostics: Diagnostic[] } {
   const filename = basename(sourcePath);
   const isJson = filename === "atlante.json";
   const isJsonc = filename === "atlante.jsonc";
@@ -52,7 +54,15 @@ export function validateDocumentText(
     };
   }
 
-  const raw = getNodeValue(tree) as unknown;
+  return { raw: getNodeValue(tree) as unknown, diagnostics: [] };
+}
+
+export function validateDocumentText(
+  text: string,
+  sourcePath: string,
+): { document?: AtlanteDocument; diagnostics: Diagnostic[] } {
+  const { raw, diagnostics } = parseConfigSource(text, sourcePath);
+  if (!raw) return { diagnostics };
   return validateParsedDocument(raw, sourcePath);
 }
 
@@ -99,45 +109,68 @@ export function parseDocumentOverlay(
   overlay: AtlanteDocumentOverlay | undefined;
   diagnostics: Diagnostic[];
 } {
-  const filename = basename(sourcePath);
-  const isJson = filename === "atlante.json";
-  const isJsonc = filename === "atlante.jsonc";
-  if (
-    (filename.endsWith(".json") || filename.endsWith(".jsonc")) &&
-    !isJson &&
-    !isJsonc
-  ) {
-    return {
-      overlay: undefined,
-      diagnostics: [
-        error(
-          "invalid-config-filename",
-          `${sourcePath}: configuration files must be named atlante.json or atlante.jsonc`,
-        ),
-      ],
-    };
-  }
-
-  const parseErrors: ParseError[] = [];
-  const tree = parseTree(text, parseErrors, {
-    allowTrailingComma: !isJson,
-    disallowComments: isJson,
-  });
-
-  if (parseErrors.length > 0 || !tree) {
-    const first = parseErrors[0];
-    return {
-      overlay: undefined,
-      diagnostics: [
-        error("invalid-json", `${sourcePath}: malformed JSON`, {
-          location: first ? positionOf(text, first.offset) : undefined,
-        }),
-      ],
-    };
-  }
-
-  const raw = getNodeValue(tree) as unknown;
+  const { raw, diagnostics } = parseConfigSource(text, sourcePath);
+  if (!raw) return { overlay: undefined, diagnostics };
   return parseOverlay(raw, sourcePath);
+}
+
+function parseOverlayValues(rawValues: unknown): Record<string, string | null> {
+  const values: Record<string, string | null> = Object.create(null);
+  if (
+    typeof rawValues !== "object" ||
+    rawValues === null ||
+    Array.isArray(rawValues)
+  ) {
+    return values;
+  }
+
+  for (const [key, value] of Object.entries(
+    rawValues as Record<string, unknown>,
+  )) {
+    if (value === null || typeof value === "string") {
+      values[key] = value;
+    }
+  }
+  return values;
+}
+
+function parseOverlayAgent(binding: unknown): Record<string, unknown> | null {
+  if (binding === null) return null;
+
+  if (
+    typeof binding !== "object" ||
+    Array.isArray(binding) ||
+    binding === null
+  ) {
+    return undefined as unknown as Record<string, unknown>; // caller filters undefined
+  }
+
+  const agentBinding = binding as Record<string, unknown>;
+  const agentValues: Record<string, string | null> = {};
+
+  if (
+    agentBinding.values !== undefined &&
+    typeof agentBinding.values === "object" &&
+    agentBinding.values !== null &&
+    !Array.isArray(agentBinding.values)
+  ) {
+    for (const [key, value] of Object.entries(
+      agentBinding.values as Record<string, unknown>,
+    )) {
+      if (value === null || typeof value === "string") {
+        agentValues[key] = value;
+      }
+    }
+  }
+
+  const base: Record<string, unknown> = { ...agentBinding };
+  if (Object.keys(agentValues).length > 0) {
+    base.values = agentValues;
+  } else if (!Object.hasOwn(agentBinding, "values")) {
+    delete base.values;
+  }
+
+  return base;
 }
 
 function parseOverlay(
@@ -177,25 +210,7 @@ function parseOverlay(
       ? obj.extends
       : undefined;
 
-  const values: Record<string, string | null> = Object.create(null);
-  if (obj.values !== undefined) {
-    if (
-      typeof obj.values !== "object" ||
-      obj.values === null ||
-      Array.isArray(obj.values)
-    ) {
-      // Diagnose but continue — expansion can handle missing values.
-    } else {
-      for (const [key, value] of Object.entries(
-        obj.values as Record<string, unknown>,
-      )) {
-        if (value === null || typeof value === "string") {
-          values[key] = value;
-        }
-        // Non-string, non-null values are ignored; canonical validation catches them.
-      }
-    }
-  }
+  const values = parseOverlayValues(obj.values);
 
   const agents: Record<string, Record<string, unknown> | null> =
     Object.create(null);
@@ -220,39 +235,10 @@ function parseOverlay(
     for (const [agentId, binding] of Object.entries(
       obj.agents as Record<string, unknown>,
     )) {
-      if (binding === null) {
-        agents[agentId] = null;
-      } else if (typeof binding === "object" && !Array.isArray(binding)) {
-        const agentBinding = binding as Record<string, unknown>;
-
-        const agentValues: Record<string, string | null> = {};
-        if (
-          agentBinding.values !== undefined &&
-          typeof agentBinding.values === "object" &&
-          agentBinding.values !== null &&
-          !Array.isArray(agentBinding.values)
-        ) {
-          for (const [key, value] of Object.entries(
-            agentBinding.values as Record<string, unknown>,
-          )) {
-            if (value === null || typeof value === "string") {
-              agentValues[key] = value;
-            }
-          }
-        }
-
-        const base: Record<string, unknown> = { ...agentBinding };
-
-        // Only include `values` when the raw binding had one or we found values.
-        if (Object.keys(agentValues).length > 0) {
-          base.values = agentValues;
-        } else if (!Object.hasOwn(agentBinding, "values")) {
-          delete base.values;
-        }
-
-        agents[agentId] = base;
+      const parsed = parseOverlayAgent(binding);
+      if (parsed !== undefined) {
+        agents[agentId] = parsed;
       }
-      // Non-object, non-null values are ignored; canonical validation catches them.
     }
   }
 

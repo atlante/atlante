@@ -6,6 +6,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@atlante/presets": "workspace:*",
     "@atlante/schema": "workspace:*",
     "@atlante/templates": "workspace:*",
     "ajv": "^8.17.1",

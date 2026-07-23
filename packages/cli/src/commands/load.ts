@@ -1,15 +1,14 @@
-import { listPresets, presetName, readPreset } from "@atlante/presets";
 import type { AtlanteDocument } from "@atlante/schema";
 import {
   loadBundledTemplates,
   type TemplateRegistry,
 } from "@atlante/templates";
-import type { PresetLoader } from "@atlante/validator";
 import {
+  createBundledPresetLoader,
   type Diagnostic,
-  error,
   expandDocument,
   findConfigFile,
+  hasAnyExtends,
   loadDocument,
   parseDocumentOverlay,
   templateLoadDiagnostics,
@@ -21,62 +20,6 @@ export type LoadedCliResources = {
   registry?: TemplateRegistry;
   diagnostics: Diagnostic[];
 };
-
-/**
- * Creates a PresetLoader backed by the bundled @atlante/presets.
- * Enforces that the requested preset ID matches the manifest ID.
- */
-function createBundledPresetLoader(): PresetLoader {
-  return {
-    load(id: string) {
-      const { presets, errors } = listPresets();
-      const manifest = presets.find((m) => m.id === id);
-      if (!manifest) {
-        const known = presets.map((m) => m.id).join(", ");
-        const diags = errors.map((e) =>
-          error("preset-load-error", `${e.directory}: ${e.message}`),
-        );
-        return {
-          document: undefined,
-          diagnostics: [
-            error(
-              "unknown-preset",
-              `preset "${id}" not found${known ? `; available: ${known}` : ""}`,
-            ),
-            ...diags,
-          ],
-        };
-      }
-
-      const name = presetName(manifest);
-      const source = readPreset(name);
-      if (!source) {
-        return {
-          document: undefined,
-          diagnostics: [
-            error(
-              "preset-load-error",
-              `preset "${id}": manifest found but document is missing or unreadable`,
-            ),
-          ],
-        };
-      }
-
-      const { overlay, diagnostics } = parseDocumentOverlay(
-        source,
-        `preset:${id}`,
-      );
-      return { document: overlay, diagnostics };
-    },
-  };
-}
-
-/**
- * Checks whether an overlay document uses `extends`, which requires the expansion path.
- */
-function hasAnyExtends(overlay: { extends?: string }): boolean {
-  return !!overlay.extends;
-}
 
 /**
  * Loads the user document, expands preset inheritance, and loads bundled

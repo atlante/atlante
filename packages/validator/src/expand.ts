@@ -9,7 +9,7 @@ import { atlanteDocumentSchema } from "@atlante/schema";
 import type { Diagnostic } from "./diagnostic.ts";
 import { error, escapeJsonPointerSegment } from "./diagnostic.ts";
 
-export const MAX_PRESET_DEPTH = 32;
+const MAX_PRESET_DEPTH = 32;
 
 /** @atlante/validator does not depend on @atlante/presets. */
 export interface PresetLoader {

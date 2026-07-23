@@ -6,7 +6,11 @@ export {
   hasErrors,
   warning,
 } from "./diagnostic.ts";
-export { CONFIG_FILENAMES, discoverConfigPath, findConfigFile } from "./discover.ts";
+export {
+  CONFIG_FILENAMES,
+  discoverConfigPath,
+  findConfigFile,
+} from "./discover.ts";
 export {
   loadDocument,
   parseDocumentOverlay,
@@ -15,6 +19,10 @@ export {
 export type { PresetLoader } from "./expand.ts";
 export { expandDocument } from "./expand.ts";
 export { templateLoadDiagnostics } from "./loader-diagnostics.ts";
+export {
+  createBundledPresetLoader,
+  hasAnyExtends,
+} from "./preset-loader.ts";
 export {
   expandInputSchema,
   promptInputOf,
