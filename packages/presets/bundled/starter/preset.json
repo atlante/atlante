@@ -1,0 +1,5 @@
+{
+  "$schema": "https://atlante.sh/schema/preset/v0.1/schema.json",
+  "id": "atlante/starter",
+  "description": "A base Atlante configuration with guide and build agents."
+}

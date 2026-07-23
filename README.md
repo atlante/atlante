@@ -26,7 +26,7 @@ host tool, not the agent itself, but the declarative layer in between.
 
 ```bash
 bun install
-bun packages/cli/bin/atlante.ts init --preset code-review
+bun packages/cli/bin/atlante.ts init
 bun packages/cli/bin/atlante.ts validate
 bun packages/cli/bin/atlante.ts resolve
 ```
@@ -105,8 +105,16 @@ metadata; every other key is prompt input, owned by the selected template's
 
 ### How values reach a prompt
 
-Only through `{{values.x}}` references written in the document's own strings, as
-above. Templates never receive the values dictionary: a template's entire input
+Values flow through two layers:
+
+1. **System values** (`{{sys.cwd.basename}}`): preset defaults that resolve at
+   runtime (here, to the project directory name). System values are resolved
+   before user overrides are merged, so a user-provided value always wins.
+2. **Document values** (`{{values.project}}`): written by you in
+   `atlante.jsonc`, or inherited from a preset via `extends`. These are
+   substituted into the prompt definition before template rendering.
+
+Templates never receive the values dictionary: a template's entire input
 contract is its `inputSchema`, so it cannot depend on keys that no schema
 defines. The resolver substitutes references into the prompt definition before
 the template renders.
@@ -166,13 +174,17 @@ A preset is a pre-filled `atlante.jsonc` to start from. A preset is a
 *document*; a template is a *renderer*. Presets are validated by exactly the
 same validators as user-authored configurations, so a broken preset cannot ship.
 
-- **`code-review`** — a reviewer agent with an explicit review workflow
+- **`starter`** — a guide agent and a build agent, the default for `init`
 
-Run `atlante init` without `--preset` to scaffold a bare configuration instead.
+Presets use `{{sys.cwd.basename}}` for their `project` value so you get a
+sensible default without writing a `values` block. Add your own
+`"values": { "project": "my-app" }` when you want to override it.
+
+Run `atlante init` to scaffold from the `starter` preset.
 
 ## CLI
 
-- `atlante init [path] [--preset <name>] [--force]` — scaffold `atlante.jsonc`
+- `atlante init [path] [--preset starter] [--force]` — scaffold `atlante.jsonc`
   and register the OpenCode plugin
 - `atlante validate [path]` — validate the document and every referenced
   template's input schema, without rendering
@@ -207,7 +219,7 @@ templates and presets without pulling in the core.
 - Two-level validation: document structure, then template input schemas
 - Deterministic prompt resolution
 - OpenCode adapter for prompt materialization
-- Bundled presets via `atlante init --preset`
+- Bundled `starter` preset via `atlante init`
 
 **Does not include:**
 

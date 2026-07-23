@@ -28,14 +28,14 @@ jobs:
           project="$(mktemp -d)"
           cli="$PWD/packages/cli/bin/atlante.ts"
 
-          bun "$cli" init "$project" --preset code-review
+          bun "$cli" init "$project"
           test -f "$project/atlante.jsonc"
           grep -q '@atlante/opencode-plugin' "$project/opencode.jsonc"
 
           bun "$cli" validate "$project"
           bun "$cli" resolve "$project" | tee /tmp/resolved.md
           grep -q '# Workflow' /tmp/resolved.md
-          grep -q 'my-project' /tmp/resolved.md
+          grep -q 'Do not change code that is not related to the task' /tmp/resolved.md
 
           # A broken configuration must fail loudly rather than exit 0.
           printf '{"$schema":"https://atlante.sh/schema/v0.1/schema.json","agents":{"a":{"identity":"x"}}}' \

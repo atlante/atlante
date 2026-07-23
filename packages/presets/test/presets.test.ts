@@ -27,8 +27,8 @@ afterEach(() => {
 });
 
 describe("bundled presets", () => {
-  test("lists code-review", () => {
-    expect(listPresets().presets.map(presetName)).toEqual(["code-review"]);
+  test("lists the bundled presets", () => {
+    expect(listPresets().presets.map(presetName).sort()).toEqual(["starter"]);
   });
 
   test("every manifest declares the versioned schema and a namespaced id", () => {
@@ -60,7 +60,7 @@ describe("bundled presets", () => {
   });
 
   test("reads a preset's document source", () => {
-    expect(readPreset("code-review")).toContain("$schema");
+    expect(readPreset("starter")).toContain("$schema");
   });
 
   test("returns undefined for an unknown preset", () => {

@@ -8,7 +8,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, join } from "node:path";
+import { join } from "node:path";
 import {
   type InitDependencies,
   runInitWithDependencies,
@@ -57,11 +57,12 @@ describe("runInit", () => {
     expect(text).not.toContain("workflow");
   });
 
-  test("scaffolds the code-review preset", async () => {
+  test("--preset starter is an alias for the default", async () => {
     const dir = tempDir();
-    expect(await runInit(dir, { preset: "code-review" })).toBe(0);
+    expect(await runInit(dir, { preset: "starter" })).toBe(0);
     const text = readFileSync(join(dir, "atlante.jsonc"), "utf8");
-    expect(text).toContain("Find defects");
+    expect(text).toContain("atlante/starter");
+    expect(text).toContain("extends");
     expect(await runValidate(dir)).toBe(0);
   });
 
@@ -329,7 +330,7 @@ describe("runInit", () => {
     const contents = readFileSync(target, "utf8");
     expect(contents).not.toBe("altered contents");
     expect(contents).toContain('"$schema"');
-    expect(contents).toContain(`"${basename(dir)}"`);
+    expect(contents).toContain('"extends"');
   });
 
   test("refuses to overwrite an existing config without --force", async () => {

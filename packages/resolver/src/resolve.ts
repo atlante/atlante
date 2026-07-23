@@ -4,6 +4,7 @@ import {
   interpolateValues,
   MissingValueError,
   renderTemplate,
+  resolveSystemValues,
 } from "@atlante/templates";
 import type { Diagnostic } from "@atlante/validator";
 import {
@@ -50,8 +51,9 @@ export function resolve(
     const templateId = binding.promptTemplate ?? DEFAULT_TEMPLATE_ID;
     try {
       const values = mergeValues(document.values, binding.values);
+      const resolvedValues = resolveSystemValues(values);
       // §6.4 and §7: resolve every {{values.x}} reference before rendering.
-      const input = interpolateValues(promptInputOf(binding), values);
+      const input = interpolateValues(promptInputOf(binding), resolvedValues);
 
       agents.push({
         hostAgentId,

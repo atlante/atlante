@@ -15,7 +15,14 @@
         "pattern": "^[A-Za-z_$][A-Za-z0-9_$-]*$"
       },
       "additionalProperties": {
-        "type": "string"
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
       }
     },
     "agents": {
@@ -25,25 +32,47 @@
         "minLength": 1
       },
       "additionalProperties": {
-        "type": "object",
-        "properties": {
-          "promptTemplate": {
-            "type": "string",
-            "minLength": 1
-          },
-          "values": {
+        "oneOf": [
+          {
             "type": "object",
-            "propertyNames": {
-              "type": "string",
-              "pattern": "^[A-Za-z_$][A-Za-z0-9_$-]*$"
+            "properties": {
+              "promptTemplate": {
+                "type": "string",
+                "minLength": 1
+              },
+              "values": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_$][A-Za-z0-9_$-]*$"
+                },
+                "additionalProperties": {
+                  "oneOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "extends": {
+                "type": "string",
+                "minLength": 1
+              }
             },
-            "additionalProperties": {
-              "type": "string"
-            }
+            "additionalProperties": {}
+          },
+          {
+            "type": "null"
           }
-        },
-        "additionalProperties": {}
+        ]
       }
+    },
+    "extends": {
+      "type": "string",
+      "minLength": 1
     }
   },
   "required": ["$schema", "agents"],

@@ -1,6 +1,5 @@
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
-import { basename, join } from "node:path";
-import { listPresets, presetName, readPreset } from "@atlante/presets";
+import { join } from "node:path";
 import { SCHEMA_URI } from "@atlante/schema";
 import {
   applyEdits,
@@ -38,23 +37,13 @@ type PluginPlan = {
   registered: boolean;
 };
 
-function bareConfig(projectName: string): string {
+function bareConfig(): string {
   return `{
   "$schema": "${SCHEMA_URI}",
 
-  // Project-wide values. Reference them from any string below as {{values.x}};
-  // the resolver substitutes them before the template is rendered.
-  "values": {
-    "project": ${JSON.stringify(projectName)},
-  },
-
-  // Each key is a host-agent ID owned by the harness.
-  "agents": {
-    "build": {
-      "identity": "You are a software engineer working on {{values.project}}.",
-      "mission": "Implement changes the user asks for, and nothing more.",
-    },
-  },
+  // Extend the bundled starter preset. You can override any value or agent
+  // below; your local configuration takes precedence over the inherited one.
+  "extends": "atlante/starter",
 }
 `;
 }
@@ -244,26 +233,13 @@ export async function runInitWithDependencies(
       return 1;
     }
 
-    let contents: string;
-    if (options.preset) {
-      const preset = readPreset(options.preset);
-      if (!preset) {
-        const { presets, errors } = listPresets();
-        for (const loadError of errors) {
-          console.error(
-            `warning: ${loadError.directory}: ${loadError.message}`,
-          );
-        }
-        const known = presets.map(presetName).join(", ");
-        console.error(
-          `error: unknown preset "${options.preset}"; available: ${known}`,
-        );
-        return 1;
-      }
-      contents = preset;
-    } else {
-      contents = bareConfig(basename(directory));
+    if (options.preset && options.preset !== "starter") {
+      console.error(
+        `error: unknown preset "${options.preset}"; only "starter" is available`,
+      );
+      return 1;
     }
+    const contents = bareConfig();
 
     const before = {
       target: snapshot(target, fileSystem),

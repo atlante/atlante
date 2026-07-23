@@ -27,6 +27,11 @@ export {
   slotPartialName,
   ValueReferenceCollisionError,
 } from "./renderer.ts";
+export {
+  resolveSystemValues,
+  SYSTEM_RESOLVERS,
+  UnknownSystemVariableError,
+} from "./system-values.ts";
 export type { ValueReference, ValueReferenceVisitor } from "./values.ts";
 export {
   analyzeValueReferences,
