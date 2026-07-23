@@ -1,0 +1,5 @@
+{
+  "$schema": "https://atlante.sh/schema/template/v0.1/schema.json",
+  "id": "test/missing-input-dialect",
+  "inputSchema": { "type": "object" }
+}

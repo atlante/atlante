@@ -15,6 +15,19 @@ describe("injectAgents", () => {
     expect(config.agent?.reviewer).toEqual({ prompt: "PROMPT" });
   });
 
+  test("injects __proto__ as an own agent without changing the agent map prototype", () => {
+    const config: HostConfig = { agent: {} };
+    const prototype = Object.getPrototypeOf(config.agent);
+    injectAgents(config, [
+      { hostAgentId: "__proto__", templateId: "atlante/agent", prompt: "P" },
+    ]);
+    expect(Object.getPrototypeOf(config.agent)).toBe(prototype);
+    expect(Object.hasOwn(config.agent ?? {}, "__proto__")).toBe(true);
+    expect(
+      Object.getOwnPropertyDescriptor(config.agent ?? {}, "__proto__")?.value,
+    ).toEqual({ prompt: "P" });
+  });
+
   test("preserves host-owned fields on an existing agent", () => {
     const config: HostConfig = {
       agent: {

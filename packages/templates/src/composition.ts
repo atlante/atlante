@@ -1,5 +1,5 @@
 import type { TemplateRegistry } from "./loader.ts";
-import type { TemplateManifest } from "./manifest.ts";
+import { TEMPLATE_ID_PATTERN, type TemplateManifest } from "./manifest.ts";
 
 export type Slot = { property: string; templateId: string };
 
@@ -12,12 +12,65 @@ export type CompositionIssue = {
   chain?: string[];
 };
 
-function isSlot(node: unknown): node is { template: string } {
-  return (
-    typeof node === "object" &&
-    node !== null &&
-    typeof (node as { template?: unknown }).template === "string"
-  );
+type SlotMarker = {
+  path: string[];
+  property: string;
+  template: unknown;
+  topLevel: boolean;
+};
+
+function isObject(node: unknown): node is Record<string, unknown> {
+  return typeof node === "object" && node !== null && !Array.isArray(node);
+}
+
+function isValidTemplateId(value: unknown): value is string {
+  return typeof value === "string" && TEMPLATE_ID_PATTERN.test(value);
+}
+
+function markersOf(inputSchema: Record<string, unknown>): SlotMarker[] {
+  const markers: SlotMarker[] = [];
+  const properties = inputSchema.properties;
+
+  const visit = (
+    node: unknown,
+    path: string[],
+    property: string,
+    topLevel: boolean,
+  ): void => {
+    if (Array.isArray(node)) {
+      for (const [index, item] of node.entries())
+        visit(item, [...path, String(index)], property, false);
+      return;
+    }
+    if (!isObject(node)) return;
+    if (Object.hasOwn(node, "template")) {
+      markers.push({
+        path,
+        property: path.at(-1) ?? property,
+        template: node.template,
+        topLevel,
+      });
+      return;
+    }
+    for (const [key, value] of Object.entries(node)) {
+      visit(
+        value,
+        key === "properties" ? path : [...path, key],
+        property,
+        false,
+      );
+    }
+  };
+
+  if (isObject(properties)) {
+    for (const [property, node] of Object.entries(properties))
+      visit(node, [property], property, true);
+  }
+
+  for (const [key, value] of Object.entries(inputSchema)) {
+    if (key !== "properties") visit(value, [key], key, false);
+  }
+  return markers;
 }
 
 /**
@@ -26,57 +79,15 @@ function isSlot(node: unknown): node is { template: string } {
  * recursion happens through template ids instead.
  */
 export function slotsOf(manifest: TemplateManifest): Slot[] {
-  const properties = manifest.inputSchema.properties;
-  if (typeof properties !== "object" || properties === null) return [];
-
-  const slots: Slot[] = [];
-  for (const [property, node] of Object.entries(properties)) {
-    if (isSlot(node)) slots.push({ property, templateId: node.template });
-  }
-  return slots;
-}
-
-/**
- * Finds `{ "template": "namespace/name" }` nodes nested below the top level
- * of `inputSchema.properties` — the ones `slotsOf` deliberately does not
- * treat as slots. Ajv runs with `strict: false`, so an unknown `template`
- * keyword left in place would silently accept any value underneath it
- * instead of being validated; nested slots must instead be an explicit
- * rejection.
- */
-function nestedSlotReferences(
-  inputSchema: Record<string, unknown>,
-): { templateId: string; path: string[] }[] {
-  const topLevelSlotNodes = new Set(slotsOfSchema(inputSchema));
-
-  const found: { templateId: string; path: string[] }[] = [];
-  const visit = (node: unknown, path: string[]): void => {
-    if (Array.isArray(node)) {
-      for (const [index, item] of node.entries())
-        visit(item, [...path, String(index)]);
-      return;
-    }
-    if (typeof node !== "object" || node === null) return;
-    if (isSlot(node)) {
-      if (!topLevelSlotNodes.has(node)) {
-        found.push({ templateId: node.template, path });
-      }
-      return;
-    }
-    for (const [key, value] of Object.entries(node)) {
-      visit(value, key === "properties" ? path : [...path, key]);
-    }
-  };
-
-  visit(inputSchema, []);
-  return found;
-}
-
-/** The raw top-level slot node objects of an `inputSchema`, for identity checks. */
-function slotsOfSchema(inputSchema: Record<string, unknown>): unknown[] {
-  const properties = inputSchema.properties;
-  if (typeof properties !== "object" || properties === null) return [];
-  return Object.values(properties).filter(isSlot);
+  return markersOf(manifest.inputSchema)
+    .filter(
+      (marker): marker is SlotMarker & { template: string } =>
+        marker.topLevel && isValidTemplateId(marker.template),
+    )
+    .map((marker) => ({
+      property: marker.property,
+      templateId: marker.template,
+    }));
 }
 
 /** Depth-first walk over the slot graph, collecting every issue it finds. */
@@ -115,14 +126,34 @@ export function walkComposition(
 
   const issues: CompositionIssue[] = [];
 
-  for (const nested of nestedSlotReferences(template.manifest.inputSchema)) {
-    issues.push({
-      code: "invalid-input-schema",
-      message: `template "${rootId}": slot reference to "${nested.templateId}" is nested below the top level of inputSchema; slots must be top-level properties in v0.1`,
-      templateId: rootId,
-      property: [...slotPath, ...nested.path].at(-1),
-      slotPath: [...slotPath, ...nested.path],
-    });
+  for (const marker of markersOf(template.manifest.inputSchema)) {
+    if (!marker.topLevel) {
+      const suffix = isValidTemplateId(marker.template)
+        ? `slot reference to "${marker.template}"`
+        : "slot marker";
+      issues.push({
+        code: "invalid-input-schema",
+        message: `template "${rootId}": ${suffix} is nested below the top level of inputSchema; slots must be top-level properties in v0.1`,
+        templateId: rootId,
+        property: [...slotPath, ...marker.path].at(-1),
+        slotPath: [...slotPath, ...marker.path],
+      });
+      continue;
+    }
+
+    if (!isValidTemplateId(marker.template)) {
+      const actual =
+        typeof marker.template === "string"
+          ? JSON.stringify(marker.template)
+          : `${typeof marker.template} ${JSON.stringify(marker.template)}`;
+      issues.push({
+        code: "invalid-input-schema",
+        message: `template "${rootId}": slot "${marker.property}" has invalid template marker ${actual}; expected a non-empty namespaced id matching namespace/name`,
+        templateId: rootId,
+        property: [...slotPath, marker.property].at(-1),
+        slotPath: [...slotPath, marker.property],
+      });
+    }
   }
 
   for (const slot of slotsOf(template.manifest)) {

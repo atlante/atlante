@@ -22,7 +22,9 @@ export function injectAgents(
   const agents = config.agent;
 
   for (const artifact of artifacts) {
-    const existing = agents[artifact.hostAgentId];
+    const existing = Object.hasOwn(agents, artifact.hostAgentId)
+      ? agents[artifact.hostAgentId]
+      : undefined;
 
     if (existing?.prompt) {
       diagnostics.push(
@@ -33,7 +35,13 @@ export function injectAgents(
       );
     }
 
-    agents[artifact.hostAgentId] = { ...existing, prompt: artifact.prompt };
+    const replacement = { ...existing, prompt: artifact.prompt };
+    Object.defineProperty(agents, artifact.hostAgentId, {
+      configurable: true,
+      enumerable: true,
+      value: replacement,
+      writable: true,
+    });
   }
 
   return diagnostics;

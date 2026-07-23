@@ -1,12 +1,7 @@
 import { DEFAULT_TEMPLATE_ID } from "@atlante/resolver";
-import { loadBundledTemplates } from "@atlante/templates";
-import {
-  hasErrors,
-  loadDocument,
-  templateLoadDiagnostics,
-  validateTemplates,
-} from "@atlante/validator";
+import { hasErrors, validateTemplates } from "@atlante/validator";
 import { printDiagnostics } from "../report.ts";
+import { loadCliResources } from "./load.ts";
 
 /**
  * Validation deliberately stops short of rendering. Going through `resolve`
@@ -16,21 +11,15 @@ import { printDiagnostics } from "../report.ts";
  * template is broken".
  */
 export async function runValidate(target: string): Promise<number> {
-  const loaded = loadDocument(target);
-  if (!loaded.document) {
+  const loaded = loadCliResources(target);
+  if (!loaded.document || !loaded.registry) {
     printDiagnostics(loaded.diagnostics);
-    return 1;
-  }
-
-  const { registry, errors } = loadBundledTemplates();
-  if (errors.length > 0) {
-    printDiagnostics(templateLoadDiagnostics(errors));
     return 1;
   }
 
   const diagnostics = validateTemplates(
     loaded.document,
-    registry,
+    loaded.registry,
     DEFAULT_TEMPLATE_ID,
   );
   printDiagnostics(diagnostics);

@@ -3,6 +3,7 @@ import { runInit } from "./commands/init.ts";
 import { runResolve } from "./commands/resolve.ts";
 import { runValidate } from "./commands/validate.ts";
 
+// Preserve the existing preset helpers as public aliases for CLI consumers.
 export { listPresets, presetName, readPreset } from "@atlante/presets";
 export { runInit } from "./commands/init.ts";
 export { runResolve } from "./commands/resolve.ts";

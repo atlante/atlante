@@ -1,4 +1,5 @@
 import { readFileSync, statSync } from "node:fs";
+import { basename } from "node:path";
 import type { AtlanteDocument } from "@atlante/schema";
 import { atlanteDocumentSchema, SCHEMA_URI } from "@atlante/schema";
 import { getNodeValue, type ParseError, parseTree } from "jsonc-parser";
@@ -16,10 +17,28 @@ export function validateDocumentText(
   text: string,
   sourcePath: string,
 ): { document?: AtlanteDocument; diagnostics: Diagnostic[] } {
+  const filename = basename(sourcePath);
+  const isJson = filename === "atlante.json";
+  const isJsonc = filename === "atlante.jsonc";
+  if (
+    (filename.endsWith(".json") || filename.endsWith(".jsonc")) &&
+    !isJson &&
+    !isJsonc
+  ) {
+    return {
+      diagnostics: [
+        error(
+          "invalid-config-filename",
+          `${sourcePath}: configuration files must be named atlante.json or atlante.jsonc`,
+        ),
+      ],
+    };
+  }
+
   const parseErrors: ParseError[] = [];
   const tree = parseTree(text, parseErrors, {
-    allowTrailingComma: true,
-    disallowComments: false,
+    allowTrailingComma: !isJson,
+    disallowComments: isJson,
   });
 
   if (parseErrors.length > 0 || !tree) {
@@ -34,7 +53,13 @@ export function validateDocumentText(
   }
 
   const raw = getNodeValue(tree) as unknown;
+  return validateParsedDocument(raw, sourcePath);
+}
 
+function validateParsedDocument(
+  raw: unknown,
+  sourcePath: string,
+): { document?: AtlanteDocument; diagnostics: Diagnostic[] } {
   const schemaUri = (raw as { $schema?: unknown })?.$schema;
   if (schemaUri !== SCHEMA_URI) {
     return {
@@ -59,7 +84,7 @@ export function validateDocumentText(
     };
   }
 
-  return { document: result.data as AtlanteDocument, diagnostics: [] };
+  return { document: result.data, diagnostics: [] };
 }
 
 /** Accepts either a config file path or a directory to discover one in. */
@@ -100,6 +125,18 @@ export function loadDocument(
     const discovered = discoverConfigPath(pathOrDirectory);
     if (!discovered.path) return { diagnostics: discovered.diagnostics };
     path = discovered.path;
+  }
+
+  const filename = basename(path);
+  if (filename !== "atlante.json" && filename !== "atlante.jsonc") {
+    return {
+      diagnostics: [
+        error(
+          "invalid-config-filename",
+          `${path}: configuration files must be named atlante.json or atlante.jsonc`,
+        ),
+      ],
+    };
   }
 
   let text: string;

@@ -28,6 +28,25 @@ describe("validateDocumentText", () => {
     expect(result.document).toBeDefined();
   });
 
+  test("rejects comments and trailing commas in atlante.json", () => {
+    const result = validateDocumentText(
+      `{
+        // comments belong only in JSONC
+        "$schema": "${SCHEMA_URI}",
+        "agents": {},
+      }`,
+      "atlante.json",
+    );
+    expect(result.document).toBeUndefined();
+    expect(result.diagnostics[0]?.code).toBe("invalid-json");
+  });
+
+  test("rejects explicit config paths with non-canonical basenames", () => {
+    const result = validateDocumentText("{}", "project-config.jsonc");
+    expect(result.document).toBeUndefined();
+    expect(result.diagnostics[0]?.code).toBe("invalid-config-filename");
+  });
+
   test("rejects malformed JSON with a position", () => {
     const result = validateDocumentText("{ nope", "atlante.jsonc");
     expect(result.document).toBeUndefined();
@@ -76,6 +95,19 @@ describe("loadDocument", () => {
       expect(result.path).toBe(path);
       expect(result.diagnostics).toEqual([]);
       expect(result.document?.agents.reviewer?.identity).toBe("x");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("rejects an explicit file path with a non-canonical basename", () => {
+    const dir = mkdtempSync(join(tmpdir(), "atlante-document-"));
+    const path = join(dir, "config.jsonc");
+    writeFileSync(path, valid);
+    try {
+      const result = loadDocument(path);
+      expect(result.document).toBeUndefined();
+      expect(result.diagnostics[0]?.code).toBe("invalid-config-filename");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

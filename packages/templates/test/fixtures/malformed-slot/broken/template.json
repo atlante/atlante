@@ -1,11 +1,13 @@
 {
   "$schema": "https://atlante.sh/schema/template/v0.1/schema.json",
-  "id": "test/leaf",
+  "id": "test/malformed-slot",
   "inputSchema": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
-    "properties": { "label": { "type": "string" } },
-    "required": ["label"],
-    "additionalProperties": false
+    "properties": {
+      "notString": { "template": 3 },
+      "empty": { "template": "" },
+      "notNamespaced": { "template": "workflow" }
+    }
   }
 }

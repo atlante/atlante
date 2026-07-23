@@ -8,6 +8,8 @@ const danglingSlotRoot = new URL("./fixtures/dangling-slot", import.meta.url)
 const diamondRoot = new URL("./fixtures/diamond", import.meta.url).pathname;
 const nestedSlotRoot = new URL("./fixtures/nested-slot", import.meta.url)
   .pathname;
+const malformedSlotRoot = new URL("./fixtures/malformed-slot", import.meta.url)
+  .pathname;
 
 describe("slotsOf", () => {
   test("finds a top-level slot property", () => {
@@ -75,5 +77,20 @@ describe("walkComposition", () => {
     expect(issues).toHaveLength(1);
     expect(issues[0]?.code).toBe("invalid-input-schema");
     expect(issues[0]?.message).toContain("test/does-not-exist");
+  });
+
+  test("rejects malformed slot markers explicitly", () => {
+    const { registry } = loadTemplates(malformedSlotRoot);
+    const issues = walkComposition(registry, "test/malformed-slot");
+    expect(issues).toHaveLength(3);
+    expect(issues.every((issue) => issue.code === "invalid-input-schema")).toBe(
+      true,
+    );
+    expect(issues.map((issue) => issue.property)).toEqual([
+      "notString",
+      "empty",
+      "notNamespaced",
+    ]);
+    expect(issues[0]?.message).toContain("invalid template marker");
   });
 });

@@ -6,12 +6,14 @@ import {
   MissingValueError,
   NonStringValueError,
   renderTemplate,
+  slotPartialName,
 } from "../src/index.ts";
 import type { TemplateRegistry } from "../src/loader.ts";
 import type { TemplateManifest } from "../src/manifest.ts";
 
 const root = new URL("./fixtures/composed", import.meta.url).pathname;
 const cyclicRoot = new URL("./fixtures/cyclic", import.meta.url).pathname;
+const diamondRoot = new URL("./fixtures/diamond", import.meta.url).pathname;
 
 function render(input: Record<string, unknown>): string {
   const { registry } = loadTemplates(root);
@@ -27,7 +29,11 @@ function registryOf(source: string): TemplateRegistry {
   const manifest: TemplateManifest = {
     $schema: "https://atlante.sh/schema/template/v0.1/schema.json",
     id: "test/probe",
-    inputSchema: { type: "object", properties: {} },
+    inputSchema: {
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+      type: "object",
+      properties: {},
+    },
   };
   return {
     get: (id) =>
@@ -35,6 +41,43 @@ function registryOf(source: string): TemplateRegistry {
         ? { manifest, source, directory: "<memory>" }
         : undefined,
     ids: () => ["test/probe"],
+  };
+}
+
+function slotRegistry(properties: string[], source: string): TemplateRegistry {
+  const rootManifest: TemplateManifest = {
+    $schema: "https://atlante.sh/schema/template/v0.1/schema.json",
+    id: "test/root",
+    inputSchema: {
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+      type: "object",
+      properties: Object.fromEntries(
+        properties.map((property) => [property, { template: "test/child" }]),
+      ),
+    },
+  };
+  const childManifest: TemplateManifest = {
+    $schema: "https://atlante.sh/schema/template/v0.1/schema.json",
+    id: "test/child",
+    inputSchema: {
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+      type: "object",
+      properties: { value: { type: "string" } },
+    },
+  };
+  return {
+    get: (id) => {
+      if (id === "test/root")
+        return { manifest: rootManifest, source, directory: "<memory>" };
+      if (id === "test/child")
+        return {
+          manifest: childManifest,
+          source: "Child: {{value}}",
+          directory: "<memory>",
+        };
+      return undefined;
+    },
+    ids: () => ["test/child", "test/root"],
   };
 }
 
@@ -47,6 +90,20 @@ describe("renderTemplate", () => {
   test("renders a slot's child with the slot's own input", () => {
     const output = render({ title: "Report", detail: { body: "ok" } });
     expect(output).toContain("Detail: ok");
+  });
+
+  test("renders repeated child templates with each slot's own input", () => {
+    const { registry } = loadTemplates(diamondRoot);
+    const output = renderTemplate({
+      registry,
+      templateId: "test/diamond",
+      input: {
+        left: { label: "LEFT" },
+        right: { label: "RIGHT" },
+      },
+    });
+    expect(output).toContain("Leaf: LEFT");
+    expect(output).toContain("Leaf: RIGHT");
   });
 
   test("omits the slot section when the slot input is absent", () => {
@@ -81,6 +138,75 @@ describe("renderTemplate", () => {
     });
     expect(output).toBe("[]");
   });
+
+  test("does not render inherited optional slot inputs", () => {
+    const input = Object.create({ detail: { body: "inherited" } }) as Record<
+      string,
+      unknown
+    >;
+    const output = renderTemplate({
+      registry: slotRegistry(["detail"], `{{> ${slotPartialName("detail")}}}`),
+      templateId: "test/root",
+      input,
+    });
+    expect(output).toBe("");
+  });
+
+  test("does not render inherited __proto__ or constructor-like slots", () => {
+    const properties = ["__proto__", "constructor"];
+    const prototype: Record<string, unknown> = {};
+    for (const property of properties)
+      Object.defineProperty(prototype, property, {
+        enumerable: true,
+        value: { value: "inherited" },
+      });
+    const input = Object.create(prototype) as Record<string, unknown>;
+    const output = renderTemplate({
+      registry: slotRegistry(
+        properties,
+        properties
+          .map((property) => `{{> ${slotPartialName(property)}}}`)
+          .join(" "),
+      ),
+      templateId: "test/root",
+      input,
+    });
+    expect(output).toBe(" ");
+  });
+
+  test("handles arbitrary slot properties and preserves the single-slot alias", () => {
+    const property = "part/name %";
+    const registry = slotRegistry(
+      [property],
+      `{{> "${slotPartialName(property)}"}}`,
+    );
+    const output = renderTemplate({
+      registry,
+      templateId: "test/root",
+      input: { [property]: { value: "encoded" } },
+    });
+    expect(output).toBe("Child: encoded");
+
+    const aliasOutput = renderTemplate({
+      registry: slotRegistry(["left"], "{{> test/child}}"),
+      templateId: "test/root",
+      input: { left: { value: "alias" } },
+    });
+    expect(aliasOutput).toBe("Child: alias");
+  });
+
+  test("does not register an ambiguous old alias for duplicate child slots", () => {
+    expect(() =>
+      renderTemplate({
+        registry: slotRegistry(["left", "right"], "{{> test/child}}"),
+        templateId: "test/root",
+        input: {
+          left: { value: "left" },
+          right: { value: "right" },
+        },
+      }),
+    ).toThrow(/partial test\/child/);
+  });
 });
 
 describe("interpolateValues", () => {
@@ -100,6 +226,18 @@ describe("interpolateValues", () => {
     ).toBe("for atlante");
   });
 
+  test("diagnoses unsupported bracket and spaced-dot values forms", () => {
+    expect(() => interpolateValues("{{values[project]}}", values)).toThrow(
+      InvalidValueReferenceError,
+    );
+    expect(() => interpolateValues("{{ values . project }}", values)).toThrow(
+      InvalidValueReferenceError,
+    );
+    expect(() => interpolateValues("{{values}}", values)).toThrow(
+      InvalidValueReferenceError,
+    );
+  });
+
   test("walks nested objects and arrays", () => {
     expect(
       interpolateValues(
@@ -107,6 +245,18 @@ describe("interpolateValues", () => {
         values,
       ),
     ).toEqual({ a: ["atlante"], b: { c: "it" } });
+  });
+
+  test("interpolates object keys and rejects collisions safely", () => {
+    expect(
+      interpolateValues(
+        { "{{values.project}}": "value" } as Record<string, unknown>,
+        values,
+      ),
+    ).toEqual({ atlante: "value" });
+    expect(() =>
+      interpolateValues({ "{{values.project}}": "a", atlante: "b" }, values),
+    ).toThrow(/collide/);
   });
 
   test("leaves strings without references untouched", () => {

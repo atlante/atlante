@@ -47,6 +47,17 @@ describe("resolve", () => {
     expect(agents[0]?.templateId).toBe("atlante/agent");
   });
 
+  test("resolves a valid __proto__ value and agent ID end to end", () => {
+    const protoDocument = JSON.parse(
+      `{"$schema":"${SCHEMA_URI}","values":{"__proto__":"safe"},"agents":{"__proto__":{"identity":"Work on {{values.__proto__}}.","mission":"Help."}}}`,
+    ) as AtlanteDocument;
+    const result = resolve(protoDocument, registry);
+    expect(result.diagnostics).toEqual([]);
+    expect(result.agents).toHaveLength(1);
+    expect(result.agents[0]?.hostAgentId).toBe("__proto__");
+    expect(result.agents[0]?.prompt).toContain("Work on safe.");
+  });
+
   test("falls back to the default template when promptTemplate is omitted", () => {
     const { agents } = resolve(document, registry);
     expect(agents[1]?.templateId).toBe("atlante/agent");

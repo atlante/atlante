@@ -55,6 +55,13 @@ describe("expandInputSchema", () => {
     expect(diagnostics[0]?.code).toBe("cyclic-template");
   });
 
+  test("guards direct exported calls with a cyclic stack", () => {
+    const { registry } = loadTemplates(cyclicRoot);
+    const result = expandInputSchema(registry, "test/a", ["test/a"]);
+    expect(result.schema).toBeUndefined();
+    expect(result.diagnostics[0]?.code).toBe("cyclic-template");
+  });
+
   test("reports a slot pointing at a template that does not exist", () => {
     const { registry } = loadTemplates(cyclicRoot);
     const { diagnostics } = expandInputSchema(registry, "test/nope");
@@ -124,6 +131,7 @@ describe("validateAgentInput", () => {
                 $schema: "https://atlante.sh/schema/template/v0.1/schema.json",
                 id: "test/root",
                 inputSchema: {
+                  $schema: "https://json-schema.org/draft/2020-12/schema",
                   type: "object",
                   properties: {
                     "slot/a~b": { template: "test/missing" },
@@ -270,5 +278,54 @@ describe("validateTemplates", () => {
     );
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]?.code).toBe("invalid-value-reference");
+  });
+
+  test("diagnoses bracket and spaced-dot values-like references", () => {
+    for (const identity of ["{{values[project]}}", "{{ values . project }}"]) {
+      const diagnostics = check({ identity, mission: "y" });
+      expect(diagnostics).toHaveLength(1);
+      expect(diagnostics[0]?.code).toBe("invalid-value-reference");
+    }
+  });
+
+  test("checks references used in object keys", () => {
+    const diagnostics = validateTemplates(
+      {
+        $schema: SCHEMA_URI,
+        agents: {
+          reviewer: {
+            identity: "x",
+            mission: "y",
+            "{{values.missing}}": "field",
+          },
+        },
+      },
+      registry,
+      "atlante/agent",
+    );
+    expect(diagnostics[0]?.code).toBe("missing-value");
+    expect(diagnostics[0]?.path).toBe("/agents/reviewer");
+  });
+
+  test("surfaces interpolated object-key collisions before resolution", () => {
+    const diagnostics = validateTemplates(
+      {
+        $schema: SCHEMA_URI,
+        values: { project: "atlante" },
+        agents: {
+          reviewer: {
+            identity: "x",
+            mission: "y",
+            "{{values.project}}": "first",
+            atlante: "second",
+          },
+        },
+      },
+      registry,
+      "atlante/agent",
+    );
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]?.code).toBe("value-reference-collision");
+    expect(diagnostics[0]?.path).toBe("/agents/reviewer");
   });
 });

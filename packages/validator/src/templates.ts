@@ -1,9 +1,12 @@
-import { type AtlanteDocument, VALUE_KEY_PATTERN } from "@atlante/schema";
+import type { AtlanteDocument } from "@atlante/schema";
 import type { TemplateRegistry } from "@atlante/templates";
 import {
   interpolateValues,
+  isValidValueKey,
   slotsOf,
+  ValueReferenceCollisionError,
   walkComposition,
+  walkValueReferences,
 } from "@atlante/templates";
 import Ajv2020 from "ajv/dist/2020.js";
 import type { Diagnostic } from "./diagnostic.ts";
@@ -26,6 +29,18 @@ export function expandInputSchema(
   templateId: string,
   stack: string[] = [],
 ): { schema?: Record<string, unknown>; diagnostics: Diagnostic[] } {
+  if (stack.includes(templateId)) {
+    const chain = [...stack, templateId];
+    return {
+      diagnostics: [
+        error(
+          "cyclic-template",
+          `circular template composition: ${chain.join(" -> ")}`,
+        ),
+      ],
+    };
+  }
+
   if (stack.length === 0) {
     const issues = walkComposition(registry, templateId);
     if (issues.length > 0) {
@@ -50,7 +65,10 @@ export function expandInputSchema(
     };
   }
 
-  const schema = structuredClone(template.manifest.inputSchema);
+  const schema = structuredClone(template.manifest.inputSchema) as Record<
+    string,
+    unknown
+  >;
   const properties = schema.properties as Record<string, unknown> | undefined;
 
   for (const slot of slotsOf(template.manifest)) {
@@ -130,8 +148,6 @@ export function validateAgentInput(
   );
 }
 
-const VALUES_REFERENCE_PATTERN = /\{\{\s*values\.([^{}]*?)\s*\}\}/g;
-
 function resolvedValue(values: Record<string, unknown>, key: string): unknown {
   return Object.hasOwn(values, key) ? values[key] : undefined;
 }
@@ -143,45 +159,28 @@ function missingValueDiagnostics(
   templateId: string,
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  const visit = (value: unknown, path: string): void => {
-    if (typeof value === "string") {
-      VALUES_REFERENCE_PATTERN.lastIndex = 0;
-      for (const match of value.matchAll(VALUES_REFERENCE_PATTERN)) {
-        const reference = match[1]?.trim() ?? "";
-        if (!VALUE_KEY_PATTERN.test(reference)) {
-          diagnostics.push(
-            error(
-              "invalid-value-reference",
-              `agent "${agentId}" template "${templateId}": invalid values reference "{{values.${reference}}}"; value names must match [A-Za-z_$][A-Za-z0-9_$-]*`,
-              { path },
-            ),
-          );
-        } else if (resolvedValue(values, reference) == null) {
-          diagnostics.push(
-            error(
-              "missing-value",
-              `agent "${agentId}" template "${templateId}": missing required value "{{values.${reference}}}"`,
-              { path },
-            ),
-          );
-        }
-      }
-      return;
+  walkValueReferences(input, (reference, segments) => {
+    const path = `/agents/${escapeJsonPointerSegment(agentId)}${segments
+      .map((segment) => `/${escapeJsonPointerSegment(String(segment))}`)
+      .join("")}`;
+    if (!reference.key || !isValidValueKey(reference.key)) {
+      diagnostics.push(
+        error(
+          "invalid-value-reference",
+          `agent "${agentId}" template "${templateId}": invalid values reference "{{${reference.expression}}}"; value names must match [A-Za-z_$][A-Za-z0-9_$-]*`,
+          { path },
+        ),
+      );
+    } else if (resolvedValue(values, reference.key) == null) {
+      diagnostics.push(
+        error(
+          "missing-value",
+          `agent "${agentId}" template "${templateId}": missing required value "{{values.${reference.key}}}"`,
+          { path },
+        ),
+      );
     }
-    if (Array.isArray(value)) {
-      for (const [index, item] of value.entries()) {
-        visit(item, `${path}/${index}`);
-      }
-      return;
-    }
-    if (typeof value === "object" && value !== null) {
-      for (const [key, item] of Object.entries(value)) {
-        visit(item, `${path}/${escapeJsonPointerSegment(key)}`);
-      }
-    }
-  };
-
-  visit(input, `/agents/${escapeJsonPointerSegment(agentId)}`);
+  });
   return diagnostics;
 }
 
@@ -231,7 +230,23 @@ export function validateTemplates(
     let inputForValidation = input;
     try {
       inputForValidation = interpolateValues(input, values);
-    } catch {
+    } catch (cause) {
+      if (cause instanceof ValueReferenceCollisionError) {
+        diagnostics.push(
+          error(
+            "value-reference-collision",
+            `agent "${agentId}" template "${templateId}": ${cause.message}`,
+            {
+              path: `/agents/${escapeJsonPointerSegment(agentId)}${cause.path
+                .map(
+                  (segment) => `/${escapeJsonPointerSegment(String(segment))}`,
+                )
+                .join("")}`,
+            },
+          ),
+        );
+        continue;
+      }
       // The document schema rejects non-string values before normal resolution.
     }
     diagnostics.push(

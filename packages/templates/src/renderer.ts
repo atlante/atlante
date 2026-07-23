@@ -1,12 +1,19 @@
 import Handlebars from "handlebars";
 import { slotsOf } from "./composition.ts";
 import type { TemplateRegistry } from "./loader.ts";
+import { analyzeValueReferences, isValidValueKey } from "./values.ts";
 
 export type RenderArgs = {
   registry: TemplateRegistry;
   templateId: string;
   input: Record<string, unknown>;
 };
+
+export const SLOT_PARTIAL_PREFIX = "slot/";
+
+export function slotPartialName(property: string): string {
+  return `${SLOT_PARTIAL_PREFIX}${property}`;
+}
 
 /**
  * Renders a template depth-first: each slot's child is rendered first and its
@@ -38,8 +45,18 @@ export function renderTemplate(
   const handlebars = Handlebars.create();
   const nextStack = [...stack, templateId];
 
-  for (const slot of slotsOf(template.manifest)) {
-    const slotInput = input[slot.property];
+  const slots = slotsOf(template.manifest);
+  const targetCounts = new Map<string, number>();
+  for (const slot of slots)
+    targetCounts.set(
+      slot.templateId,
+      (targetCounts.get(slot.templateId) ?? 0) + 1,
+    );
+
+  const renderedSlots = slots.map((slot) => {
+    const slotInput = Object.hasOwn(input, slot.property)
+      ? input[slot.property]
+      : undefined;
     const rendered =
       slotInput === undefined || slotInput === null
         ? ""
@@ -51,7 +68,13 @@ export function renderTemplate(
             },
             nextStack,
           );
-    handlebars.registerPartial(slot.templateId, () => rendered);
+    return { rendered, slot };
+  });
+
+  for (const { rendered, slot } of renderedSlots) {
+    if (targetCounts.get(slot.templateId) === 1)
+      handlebars.registerPartial(slot.templateId, () => rendered);
+    handlebars.registerPartial(slotPartialName(slot.property), () => rendered);
   }
 
   const compiled = handlebars.compile(template.source, {
@@ -61,10 +84,6 @@ export function renderTemplate(
 
   return compiled(input);
 }
-
-/** Value names are flat keys, not nested paths (SPECIFICATION.md §4.2). */
-const VALUE_KEY_PATTERN = /^[A-Za-z_$][A-Za-z0-9_$-]*$/;
-const VALUES_REFERENCE_PATTERN = /\{\{\s*values\.([^{}]*?)\s*\}\}/g;
 
 /** Resolves one flat key against the values map. */
 function resolvePath(source: Record<string, unknown>, key: string): unknown {
@@ -85,11 +104,22 @@ export class MissingValueError extends Error {
 
 /** Thrown when a values-like reference does not use the supported key syntax. */
 export class InvalidValueReferenceError extends Error {
-  constructor(reference: string) {
+  constructor(reference: string, expression = `values.${reference}`) {
     super(
-      `invalid values reference "{{values.${reference}}}"; value names must match [A-Za-z_$][A-Za-z0-9_$-]*`,
+      `invalid values reference "{{${expression}}}"; value names must match [A-Za-z_$][A-Za-z0-9_$-]*`,
     );
     this.name = "InvalidValueReferenceError";
+  }
+}
+
+/** Thrown when two interpolated object keys would silently overwrite data. */
+export class ValueReferenceCollisionError extends Error {
+  readonly path: (string | number)[];
+
+  constructor(key: string, path: (string | number)[] = []) {
+    super(`interpolated object keys collide at "${key}"`);
+    this.name = "ValueReferenceCollisionError";
+    this.path = path;
   }
 }
 
@@ -123,20 +153,28 @@ export function renderString(
   source: string,
   values: Record<string, unknown>,
 ): string {
-  return source.replace(VALUES_REFERENCE_PATTERN, (_match, rawKey: string) => {
-    const key = rawKey.trim();
-    if (!VALUE_KEY_PATTERN.test(key)) {
-      throw new InvalidValueReferenceError(key);
-    }
+  const references = analyzeValueReferences(source);
+  if (references.length === 0) return source;
+
+  let output = "";
+  let cursor = 0;
+  for (const reference of references) {
+    output += source.slice(cursor, reference.start);
+    const key = reference.key;
+    if (!key || !isValidValueKey(key))
+      throw new InvalidValueReferenceError(
+        key ?? reference.expression,
+        reference.expression,
+      );
     const resolved = resolvePath(values, key);
-    if (resolved === null || resolved === undefined) {
+    if (resolved === null || resolved === undefined)
       throw new MissingValueError(key);
-    }
-    if (typeof resolved !== "string") {
+    if (typeof resolved !== "string")
       throw new NonStringValueError(key, resolved);
-    }
-    return resolved;
-  });
+    output += resolved;
+    cursor = reference.end;
+  }
+  return output + source.slice(cursor);
 }
 
 /**
@@ -149,20 +187,30 @@ export function renderString(
 export function interpolateValues<T>(
   input: T,
   values: Record<string, unknown>,
+  path: (string | number)[] = [],
 ): T {
   if (typeof input === "string") return renderString(input, values) as T;
 
   if (Array.isArray(input)) {
-    return input.map((item) => interpolateValues(item, values)) as T;
+    return input.map((item, index) =>
+      interpolateValues(item, values, [...path, index]),
+    ) as T;
   }
 
   if (typeof input === "object" && input !== null) {
-    return Object.fromEntries(
-      Object.entries(input).map(([key, value]) => [
-        key,
-        interpolateValues(value, values),
-      ]),
-    ) as T;
+    const output: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(input)) {
+      const resolvedKey = renderString(key, values);
+      if (Object.hasOwn(output, resolvedKey))
+        throw new ValueReferenceCollisionError(resolvedKey, path);
+      Object.defineProperty(output, resolvedKey, {
+        configurable: true,
+        enumerable: true,
+        value: interpolateValues(value, values, [...path, resolvedKey]),
+        writable: true,
+      });
+    }
+    return output as T;
   }
 
   return input;

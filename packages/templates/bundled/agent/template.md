@@ -23,5 +23,5 @@
 {{/if}}
 {{#if workflow}}
 
-{{> atlante/workflow}}
+{{> slot/workflow}}
 {{/if}}

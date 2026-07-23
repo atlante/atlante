@@ -31,6 +31,12 @@ const twoAgents = `{
   }
 }`;
 
+const emptyAgents = `{
+  "$schema": "${SCHEMA_URI}",
+  "values": { "project": "demo" },
+  "agents": {}
+}`;
+
 afterEach(() => {
   for (const dir of created.splice(0))
     rmSync(dir, { recursive: true, force: true });
@@ -52,6 +58,12 @@ describe("runValidate", () => {
     const dir = mkdtempSync(join(tmpdir(), "atlante-empty-"));
     created.push(dir);
     expect(await runValidate(dir)).toBe(1);
+  });
+
+  test("shares document-load failures with resolve", async () => {
+    const dir = project('{ "agents": ');
+    expect(await runValidate(dir)).toBe(1);
+    expect(await runResolve(dir, {})).toBe(1);
   });
 });
 
@@ -103,5 +115,36 @@ describe("runResolve", () => {
     expect(parsed).toHaveLength(1);
     expect(parsed[0].hostAgentId).toBe("planner");
     expect(parsed[0].prompt).toContain("You plan.");
+  });
+
+  test("an empty agents map resolves to an empty JSON array", async () => {
+    const dir = project(emptyAgents);
+    const written: string[] = [];
+    const original = console.log;
+    console.log = (...args: unknown[]) => written.push(args.join(" "));
+    try {
+      expect(await runResolve(dir, { json: true })).toBe(0);
+    } finally {
+      console.log = original;
+    }
+    expect(JSON.parse(written.join("\n"))).toEqual([]);
+  });
+
+  test("an empty agents map has no no-agent error without --agent", async () => {
+    const dir = project(emptyAgents);
+    const errors: string[] = [];
+    const original = console.error;
+    console.error = (...args: unknown[]) => errors.push(args.join(" "));
+    try {
+      expect(await runResolve(dir, {})).toBe(0);
+    } finally {
+      console.error = original;
+    }
+    expect(errors).toEqual([]);
+  });
+
+  test("an explicit --agent still fails against an empty agents map", async () => {
+    const dir = project(emptyAgents);
+    expect(await runResolve(dir, { agent: "missing" })).toBe(1);
   });
 });

@@ -1,5 +1,5 @@
 # {{title}}
 
 {{#if detail}}
-{{> test/inner}}
+{{> slot/detail}}
 {{/if}}

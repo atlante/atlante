@@ -4,6 +4,10 @@ import { loadTemplates } from "../src/index.ts";
 const validRoot = new URL("./fixtures/valid", import.meta.url).pathname;
 const brokenRoot = new URL("./fixtures/broken", import.meta.url).pathname;
 const duplicateRoot = new URL("./fixtures/duplicate", import.meta.url).pathname;
+const missingInputDialectRoot = new URL(
+  "./fixtures/missing-input-dialect",
+  import.meta.url,
+).pathname;
 
 describe("loadTemplates", () => {
   test("loads a template keyed by its manifest id", () => {
@@ -30,6 +34,14 @@ describe("loadTemplates", () => {
     const { registry, errors } = loadTemplates(brokenRoot);
     expect(registry.ids()).toEqual([]);
     expect(errors).toHaveLength(1);
+    expect(errors[0]?.message).toContain("$schema");
+  });
+
+  test("requires every inputSchema to declare the exact Draft 2020-12 dialect", () => {
+    const { registry, errors } = loadTemplates(missingInputDialectRoot);
+    expect(registry.ids()).toEqual([]);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.message).toContain("inputSchema");
     expect(errors[0]?.message).toContain("$schema");
   });
 

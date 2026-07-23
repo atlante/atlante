@@ -1,1 +1,1 @@
-Diamond {{> test/leaf}} {{> test/leaf}}
+Diamond {{> slot/left}} {{> slot/right}}
