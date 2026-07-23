@@ -1,5 +1,3 @@
-import { readFileSync, statSync } from "node:fs";
-import { basename } from "node:path";
 import { listPresets, presetName, readPreset } from "@atlante/presets";
 import type { AtlanteDocument } from "@atlante/schema";
 import {
@@ -9,9 +7,9 @@ import {
 import type { PresetLoader } from "@atlante/validator";
 import {
   type Diagnostic,
-  discoverConfigPath,
   error,
   expandDocument,
+  findConfigFile,
   loadDocument,
   parseDocumentOverlay,
   templateLoadDiagnostics,
@@ -71,39 +69,6 @@ function createBundledPresetLoader(): PresetLoader {
       return { document: overlay, diagnostics };
     },
   };
-}
-
-/**
- * Finds the config file. Accepts either a direct file path or a directory.
- */
-function findConfigFile(target: string): {
-  path: string;
-  text: string;
-} | null {
-  // 1. If the target is a regular file with a valid basename, read it directly.
-  try {
-    const st = statSync(target, { throwIfNoEntry: false });
-    if (st?.isFile()) {
-      const name = basename(target);
-      if (name === "atlante.json" || name === "atlante.jsonc") {
-        return { path: target, text: readFileSync(target, "utf8") };
-      }
-    }
-  } catch {
-    // Fall through to directory discovery.
-  }
-
-  // 2. Otherwise, treat it as a directory and discover the config file.
-  const discovered = discoverConfigPath(target);
-  if (!discovered.path) return null;
-  try {
-    return {
-      path: discovered.path,
-      text: readFileSync(discovered.path, "utf8"),
-    };
-  } catch {
-    return null;
-  }
 }
 
 /**

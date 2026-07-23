@@ -6,7 +6,7 @@ export {
   hasErrors,
   warning,
 } from "./diagnostic.ts";
-export { CONFIG_FILENAMES, discoverConfigPath } from "./discover.ts";
+export { CONFIG_FILENAMES, discoverConfigPath, findConfigFile } from "./discover.ts";
 export {
   loadDocument,
   parseDocumentOverlay,
