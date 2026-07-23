@@ -1,0 +1,37 @@
+name: Template or preset proposal
+description: Propose a new template or preset
+type: Feature
+labels: ["area: templates", "area: presets"]
+body:
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: What workflow or agent configuration is missing?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: |
+        Sketch the template/preset. For templates: describe slots and their purpose. For presets: describe the agent and its bindings.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Could this be achieved with an existing template or preset?
+    validations:
+      required: false
+
+  - type: textarea
+    id: details
+    attributes:
+      label: Additional details
+      description: Full slot definitions, example output, integration notes, acceptance criteria — anything that helps.
+    validations:
+      required: false

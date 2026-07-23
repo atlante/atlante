@@ -1,0 +1,43 @@
+name: Tooling / developer experience
+description: Propose internal tooling, CI, linting, or dev-experience improvements
+type: Chore
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or friction
+      description: What developer friction or maintenance cost are you addressing?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed tooling or change
+      description: Which tool or change, and how it runs.
+    validations:
+      required: true
+
+  - type: textarea
+    id: integration
+    attributes:
+      label: Integration points
+      description: Where it hooks in — CI, Biome, Bun scripts, etc.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and trade-offs
+      description: Other tools considered, and why you prefer this one.
+    validations:
+      required: false
+
+  - type: textarea
+    id: details
+    attributes:
+      label: Additional details
+      description: Rollout plan, baselines, benchmarks, references, or anything else relevant.
+    validations:
+      required: false
