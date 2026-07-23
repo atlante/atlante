@@ -4,7 +4,7 @@
   // Project-wide values. Reference them from any string below as {{values.x}};
   // the resolver substitutes them before the template is rendered.
   "values": {
-    "project": "my-project",
+    "project": "{{sys.cwd.basename}}",
     "scopeRule": "Never modify files outside the reviewed diff."
   },
 

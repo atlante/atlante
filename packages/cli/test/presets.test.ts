@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { basename } from "node:path";
 import { listPresets, presetName, readPreset } from "@atlante/presets";
 import { resolve as resolveHarness } from "@atlante/resolver";
 import { loadBundledTemplates } from "@atlante/templates";
@@ -28,6 +29,6 @@ describe("bundled presets as user configurations", () => {
     const { agents, diagnostics } = resolveHarness(document, registry);
     expect(diagnostics).toEqual([]);
     expect(agents[0]?.prompt).toContain("# Workflow");
-    expect(agents[0]?.prompt).toContain("my-project");
+    expect(agents[0]?.prompt).toContain(basename(process.cwd()));
   });
 });

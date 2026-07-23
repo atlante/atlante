@@ -99,6 +99,12 @@ code is not part of the configuration format.
   `language`) in the document root, referenced from a prompt definition via
   `{{values.x}}` and resolved into it before rendering. Values are never
   passed to a template.
+- **System value**: a `{{sys.<key>}}` reference used inside a preset's `values`
+  dictionary to supply a default that is resolved at runtime (e.g.,
+  `{{sys.cwd.basename}}`). System values are resolved during document expansion
+  — before `{{values.x}}` interpolation — so a user override always takes
+  precedence. Unknown system value keys MUST be diagnosed. Version 0.1 defines
+  `cwd.basename`; other system value keys are reserved for future versions.
 - **Adapter**: the host-specific component that translates resolved Atlante
   artifacts into host configuration.
 
@@ -177,6 +183,12 @@ project-wide and are resolved into prompt definitions via these references. An
 agent definition MAY contain a `values` object for local overrides. The resolver
 MUST merge local values over global values by key; a local value replaces the
 global value with the same key for that agent only.
+
+A preset value MAY use a `{{sys.<key>}}` reference to defer resolution to
+runtime (see §11.1). System value references MUST be resolved during document
+expansion, before `{{values.x}}` interpolation; this ensures that
+`{{values.x}}` lookups never encounter unresolved system references. Unknown
+`sys.<key>` keys MUST be diagnosed before rendering.
 
 ### 4.3 Agent map
 
@@ -456,9 +468,19 @@ configuration.
 ### 11.1 Preset inheritance
 
 `atlante init` scaffolds a project configuration that extends a bundled preset
-via the `extends` field. The generated configuration is minimal — it carries
-only the document `$schema`, the `extends` reference, and overrides for
-project-specific values.
+via the `extends` field. The generated configuration carries only the document
+`$schema` and the `extends` reference; values are left to the preset's system
+value defaults (e.g. `project` resolves to the basename of `process.cwd()` at
+runtime). Users add per-project overrides as needed.
+
+```jsonc
+{
+  "$schema": "https://atlante.sh/schema/v0.1/schema.json",
+  "extends": "atlante/code-review"
+}
+```
+
+To override a value, add a `values` object:
 
 ```jsonc
 {

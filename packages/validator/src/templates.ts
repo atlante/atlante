@@ -3,7 +3,9 @@ import type { TemplateRegistry } from "@atlante/templates";
 import {
   interpolateValues,
   isValidValueKey,
+  resolveSystemValues,
   slotsOf,
+  UnknownSystemVariableError,
   ValueReferenceCollisionError,
   walkComposition,
   walkValueReferences,
@@ -202,10 +204,27 @@ export function validateTemplates(
   for (const [agentId, binding] of Object.entries(document.agents)) {
     const templateId = binding.promptTemplate ?? defaultTemplateId;
     const input = promptInputOf(binding);
-    const values = {
-      ...(document.values ?? {}),
-      ...(binding.values ?? {}),
-    };
+    let values: Record<string, unknown>;
+    try {
+      values = resolveSystemValues({
+        ...(document.values ?? {}),
+        ...(binding.values ?? {}),
+      });
+    } catch (cause) {
+      if (cause instanceof UnknownSystemVariableError) {
+        diagnostics.push(
+          error(
+            "unknown-system-variable",
+            `agent "${agentId}" template "${templateId}": ${cause.message}`,
+            {
+              path: `/agents/${escapeJsonPointerSegment(agentId)}`,
+            },
+          ),
+        );
+        continue;
+      }
+      throw cause;
+    }
     const valueDiagnostics = missingValueDiagnostics(
       input,
       values,

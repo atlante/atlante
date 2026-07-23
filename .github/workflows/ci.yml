@@ -35,7 +35,7 @@ jobs:
           bun "$cli" validate "$project"
           bun "$cli" resolve "$project" | tee /tmp/resolved.md
           grep -q '# Workflow' /tmp/resolved.md
-          grep -q 'my-project' /tmp/resolved.md
+          grep -q "$(basename "$project")" /tmp/resolved.md
 
           # A broken configuration must fail loudly rather than exit 0.
           printf '{"$schema":"https://atlante.sh/schema/v0.1/schema.json","agents":{"a":{"identity":"x"}}}' \

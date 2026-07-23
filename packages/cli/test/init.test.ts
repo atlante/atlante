@@ -8,7 +8,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, join } from "node:path";
+import { join } from "node:path";
 import {
   type InitDependencies,
   runInitWithDependencies,
@@ -330,7 +330,7 @@ describe("runInit", () => {
     const contents = readFileSync(target, "utf8");
     expect(contents).not.toBe("altered contents");
     expect(contents).toContain('"$schema"');
-    expect(contents).toContain(`"${basename(dir)}"`);
+    expect(contents).toContain('"extends"');
   });
 
   test("refuses to overwrite an existing config without --force", async () => {

@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
-import { basename, join } from "node:path";
+import { join } from "node:path";
 import { listPresets, presetName, readPreset } from "@atlante/presets";
 import { SCHEMA_URI } from "@atlante/schema";
 import {
@@ -38,18 +38,13 @@ type PluginPlan = {
   registered: boolean;
 };
 
-function bareConfig(projectName: string): string {
+function bareConfig(): string {
   return `{
   "$schema": "${SCHEMA_URI}",
 
   // Extend the bundled starter preset. You can override any value or agent
   // below; your local configuration takes precedence over the inherited one.
   "extends": "atlante/starter",
-
-  // Override project-wide values from the preset.
-  "values": {
-    "project": ${JSON.stringify(projectName)},
-  },
 }
 `;
 }
@@ -266,13 +261,12 @@ export async function runInitWithDependencies(
         {
           $schema: SCHEMA_URI,
           extends: manifest.id,
-          values: { project: basename(directory) },
         },
         null,
         2,
       );
     } else {
-      contents = bareConfig(basename(directory));
+      contents = bareConfig();
     }
 
     const before = {
