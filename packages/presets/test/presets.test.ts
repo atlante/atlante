@@ -29,7 +29,6 @@ afterEach(() => {
 describe("bundled presets", () => {
   test("lists the bundled presets", () => {
     expect(listPresets().presets.map(presetName).sort()).toEqual([
-      "code-review",
       "starter",
     ]);
   });
@@ -63,7 +62,7 @@ describe("bundled presets", () => {
   });
 
   test("reads a preset's document source", () => {
-    expect(readPreset("code-review")).toContain("$schema");
+    expect(readPreset("starter")).toContain("$schema");
   });
 
   test("returns undefined for an unknown preset", () => {

@@ -57,11 +57,11 @@ describe("runInit", () => {
     expect(text).not.toContain("workflow");
   });
 
-  test("scaffolds the code-review preset", async () => {
+  test("--preset starter is an alias for the default", async () => {
     const dir = tempDir();
-    expect(await runInit(dir, { preset: "code-review" })).toBe(0);
+    expect(await runInit(dir, { preset: "starter" })).toBe(0);
     const text = readFileSync(join(dir, "atlante.jsonc"), "utf8");
-    expect(text).toContain("atlante/code-review");
+    expect(text).toContain("atlante/starter");
     expect(text).toContain("extends");
     expect(await runValidate(dir)).toBe(0);
   });

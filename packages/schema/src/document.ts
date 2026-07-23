@@ -65,18 +65,17 @@ export type AtlanteDocument = z.infer<typeof atlanteDocumentSchema>;
 // Overlay types — used during expansion before canonical validation
 // ---------------------------------------------------------------------------
 
-/** An agent binding in an overlay document: allows `extends` and `null` tombstones. */
+/** An agent binding in an overlay document: allows `null` tombstones. */
 export type AgentBindingOverlay = {
   promptTemplate?: string | null;
   values?: ValuesMapOverlay;
-  extends?: string;
   [key: string]: unknown;
 };
 
 /** Agents map in an overlay document: values can be `null` (tombstone). */
 export type AgentsOverlay = Record<string, AgentBindingOverlay | null>;
 
-/** Raw overlay document before expansion: allows `extends` and tombstone `null`s.
+/** Raw overlay document before expansion: allows document-level `extends` and tombstone `null`s.
  * `agents` is optional — it can be inherited from a preset. */
 export type AtlanteDocumentOverlay = {
   $schema: string;

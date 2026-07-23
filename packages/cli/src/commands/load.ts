@@ -1,7 +1,6 @@
 import { readFileSync, statSync } from "node:fs";
 import { basename } from "node:path";
 import { listPresets, presetName, readPreset } from "@atlante/presets";
-import { DEFAULT_TEMPLATE_ID } from "@atlante/resolver";
 import type { AtlanteDocument } from "@atlante/schema";
 import {
   loadBundledTemplates,
@@ -108,18 +107,10 @@ function findConfigFile(target: string): {
 }
 
 /**
- * Checks whether an overlay document uses `extends` anywhere (root or
- * agent-level), which requires the expansion path.
+ * Checks whether an overlay document uses `extends`, which requires the expansion path.
  */
-function hasAnyExtends(overlay: {
-  extends?: string;
-  agents?: Record<string, { extends?: string } | null>;
-}): boolean {
-  if (overlay.extends) return true;
-  for (const binding of Object.values(overlay.agents ?? {})) {
-    if (binding?.extends) return true;
-  }
-  return false;
+function hasAnyExtends(overlay: { extends?: string }): boolean {
+  return !!overlay.extends;
 }
 
 /**
@@ -165,7 +156,6 @@ export function loadCliResources(target: string): LoadedCliResources {
   const expanded = expandDocument(
     parsed.overlay,
     presetLoader,
-    DEFAULT_TEMPLATE_ID,
   );
   return {
     document: expanded.document,

@@ -27,7 +27,7 @@ Version 0.1 includes:
 - two-level validation (document structure + template input schema);
 - deterministic prompt resolution;
 - OpenCode prompt materialization;
-- bundled presets (`atlante init --preset`).
+- bundled `starter` preset (`atlante init`).
 
 Version 0.1 does not include:
 
@@ -89,7 +89,7 @@ code is not part of the configuration format.
   versioned `$schema` and a `namespace/name` `id`, so presets can later be
   distributed by third parties on the same terms as templates. A preset is a
   document, not a renderer, which is what distinguishes it from a **template**.
-- **Extends**: an optional field at the document or agent level that references
+- **Extends**: an optional field at the document level that references
   a preset by its `namespace/name` id. When present, the referenced preset's
   configuration is loaded, expanded recursively, and merged with the local
   configuration using JSON Merge Patch semantics. The local layer always takes
@@ -442,7 +442,7 @@ The v1 implementation SHOULD preserve these package responsibilities:
   bundled presets themselves;
 - `@atlante/opencode-plugin`: OpenCode materialization and future runtime;
 - `@atlante/cli`: validation, resolution, materialization, and
-  `atlante init --preset` entry points.
+  `atlante init` entry point.
 
 `@atlante/templates` and `@atlante/presets` are the two content packages and
 MUST remain leaves of the dependency graph: neither depends on any other Atlante
@@ -476,7 +476,7 @@ runtime). Users add per-project overrides as needed.
 ```jsonc
 {
   "$schema": "https://atlante.sh/schema/v0.1/schema.json",
-  "extends": "atlante/code-review"
+  "extends": "atlante/starter"
 }
 ```
 
@@ -512,8 +512,6 @@ taking precedence:
   resolved document.
 - `extends` is consumed during expansion and MUST NOT be passed to a prompt
   template.
-- A local override MUST NOT switch the `promptTemplate` of an inherited agent
-  binding.
 
 #### Validation and resolution
 
@@ -532,8 +530,6 @@ resolution:
 Diagnostics MUST identify the local JSON Pointer and preset chain for at least:
 
 - unknown preset IDs;
-- a document preset used as an agent preset or vice versa;
-- an agent preset used with an incompatible template;
 - inheritance cycles;
 - depth limits exceeded.
 
@@ -543,8 +539,7 @@ built-in or, later, plugin-contributed presets through the same path.
 
 Version 0.1 MUST include the `atlante/starter` preset as the default
 initialization target. The starter preset MUST provide at least a guide
-agent and a build agent. Specialized presets such as `atlante/code-review`
-MAY remain available as alternatives.
+agent and a build agent.
 
 ## 12. Compatibility and Evolution
 
@@ -603,5 +598,4 @@ Version 0.1 is complete when a conforming implementation can:
 6. create a missing OpenCode agent with host defaults;
 7. replace an existing agent prompt while preserving host-owned fields;
 8. report a warning when a non-empty host prompt is replaced;
-9. scaffold a project from a bundled preset via
-   `atlante init --preset`.
+9. scaffold a project from the bundled `starter` preset via `atlante init`.

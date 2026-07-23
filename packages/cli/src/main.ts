@@ -39,7 +39,7 @@ export function createProgram(): Command {
   program
     .command("init")
     .argument("[path]", "project directory", process.cwd())
-    .option("--preset <name>", "scaffold from a bundled preset")
+    .option("--preset <name>", "preset to extend (default: starter)")
     .option("--force", "overwrite an existing Atlante config")
     .description("scaffold an Atlante configuration")
     .action(

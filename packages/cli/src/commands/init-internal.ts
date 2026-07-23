@@ -1,6 +1,5 @@
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { listPresets, presetName, readPreset } from "@atlante/presets";
 import { SCHEMA_URI } from "@atlante/schema";
 import {
   applyEdits,
@@ -234,40 +233,13 @@ export async function runInitWithDependencies(
       return 1;
     }
 
-    let contents: string;
-    if (options.preset) {
-      const { presets, errors } = listPresets();
-      for (const loadError of errors) {
-        console.error(`warning: ${loadError.directory}: ${loadError.message}`);
-      }
-      const manifest = presets.find((m) => presetName(m) === options.preset);
-      if (!manifest) {
-        const known = presets.map(presetName).join(", ");
-        console.error(
-          `error: unknown preset "${options.preset}"; available: ${known}`,
-        );
-        return 1;
-      }
-      // Verify the preset document actually exists.
-      const name = presetName(manifest);
-      if (!readPreset(name)) {
-        console.error(
-          `error: preset "${manifest.id}" manifest found but document is missing or unreadable`,
-        );
-        return 1;
-      }
-      // Generate a minimal config that extends the selected preset.
-      contents = JSON.stringify(
-        {
-          $schema: SCHEMA_URI,
-          extends: manifest.id,
-        },
-        null,
-        2,
+    if (options.preset && options.preset !== "starter") {
+      console.error(
+        `error: unknown preset "${options.preset}"; only "starter" is available`,
       );
-    } else {
-      contents = bareConfig();
+      return 1;
     }
+    const contents = bareConfig();
 
     const before = {
       target: snapshot(target, fileSystem),

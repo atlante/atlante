@@ -1,6 +1,5 @@
 import type {
   AgentBinding,
-  AgentBindingOverlay,
   AgentsOverlay,
   AtlanteDocument,
   AtlanteDocumentOverlay,
@@ -50,15 +49,6 @@ function safeObject(): Record<string, unknown> {
 
 function asRecord(value: unknown): Record<string, unknown> {
   return isRecord(value) ? (value as Record<string, unknown>) : safeObject();
-}
-
-function asSafeRecord(value: unknown): Record<string, unknown> {
-  if (!isRecord(value)) return safeObject();
-  const result = safeObject();
-  for (const key of Object.keys(value as Record<string, unknown>)) {
-    own(result, key, (value as Record<string, unknown>)[key]);
-  }
-  return result;
 }
 
 /** Strips null entries from a values overlay after merge. */
@@ -114,30 +104,7 @@ function deepMerge(
   return result;
 }
 
-/**
- * Merges two agent bindings. The local binding can tombstone properties with
- * `null`. `extends` is consumed and never reaches the output.
- */
-function mergeAgentBinding(
-  base: AgentBindingOverlay,
-  local: AgentBindingOverlay,
-): AgentBinding {
-  const baseRecord = asSafeRecord(base);
-  const localRecord = asSafeRecord(local);
 
-  // Strip `values: undefined` from the local side so it doesn't erase
-  // inherited values when the user simply omitted `values`.
-  if (!Object.hasOwn(local, "values")) {
-    delete localRecord.values;
-  }
-  if (!Object.hasOwn(local, "extends")) {
-    delete localRecord.extends;
-  }
-
-  const merged = deepMerge(baseRecord, localRecord);
-  delete merged.extends;
-  return merged as unknown as AgentBinding;
-}
 
 /**
  * Recursively expands extends chains for the document level.
@@ -215,188 +182,12 @@ function expandDocumentChain(
 }
 
 /**
- * Expands a preset document fully (including its root extends chain) and then
- * extracts the matching agent binding.
- */
-function expandAndExtractAgent(
-  agentId: string,
-  presetId: string,
-  presetDocument: AtlanteDocumentOverlay,
-  presetLoader: PresetLoader,
-  chain: string[],
-  diagnostics: Diagnostic[],
-): AgentBindingOverlay | undefined {
-  // First, expand the preset document's own root extends chain.
-  const expandedPreset = expandDocumentChain(
-    presetDocument,
-    presetLoader,
-    chain,
-    0,
-    diagnostics,
-  );
-  if (!expandedPreset) return undefined;
-
-  const presetAgents = Object.entries(expandedPreset.agents ?? {}).filter(
-    ([, v]) => v !== null,
-  ) as [string, AgentBindingOverlay][];
-
-  if (presetAgents.length === 0) {
-    diagnostics.push(
-      error(
-        "incompatible-preset",
-        `agent "${agentId}": preset "${presetId}" has no agents`,
-        {
-          path: `/agents/${escapeJsonPointerSegment(agentId)}/extends`,
-        },
-      ),
-    );
-    return undefined;
-  }
-
-  if (presetAgents.length === 1) {
-    return presetAgents[0]?.[1];
-  }
-
-  const match = presetAgents.find(([id]) => id === agentId);
-  if (!match) {
-    diagnostics.push(
-      error(
-        "incompatible-preset",
-        `agent "${agentId}": preset "${presetId}" does not contain an agent "${agentId}" (available: ${presetAgents.map(([id]) => id).join(", ")})`,
-        {
-          path: `/agents/${escapeJsonPointerSegment(agentId)}/extends`,
-        },
-      ),
-    );
-    return undefined;
-  }
-  return match[1];
-}
-
-/**
- * Expands agent-level extends. Loads the referenced preset document, expands
- * its full inheritance tree, finds the matching agent binding, and merges.
- */
-function expandAgentBinding(
-  agentId: string,
-  binding: AgentBindingOverlay,
-  presetLoader: PresetLoader,
-  defaultTemplateId: string,
-  chain: string[],
-  depth: number,
-  diagnostics: Diagnostic[],
-): AgentBinding | undefined {
-  if (!binding.extends) {
-    // No inheritance — just clean up and return.
-    const result: Record<string, unknown> = safeObject();
-    for (const [key, value] of Object.entries(binding)) {
-      if (value !== null && key !== "extends") {
-        own(result, key, value);
-      }
-    }
-    return result as unknown as AgentBinding;
-  }
-
-  if (depth >= MAX_PRESET_DEPTH) {
-    diagnostics.push(
-      error(
-        "preset-depth-exceeded",
-        `agent "${agentId}": preset inheritance depth limit of ${MAX_PRESET_DEPTH} exceeded`,
-        { path: `/agents/${escapeJsonPointerSegment(agentId)}/extends` },
-      ),
-    );
-    return undefined;
-  }
-
-  const presetId = binding.extends;
-
-  if (chain.includes(presetId)) {
-    const cycleChain = [...chain, presetId];
-    diagnostics.push(
-      error(
-        "preset-cycle",
-        `circular preset inheritance: ${cycleChain.join(" -> ")}`,
-        { path: `/agents/${escapeJsonPointerSegment(agentId)}/extends` },
-      ),
-    );
-    return undefined;
-  }
-
-  const loaded = presetLoader.load(presetId);
-  diagnostics.push(...loaded.diagnostics);
-
-  if (!loaded.document) {
-    diagnostics.push(
-      error("unknown-preset", `preset "${presetId}" could not be loaded`, {
-        path: `/agents/${escapeJsonPointerSegment(agentId)}/extends`,
-      }),
-    );
-    return undefined;
-  }
-
-  const baseAgent = expandAndExtractAgent(
-    agentId,
-    presetId,
-    loaded.document,
-    presetLoader,
-    [...chain, presetId],
-    diagnostics,
-  );
-  if (!baseAgent) return undefined;
-
-  // Recursively expand the base agent (it might have its own agent-level extends).
-  let expandedBaseBinding = baseAgent;
-  if (baseAgent.extends) {
-    const expanded = expandAgentBinding(
-      agentId,
-      baseAgent,
-      presetLoader,
-      defaultTemplateId,
-      [...chain, presetId],
-      depth + 1,
-      diagnostics,
-    );
-    if (!expanded) return undefined;
-    expandedBaseBinding = expanded as unknown as AgentBindingOverlay;
-  }
-
-  // Validate template compatibility: local must not switch promptTemplate.
-  const baseTemplate =
-    expandedBaseBinding.promptTemplate === null
-      ? null
-      : (expandedBaseBinding.promptTemplate ?? defaultTemplateId);
-  const localTemplate =
-    binding.promptTemplate === null ? null : binding.promptTemplate;
-
-  if (
-    baseTemplate &&
-    localTemplate !== undefined &&
-    localTemplate !== null &&
-    localTemplate !== baseTemplate
-  ) {
-    diagnostics.push(
-      error(
-        "agent-preset-template-mismatch",
-        `agent "${agentId}": cannot switch promptTemplate from "${baseTemplate}" to "${localTemplate}" when extending a preset`,
-        {
-          path: `/agents/${escapeJsonPointerSegment(agentId)}/promptTemplate`,
-        },
-      ),
-    );
-    return undefined;
-  }
-
-  return mergeAgentBinding(expandedBaseBinding as AgentBindingOverlay, binding);
-}
-
-/**
  * Main entry point: expands an overlay document into a canonical
  * `AtlanteDocument` and validates the result against the canonical schema.
  */
 export function expandDocument(
   overlay: AtlanteDocumentOverlay,
   presetLoader: PresetLoader,
-  defaultTemplateId: string,
 ): {
   document: AtlanteDocument | undefined;
   diagnostics: Diagnostic[];
@@ -413,30 +204,20 @@ export function expandDocument(
   );
   if (!expandedBase) return { document: undefined, diagnostics };
 
-  // Step 2: Expand agent-level extends.
+  // Step 2: Clean up agent bindings (strip null tombstones).
   const expandedAgents: Record<string, AgentBinding> = Object.create(null);
-  let agentErrors = false;
 
   for (const [agentId, binding] of Object.entries(expandedBase.agents ?? {})) {
     if (binding === null) continue; // tombstoned agent
 
-    const expanded = expandAgentBinding(
-      agentId,
-      binding,
-      presetLoader,
-      defaultTemplateId,
-      [],
-      0,
-      diagnostics,
-    );
-    if (expanded) {
-      expandedAgents[agentId] = expanded;
-    } else {
-      agentErrors = true;
+    const cleaned: Record<string, unknown> = safeObject();
+    for (const [key, value] of Object.entries(binding)) {
+      if (value !== null) {
+        own(cleaned, key, value);
+      }
     }
+    expandedAgents[agentId] = cleaned as unknown as AgentBinding;
   }
-
-  if (agentErrors) return { document: undefined, diagnostics };
 
   // Step 3: Build canonical document.
   const canonical: AtlanteDocument = {
