@@ -24,7 +24,10 @@
     "atlante": "./dist/bin/atlante.js"
   },
   "exports": {
-    ".": "./dist/main.js"
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
   },
   "scripts": {
     "build": "tsc --project tsconfig.build.json && tsc --project tsconfig.build.bin.json"

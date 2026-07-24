@@ -22,7 +22,10 @@
     "bundled"
   ],
   "exports": {
-    ".": "./dist/index.js"
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
   },
   "scripts": {
     "build": "tsc --project tsconfig.build.json"
