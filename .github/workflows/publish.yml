@@ -89,7 +89,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Copy schema files
-        run: cp -r packages/schema/schema website/
+        run: |
+          cp -r packages/schema/schema website/
+          cp -r packages/templates/schema/template website/schema/
       - name: Deploy to Vercel
         uses: amondnet/vercel-action@v25
         with:

@@ -19,10 +19,7 @@ function buildTemplateManifestJsonSchema(): Record<string, unknown> {
 }
 
 if (import.meta.main) {
-  const out = new URL(
-    "../../schema/schema/template/v0.1/schema.json",
-    import.meta.url,
-  );
+  const out = new URL("../schema/template/v0.1/schema.json", import.meta.url);
   await Bun.write(
     out,
     `${JSON.stringify(buildTemplateManifestJsonSchema(), null, 2)}\n`,
