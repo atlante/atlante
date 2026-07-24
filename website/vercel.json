@@ -1,0 +1,15 @@
+{
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "headers": [
+    {
+      "source": "/(.*\\.json)",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/schema+json"
+        }
+      ]
+    }
+  ]
+}
