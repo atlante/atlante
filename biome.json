@@ -1,6 +1,6 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.5.5/schema.json",
-  "files": { "includes": ["**/*.ts", "**/*.json", "**/*.jsonc"] },
+  "files": { "includes": ["**/*.ts", "**/*.json", "**/*.jsonc", "!**/dist"] },
   "formatter": {
     "enabled": true,
     "indentStyle": "space",

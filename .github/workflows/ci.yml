@@ -15,7 +15,7 @@ jobs:
           bun-version: "1.2.x"
       - run: bun install --frozen-lockfile
       - run: bunx biome ci .
-      - run: bun run typecheck
+      - run: bun run type:check
       - run: bun test
 
       # Every test above calls the command handlers as functions, so a broken
