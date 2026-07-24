@@ -442,7 +442,7 @@ async function rewriteExportsForPublish(
         fail(`${packageFile.path} does not contain a bin object`);
       }
       (bin as Record<string, unknown>).atlante = "./dist/bin/atlante.js";
-      changes.push('bin.atlante -> ./dist/bin/atlante.js');
+      changes.push("bin.atlante -> ./dist/bin/atlante.js");
     }
 
     await writeFile(
