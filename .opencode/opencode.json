@@ -1,0 +1,19 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": [
+    "./packages/opencode-plugin/src/index.ts",
+    "superpowers@git+https://github.com/obra/superpowers.git"
+  ],
+
+  // Disable OpenCode's user-facing default agents so the roster is Atlante's
+  // own (architect / implement / review, injected by the plugin). The internal
+  // system agents (compaction, summary, title) are intentionally left enabled
+  // because OpenCode relies on them for context compaction, session summaries,
+  // and title generation.
+  "agent": {
+    "build": { "disable": true },
+    "plan": { "disable": true },
+    "general": { "disable": true },
+    "explore": { "disable": true }
+  }
+}
