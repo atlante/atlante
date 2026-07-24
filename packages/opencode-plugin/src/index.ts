@@ -1,2 +1,2 @@
-export type { HostAgentConfig, HostConfig } from "./inject.ts";
-export { AtlantePlugin, AtlantePlugin as default } from "./plugin.ts";
+export type { HostAgentConfig, HostConfig } from "./inject.js";
+export { AtlantePlugin, AtlantePlugin as default } from "./plugin.js";
