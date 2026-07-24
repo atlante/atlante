@@ -97,7 +97,8 @@ function parseArgs(args: string[]) {
     }
   }
 
-  if (versionText === undefined) throw new Error("usage: bun scripts/release.ts <version> [--dry-run]");
+  if (versionText === undefined)
+    throw new Error("usage: bun scripts/release.ts <version> [--dry-run]");
   return { version: parseVersion(versionText, "Version"), dryRun };
 }
 

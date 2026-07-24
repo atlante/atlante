@@ -15,8 +15,7 @@ const PACKAGES = [
 
 function parseArgs() {
   const version = process.argv[2];
-  if (!version)
-    throw new Error("usage: bun scripts/publish.ts <version>");
+  if (!version) throw new Error("usage: bun scripts/publish.ts <version>");
   if (!/^\d+\.\d+\.\d+$/.test(version))
     throw new Error(`version must match X.Y.Z, got "${version}"`);
   return version;
