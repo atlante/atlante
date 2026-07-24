@@ -409,6 +409,51 @@ async function bumpVersions(
   }
 }
 
+async function rewriteExportsForPublish(
+  packages: PackageFile[],
+): Promise<void> {
+  const exportPaths: Record<PackageDir, string> = {
+    schema: "./dist/index.js",
+    templates: "./dist/index.js",
+    presets: "./dist/index.js",
+    validator: "./dist/index.js",
+    resolver: "./dist/index.js",
+    "opencode-plugin": "./dist/index.js",
+    cli: "./dist/main.js",
+  };
+
+  for (const packageFile of packages) {
+    const exportsField = packageFile.json.exports;
+    if (
+      typeof exportsField !== "object" ||
+      exportsField === null ||
+      Array.isArray(exportsField)
+    ) {
+      fail(`${packageFile.path} does not contain an exports object`);
+    }
+
+    (exportsField as Record<string, unknown>)["."] =
+      exportPaths[packageFile.directory];
+    const changes = [`exports["."] -> ${exportPaths[packageFile.directory]}`];
+
+    if (packageFile.directory === "cli") {
+      const bin = packageFile.json.bin;
+      if (typeof bin !== "object" || bin === null || Array.isArray(bin)) {
+        fail(`${packageFile.path} does not contain a bin object`);
+      }
+      (bin as Record<string, unknown>).atlante = "./dist/bin/atlante.js";
+      changes.push('bin.atlante -> ./dist/bin/atlante.js');
+    }
+
+    await writeFile(
+      packageFile.path,
+      `${JSON.stringify(packageFile.json, null, 2)}\n`,
+      "utf8",
+    );
+    console.log(`✅ ${packageFile.path}: ${changes.join(", ")}`);
+  }
+}
+
 async function commitAndTag(
   packages: PackageFile[],
   version: Version,
@@ -493,6 +538,7 @@ async function main(): Promise<void> {
   }
 
   await bumpVersions(packages, options.version);
+  await rewriteExportsForPublish(packages);
   await validatePacks();
   await runNodeSmokeTest();
   await commitAndTag(packages, options.version);

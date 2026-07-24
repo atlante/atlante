@@ -21,13 +21,10 @@
     "LICENSE"
   ],
   "bin": {
-    "atlante": "./dist/bin/atlante.js"
+    "atlante": "./bin/atlante.ts"
   },
   "exports": {
-    ".": {
-      "types": "./src/index.ts",
-      "default": "./dist/index.js"
-    }
+    ".": "./src/main.ts"
   },
   "scripts": {
     "build": "tsc --project tsconfig.build.json && tsc --project tsconfig.build.bin.json"

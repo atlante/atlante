@@ -22,10 +22,7 @@
     "schema"
   ],
   "exports": {
-    ".": {
-      "types": "./src/index.ts",
-      "default": "./dist/index.js"
-    },
+    ".": "./src/index.ts",
     "./schema.json": "./schema/v0.1/schema.json"
   },
   "scripts": {
