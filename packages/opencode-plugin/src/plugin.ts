@@ -15,8 +15,8 @@ import {
   templateLoadDiagnostics,
 } from "@atlante/validator";
 import type { Plugin } from "@opencode-ai/plugin";
-import type { HostConfig } from "./inject.ts";
-import { injectAgents } from "./inject.ts";
+import type { HostConfig } from "./inject.js";
+import { injectAgents } from "./inject.js";
 
 function report(diagnostics: Diagnostic[]): void {
   for (const diagnostic of diagnostics) {

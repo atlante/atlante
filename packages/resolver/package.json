@@ -2,8 +2,41 @@
   "name": "@atlante/resolver",
   "version": "0.1.0",
   "type": "module",
+  "description": "Atlante value merging and prompt resolution",
+  "license": "MIT",
+  "contributors": [
+    {
+      "name": "cedoor",
+      "email": "me@cedoor.dev",
+      "url": "https://github.com/cedoor"
+    },
+    {
+      "name": "0xjei",
+      "email": "hello@0xjei.dev",
+      "url": "https://github.com/0xjei"
+    }
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/atlante/atlante.git",
+    "directory": "packages/resolver"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
   "exports": {
     ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json"
   },
   "dependencies": {
     "@atlante/schema": "workspace:*",

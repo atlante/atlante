@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { loadTemplates } from "../src/index.ts";
+import { loadTemplates } from "../src/index.js";
 
 const validRoot = new URL("./fixtures/valid", import.meta.url).pathname;
 const brokenRoot = new URL("./fixtures/broken", import.meta.url).pathname;

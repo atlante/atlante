@@ -233,8 +233,8 @@ templates and presets without pulling in the core.
 
 ```bash
 bun install
-bun run check      # biome check .
-bun run typecheck  # tsc --build packages/*/tsconfig.json
+bun run lint:check  # biome check .
+bun run type:check   # tsc --build packages/*/tsconfig.json
 bun test
 ```
 

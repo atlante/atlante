@@ -1,7 +1,7 @@
 import Handlebars from "handlebars";
-import { slotsOf } from "./composition.ts";
-import type { TemplateRegistry } from "./loader.ts";
-import { analyzeValueReferences, isValidValueKey } from "./values.ts";
+import { slotsOf } from "./composition.js";
+import type { TemplateRegistry } from "./loader.js";
+import { analyzeValueReferences, isValidValueKey } from "./values.js";
 
 export type RenderArgs = {
   registry: TemplateRegistry;

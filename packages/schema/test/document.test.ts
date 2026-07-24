@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { atlanteDocumentSchema, SCHEMA_URI } from "../src/index.ts";
+import { atlanteDocumentSchema, SCHEMA_URI } from "../src/index.js";
 
 const valid = {
   $schema: SCHEMA_URI,

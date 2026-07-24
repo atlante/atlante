@@ -3,9 +3,9 @@ import { basename } from "node:path";
 import type { AtlanteDocument, AtlanteDocumentOverlay } from "@atlante/schema";
 import { atlanteDocumentSchema, SCHEMA_URI } from "@atlante/schema";
 import { getNodeValue, type ParseError, parseTree } from "jsonc-parser";
-import type { Diagnostic } from "./diagnostic.ts";
-import { error, escapeJsonPointerSegment } from "./diagnostic.ts";
-import { discoverConfigPath } from "./discover.ts";
+import type { Diagnostic } from "./diagnostic.js";
+import { error, escapeJsonPointerSegment } from "./diagnostic.js";
+import { discoverConfigPath } from "./discover.js";
 
 function positionOf(text: string, offset: number) {
   const before = text.slice(0, offset);

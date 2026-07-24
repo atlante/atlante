@@ -10,7 +10,7 @@
 
 - [ ] Branch name follows the naming convention
 - [ ] `biome check .` passes
-- [ ] `bun run typecheck` passes
+- [ ] `bun run type:check` passes
 - [ ] `bun test` passes
 
 ## Testing

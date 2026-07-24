@@ -1,0 +1,102 @@
+name: Publish
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  id-token: write
+  contents: write
+
+jobs:
+  verify-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          if [[ -z "$VERSION" || "$VERSION" == "$GITHUB_REF" ]]; then
+            echo "Unable to extract a version from tag: $GITHUB_REF" >&2
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "Publishing version $VERSION"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.2.x"
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          bun install --frozen-lockfile
+
+      - name: Build
+        shell: bash
+        run: bun run build
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Update npm for Trusted Publishing
+        shell: bash
+        run: npm install --global npm@11.5.1
+
+      - name: Publish packages
+        shell: bash
+        run: bun scripts/publish.ts "$VERSION"
+
+      - name: Verify npm publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          packages=(schema templates presets validator resolver opencode-plugin cli)
+          verification_failed=0
+
+          for package in "${packages[@]}"; do
+            if npm view "@atlante/$package@$VERSION" version >/dev/null; then
+              echo "Verified @atlante/$package@$VERSION on npm"
+            else
+              echo "MISSING: @atlante/$package@$VERSION" >&2
+              verification_failed=1
+            fi
+          done
+
+          if (( verification_failed != 0 )); then
+            exit 1
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          name: "v${{ env.VERSION }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy-website:
+    needs: verify-and-publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Copy schema files
+        run: |
+          cp -r packages/schema/schema website/
+          cp -r packages/templates/schema website/schema/template
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod'
+          working-directory: website/

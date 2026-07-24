@@ -45,7 +45,7 @@
       "responsibilities": [
         "Review implementations for bugs, missing tests, and design issues.",
         "Check that schema, presets, and templates stay consistent with each other across the workspace packages.",
-        "Confirm the check suite (`bun test`, `bun run typecheck`, `bun run check`) would pass."
+        "Confirm the check suite (`bun test`, `bun run type:check`, `bun run lint:check`) would pass."
       ],
       "constraints": [
         "Flag problems clearly; do not silently rewrite the implement agent's work.",

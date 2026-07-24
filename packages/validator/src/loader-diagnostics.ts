@@ -1,6 +1,6 @@
 import type { TemplateLoadError } from "@atlante/templates";
-import type { Diagnostic } from "./diagnostic.ts";
-import { error } from "./diagnostic.ts";
+import type { Diagnostic } from "./diagnostic.js";
+import { error } from "./diagnostic.js";
 
 /**
  * Maps loader-level failures (an unreadable, malformed, or duplicate

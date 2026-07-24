@@ -1,31 +1,31 @@
-export type { Diagnostic } from "./diagnostic.ts";
+export type { Diagnostic } from "./diagnostic.js";
 export {
   error,
   escapeJsonPointerSegment,
   formatDiagnostic,
   hasErrors,
   warning,
-} from "./diagnostic.ts";
+} from "./diagnostic.js";
 export {
   CONFIG_FILENAMES,
   discoverConfigPath,
   findConfigFile,
-} from "./discover.ts";
+} from "./discover.js";
 export {
   loadDocument,
   parseDocumentOverlay,
   validateDocumentText,
-} from "./document.ts";
-export type { PresetLoader } from "./expand.ts";
-export { expandDocument } from "./expand.ts";
-export { templateLoadDiagnostics } from "./loader-diagnostics.ts";
+} from "./document.js";
+export type { PresetLoader } from "./expand.js";
+export { expandDocument } from "./expand.js";
+export { templateLoadDiagnostics } from "./loader-diagnostics.js";
 export {
   createBundledPresetLoader,
   hasAnyExtends,
-} from "./preset-loader.ts";
+} from "./preset-loader.js";
 export {
   expandInputSchema,
   promptInputOf,
   validateAgentInput,
   validateTemplates,
-} from "./templates.ts";
+} from "./templates.js";

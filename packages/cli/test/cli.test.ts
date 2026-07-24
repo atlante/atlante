@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SCHEMA_URI } from "@atlante/schema";
-import { runResolve, runValidate } from "../src/main.ts";
+import { runResolve, runValidate } from "../src/main.js";
 
 const created: string[] = [];
 

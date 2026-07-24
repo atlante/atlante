@@ -1,14 +1,14 @@
 import { Command } from "commander";
-import { runInit } from "./commands/init.ts";
-import { runResolve } from "./commands/resolve.ts";
-import { runValidate } from "./commands/validate.ts";
+import { runInit } from "./commands/init.js";
+import { runResolve } from "./commands/resolve.js";
+import { runValidate } from "./commands/validate.js";
 
 // Preserve the existing preset helpers as public aliases for CLI consumers.
 export { listPresets, presetName, readPreset } from "@atlante/presets";
-export { runInit } from "./commands/init.ts";
-export { runResolve } from "./commands/resolve.ts";
-export { runValidate } from "./commands/validate.ts";
-export { formatDiagnostic } from "./report.ts";
+export { runInit } from "./commands/init.js";
+export { runResolve } from "./commands/resolve.js";
+export { runValidate } from "./commands/validate.js";
+export { formatDiagnostic } from "./report.js";
 
 export function createProgram(): Command {
   const program = new Command()

@@ -1,5 +1,5 @@
-import type { TemplateRegistry } from "./loader.ts";
-import { TEMPLATE_ID_PATTERN, type TemplateManifest } from "./manifest.ts";
+import type { TemplateRegistry } from "./loader.js";
+import { TEMPLATE_ID_PATTERN, type TemplateManifest } from "./manifest.js";
 
 export type Slot = { property: string; templateId: string };
 

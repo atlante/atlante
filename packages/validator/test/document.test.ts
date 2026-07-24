@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SCHEMA_URI } from "@atlante/schema";
-import { loadDocument, validateDocumentText } from "../src/index.ts";
+import { loadDocument, validateDocumentText } from "../src/index.js";
 
 const valid = `{
   // a comment, because this is JSONC

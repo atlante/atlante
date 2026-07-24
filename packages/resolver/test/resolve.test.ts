@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { AtlanteDocument } from "@atlante/schema";
 import { SCHEMA_URI } from "@atlante/schema";
 import { loadBundledTemplates, loadTemplates } from "@atlante/templates";
-import { resolve } from "../src/index.ts";
+import { resolve } from "../src/index.js";
 
 const { registry } = loadBundledTemplates();
 

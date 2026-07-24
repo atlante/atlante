@@ -1,7 +1,7 @@
 import { listPresets, presetName, readPreset } from "@atlante/presets";
-import { error } from "./diagnostic.ts";
-import { parseDocumentOverlay } from "./document.ts";
-import type { PresetLoader } from "./expand.ts";
+import { error } from "./diagnostic.js";
+import { parseDocumentOverlay } from "./document.js";
+import type { PresetLoader } from "./expand.js";
 
 /** Creates a PresetLoader backed by the bundled @atlante/presets. */
 export function createBundledPresetLoader(): PresetLoader {
