@@ -2,8 +2,30 @@
   "name": "@atlante/presets",
   "version": "0.1.0",
   "type": "module",
+  "description": "Atlante bundled configuration presets",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/atlante/atlante.git",
+    "directory": "packages/presets"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "bundled"
+  ],
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json"
   },
   "dependencies": {
     "zod": "^4.0.0"

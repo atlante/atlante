@@ -1,7 +1,7 @@
 import { DEFAULT_TEMPLATE_ID } from "@atlante/resolver";
 import { hasErrors, validateTemplates } from "@atlante/validator";
-import { printDiagnostics } from "../report.ts";
-import { loadCliResources } from "./load.ts";
+import { printDiagnostics } from "../report.js";
+import { loadCliResources } from "./load.js";
 
 /**
  * Validation deliberately stops short of rendering. Going through `resolve`

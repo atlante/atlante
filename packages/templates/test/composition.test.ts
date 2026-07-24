@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { loadTemplates, slotsOf, walkComposition } from "../src/index.ts";
+import { loadTemplates, slotsOf, walkComposition } from "../src/index.js";
 
 const cyclicRoot = new URL("./fixtures/cyclic", import.meta.url).pathname;
 const validRoot = new URL("./fixtures/valid", import.meta.url).pathname;

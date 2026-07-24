@@ -10,9 +10,9 @@ import {
   walkComposition,
   walkValueReferences,
 } from "@atlante/templates";
-import Ajv2020 from "ajv/dist/2020.js";
-import type { Diagnostic } from "./diagnostic.ts";
-import { error, escapeJsonPointerSegment } from "./diagnostic.ts";
+import { Ajv2020 } from "ajv/dist/2020.js";
+import type { Diagnostic } from "./diagnostic.js";
+import { error, escapeJsonPointerSegment } from "./diagnostic.js";
 
 /** Binding metadata, not template input (SPECIFICATION.md §4.3). */
 const BINDING_KEYS = new Set(["promptTemplate", "values"]);

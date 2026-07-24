@@ -9,7 +9,7 @@ import {
   expandInputSchema,
   validateAgentInput,
   validateTemplates,
-} from "../src/index.ts";
+} from "../src/index.js";
 
 const cyclicRoot = new URL(
   "../../templates/test/fixtures/cyclic",

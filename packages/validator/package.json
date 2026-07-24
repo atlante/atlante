@@ -2,8 +2,29 @@
   "name": "@atlante/validator",
   "version": "0.1.0",
   "type": "module",
+  "description": "Atlante document and template validator",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/atlante/atlante.git",
+    "directory": "packages/validator"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json"
   },
   "dependencies": {
     "@atlante/presets": "workspace:*",

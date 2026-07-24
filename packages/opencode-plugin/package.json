@@ -2,8 +2,29 @@
   "name": "@atlante/opencode-plugin",
   "version": "0.1.0",
   "type": "module",
+  "description": "Atlante OpenCode host adapter plugin",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/atlante/atlante.git",
+    "directory": "packages/opencode-plugin"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json"
   },
   "dependencies": {
     "@atlante/resolver": "workspace:*",

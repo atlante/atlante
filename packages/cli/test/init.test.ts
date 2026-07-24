@@ -12,8 +12,8 @@ import { join } from "node:path";
 import {
   type InitDependencies,
   runInitWithDependencies,
-} from "../src/commands/init-internal.ts";
-import { runInit, runValidate } from "../src/main.ts";
+} from "../src/commands/init-internal.js";
+import { runInit, runValidate } from "../src/main.js";
 
 const created: string[] = [];
 

@@ -1,6 +1,6 @@
-import { type InitOptions, runInitWithDependencies } from "./init-internal.ts";
+import { type InitOptions, runInitWithDependencies } from "./init-internal.js";
 
-export type { InitOptions } from "./init-internal.ts";
+export type { InitOptions } from "./init-internal.js";
 
 export function runInit(
   directory: string,

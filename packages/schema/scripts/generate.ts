@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { atlanteDocumentSchema, SCHEMA_URI } from "../src/document.ts";
-import { VALUE_KEY_PATTERN } from "../src/values.ts";
+import { atlanteDocumentSchema, SCHEMA_URI } from "../src/document.js";
+import { VALUE_KEY_PATTERN } from "../src/values.js";
 
 export function buildDocumentJsonSchema(): Record<string, unknown> {
   const generated = z.toJSONSchema(atlanteDocumentSchema, {

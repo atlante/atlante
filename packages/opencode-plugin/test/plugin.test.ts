@@ -4,8 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SCHEMA_URI } from "@atlante/schema";
 import type { Config, PluginInput } from "@opencode-ai/plugin";
-import type { HostConfig } from "../src/index.ts";
-import { AtlantePlugin, createAtlantePlugin } from "../src/plugin.ts";
+import type { HostConfig } from "../src/index.js";
+import { AtlantePlugin, createAtlantePlugin } from "../src/plugin.js";
 
 const created: string[] = [];
 

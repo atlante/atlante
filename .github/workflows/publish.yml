@@ -1,0 +1,256 @@
+name: Publish
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  id-token: write
+  contents: write
+
+jobs:
+  verify-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          if [[ -z "$VERSION" || "$VERSION" == "$GITHUB_REF" ]]; then
+            echo "Unable to extract a version from tag: $GITHUB_REF" >&2
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "Publishing version $VERSION"
+
+      - name: Verify tag matches package manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          mismatches=()
+
+          for manifest in packages/*/package.json; do
+            package_version="$(jq -r '.version // empty' "$manifest")"
+            if [[ "$package_version" != "$VERSION" ]]; then
+              mismatches+=("$manifest: expected $VERSION, found ${package_version:-<missing>}")
+            fi
+          done
+
+          if (( ${#mismatches[@]} > 0 )); then
+            echo "Package version verification failed:" >&2
+            printf '  %s\n' "${mismatches[@]}" >&2
+            exit 1
+          fi
+
+          echo "All package manifests match version $VERSION"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.2.x"
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          bun install --frozen-lockfile
+
+      - name: Run quality checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          bunx biome ci .
+          bun run typecheck
+          bun test
+          bun run build
+
+      - name: Validate package contents
+        shell: bash
+        run: |
+          set -euo pipefail
+          packages=(schema templates presets validator resolver opencode-plugin cli)
+
+          for package in "${packages[@]}"; do
+            source_dir="packages/$package"
+            staging_dir="$(mktemp -d)"
+            cp "$source_dir/package.json" "$staging_dir/package.json"
+
+            for asset in dist schema bundled LICENSE; do
+              if [[ -e "$source_dir/$asset" ]]; then
+                cp -R "$source_dir/$asset" "$staging_dir/"
+              fi
+            done
+
+            node - "$staging_dir/package.json" "$VERSION" <<'NODE'
+          const fs = require("node:fs");
+
+          const manifestPath = process.argv[2];
+          const version = process.argv[3];
+          const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+
+          for (const field of ["dependencies", "peerDependencies", "devDependencies"]) {
+            for (const [name, range] of Object.entries(manifest[field] ?? {})) {
+              if (range === "workspace:*") {
+                manifest[field][name] = `^${version}`;
+              }
+            }
+          }
+
+          fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+          NODE
+
+            (cd "$staging_dir" && npm pack --dry-run --json > pack.json)
+
+            required_asset=""
+            case "$package" in
+              schema)
+                required_asset="schema/"
+                ;;
+              templates|presets)
+                required_asset="bundled/"
+                ;;
+            esac
+
+            node - "$staging_dir/pack.json" "$package" "$required_asset" <<'NODE'
+          const fs = require("node:fs");
+
+          const reportPath = process.argv[2];
+          const packageName = process.argv[3];
+          const requiredAsset = process.argv[4];
+          const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+          const files = report[0]?.files?.map(({ path }) => path) ?? [];
+          const missing = [];
+
+          if (!files.includes("package.json")) missing.push("package.json");
+          if (!files.some((file) => file.startsWith("dist/"))) missing.push("dist/");
+          if (!files.some((file) => file.startsWith("dist/") && file.endsWith(".js"))) {
+            missing.push("dist/*.js");
+          }
+          if (!files.some((file) => file.startsWith("dist/") && file.endsWith(".d.ts"))) {
+            missing.push("dist/*.d.ts");
+          }
+          if (requiredAsset && !files.some((file) => file.startsWith(requiredAsset))) {
+            missing.push(requiredAsset);
+          }
+
+          if (missing.length > 0) {
+            console.error(`npm pack validation failed for @atlante/${packageName}:`);
+            console.error(`Missing: ${missing.join(", ")}`);
+            process.exit(1);
+          }
+
+          console.log(`Package contents validated for @atlante/${packageName}`);
+          NODE
+
+            rm -rf "$staging_dir"
+          done
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Update npm for Trusted Publishing
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --global npm@11.5.1
+
+      - name: Smoke test CLI under Node.js
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Run the compiled CLI directly under Node, relying on the
+          # workspace symlinks that bun install created in node_modules/.
+          node packages/cli/dist/bin/atlante.js --help
+
+      - name: Publish packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          packages=(schema templates presets validator resolver opencode-plugin cli)
+          publish_failed=0
+
+          for package in "${packages[@]}"; do
+            source_dir="packages/$package"
+            staging_dir="$(mktemp -d)"
+            cp "$source_dir/package.json" "$staging_dir/package.json"
+
+            for asset in dist schema bundled LICENSE; do
+              if [[ -e "$source_dir/$asset" ]]; then
+                cp -R "$source_dir/$asset" "$staging_dir/"
+              fi
+            done
+
+            node - "$staging_dir/package.json" "$VERSION" <<'NODE'
+          const fs = require("node:fs");
+
+          const manifestPath = process.argv[2];
+          const version = process.argv[3];
+          const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+
+          for (const field of ["dependencies", "peerDependencies", "devDependencies"]) {
+            for (const [name, range] of Object.entries(manifest[field] ?? {})) {
+              if (range === "workspace:*") {
+                manifest[field][name] = `^${version}`;
+              }
+            }
+          }
+
+          fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+          NODE
+
+            echo "Publishing @atlante/$package@$VERSION"
+            if (cd "$staging_dir" && npm publish --provenance --access public); then
+              echo "Published @atlante/$package@$VERSION"
+            else
+              echo "Failed to publish @atlante/$package@$VERSION; continuing" >&2
+              publish_failed=1
+            fi
+
+            rm -rf "$staging_dir"
+          done
+
+          if (( publish_failed != 0 )); then
+            echo "One or more packages failed to publish" >&2
+            exit 1
+          fi
+
+      - name: Verify npm publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          packages=(schema templates presets validator resolver opencode-plugin cli)
+          verification_failed=0
+
+          for package in "${packages[@]}"; do
+            if npm view "@atlante/$package@$VERSION" version >/dev/null; then
+              echo "Verified @atlante/$package@$VERSION on npm"
+            else
+              echo "MISSING: @atlante/$package@$VERSION" >&2
+              verification_failed=1
+            fi
+          done
+
+          if (( verification_failed != 0 )); then
+            exit 1
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          name: "v${{ env.VERSION }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  vercel-deploy:
+    runs-on: ubuntu-latest
+    needs: verify-and-publish
+    if: false
+    steps:
+      - run: 'echo "Vercel deployment not yet configured (see #4, #5, #8)"'

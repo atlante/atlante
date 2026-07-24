@@ -1,7 +1,7 @@
 import { resolve as resolveHarness } from "@atlante/resolver";
 import { hasErrors } from "@atlante/validator";
-import { printDiagnostics } from "../report.ts";
-import { loadCliResources } from "./load.ts";
+import { printDiagnostics } from "../report.js";
+import { loadCliResources } from "./load.js";
 
 export type ResolveOptions = { agent?: string; json?: boolean };
 

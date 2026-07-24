@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { loadBundledTemplates, renderTemplate } from "../src/index.ts";
+import { loadBundledTemplates, renderTemplate } from "../src/index.js";
 
 describe("bundled templates", () => {
   test("load without errors", () => {

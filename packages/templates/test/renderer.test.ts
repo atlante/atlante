@@ -7,9 +7,9 @@ import {
   NonStringValueError,
   renderTemplate,
   slotPartialName,
-} from "../src/index.ts";
-import type { TemplateRegistry } from "../src/loader.ts";
-import type { TemplateManifest } from "../src/manifest.ts";
+} from "../src/index.js";
+import type { TemplateRegistry } from "../src/loader.js";
+import type { TemplateManifest } from "../src/manifest.js";
 
 const root = new URL("./fixtures/composed", import.meta.url).pathname;
 const cyclicRoot = new URL("./fixtures/cyclic", import.meta.url).pathname;

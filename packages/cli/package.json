@@ -2,11 +2,32 @@
   "name": "@atlante/cli",
   "version": "0.1.0",
   "type": "module",
+  "description": "Atlante command-line interface for structured, versionable AI agent prompts",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/atlante/atlante.git",
+    "directory": "packages/cli"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
   "bin": {
-    "atlante": "./bin/atlante.ts"
+    "atlante": "./dist/bin/atlante.js"
   },
   "exports": {
-    ".": "./src/main.ts"
+    ".": "./dist/main.js"
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json && tsc --project tsconfig.build.bin.json"
   },
   "dependencies": {
     "@atlante/presets": "workspace:*",

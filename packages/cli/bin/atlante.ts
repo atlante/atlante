@@ -1,4 +1,6 @@
 #!/usr/bin/env bun
-import { createProgram } from "../src/main.ts";
+const mainModule = await import(
+  import.meta.url.includes("/dist/") ? "../main.js" : "../src/main.js"
+);
 
-await createProgram().parseAsync(process.argv);
+await mainModule.createProgram().parseAsync(process.argv);

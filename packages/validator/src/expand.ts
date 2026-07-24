@@ -6,8 +6,8 @@ import type {
   ValuesMapOverlay,
 } from "@atlante/schema";
 import { atlanteDocumentSchema } from "@atlante/schema";
-import type { Diagnostic } from "./diagnostic.ts";
-import { error, escapeJsonPointerSegment } from "./diagnostic.ts";
+import type { Diagnostic } from "./diagnostic.js";
+import { error, escapeJsonPointerSegment } from "./diagnostic.js";
 
 const MAX_PRESET_DEPTH = 32;
 

@@ -1,21 +1,21 @@
-export { BUNDLED_TEMPLATES_DIR, loadBundledTemplates } from "./bundled.ts";
-export type { CompositionIssue, Slot } from "./composition.ts";
-export { slotsOf, walkComposition } from "./composition.ts";
+export { BUNDLED_TEMPLATES_DIR, loadBundledTemplates } from "./bundled.js";
+export type { CompositionIssue, Slot } from "./composition.js";
+export { slotsOf, walkComposition } from "./composition.js";
 export type {
   Template,
   TemplateLoadError,
   TemplateRegistry,
-} from "./loader.ts";
-export { loadTemplates } from "./loader.ts";
-export type { TemplateManifest } from "./manifest.ts";
+} from "./loader.js";
+export { loadTemplates } from "./loader.js";
+export type { TemplateManifest } from "./manifest.js";
 export {
   inputSchemaSchema,
   JSON_SCHEMA_DRAFT_2020_12_URI,
   TEMPLATE_ID_PATTERN,
   TEMPLATE_MANIFEST_URI,
   templateManifestSchema,
-} from "./manifest.ts";
-export type { RenderArgs } from "./renderer.ts";
+} from "./manifest.js";
+export type { RenderArgs } from "./renderer.js";
 export {
   InvalidValueReferenceError,
   interpolateValues,
@@ -26,15 +26,15 @@ export {
   SLOT_PARTIAL_PREFIX,
   slotPartialName,
   ValueReferenceCollisionError,
-} from "./renderer.ts";
+} from "./renderer.js";
 export {
   resolveSystemValues,
   SYSTEM_RESOLVERS,
   UnknownSystemVariableError,
-} from "./system-values.ts";
-export type { ValueReference, ValueReferenceVisitor } from "./values.ts";
+} from "./system-values.js";
+export type { ValueReference, ValueReferenceVisitor } from "./values.js";
 export {
   analyzeValueReferences,
   isValidValueKey,
   walkValueReferences,
-} from "./values.ts";
+} from "./values.js";

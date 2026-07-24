@@ -4,19 +4,19 @@ export type {
   AgentsOverlay,
   AtlanteDocument,
   AtlanteDocumentOverlay,
-} from "./document.ts";
+} from "./document.js";
 export {
   agentBindingSchema,
   atlanteDocumentSchema,
   SCHEMA_URI,
-} from "./document.ts";
-export type { Value, ValuesMap, ValuesMapOverlay } from "./values.ts";
+} from "./document.js";
+export type { Value, ValuesMap, ValuesMapOverlay } from "./values.js";
 export {
   VALUE_KEY_PATTERN,
   valueSchema,
   valuesMapOverlaySchema,
   valuesMapSchema,
-} from "./values.ts";
+} from "./values.js";
 
 import documentJsonSchemaRaw from "../schema/v0.1/schema.json" with {
   type: "json",

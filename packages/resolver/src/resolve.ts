@@ -14,7 +14,7 @@ import {
   promptInputOf,
   validateTemplates,
 } from "@atlante/validator";
-import { mergeValues } from "./values.ts";
+import { mergeValues } from "./values.js";
 
 export const DEFAULT_TEMPLATE_ID = "atlante/agent";
 

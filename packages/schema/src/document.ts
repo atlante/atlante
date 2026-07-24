@@ -1,6 +1,6 @@
 import { z } from "zod";
-import type { ValuesMapOverlay } from "./values.ts";
-import { safeRecord, valuesMapSchema } from "./values.ts";
+import type { ValuesMapOverlay } from "./values.js";
+import { safeRecord, valuesMapSchema } from "./values.js";
 
 export const SCHEMA_URI = "https://atlante.sh/schema/v0.1/schema.json";
 

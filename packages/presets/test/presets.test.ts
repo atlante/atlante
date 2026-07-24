@@ -7,7 +7,7 @@ import {
   PRESET_MANIFEST_URI,
   presetName,
   readPreset,
-} from "../src/index.ts";
+} from "../src/index.js";
 
 const created: string[] = [];
 

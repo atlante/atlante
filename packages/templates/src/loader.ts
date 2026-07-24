@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import type { TemplateManifest } from "./manifest.ts";
-import { templateManifestSchema } from "./manifest.ts";
+import type { TemplateManifest } from "./manifest.js";
+import { templateManifestSchema } from "./manifest.js";
 
 export type Template = {
   manifest: TemplateManifest;

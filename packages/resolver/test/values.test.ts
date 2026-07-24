@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mergeValues } from "../src/index.ts";
+import { mergeValues } from "../src/index.js";
 
 describe("mergeValues", () => {
   test("returns global values when there are no overrides", () => {

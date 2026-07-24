@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { buildDocumentJsonSchema } from "../scripts/generate.ts";
-import { documentJsonSchema, SCHEMA_URI } from "../src/index.ts";
+import { buildDocumentJsonSchema } from "../scripts/generate.js";
+import { documentJsonSchema, SCHEMA_URI } from "../src/index.js";
 
 describe("document JSON Schema", () => {
   test("identifies itself with the versioned $id", () => {

@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url";
-import { loadTemplates } from "./loader.ts";
+import { loadTemplates } from "./loader.js";
 
 export const BUNDLED_TEMPLATES_DIR = fileURLToPath(
   new URL("../bundled", import.meta.url),

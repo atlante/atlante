@@ -2,12 +2,32 @@
   "name": "@atlante/schema",
   "version": "0.1.0",
   "type": "module",
+  "description": "Atlante document schema and TypeScript types",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/atlante/atlante.git",
+    "directory": "packages/schema"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "schema"
+  ],
   "exports": {
-    ".": "./src/index.ts",
+    ".": "./dist/index.js",
     "./schema.json": "./schema/v0.1/schema.json"
   },
   "scripts": {
-    "generate": "bun scripts/generate.ts"
+    "generate": "bun scripts/generate.ts",
+    "build": "tsc --project tsconfig.build.json"
   },
   "dependencies": {
     "zod": "^4.0.0"
