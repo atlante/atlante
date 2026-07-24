@@ -2,6 +2,10 @@
   "name": "atlante",
   "private": true,
   "type": "module",
+  "contributors": [
+    { "name": "cedoor", "email": "me@cedoor.dev", "url": "https://github.com/cedoor" },
+    { "name": "0xjei", "email": "hello@0xjei.dev", "url": "https://github.com/0xjei" }
+  ],
   "workspaces": [
     "packages/*"
   ],
