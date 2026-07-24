@@ -1,5 +1,6 @@
 {
   "lockfileVersion": 1,
+  "configVersion": 0,
   "workspaces": {
     "": {
       "name": "atlante",
@@ -76,6 +77,7 @@
       "name": "@atlante/validator",
       "version": "0.1.0",
       "dependencies": {
+        "@atlante/presets": "workspace:*",
         "@atlante/schema": "workspace:*",
         "@atlante/templates": "workspace:*",
         "ajv": "^8.17.1",

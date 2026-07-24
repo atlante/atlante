@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { AgentArtifact } from "@atlante/resolver";
 import type { HostConfig } from "../src/index.ts";
-import { injectAgents } from "../src/index.ts";
+import { injectAgents } from "../src/inject.ts";
 
 const artifacts: AgentArtifact[] = [
   { hostAgentId: "reviewer", templateId: "atlante/agent", prompt: "PROMPT" },
