@@ -53,7 +53,7 @@ jobs:
 
       - name: Publish packages
         shell: bash
-        run: bun scripts/publish.ts --version "$VERSION"
+        run: bun scripts/publish.ts "$VERSION"
 
       - name: Verify npm publication
         shell: bash

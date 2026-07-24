@@ -29,6 +29,6 @@ You are executing the `/release` command.
 
 6. On **explicit confirmation**, run:
    ```sh
-   bun run release -- --version X.Y.Z
+   bun run release -- X.Y.Z
    ```
    Replace `X.Y.Z` with the confirmed version. Report the result.

@@ -14,10 +14,12 @@ const PACKAGES = [
 ] as const;
 
 function parseArgs() {
-  const idx = process.argv.indexOf("--version");
-  if (idx === -1 || !process.argv[idx + 1])
-    throw new Error("--version X.Y.Z is required");
-  return process.argv[idx + 1];
+  const version = process.argv[2];
+  if (!version)
+    throw new Error("usage: bun scripts/publish.ts <version>");
+  if (!/^\d+\.\d+\.\d+$/.test(version))
+    throw new Error(`version must match X.Y.Z, got "${version}"`);
+  return version;
 }
 
 function transformExports(

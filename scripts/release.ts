@@ -84,22 +84,20 @@ function parseArgs(args: string[]) {
   let dryRun = false;
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    if (arg === "--version") {
-      if (versionText !== undefined)
-        throw new Error("--version may only be provided once");
-      const val = args[i + 1];
-      if (val === undefined || val.startsWith("--"))
-        throw new Error("--version requires a value");
-      versionText = val;
-      i++;
-    } else if (arg === "--dry-run") {
-      dryRun = true;
+    if (arg.startsWith("--")) {
+      if (arg === "--dry-run") {
+        dryRun = true;
+      } else {
+        throw new Error(`unknown argument: ${arg}`);
+      }
     } else {
-      throw new Error(`unknown argument: ${arg}`);
+      if (versionText !== undefined)
+        throw new Error("only one version may be provided");
+      versionText = arg;
     }
   }
 
-  if (versionText === undefined) throw new Error("--version X.Y.Z is required");
+  if (versionText === undefined) throw new Error("usage: bun scripts/release.ts <version> [--dry-run]");
   return { version: parseVersion(versionText, "Version"), dryRun };
 }
 
