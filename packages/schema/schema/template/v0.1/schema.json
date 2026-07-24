@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://atlante.sh/schema/template/v0.1/schema.json",
+  "title": "Atlante template manifest",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "const": "https://atlante.sh/schema/template/v0.1/schema.json"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+\\/[a-z0-9-]+$"
+    },
+    "description": {
+      "type": "string"
+    },
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "$schema": {
+          "type": "string",
+          "const": "https://json-schema.org/draft/2020-12/schema"
+        }
+      },
+      "required": ["$schema"],
+      "additionalProperties": {}
+    }
+  },
+  "required": ["$schema", "id", "inputSchema"],
+  "additionalProperties": false
+}

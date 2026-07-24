@@ -37,6 +37,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
+    "generate": "bun scripts/generate.ts",
     "build": "tsc --project tsconfig.build.json"
   },
   "dependencies": {
