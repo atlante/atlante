@@ -22,7 +22,6 @@ export function buildDocumentJsonSchema(): Record<string, unknown> {
     properties: {
       template: { type: "string", minLength: 1 },
       values: valuesSchema,
-      extends: { type: "string", minLength: 1 },
     },
     additionalProperties: {},
   };

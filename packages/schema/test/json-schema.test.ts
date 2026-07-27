@@ -13,6 +13,24 @@ describe("document JSON Schema", () => {
     );
   });
 
+  test("does not reserve extends as an agent binding property", () => {
+    const documentProperties = buildDocumentJsonSchema().properties as Record<
+      string,
+      unknown
+    >;
+    const agents = documentProperties.agents as {
+      additionalProperties: {
+        oneOf: [
+          { properties?: Record<string, unknown> },
+          ...Array<{ properties?: Record<string, unknown> }>,
+        ];
+      };
+    };
+    const binding = agents.additionalProperties.oneOf[0];
+
+    expect(binding.properties).not.toHaveProperty("extends");
+  });
+
   test("the committed file matches the generated output", () => {
     expect(documentJsonSchema).toEqual(buildDocumentJsonSchema());
   });
