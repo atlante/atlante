@@ -14,8 +14,8 @@ prompts and project-global Markdown skills. It defines a composable template
 system that owns prompt and skill-content semantics, a two-level validation
 model (document structure + template input schemas), deterministic resolution,
 and an OpenCode adapter that materializes resolved prompts into host agent
-definitions and exposes resolved skills through the in-memory `atlante_skill`
-adapter tool.
+definitions and exposes resolved skills through the `atlante_skill` adapter
+tool.
 
 Version 0.1 includes:
 
@@ -74,8 +74,6 @@ code is not part of the configuration format.
 - **Skill binding**: the association between a root `skills` map key and a
   description plus template-owned skill-content input. The map key is the
   binding's `skillId`.
-- **Skill artifact**: a resolved, host-independent skill descriptor containing
-  `skillId`, `templateId`, `description`, and rendered Markdown `content`.
 - **Project-global skill**: a skill binding available independently of any one
   host agent. It is content exposed through an adapter lookup, not an execution
   task or an agent runtime.
@@ -391,10 +389,8 @@ skill content renderer and defaults to `atlante/skill`. `values` contains local
 value overrides. Every other field is template-owned input. Skills are global
 to the project and are not associated with a host-agent ID.
 
-The resolver renders each skill into a `SkillArtifact`; defining or resolving a
-skill MUST NOT execute its content. The OpenCode adapter exposes the artifact
-through `atlante_skill` rather than writing a native OpenCode skill file or
-registering the native `skill` tool.
+Defining or resolving a skill MUST NOT execute its content. The OpenCode adapter
+exposes resolved skill content through `atlante_skill`.
 
 ## 8. Validation
 
@@ -477,20 +473,18 @@ The resolver MUST:
 
 For skills, the resolver MUST:
 
-1. iterate the root `skills` map in its stable object-enumeration order;
-2. select the explicit `template` or default to `atlante/skill`;
-3. merge global values with skill-local `values`, resolve system values, and
+1. select the explicit `template` or default to `atlante/skill`;
+2. merge global values with skill-local `values`, resolve system values, and
    interpolate both `description` and template-owned input before rendering;
-4. remove reserved skill metadata (`description`, `template`, and `values`) from
+3. remove reserved skill metadata (`description`, `template`, and `values`) from
    template input;
-5. produce one `SkillArtifact` per binding with exactly `skillId`, `templateId`,
-   `description`, and rendered Markdown `content`.
+4. produce one resolved descriptor per binding containing `skillId`,
+   `templateId`, `description`, and rendered Markdown `content`.
 
-`ResolvedHarness` MUST contain `agents`, `skills`, and `diagnostics`. The
-`skills` array preserves root `skills` map order. Resolution is globally
-fail-closed: if any agent or skill validation, value interpolation,
+Resolved output MUST contain `agents`, `skills`, and `diagnostics`. Resolution
+is globally fail-closed: if any agent or skill validation, value interpolation,
 composition, or rendering fails, it MUST return no partial agent or skill
-artifacts, MUST return empty `agents` and `skills` arrays, and MUST report
+descriptors, MUST return empty `agents` and `skills` arrays, and MUST report
 diagnostics. An empty `skills` array is a successful result when the document
 contains no skills.
 
@@ -503,11 +497,9 @@ Materialization is performed by an adapter. The OpenCode adapter MUST:
 - report prompt replacement warnings;
 - avoid executing the agent or any command.
 
-The adapter MUST resolve the complete document once during OpenCode
-initialization. It MUST stage all agent configuration changes on a clone and
-commit the staged config only after agents and skills resolve successfully. A
-failure MUST leave the host config unchanged; no partial agent injection or
-partial skill availability is permitted.
+Materialization MUST be atomic. A failure MUST leave the host configuration
+unchanged; no partial agent injection or partial skill availability is
+permitted.
 
 Repeated materialization from the same valid document SHOULD produce the same
 host artifacts and MUST NOT duplicate agents.
@@ -530,8 +522,7 @@ The v1 implementation SHOULD preserve these package responsibilities:
   resolution, and host-independent artifact descriptors;
 - `@atlante/presets`: registry-derived preset loading and the bundled preset
   documents themselves;
-- `@atlante/opencode-plugin`: OpenCode prompt materialization and the in-memory
-  `atlante_skill` adapter tool; no skill execution runtime;
+- `@atlante/opencode-plugin`: OpenCode prompt materialization and skill lookup;
 - `@atlante/cli`: validation, resolution, materialization, and
   `atlante init` entry point.
 
@@ -569,30 +560,19 @@ The adapter MUST treat the Atlante configuration as the only source of truth for
 prompts. Users SHOULD not maintain a competing prompt in OpenCode agent
 configuration.
 
-### 11.1 Skill tool lifecycle
+### 11.1 Skill lookup
 
-The OpenCode adapter performs one complete resolution during initialization.
-After successful resolution and materialization it exposes an in-memory
-`atlante_skill` tool for project-global skills. The tool input MUST be exactly an
-object with one string field, `{ "name": "<skillId>" }`; the name is looked up
-against the root `skills` map key. A successful known-name lookup returns only
-the resolved Markdown `content`; the skill `description` is not returned by the
-tool.
+After successful resolution and materialization, the OpenCode adapter exposes
+an `atlante_skill` tool for project-global skills. The tool input MUST be exactly
+an object with one string field, `{ "name": "<skillId>" }`; the name is looked
+up against the root `skills` map key. A successful known-name lookup returns
+only the resolved Markdown `content`; the skill `description` is not returned
+by the tool.
 
-During preparation, the adapter is inactive and the tool is unavailable. If
-overlay expansion, validation, or resolution fails during preparation, the
-tool MUST be omitted and the host configuration MUST remain unchanged. After
-the complete result is materialized, the tool is active. A failure after
-materialization, including a runtime failure, MUST move the tool to the failed
-lifecycle state. Unavailable, failed, malformed-input, and unknown-name
-requests MUST return explicit errors and MUST NOT return partial skill content.
-Skill content is not executed and does not carry runtime state.
-
-The adapter MUST NOT write skill or agent files, create a skill cache, or
-register Atlante skills as native OpenCode skills. The native OpenCode `skill`
-tool MAY coexist with `atlante_skill`; neither tool replaces or intercepts the
-other. The adapter MUST stage host config changes and commit no mutation when
-resolution fails.
+If overlay expansion, validation, or resolution fails, `atlante_skill` MUST be
+unavailable and the host configuration MUST remain unchanged. Malformed input
+and unknown names MUST return explicit errors without partial skill content.
+Skill content is returned as data and is not executed.
 
 ### 11.2 Preset inheritance
 
@@ -742,10 +722,6 @@ Version 0.1 is complete when a conforming implementation can:
      and `diagnostics`, with JSON failures on stdout and no duplicate stderr
      diagnostics, while `--agent` filters only agents;
 15. expose `atlante_skill` with the `{ "name": "<skillId>" }` lookup returning
-     rendered Markdown content only, omit the tool on preparation failure, and
-     use the failed lifecycle only after materialization/runtime failure;
-16. initialize the tool once, commit staged host configuration atomically, and
-    leave the host unchanged on failure;
-17. allow native OpenCode `skill` coexistence without native skill
-    registration; and
-18. write no skill files, agent files, or skill cache during materialization.
+    rendered Markdown content only and make it unavailable when preparation
+    fails; and
+16. materialize atomically and leave the host unchanged on failure.
