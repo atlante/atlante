@@ -1,8 +1,9 @@
 #!/usr/bin/env bun
 import { readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const ROOT = join(import.meta.dir, "..");
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const PACKAGES = [
   "schema",
   "templates",
@@ -17,10 +18,12 @@ const PACKAGES = [
 // Helpers
 // ---------------------------------------------------------------------------
 
+type ShellArg = string | number | boolean | null | ShellArg[];
+
 /** Run a shell command at ROOT. Throws on non‑zero exit. Returns trimmed stdout. */
 async function run(
   strings: TemplateStringsArray,
-  ...values: string[]
+  ...values: ShellArg[]
 ): Promise<string> {
   const r = await Bun.$(strings, ...values)
     .cwd(ROOT)
@@ -37,7 +40,7 @@ async function run(
 /** Like `run` but returns null on failure (128 + no‑tags). */
 async function maybe(
   strings: TemplateStringsArray,
-  ...values: string[]
+  ...values: ShellArg[]
 ): Promise<string | null> {
   const r = await Bun.$(strings, ...values)
     .cwd(ROOT)
@@ -184,7 +187,7 @@ async function bump(pkgs: Pkg[], v: ReturnType<typeof parseVersion>) {
 
 async function commitAndTag(pkgs: Pkg[], v: ReturnType<typeof parseVersion>) {
   const paths = pkgs.map((p) => p.path.slice(ROOT.length + 1));
-  await run`git add -- ${paths.join(" ")}`;
+  await run`git add -- ${paths}`;
   await run`git commit -m ${`release: v${v.raw}`}`;
   await run`git tag -a ${`v${v.raw}`} -m ${`v${v.raw}`}`;
   console.log(`Created commit and annotated tag v${v.raw}`);
