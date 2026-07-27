@@ -99,7 +99,7 @@ export function resolve(
 
   const agents: AgentArtifact[] = [];
 
-  for (const [hostAgentId, binding] of Object.entries(document.agents)) {
+  for (const [hostAgentId, binding] of Object.entries(document.agents ?? {})) {
     const templateId = binding.template ?? DEFAULT_TEMPLATE_ID;
     try {
       const rendered = renderBinding(

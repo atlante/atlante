@@ -19,7 +19,7 @@ adapter tool.
 
 Version 0.1 includes:
 
-- a minimal document structure (`$schema`, `agents`, `values`, and optional
+- a minimal document structure (`$schema` plus optional `agents`, `values`, and
   `skills`);
 - a composable, namespaced template system (`namespace/name`) with Markdown
   rendering and variable resolution;
@@ -133,17 +133,19 @@ be preferred when comments are useful. `atlante.json` MUST contain strict JSON;
 the same document schema and resolve to the same canonical document model.
 
 Configuration files are first parsed as raw overlay input for preset expansion. A
-raw overlay MAY contain `extends` and MAY omit `agents` when those bindings are
-inherited. After expansion, `extends` is consumed and the result MUST be a
-strict canonical document; the field restrictions below apply to that canonical
-document, not to the raw overlay's expansion metadata.
+raw overlay MAY contain `extends` and MAY omit `agents` or `skills`. During
+expansion, omission preserves inherited bindings when present. After expansion,
+`extends` is consumed and the result MUST be a strict canonical document; the
+field restrictions below apply to that canonical document, not to the raw
+overlay's expansion metadata.
 
 When no explicit configuration path is provided, the CLI MUST discover either
 root-level filename. If both files exist, the CLI MUST report an ambiguous
 configuration and require an explicit path rather than choosing silently.
 
-The document MUST contain exactly one agent map and MAY contain a values
-dictionary. Its top-level shape is:
+The document MUST contain `$schema` and MAY contain `values`, `agents`, and
+`skills` maps. Missing `agents` and `skills` maps normalize to empty
+collections. Its top-level shape is:
 
 ```jsonc
 {
@@ -177,14 +179,14 @@ dictionary. Its top-level shape is:
 }
 ```
 
-The document MUST NOT contain fields other than `$schema`, `values`, `agents`,
-and optional `skills`. Unknown top-level fields MUST be rejected. `skills` is an
-optional object whose non-empty keys are `skillId` values. Each skill binding
-MUST contain a non-empty string `description`; `template` defaults to
-`atlante/skill` and, when present, MUST be a non-empty template ID. `description`,
-`template`, and `values` are reserved binding metadata. Every other skill field
-is template-owned input and MUST be validated against the selected template's
-input schema.
+The document MUST NOT contain fields other than `$schema`, `values`, and
+optional `agents` and `skills`. Unknown top-level fields MUST be rejected.
+When present, `skills` is an object whose non-empty keys are `skillId` values.
+Each skill binding MUST contain a non-empty string `description`; `template`
+defaults to `atlante/skill` and, when present, MUST be a non-empty template ID.
+`description`, `template`, and `values` are reserved binding metadata. Every
+other skill field is template-owned input and MUST be validated against the
+selected template's input schema.
 
 ### 4.1 Schema reference
 
@@ -205,18 +207,6 @@ interpreting them. The schema document MUST identify itself with a versioned
 }
 ```
 
-#### 4.1.1 Approved v0.1 compatibility exception
-
-The addition of optional `skills` to the existing v0.1 schema URI is an
-approved one-off additive compatibility exception for project-global skill
-support. The URI remains
-`https://atlante.sh/schema/v0.1/schema.json`; implementations MUST continue to
-accept every previously valid v0.1 document with the same canonical agent and
-value semantics, and documents without `skills` MUST resolve to the same agent
-artifacts. Unknown fields other than the new optional `skills` field remain
-errors. Future schema changes MUST NOT modify a released schema in place: they
-remain immutable and MUST use a new versioned URI.
-
 ### 4.2 Values
 
 `values` MUST be a flat dictionary whose values are strings. Value names MUST
@@ -235,8 +225,8 @@ expansion, before `{{values.x}}` interpolation; this ensures that
 
 ### 4.3 Agent map
 
-`agents` MUST be an object whose keys are host-agent IDs. A host-agent ID is an
-opaque, non-empty string owned by the host adapter.
+When present, `agents` MUST be an object whose keys are host-agent IDs. A
+host-agent ID is an opaque, non-empty string owned by the host adapter.
 
 Each value is a prompt definition. An agent MAY identify its prompt template
 with `template`; when omitted, the implementation's configured default template
@@ -254,7 +244,7 @@ The Atlante JSONC document is a declarative language for agent prompts. Its
 contract is divided across four layers:
 
 1. `@atlante/schema` defines the serializable document shape (`$schema`,
-   `agents`, `values`, optional `skills`) and publishes the versioned JSON
+   optional `agents`, `values`, and `skills`) and publishes the versioned JSON
    Schema and corresponding TypeScript types; it does not define prompt or
    skill semantics;
 2. `@atlante/templates` defines prompt semantics through composable templates;
@@ -394,12 +384,12 @@ diagnostics rather than creating an additional warning file.
 
 ### 7.1 Skill bindings
 
-`skills` MUST be an object keyed by non-empty `skillId` strings. Each skill
-binding MUST contain a non-empty `description`; the description is metadata for
-lookup and is not passed to the template. `template` selects the skill content
-renderer and defaults to `atlante/skill`. `values` contains local value
-overrides. Every other field is template-owned input. Skills are global to the
-project and are not associated with a host-agent ID.
+When present, `skills` MUST be an object keyed by non-empty `skillId` strings.
+Each skill binding MUST contain a non-empty `description`; the description is
+metadata for lookup and is not passed to the template. `template` selects the
+skill content renderer and defaults to `atlante/skill`. `values` contains local
+value overrides. Every other field is template-owned input. Skills are global
+to the project and are not associated with a host-agent ID.
 
 The resolver renders each skill into a `SkillArtifact`; defining or resolving a
 skill MUST NOT execute its content. The OpenCode adapter exposes the artifact
@@ -419,7 +409,6 @@ possible.
 The validator MUST reject:
 
 - invalid JSON or an unsupported `$schema` URI;
-- a missing required `agents` object;
 - a present `values` field that is not an object;
 - a present `skills` field that is not an object, an empty skill ID, or a skill
   binding without a non-empty string `description`;
@@ -527,9 +516,10 @@ host artifacts and MUST NOT duplicate agents.
 
 The v1 implementation SHOULD preserve these package responsibilities:
 
-- `@atlante/schema`: document structure contract (`$schema`, `agents`, `values`,
-  optional `skills`), versioned JSON Schema, and TypeScript types; no prompt or
-  skill-content semantics, no template logic, no host or rendering logic;
+- `@atlante/schema`: document structure contract (`$schema`, `values`, and
+  optional `agents` and `skills`), versioned JSON Schema, and TypeScript types;
+  no prompt or skill-content semantics, no template logic, no host or rendering
+  logic;
 - `@atlante/templates`: direct Draft 2020-12 input schemas; template loading,
   parsing, composition, and Markdown rendering; `namespace/name` convention;
   variable resolution and slot composition;

@@ -78,14 +78,22 @@ export const skillBindingSchema = bindingSchema<SkillBindingOutput>(
 export const atlanteDocumentSchema = z.strictObject({
   $schema: z.literal(SCHEMA_URI),
   values: valuesMapSchema.optional(),
-  agents: safeRecord(z.string().min(1), agentBindingSchema),
-  skills: safeRecord(z.string().min(1), skillBindingSchema).optional(),
+  agents: safeRecord(z.string().min(1), agentBindingSchema).default({}),
+  skills: safeRecord(z.string().min(1), skillBindingSchema).default({}),
 });
 
 export type AgentBinding = z.infer<typeof agentBindingSchema>;
 export type SkillBinding = z.infer<typeof skillBindingSchema>;
 
-export type AtlanteDocument = z.infer<typeof atlanteDocumentSchema>;
+type AtlanteDocumentOutput = z.infer<typeof atlanteDocumentSchema>;
+
+export type AtlanteDocument = Omit<
+  AtlanteDocumentOutput,
+  "agents" | "skills"
+> & {
+  agents?: AtlanteDocumentOutput["agents"];
+  skills?: AtlanteDocumentOutput["skills"];
+};
 
 // ---------------------------------------------------------------------------
 // Overlay types — used during expansion before canonical validation

@@ -117,6 +117,6 @@
       "minLength": 1
     }
   },
-  "required": ["$schema", "agents"],
+  "required": ["$schema"],
   "additionalProperties": false
 }

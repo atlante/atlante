@@ -73,6 +73,11 @@ describe("resolve", () => {
     ]);
   });
 
+  test("resolves a document without binding maps as empty artifact collections", () => {
+    const result = resolve({ $schema: SCHEMA_URI }, registry);
+    expect(result).toEqual({ agents: [], skills: [], diagnostics: [] });
+  });
+
   test("keeps skill artifact order in ECMAScript property-enumeration order", () => {
     const result = resolve(
       {

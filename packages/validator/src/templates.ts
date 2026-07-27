@@ -244,7 +244,7 @@ function validateAgentBinding(
   registry: TemplateRegistry,
   defaultTemplateId: string,
   agentId: string,
-  binding: AtlanteDocument["agents"][string],
+  binding: NonNullable<AtlanteDocument["agents"]>[string],
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   const templateId = binding.template ?? defaultTemplateId;
@@ -486,7 +486,7 @@ export function validateTemplates(
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
 
-  for (const [agentId, binding] of Object.entries(document.agents)) {
+  for (const [agentId, binding] of Object.entries(document.agents ?? {})) {
     diagnostics.push(
       ...validateAgentBinding(
         document,

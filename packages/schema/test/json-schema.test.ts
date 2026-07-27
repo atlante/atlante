@@ -40,6 +40,10 @@ describe("document JSON Schema", () => {
     expect(properties.extends).toEqual({ type: "string", minLength: 1 });
   });
 
+  test("does not require either binding map in the published schema", () => {
+    expect(buildDocumentJsonSchema().required).toEqual(["$schema"]);
+  });
+
   test("requires description in the generated skill binding schema", () => {
     const properties = buildDocumentJsonSchema().properties as Record<
       string,

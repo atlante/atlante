@@ -47,6 +47,8 @@ const emptyAgents = `{
   "agents": {}
 }`;
 
+const emptyDocument = `{ "$schema": "${SCHEMA_URI}" }`;
+
 afterEach(() => {
   for (const dir of created.splice(0))
     rmSync(dir, { recursive: true, force: true });
@@ -289,6 +291,28 @@ describe("runResolve", () => {
       console.error = original;
     }
     expect(errors).toEqual([]);
+  });
+
+  test("a document without binding maps resolves to an empty JSON envelope", async () => {
+    const dir = project(emptyDocument);
+    const written: string[] = [];
+    const original = console.log;
+    console.log = (...args: unknown[]) => written.push(args.join(" "));
+    try {
+      expect(await runResolve(dir, { json: true })).toBe(0);
+    } finally {
+      console.log = original;
+    }
+    expect(JSON.parse(written.join("\n"))).toEqual({
+      agents: [],
+      skills: [],
+      diagnostics: [],
+    });
+  });
+
+  test("an explicit --agent still fails when agents are omitted", async () => {
+    const dir = project(emptyDocument);
+    expect(await runResolve(dir, { agent: "missing" })).toBe(1);
   });
 
   test("an explicit --agent still fails against an empty agents map", async () => {

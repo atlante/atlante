@@ -19,7 +19,7 @@ describe("validateDocumentText", () => {
   test("accepts a JSONC document with comments", () => {
     const result = validateDocumentText(valid, "atlante.jsonc");
     expect(result.diagnostics).toEqual([]);
-    expect(result.document?.agents.reviewer?.identity).toBe("x");
+    expect(result.document?.agents?.reviewer?.identity).toBe("x");
   });
 
   test("accepts a strict JSON document, per acceptance criterion 1", () => {
@@ -67,12 +67,24 @@ describe("validateDocumentText", () => {
     expect(result.diagnostics[0]?.code).toBe("unsupported-schema");
   });
 
-  test("rejects a missing agents object", () => {
+  test("accepts a document without agents or skills and normalizes both maps", () => {
     const result = validateDocumentText(
       `{ "$schema": "${SCHEMA_URI}" }`,
       "atlante.jsonc",
     );
-    expect(result.diagnostics[0]?.code).toBe("invalid-document");
+    expect(result.diagnostics).toEqual([]);
+    expect(result.document?.agents).toEqual({});
+    expect(result.document?.skills).toEqual({});
+  });
+
+  test("accepts a skill-only document", () => {
+    const result = validateDocumentText(
+      `{ "$schema": "${SCHEMA_URI}", "skills": { "testing": { "description": "Run tests" } } }`,
+      "atlante.jsonc",
+    );
+    expect(result.diagnostics).toEqual([]);
+    expect(result.document?.agents).toEqual({});
+    expect(result.document?.skills?.testing?.description).toBe("Run tests");
   });
 
   test("rejects an unknown root field and names its path", () => {
@@ -103,7 +115,7 @@ describe("validateDocumentText", () => {
       "atlante.jsonc",
     );
     expect(result.diagnostics).toEqual([]);
-    expect(result.document?.agents.reviewer?.mission).toBe("y");
+    expect(result.document?.agents?.reviewer?.mission).toBe("y");
     expect(result.document?.skills?.testing?.content).toBe("bun test");
   });
 
@@ -133,7 +145,7 @@ describe("loadDocument", () => {
       const result = loadDocument(path);
       expect(result.path).toBe(path);
       expect(result.diagnostics).toEqual([]);
-      expect(result.document?.agents.reviewer?.identity).toBe("x");
+      expect(result.document?.agents?.reviewer?.identity).toBe("x");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

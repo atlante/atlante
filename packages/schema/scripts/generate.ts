@@ -47,7 +47,7 @@ export function buildDocumentJsonSchema(): Record<string, unknown> {
     propertyNames: { type: "string", minLength: 1 },
     additionalProperties: { oneOf: [skillBindingSchema, { type: "null" }] },
   };
-  generated.required = ["$schema", "agents"];
+  generated.required = ["$schema"];
 
   return {
     $schema: "https://json-schema.org/draft/2020-12/schema",
