@@ -58,6 +58,8 @@ async function publishPackage(pkg: string, version: string) {
 
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
+  const isCI = !!process.env.GITHUB_ACTIONS;
+
   const name = `@atlante/${pkg}`;
   try {
     // Validate
@@ -69,8 +71,16 @@ async function publishPackage(pkg: string, version: string) {
     }
     console.log(`Validated ${name}`);
 
-    // Publish
-    await Bun.$`npm publish --provenance --access public`.cwd(dir).quiet();
+    // Publish (--provenance requires GitHub OIDC, only works in CI)
+    const publishArgs = ["publish", "--access", "public"];
+    if (isCI) publishArgs.push("--provenance");
+
+    const pub = await Bun.$`npm ${publishArgs}`.cwd(dir).nothrow();
+    if (pub.exitCode !== 0) {
+      const err =
+        pub.stderr.toString() || pub.stdout.toString() || "npm publish failed";
+      throw new Error(`${name}: ${err.trim()}`);
+    }
     console.log(`Published ${name}@${version}`);
   } finally {
     await writeFile(manifestPath, original);
