@@ -38,11 +38,11 @@ function parseArgs() {
 }
 
 function transformExports(
-  exports: Record<string, string>,
+  exports: Record<string, unknown>,
 ): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(exports)) {
-    if (value.endsWith(".ts")) {
+    if (typeof value === "string" && value.endsWith(".ts")) {
       const stem = value.replace("./src/", "./dist/").slice(0, -3);
       result[key] = { import: `${stem}.js`, types: `${stem}.d.ts` };
     } else {
