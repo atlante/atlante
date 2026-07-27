@@ -1,6 +1,6 @@
 {
   "name": "@atlante/resolver",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "type": "module",
   "description": "Atlante value merging and prompt resolution",
   "license": "MIT",
