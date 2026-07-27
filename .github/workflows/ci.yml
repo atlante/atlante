@@ -38,11 +38,11 @@ jobs:
           bun "$cli" validate "$project"
           bun "$cli" resolve "$project" --json > /tmp/resolved.json
           node -e '
-            const artifacts = require("/tmp/resolved.json");
-            const ids = artifacts.map(({ hostAgentId }) => hostAgentId).sort();
+            const { agents } = require("/tmp/resolved.json");
+            const ids = agents.map(({ hostAgentId }) => hostAgentId).sort();
             if (JSON.stringify(ids) !== JSON.stringify(["architect", "implement"])) process.exit(1);
-            if (!artifacts.some(({ prompt }) => prompt.includes("# Workflow"))) process.exit(1);
-            if (!artifacts.some(({ prompt }) => prompt.includes("Do not change code that is not related to the task"))) process.exit(1);
+            if (!agents.some(({ prompt }) => prompt.includes("# Workflow"))) process.exit(1);
+            if (!agents.some(({ prompt }) => prompt.includes("Do not change code that is not related to the task"))) process.exit(1);
           '
 
           # A broken configuration must fail loudly rather than exit 0.
