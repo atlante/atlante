@@ -14,11 +14,27 @@ const PACKAGES = [
 ] as const;
 
 function parseArgs() {
-  const version = process.argv[2];
-  if (!version) throw new Error("usage: bun scripts/publish.ts <version>");
+  let version: string | undefined;
+  let otp: string | undefined;
+
+  for (let i = 2; i < process.argv.length; i++) {
+    const arg = process.argv[i];
+    if (arg === "--otp") {
+      otp = process.argv[++i];
+      if (!otp) throw new Error("--otp requires a value");
+    } else if (!version) {
+      version = arg;
+    } else {
+      throw new Error(`unexpected argument: ${arg}`);
+    }
+  }
+
+  if (!version)
+    throw new Error("usage: bun scripts/publish.ts <version> [--otp <code>]");
   if (!/^\d+\.\d+\.\d+$/.test(version))
     throw new Error(`version must match X.Y.Z, got "${version}"`);
-  return version;
+
+  return { version, otp };
 }
 
 function transformExports(
@@ -36,7 +52,7 @@ function transformExports(
   return result;
 }
 
-async function publishPackage(pkg: string, version: string) {
+async function publishPackage(pkg: string, version: string, otp?: string) {
   const dir = join(ROOT, "packages", pkg);
   const manifestPath = join(dir, "package.json");
   const original = await readFile(manifestPath, "utf8");
@@ -74,6 +90,9 @@ async function publishPackage(pkg: string, version: string) {
     // Publish (--provenance requires GitHub OIDC, only works in CI)
     const publishArgs = ["publish", "--access", "public"];
     if (isCI) publishArgs.push("--provenance");
+    if (otp) {
+      publishArgs.push("--otp", otp);
+    }
 
     const pub = await Bun.$`npm ${publishArgs}`.cwd(dir).nothrow();
     if (pub.exitCode !== 0) {
@@ -88,11 +107,11 @@ async function publishPackage(pkg: string, version: string) {
 }
 
 async function main() {
-  const version = parseArgs();
+  const { version, otp } = parseArgs();
 
   for (const pkg of PACKAGES) {
     console.log(`\n--- @atlante/${pkg} ---`);
-    await publishPackage(pkg, version);
+    await publishPackage(pkg, version, otp);
   }
 }
 

@@ -34,7 +34,10 @@
     "schema"
   ],
   "exports": {
-    ".": "./src/index.ts",
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
     "./schema.json": "./schema/v0.1/schema.json"
   },
   "scripts": {
