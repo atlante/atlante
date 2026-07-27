@@ -81,7 +81,7 @@ jobs:
           cp -r packages/schema/schema website/
           cp -r packages/templates/schema website/schema/template
       - name: Deploy to Vercel
-        uses: amondnet/vercel-action@v25
+        uses: amondnet/vercel-action@v42.3.0
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
