@@ -74,8 +74,6 @@ async function publishPackage(pkg: string, version: string, otp?: string) {
 
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
-  const isCI = !!process.env.GITHUB_ACTIONS;
-
   const name = `@atlante/${pkg}`;
   try {
     // Validate
@@ -87,9 +85,8 @@ async function publishPackage(pkg: string, version: string, otp?: string) {
     }
     console.log(`Validated ${name}`);
 
-    // Publish (--provenance requires GitHub OIDC, only works in CI)
+    // Publish
     const publishArgs = ["publish", "--access", "public"];
-    if (isCI) publishArgs.push("--provenance");
     if (otp) {
       publishArgs.push("--otp", otp);
     }
