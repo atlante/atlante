@@ -1,16 +1,18 @@
-name: Publish
+name: Release
 
 on:
   push:
     tags: ['v*']
 
 permissions:
-  id-token: write
-  contents: write
+  contents: read
 
 jobs:
-  verify-and-publish:
+  publish-packages:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -53,38 +55,24 @@ jobs:
 
       - name: Publish packages
         shell: bash
-        run: bun scripts/publish.ts "$VERSION"
+        run: bun scripts/publish-packages.ts "$VERSION"
 
-      - name: Verify npm publication
-        shell: bash
-        run: |
-          set -euo pipefail
-          packages=(schema templates presets validator resolver opencode-plugin cli)
-          verification_failed=0
-
-          for package in "${packages[@]}"; do
-            if npm view "@atlante/$package@$VERSION" version >/dev/null; then
-              echo "Verified @atlante/$package@$VERSION on npm"
-            else
-              echo "MISSING: @atlante/$package@$VERSION" >&2
-              verification_failed=1
-            fi
-          done
-
-          if (( verification_failed != 0 )); then
-            exit 1
-          fi
-
+  create-release:
+    needs: publish-packages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-          name: "v${{ env.VERSION }}"
+          name: ${{ github.ref_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   deploy-website:
-    needs: verify-and-publish
+    needs: publish-packages
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

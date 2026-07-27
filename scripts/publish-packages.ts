@@ -30,7 +30,9 @@ function parseArgs() {
   }
 
   if (!version)
-    throw new Error("usage: bun scripts/publish.ts <version> [--otp <code>]");
+    throw new Error(
+      "usage: bun scripts/publish-packages.ts <version> [--otp <code>]",
+    );
   if (!/^\d+\.\d+\.\d+$/.test(version))
     throw new Error(`version must match X.Y.Z, got "${version}"`);
 
@@ -86,7 +88,7 @@ async function publishPackage(pkg: string, version: string, otp?: string) {
     console.log(`Validated ${name}`);
 
     // Publish
-    const publishArgs = ["publish", "--access", "public"];
+    const publishArgs = ["publish"];
     if (otp) {
       publishArgs.push("--otp", otp);
     }
