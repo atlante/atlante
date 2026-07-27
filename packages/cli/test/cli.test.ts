@@ -1,5 +1,14 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import {
+  chmodSync,
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SCHEMA_URI } from "@atlante/schema";
@@ -40,6 +49,35 @@ const emptyAgents = `{
 afterEach(() => {
   for (const dir of created.splice(0))
     rmSync(dir, { recursive: true, force: true });
+});
+
+test("the published launcher runs with Node when Bun is unavailable", () => {
+  const dir = mkdtempSync(join(tmpdir(), "atlante-node-launcher-"));
+  created.push(dir);
+  const executableDir = join(dir, "path");
+  const distDir = join(dir, "dist");
+  const binDir = join(distDir, "bin");
+  mkdirSync(executableDir);
+  mkdirSync(binDir, { recursive: true });
+  symlinkSync(process.execPath, join(executableDir, "node"));
+  copyFileSync(
+    new URL("../bin/atlante.ts", import.meta.url),
+    join(binDir, "atlante.js"),
+  );
+  chmodSync(join(binDir, "atlante.js"), 0o755);
+  writeFileSync(join(dir, "package.json"), '{ "type": "module" }');
+  writeFileSync(
+    join(distDir, "main.js"),
+    'export function createProgram() { return { async parseAsync() { console.log("launched"); } }; }',
+  );
+
+  const result = spawnSync(join(binDir, "atlante.js"), [], {
+    encoding: "utf8",
+    env: { ...process.env, PATH: executableDir },
+  });
+
+  expect(result.status).toBe(0);
+  expect(result.stdout.trim()).toBe("launched");
 });
 
 describe("runValidate", () => {

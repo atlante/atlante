@@ -24,12 +24,17 @@ host tool, not the agent itself, but the declarative layer in between.
 
 ## Quick start
 
+The CLI is published as [`@atlante/cli`](https://www.npmjs.com/package/@atlante/cli)
+and requires Node.js 22 or later. Run it directly with `npx`:
+
 ```bash
-bun install
-bun packages/cli/bin/atlante.ts init
-bun packages/cli/bin/atlante.ts validate
-bun packages/cli/bin/atlante.ts resolve
+npx @atlante/cli init
+npx @atlante/cli validate
+npx @atlante/cli resolve
 ```
+
+For a global `atlante` command, install the package with
+`npm install --global @atlante/cli`.
 
 `init` writes `atlante.jsonc` and registers `@atlante/opencode-plugin` in
 `opencode.jsonc`, preserving anything already there. Without that registration
@@ -181,18 +186,6 @@ sensible default without writing a `values` block. Add your own
 `"values": { "project": "my-app" }` when you want to override it.
 
 Run `atlante init` to scaffold from the `starter` preset.
-
-## CLI
-
-- `atlante init [path] [--preset starter] [--force]` — scaffold `atlante.jsonc`
-  and register the OpenCode plugin
-- `atlante validate [path]` — validate the document and every referenced
-  template's input schema, without rendering
-- `atlante resolve [path] [--agent <id>] [--json]` — render the resolved agent
-  prompts
-
-`path` defaults to the current directory and may be a config file or a project
-directory; `atlante.jsonc` and `atlante.json` are both discovered automatically.
 
 ## Packages
 

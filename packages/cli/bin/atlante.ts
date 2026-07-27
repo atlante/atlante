@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 const mainModule = await import(
   import.meta.url.includes("/dist/") ? "../main.js" : "../src/main.js"
 );

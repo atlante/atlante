@@ -75,6 +75,15 @@ describe("runInit", () => {
     expect(opencode.plugin).toContain("@atlante/opencode-plugin");
   });
 
+  test("adds the OpenCode schema to a new opencode.jsonc", async () => {
+    const dir = tempDir();
+    await runInit(dir, {});
+    const opencode = JSON.parse(
+      readFileSync(join(dir, "opencode.jsonc"), "utf8"),
+    );
+    expect(opencode.$schema).toBe("https://opencode.ai/config.json");
+  });
+
   test("preserves an existing opencode.jsonc", async () => {
     const dir = tempDir();
     writeFileSync(

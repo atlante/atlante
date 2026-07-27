@@ -117,7 +117,12 @@ function preparePlugin(
   const path = join(directory, "opencode.jsonc");
   const previous = snapshot(path, fileSystem);
 
-  const text = previous.exists ? (previous.contents ?? "") : "{}";
+  const text = previous.exists
+    ? (previous.contents ?? "")
+    : `{
+  "$schema": "https://opencode.ai/config.json"
+}
+`;
   const entries = parsePluginEntries(path, text);
   if ("error" in entries) return entries;
   if (entries.some((entry) => pluginId(entry) === "@atlante/opencode-plugin")) {
