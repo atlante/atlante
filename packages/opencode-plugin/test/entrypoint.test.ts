@@ -9,3 +9,7 @@ test("the package root exposes exactly one plugin factory", () => {
   expect(functions).toHaveLength(1);
   expect(functions[0]).toBe(entrypoint.default);
 });
+
+test("keeps the skill tool factory on the explicit API entry point", () => {
+  expect(entrypoint).not.toHaveProperty("createSkillTool");
+});

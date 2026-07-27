@@ -11,6 +11,15 @@ const undeclaredPartialRoot = new URL(
   import.meta.url,
 ).pathname;
 
+const { registry: brokenRegistry } = loadTemplates(
+  undeclaredPartialRoot,
+  "test",
+);
+const combinedRegistry = {
+  get: (id: string) => brokenRegistry.get(id) ?? registry.get(id),
+  ids: () => [...new Set([...brokenRegistry.ids(), ...registry.ids()])],
+};
+
 // Values reach prompts only through {{values.x}} references in the document's
 // own strings — templates never receive the values dictionary. So the fixture
 // must reference them explicitly, which is also how a real user writes this.
@@ -35,6 +44,97 @@ const document: AtlanteDocument = {
 };
 
 describe("resolve", () => {
+  test("resolves skill descriptions, local values, and Markdown content", () => {
+    const result = resolve(
+      {
+        $schema: SCHEMA_URI,
+        values: { project: "Atlante", emphasis: "global" },
+        agents: {},
+        skills: {
+          testing: {
+            description:
+              "Testing {{values.project}} with {{values.emphasis}} guidance",
+            values: { emphasis: "local" },
+            content: "# Testing\n\nUse {{values.project}}.",
+          },
+        },
+      },
+      registry,
+    );
+    expect(result.diagnostics).toEqual([]);
+    expect(result.agents).toEqual([]);
+    expect(result.skills).toEqual([
+      {
+        skillId: "testing",
+        description: "Testing Atlante with local guidance",
+        templateId: "atlante/skill",
+        content: "# Testing\n\nUse Atlante.",
+      },
+    ]);
+  });
+
+  test("keeps skill artifact order in ECMAScript property-enumeration order", () => {
+    const result = resolve(
+      {
+        $schema: SCHEMA_URI,
+        agents: {},
+        skills: {
+          "10": { description: "ten", content: "ten" },
+          "2": { description: "two", content: "two" },
+          alpha: { description: "alpha", content: "alpha" },
+        },
+      },
+      registry,
+    );
+    expect(result.skills.map((skill) => skill.skillId)).toEqual([
+      "2",
+      "10",
+      "alpha",
+    ]);
+  });
+
+  test("fails closed when a skill is invalid", () => {
+    const result = resolve(
+      {
+        $schema: SCHEMA_URI,
+        agents: { reviewer: { identity: "x", mission: "y" } },
+        skills: { testing: { description: "Testing", content: 42 } as never },
+      },
+      registry,
+    );
+    expect(result.agents).toEqual([]);
+    expect(result.skills).toEqual([]);
+    expect(result.diagnostics[0]?.path).toBe("/skills/testing/content");
+  });
+
+  test("turns a skill render failure into a diagnostic without partial artifacts", () => {
+    const result = resolve(
+      {
+        $schema: SCHEMA_URI,
+        agents: {},
+        skills: { broken: { description: "Broken", template: "test/broken" } },
+      },
+      combinedRegistry,
+    );
+    expect(result.agents).toEqual([]);
+    expect(result.skills).toEqual([]);
+    expect(result.diagnostics[0]?.code).toBe("template-render-failed");
+    expect(result.diagnostics[0]?.path).toBe("/skills/broken");
+  });
+
+  test("returns no artifacts when a valid skill and invalid agent are present", () => {
+    const result = resolve(
+      {
+        $schema: SCHEMA_URI,
+        agents: { reviewer: { identity: "x" } },
+        skills: { testing: { description: "Testing", content: "content" } },
+      },
+      registry,
+    );
+    expect(result.agents).toEqual([]);
+    expect(result.skills).toEqual([]);
+  });
+
   test("produces one artifact per binding in ECMAScript property-enumeration order", () => {
     const { agents, diagnostics } = resolve(document, registry);
     expect(diagnostics).toEqual([]);
@@ -118,7 +218,10 @@ describe("resolve", () => {
   });
 
   test("is deterministic", () => {
-    expect(resolve(document, registry)).toEqual(resolve(document, registry));
+    const first = resolve(document, registry);
+    const second = resolve(document, registry);
+    expect(first).toEqual(second);
+    expect(first.skills).toEqual([]);
   });
 
   test("returns diagnostics and no artifacts on invalid input", () => {
@@ -175,10 +278,6 @@ describe("resolve", () => {
   });
 
   test("returns a diagnostic instead of throwing when a template renders an undeclared partial", () => {
-    const { registry: brokenRegistry } = loadTemplates(
-      undeclaredPartialRoot,
-      "test",
-    );
     const broken: AtlanteDocument = {
       $schema: SCHEMA_URI,
       agents: { a: { template: "test/broken" } },
@@ -189,14 +288,6 @@ describe("resolve", () => {
   });
 
   test("attributes a render failure to its agent and template and emits no partial artifacts", () => {
-    const { registry: brokenRegistry } = loadTemplates(
-      undeclaredPartialRoot,
-      "test",
-    );
-    const combinedRegistry = {
-      get: (id: string) => brokenRegistry.get(id) ?? registry.get(id),
-      ids: () => [...new Set([...brokenRegistry.ids(), ...registry.ids()])],
-    };
     const broken: AtlanteDocument = {
       $schema: SCHEMA_URI,
       agents: {

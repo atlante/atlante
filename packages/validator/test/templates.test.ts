@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { SCHEMA_URI } from "@atlante/schema";
+import { type AtlanteDocument, SCHEMA_URI } from "@atlante/schema";
 import {
   loadBundledTemplates,
   loadTemplates,
@@ -8,6 +8,7 @@ import {
 import {
   expandInputSchema,
   validateAgentInput,
+  validateSkillInput,
   validateTemplates,
 } from "../src/index.js";
 
@@ -158,6 +159,18 @@ describe("validateAgentInput", () => {
     );
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]?.code).toBe("invalid-input-schema");
+  });
+
+  test("validates skill input with skill paths", () => {
+    const { registry } = loadBundledTemplates();
+    const diagnostics = validateSkillInput(
+      registry,
+      "atlante/skill",
+      { content: 42 },
+      "skill/id~one",
+    );
+    expect(diagnostics[0]?.code).toBe("invalid-prompt-input");
+    expect(diagnostics[0]?.path).toBe("/skills/skill~1id~0one/content");
   });
 });
 
@@ -332,5 +345,235 @@ describe("validateTemplates", () => {
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]?.code).toBe("value-reference-collision");
     expect(diagnostics[0]?.path).toBe("/agents/reviewer");
+  });
+
+  test("accepts a skill with the default bundled template", () => {
+    const diagnostics = validateTemplates(
+      {
+        $schema: SCHEMA_URI,
+        agents: {},
+        skills: { testing: { description: "Testing", content: "Run tests." } },
+      },
+      registry,
+      "atlante/agent",
+    );
+    expect(diagnostics).toEqual([]);
+  });
+
+  test("requires a skill description and reports its path", () => {
+    const diagnostics = validateTemplates(
+      {
+        $schema: SCHEMA_URI,
+        agents: {},
+        skills: { testing: { content: "Run tests." } as never },
+      },
+      registry,
+      "atlante/agent",
+    );
+    expect(diagnostics[0]?.code).toBe("invalid-skill-description");
+    expect(diagnostics[0]?.path).toBe("/skills/testing/description");
+  });
+
+  test("interpolates skill descriptions and local values", () => {
+    const diagnostics = validateTemplates(
+      {
+        $schema: SCHEMA_URI,
+        values: { project: "Atlante", emphasis: "deterministic" },
+        agents: {},
+        skills: {
+          testing: {
+            description:
+              "Testing {{values.project}} with {{values.emphasis}} guidance",
+            values: { emphasis: "repeatable" },
+            content: "Run tests.",
+          },
+        },
+      },
+      registry,
+      "atlante/agent",
+    );
+    expect(diagnostics).toEqual([]);
+  });
+
+  test("reports an empty interpolated skill description at the description path", () => {
+    const diagnostics = validateTemplates(
+      {
+        $schema: SCHEMA_URI,
+        values: { description: "" },
+        agents: {},
+        skills: {
+          testing: {
+            description: "{{values.description}}",
+            content: "Run tests.",
+          },
+        },
+      },
+      registry,
+      "atlante/agent",
+    );
+    expect(diagnostics[0]?.code).toBe("invalid-skill-description");
+    expect(diagnostics[0]?.path).toBe("/skills/testing/description");
+  });
+
+  test("reports description and template-input errors together", () => {
+    const diagnostics = validateTemplates(
+      {
+        $schema: SCHEMA_URI,
+        values: { description: "" },
+        agents: {},
+        skills: {
+          testing: {
+            description: "{{values.description}}",
+            content: "{{values.missing}}",
+          },
+        },
+      },
+      registry,
+      "atlante/agent",
+    );
+    expect(diagnostics).toHaveLength(2);
+    expect(diagnostics.map(({ code }) => code)).toEqual([
+      "missing-value",
+      "invalid-skill-description",
+    ]);
+    expect(diagnostics[0]?.path).toBe("/skills/testing/content");
+    expect(diagnostics[1]?.path).toBe("/skills/testing/description");
+  });
+
+  test("retains description diagnostics when template input interpolation collides", () => {
+    const diagnostics = validateTemplates(
+      {
+        $schema: SCHEMA_URI,
+        values: { description: "", project: "atlante" },
+        agents: {},
+        skills: {
+          testing: {
+            description: "{{values.description}}",
+            content: "Run tests.",
+            "{{values.project}}": "first",
+            atlante: "second",
+          },
+        },
+      },
+      registry,
+      "atlante/agent",
+    );
+    expect(diagnostics).toHaveLength(2);
+    expect(diagnostics.map(({ code }) => code)).toEqual([
+      "invalid-skill-description",
+      "value-reference-collision",
+    ]);
+    expect(diagnostics[0]?.path).toBe("/skills/testing/description");
+    expect(diagnostics[1]?.path).toBe("/skills/testing");
+  });
+
+  test("does not pass description or values to the skill template", () => {
+    const diagnostics = validateTemplates(
+      {
+        $schema: SCHEMA_URI,
+        agents: {},
+        skills: {
+          testing: {
+            description: "Testing",
+            values: { project: "Atlante" },
+            content: "Run tests.",
+          },
+        },
+      },
+      registry,
+      "atlante/agent",
+    );
+    expect(diagnostics).toEqual([]);
+  });
+
+  test("reports missing skill value references with a skill path", () => {
+    const diagnostics = validateTemplates(
+      {
+        $schema: SCHEMA_URI,
+        agents: {},
+        skills: {
+          "skill/id": {
+            description: "Use {{values.missing}}",
+            content: "Run tests.",
+          },
+        },
+      },
+      registry,
+      "atlante/agent",
+    );
+    expect(diagnostics[0]?.code).toBe("missing-value");
+    expect(diagnostics[0]?.path).toBe("/skills/skill~1id/description");
+  });
+
+  test("rejects an unknown skill template", () => {
+    const diagnostics = validateTemplates(
+      {
+        $schema: SCHEMA_URI,
+        agents: {},
+        skills: {
+          testing: {
+            description: "Testing",
+            template: "atlante/nope",
+            content: "Run tests.",
+          },
+        },
+      },
+      registry,
+      "atlante/agent",
+    );
+    expect(diagnostics[0]?.code).toBe("unknown-template");
+    expect(diagnostics[0]?.path).toBe("/skills/testing");
+  });
+
+  test("rejects invalid bundled skill content", () => {
+    const document = {
+      $schema: SCHEMA_URI,
+      agents: {},
+      skills: {
+        testing: { description: "Testing", content: 42 },
+      },
+    } as unknown as AtlanteDocument;
+    const diagnostics = validateTemplates(document, registry, "atlante/agent");
+    expect(diagnostics[0]?.code).toBe("invalid-prompt-input");
+    expect(diagnostics[0]?.path).toBe("/skills/testing/content");
+  });
+
+  test("reports skill composition cycles", () => {
+    const { registry: cyclicRegistry } = loadTemplates(cyclicRoot, "test");
+    const diagnostics = validateTemplates(
+      {
+        $schema: SCHEMA_URI,
+        agents: {},
+        skills: {
+          testing: {
+            description: "Testing",
+            template: "test/a",
+          },
+        },
+      },
+      cyclicRegistry,
+      "atlante/agent",
+    );
+    expect(diagnostics[0]?.code).toBe("cyclic-template");
+    expect(diagnostics[0]?.path).toMatch(/^\/skills\/testing/);
+  });
+
+  test("rejects unsupported values-like syntax in skill input", () => {
+    const diagnostics = validateTemplates(
+      {
+        $schema: SCHEMA_URI,
+        agents: {},
+        skills: {
+          testing: {
+            description: "Testing",
+            content: "{{values.project.name}}",
+          },
+        },
+      },
+      registry,
+      "atlante/agent",
+    );
+    expect(diagnostics[0]?.code).toBe("invalid-value-reference");
+    expect(diagnostics[0]?.path).toBe("/skills/testing/content");
   });
 });

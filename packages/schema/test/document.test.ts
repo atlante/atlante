@@ -28,6 +28,48 @@ describe("atlanteDocumentSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  test("accepts a document with a skill binding", () => {
+    const result = atlanteDocumentSchema.safeParse({
+      $schema: SCHEMA_URI,
+      agents: {},
+      skills: {
+        testing: {
+          description: "Testing guidance",
+          template: "atlante/skill",
+          content: "Run the tests.",
+        },
+      },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  test("requires a non-empty skill description", () => {
+    const result = atlanteDocumentSchema.safeParse({
+      $schema: SCHEMA_URI,
+      agents: {},
+      skills: { testing: { description: "", content: "Run the tests." } },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  test("accepts a document without skills", () => {
+    const result = atlanteDocumentSchema.safeParse({
+      $schema: SCHEMA_URI,
+      agents: {},
+    });
+    expect(result.success).toBe(true);
+  });
+
+  test("rejects an unknown root field while allowing the skills exception", () => {
+    const result = atlanteDocumentSchema.safeParse({
+      $schema: SCHEMA_URI,
+      agents: {},
+      skills: {},
+      rules: [],
+    });
+    expect(result.success).toBe(false);
+  });
+
   test("rejects an unknown root field", () => {
     const result = atlanteDocumentSchema.safeParse({ ...valid, rules: [] });
     expect(result.success).toBe(false);

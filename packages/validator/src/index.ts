@@ -27,5 +27,6 @@ export {
   expandInputSchema,
   promptInputOf,
   validateAgentInput,
+  validateSkillInput,
   validateTemplates,
 } from "./templates.js";

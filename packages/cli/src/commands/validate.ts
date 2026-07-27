@@ -17,11 +17,16 @@ export async function runValidate(target: string): Promise<number> {
     return 1;
   }
 
-  const diagnostics = validateTemplates(
-    loaded.document,
-    loaded.registry,
-    DEFAULT_TEMPLATE_ID,
-  );
+  const diagnostics = [...loaded.diagnostics];
+  if (!hasErrors(diagnostics)) {
+    diagnostics.push(
+      ...validateTemplates(
+        loaded.document,
+        loaded.registry,
+        DEFAULT_TEMPLATE_ID,
+      ),
+    );
+  }
   printDiagnostics(diagnostics);
   if (hasErrors(diagnostics)) return 1;
 

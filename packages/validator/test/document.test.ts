@@ -3,7 +3,11 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SCHEMA_URI } from "@atlante/schema";
-import { loadDocument, validateDocumentText } from "../src/index.js";
+import {
+  loadDocument,
+  parseDocumentOverlay,
+  validateDocumentText,
+} from "../src/index.js";
 
 const valid = `{
   // a comment, because this is JSONC
@@ -82,6 +86,41 @@ describe("validateDocumentText", () => {
     const text = `{ "$schema": "${SCHEMA_URI}", "agents": {}, "values": 1 }`;
     const result = validateDocumentText(text, "atlante.jsonc");
     expect(result.diagnostics[0]?.code).toBe("invalid-document");
+  });
+
+  test("accepts a valid root skills map", () => {
+    const result = validateDocumentText(
+      `{ "$schema": "${SCHEMA_URI}", "agents": {}, "skills": { "testing": { "description": "Run tests" } } }`,
+      "atlante.jsonc",
+    );
+    expect(result.diagnostics).toEqual([]);
+    expect(result.document?.skills?.testing?.description).toBe("Run tests");
+  });
+
+  test("accepts agent and skill bindings together", () => {
+    const result = validateDocumentText(
+      `{ "$schema": "${SCHEMA_URI}", "agents": { "reviewer": { "identity": "x", "mission": "y" } }, "skills": { "testing": { "description": "Run tests", "content": "bun test" } } }`,
+      "atlante.jsonc",
+    );
+    expect(result.diagnostics).toEqual([]);
+    expect(result.document?.agents.reviewer?.mission).toBe("y");
+    expect(result.document?.skills?.testing?.content).toBe("bun test");
+  });
+
+  test("rejects unknown roots while overlay parsing preserves them", () => {
+    const text = `{ "$schema": "${SCHEMA_URI}", "agents": {}, "skills": "not an object", "rules": [] }`;
+    const parsed = parseDocumentOverlay(text, "atlante.jsonc");
+
+    expect(parsed.diagnostics).toEqual([]);
+    expect(parsed.overlay).toBeDefined();
+    expect((parsed.overlay as Record<string, unknown>).rules).toEqual([]);
+    expect((parsed.overlay as Record<string, unknown>).skills).toBe(
+      "not an object",
+    );
+
+    const validated = validateDocumentText(text, "atlante.jsonc");
+    expect(validated.document).toBeUndefined();
+    expect(validated.diagnostics[0]?.code).toBe("invalid-document");
   });
 });
 

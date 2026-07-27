@@ -5,7 +5,32 @@ describe("bundled templates", () => {
   test("load without errors", () => {
     const { registry, errors } = loadBundledTemplates();
     expect(errors).toEqual([]);
-    expect(registry.ids()).toEqual(["atlante/agent", "atlante/workflow"]);
+    expect(registry.ids()).toEqual([
+      "atlante/agent",
+      "atlante/skill",
+      "atlante/workflow",
+    ]);
+  });
+
+  test("loads the bundled skill template", () => {
+    const { registry, errors } = loadBundledTemplates();
+    expect(errors).toEqual([]);
+    expect(registry.ids()).toEqual([
+      "atlante/agent",
+      "atlante/skill",
+      "atlante/workflow",
+    ]);
+  });
+
+  test("renders skill Markdown content verbatim", () => {
+    const { registry } = loadBundledTemplates();
+    expect(
+      renderTemplate({
+        registry,
+        templateId: "atlante/skill",
+        input: { content: "# Testing\n\nRun `bun test`." },
+      }),
+    ).toBe("# Testing\n\nRun `bun test`.");
   });
 
   test("render a full agent prompt", () => {

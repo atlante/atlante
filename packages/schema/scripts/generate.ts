@@ -25,14 +25,28 @@ export function buildDocumentJsonSchema(): Record<string, unknown> {
     },
     additionalProperties: {},
   };
+  const skillBindingSchema = {
+    type: "object",
+    properties: {
+      description: { type: "string", minLength: 1 },
+      template: { type: "string", minLength: 1 },
+      values: valuesSchema,
+    },
+    required: ["description"],
+    additionalProperties: {},
+  };
+  documentProperties.extends = { type: "string", minLength: 1 };
   documentProperties.values = valuesSchema;
   documentProperties.agents = {
     type: "object",
     propertyNames: { type: "string", minLength: 1 },
     additionalProperties: { oneOf: [agentBindingSchema, { type: "null" }] },
   };
-  // `extends` is optional at the document level — a preset id to inherit from.
-  documentProperties.extends = { type: "string", minLength: 1 };
+  documentProperties.skills = {
+    type: "object",
+    propertyNames: { type: "string", minLength: 1 },
+    additionalProperties: { oneOf: [skillBindingSchema, { type: "null" }] },
+  };
   generated.required = ["$schema", "agents"];
 
   return {

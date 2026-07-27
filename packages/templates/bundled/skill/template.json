@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Markdown content exposed as a project skill.",
+  "type": "object",
+  "properties": {
+    "content": { "type": "string" }
+  },
+  "required": ["content"],
+  "additionalProperties": false
+}

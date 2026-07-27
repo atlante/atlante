@@ -8,7 +8,6 @@ import {
   type Diagnostic,
   expandDocument,
   findConfigFile,
-  hasAnyExtends,
   loadDocument,
   parseDocumentOverlay,
   templateLoadDiagnostics,
@@ -42,21 +41,7 @@ export function loadCliResources(target: string): LoadedCliResources {
   if (errors.length > 0) {
     return {
       path: config.path,
-      diagnostics: templateLoadDiagnostics(errors),
-    };
-  }
-
-  // If the document has no extends anywhere, use the canonical path.
-  if (!hasAnyExtends(parsed.overlay)) {
-    const loaded = loadDocument(target);
-    if (!loaded.document) {
-      return { path: config.path, registry, diagnostics: loaded.diagnostics };
-    }
-    return {
-      document: loaded.document,
-      path: config.path,
-      registry,
-      diagnostics: [],
+      diagnostics: [...parsed.diagnostics, ...templateLoadDiagnostics(errors)],
     };
   }
 
@@ -66,6 +51,6 @@ export function loadCliResources(target: string): LoadedCliResources {
     document: expanded.document,
     path: config.path,
     registry,
-    diagnostics: expanded.diagnostics,
+    diagnostics: [...parsed.diagnostics, ...expanded.diagnostics],
   };
 }

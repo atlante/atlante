@@ -16,6 +16,8 @@ import { error, escapeJsonPointerSegment } from "./diagnostic.js";
 
 /** Binding metadata, not template input (SPECIFICATION.md §4.3). */
 const BINDING_KEYS = new Set(["template", "values"]);
+const SKILL_BINDING_KEYS = new Set(["description", "template", "values"]);
+const DEFAULT_SKILL_TEMPLATE_ID = "atlante/skill";
 
 function unescapeJsonPointerSegment(segment: string): string {
   return segment.replaceAll("~1", "/").replaceAll("~0", "~");
@@ -85,17 +87,29 @@ export function expandInputSchema(
   return { schema, diagnostics: [] };
 }
 
-export function validateAgentInput(
+function bindingPath(
+  root: "agents" | "skills",
+  bindingId: string,
+  segments: (string | number)[] = [],
+): string {
+  return `/${root}/${escapeJsonPointerSegment(bindingId)}${segments
+    .map((segment) => `/${escapeJsonPointerSegment(String(segment))}`)
+    .join("")}`;
+}
+
+function validateBindingInput(
   registry: TemplateRegistry,
   templateId: string,
   input: Record<string, unknown>,
-  agentId: string,
+  bindingId: string,
+  root: "agents" | "skills",
+  subject: "agent" | "skill",
 ): Diagnostic[] {
   const { schema, diagnostics } = expandInputSchema(registry, templateId);
   if (!schema) {
     return diagnostics.map((diagnostic) => {
       const slotPath = diagnostic.path ?? "";
-      const path = `/agents/${escapeJsonPointerSegment(agentId)}${slotPath}`;
+      const path = bindingPath(root, bindingId) + slotPath;
       const slot = slotPath
         ? ` at slot "${slotPath
             .slice(1)
@@ -105,7 +119,7 @@ export function validateAgentInput(
         : "";
       return {
         ...diagnostic,
-        message: `agent "${agentId}"${slot}: ${diagnostic.message}`,
+        message: `${subject} "${bindingId}"${slot}: ${diagnostic.message}`,
         path,
       };
     });
@@ -121,8 +135,8 @@ export function validateAgentInput(
     return [
       error(
         "invalid-input-schema",
-        `agent "${agentId}" template "${templateId}": inputSchema is invalid; expected a valid JSON Schema Draft 2020-12 object`,
-        { path: `/agents/${escapeJsonPointerSegment(agentId)}` },
+        `${subject} "${bindingId}" template "${templateId}": inputSchema is invalid; expected a valid JSON Schema Draft 2020-12 object`,
+        { path: bindingPath(root, bindingId) },
       ),
     ];
   }
@@ -131,7 +145,7 @@ export function validateAgentInput(
   return (validate.errors ?? []).map((issue) =>
     error(
       "invalid-prompt-input",
-      `agent "${agentId}": ${issue.instancePath || "<root>"} ${issue.message ?? "is invalid"}${
+      `${subject} "${bindingId}": ${issue.instancePath || "<root>"} ${issue.message ?? "is invalid"}${
         issue.params && "additionalProperty" in issue.params
           ? ` (${String(issue.params.additionalProperty)})`
           : ""
@@ -141,9 +155,41 @@ export function validateAgentInput(
           : ""
       }`,
       {
-        path: `/agents/${escapeJsonPointerSegment(agentId)}${issue.instancePath}`,
+        path: `${bindingPath(root, bindingId)}${issue.instancePath}`,
       },
     ),
+  );
+}
+
+export function validateAgentInput(
+  registry: TemplateRegistry,
+  templateId: string,
+  input: Record<string, unknown>,
+  agentId: string,
+): Diagnostic[] {
+  return validateBindingInput(
+    registry,
+    templateId,
+    input,
+    agentId,
+    "agents",
+    "agent",
+  );
+}
+
+export function validateSkillInput(
+  registry: TemplateRegistry,
+  templateId: string,
+  input: Record<string, unknown>,
+  skillId: string,
+): Diagnostic[] {
+  return validateBindingInput(
+    registry,
+    templateId,
+    input,
+    skillId,
+    "skills",
+    "skill",
   );
 }
 
@@ -152,21 +198,22 @@ function resolvedValue(values: Record<string, unknown>, key: string): unknown {
 }
 
 function missingValueDiagnostics(
-  input: Record<string, unknown>,
+  input: unknown,
   values: Record<string, unknown>,
-  agentId: string,
+  bindingId: string,
   templateId: string,
+  root: "agents" | "skills",
+  subject: "agent" | "skill",
+  pathPrefix: (string | number)[] = [],
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   walkValueReferences(input, (reference, segments) => {
-    const path = `/agents/${escapeJsonPointerSegment(agentId)}${segments
-      .map((segment) => `/${escapeJsonPointerSegment(String(segment))}`)
-      .join("")}`;
+    const path = bindingPath(root, bindingId, [...pathPrefix, ...segments]);
     if (!reference.key || !isValidValueKey(reference.key)) {
       diagnostics.push(
         error(
           "invalid-value-reference",
-          `agent "${agentId}" template "${templateId}": invalid values reference "{{${reference.expression}}}"; value names must match [A-Za-z_$][A-Za-z0-9_$-]*`,
+          `${subject} "${bindingId}" template "${templateId}": invalid values reference "{{${reference.expression}}}"; value names must match [A-Za-z_$][A-Za-z0-9_$-]*`,
           { path },
         ),
       );
@@ -174,7 +221,7 @@ function missingValueDiagnostics(
       diagnostics.push(
         error(
           "missing-value",
-          `agent "${agentId}" template "${templateId}": missing required value "{{values.${reference.key}}}"`,
+          `${subject} "${bindingId}" template "${templateId}": missing required value "{{values.${reference.key}}}"`,
           { path },
         ),
       );
@@ -185,10 +232,251 @@ function missingValueDiagnostics(
 
 export function promptInputOf(
   binding: Record<string, unknown>,
+  reservedKeys: ReadonlySet<string> = BINDING_KEYS,
 ): Record<string, unknown> {
   return Object.fromEntries(
-    Object.entries(binding).filter(([key]) => !BINDING_KEYS.has(key)),
+    Object.entries(binding).filter(([key]) => !reservedKeys.has(key)),
   );
+}
+
+function validateAgentBinding(
+  document: AtlanteDocument,
+  registry: TemplateRegistry,
+  defaultTemplateId: string,
+  agentId: string,
+  binding: AtlanteDocument["agents"][string],
+): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  const templateId = binding.template ?? defaultTemplateId;
+  const input = promptInputOf(binding);
+  let values: Record<string, unknown>;
+  try {
+    values = resolveSystemValues({
+      ...(document.values ?? {}),
+      ...(binding.values ?? {}),
+    });
+  } catch (cause) {
+    if (cause instanceof UnknownSystemVariableError) {
+      diagnostics.push(
+        error(
+          "unknown-system-variable",
+          `agent "${agentId}" template "${templateId}": ${cause.message}`,
+          {
+            path: bindingPath("agents", agentId),
+          },
+        ),
+      );
+      return diagnostics;
+    }
+    throw cause;
+  }
+  const valueDiagnostics = missingValueDiagnostics(
+    input,
+    values,
+    agentId,
+    templateId,
+    "agents",
+    "agent",
+  );
+  if (valueDiagnostics.length > 0) {
+    // Keep template/composition failures, but do not report schema failures
+    // against raw `{{values.x}}` placeholders when a value is missing.
+    diagnostics.push(
+      ...validateAgentInput(registry, templateId, input, agentId).filter(
+        (diagnostic) => diagnostic.code !== "invalid-prompt-input",
+      ),
+      ...valueDiagnostics,
+    );
+    return diagnostics;
+  }
+
+  // Template schemas must see the same values the renderer will see. A
+  // hand-built document with a non-string value is left for the resolver's
+  // defence-in-depth render diagnostic instead of making validation throw.
+  let inputForValidation = input;
+  try {
+    inputForValidation = interpolateValues(input, values);
+  } catch (cause) {
+    if (cause instanceof ValueReferenceCollisionError) {
+      diagnostics.push(
+        error(
+          "value-reference-collision",
+          `agent "${agentId}" template "${templateId}": ${cause.message}`,
+          {
+            path: bindingPath("agents", agentId, cause.path),
+          },
+        ),
+      );
+      return diagnostics;
+    }
+    // The document schema rejects non-string values before normal resolution.
+  }
+  diagnostics.push(
+    ...validateAgentInput(registry, templateId, inputForValidation, agentId),
+  );
+  return diagnostics;
+}
+
+function emptySkillDescriptionDiagnostics(
+  description: unknown,
+  descriptionValueDiagnostics: Diagnostic[],
+  values: Record<string, unknown>,
+  skillId: string,
+  templateId: string,
+): Diagnostic[] {
+  if (typeof description !== "string" || descriptionValueDiagnostics.length > 0)
+    return [];
+
+  let interpolatedDescription = description;
+  try {
+    interpolatedDescription = interpolateValues(description, values);
+  } catch {
+    return [];
+  }
+  if (interpolatedDescription.length !== 0) return [];
+
+  return [
+    error(
+      "invalid-skill-description",
+      `skill "${skillId}" template "${templateId}": description must be a non-empty string`,
+      { path: bindingPath("skills", skillId, ["description"]) },
+    ),
+  ];
+}
+
+function interpolatedSkillInput(
+  input: Record<string, unknown>,
+  values: Record<string, unknown>,
+  skillId: string,
+  templateId: string,
+): { input: Record<string, unknown>; diagnostic?: Diagnostic } {
+  try {
+    return { input: interpolateValues(input, values) };
+  } catch (cause) {
+    if (cause instanceof ValueReferenceCollisionError) {
+      return {
+        input,
+        diagnostic: error(
+          "value-reference-collision",
+          `skill "${skillId}" template "${templateId}": ${cause.message}`,
+          { path: bindingPath("skills", skillId, cause.path) },
+        ),
+      };
+    }
+    return { input };
+  }
+}
+
+function skillValues(
+  document: AtlanteDocument,
+  rawBinding: Record<string, unknown>,
+  skillId: string,
+  templateId: string,
+): { values: Record<string, unknown>; diagnostic?: Diagnostic } {
+  try {
+    return {
+      values: resolveSystemValues({
+        ...(document.values ?? {}),
+        ...((rawBinding.values as Record<string, unknown> | undefined) ?? {}),
+      }),
+    };
+  } catch (cause) {
+    if (cause instanceof UnknownSystemVariableError) {
+      return {
+        values: {},
+        diagnostic: error(
+          "unknown-system-variable",
+          `skill "${skillId}" template "${templateId}": ${cause.message}`,
+          { path: bindingPath("skills", skillId) },
+        ),
+      };
+    }
+    throw cause;
+  }
+}
+
+function validateSkillBinding(
+  document: AtlanteDocument,
+  registry: TemplateRegistry,
+  skillId: string,
+  rawBinding: Record<string, unknown>,
+): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  const templateId = (rawBinding.template ??
+    DEFAULT_SKILL_TEMPLATE_ID) as string;
+  const input = promptInputOf(rawBinding, SKILL_BINDING_KEYS);
+  const resolvedValues = skillValues(document, rawBinding, skillId, templateId);
+  if (resolvedValues.diagnostic) {
+    diagnostics.push(resolvedValues.diagnostic);
+    return diagnostics;
+  }
+  const { values } = resolvedValues;
+
+  const description = rawBinding.description;
+  if (typeof description !== "string") {
+    diagnostics.push(
+      error(
+        "invalid-skill-description",
+        `skill "${skillId}" template "${templateId}": description must be a non-empty string`,
+        { path: bindingPath("skills", skillId, ["description"]) },
+      ),
+    );
+  }
+
+  const descriptionValueDiagnostics =
+    typeof description === "string"
+      ? missingValueDiagnostics(
+          description,
+          values,
+          skillId,
+          templateId,
+          "skills",
+          "skill",
+          ["description"],
+        )
+      : [];
+  const inputValueDiagnostics = missingValueDiagnostics(
+    input,
+    values,
+    skillId,
+    templateId,
+    "skills",
+    "skill",
+  );
+  diagnostics.push(...descriptionValueDiagnostics, ...inputValueDiagnostics);
+  diagnostics.push(
+    ...emptySkillDescriptionDiagnostics(
+      description,
+      descriptionValueDiagnostics,
+      values,
+      skillId,
+      templateId,
+    ),
+  );
+
+  if (inputValueDiagnostics.length > 0) {
+    diagnostics.push(
+      ...validateSkillInput(registry, templateId, input, skillId).filter(
+        (diagnostic) => diagnostic.code !== "invalid-prompt-input",
+      ),
+    );
+    return diagnostics;
+  }
+
+  const interpolated = interpolatedSkillInput(
+    input,
+    values,
+    skillId,
+    templateId,
+  );
+  if (interpolated.diagnostic) {
+    diagnostics.push(interpolated.diagnostic);
+    return diagnostics;
+  }
+  diagnostics.push(
+    ...validateSkillInput(registry, templateId, interpolated.input, skillId),
+  );
+  return diagnostics;
 }
 
 export function validateTemplates(
@@ -199,74 +487,25 @@ export function validateTemplates(
   const diagnostics: Diagnostic[] = [];
 
   for (const [agentId, binding] of Object.entries(document.agents)) {
-    const templateId = binding.template ?? defaultTemplateId;
-    const input = promptInputOf(binding);
-    let values: Record<string, unknown>;
-    try {
-      values = resolveSystemValues({
-        ...(document.values ?? {}),
-        ...(binding.values ?? {}),
-      });
-    } catch (cause) {
-      if (cause instanceof UnknownSystemVariableError) {
-        diagnostics.push(
-          error(
-            "unknown-system-variable",
-            `agent "${agentId}" template "${templateId}": ${cause.message}`,
-            {
-              path: `/agents/${escapeJsonPointerSegment(agentId)}`,
-            },
-          ),
-        );
-        continue;
-      }
-      throw cause;
-    }
-    const valueDiagnostics = missingValueDiagnostics(
-      input,
-      values,
-      agentId,
-      templateId,
-    );
-    if (valueDiagnostics.length > 0) {
-      // Keep template/composition failures, but do not report schema failures
-      // against raw `{{values.x}}` placeholders when a value is missing.
-      diagnostics.push(
-        ...validateAgentInput(registry, templateId, input, agentId).filter(
-          (diagnostic) => diagnostic.code !== "invalid-prompt-input",
-        ),
-        ...valueDiagnostics,
-      );
-      continue;
-    }
-
-    // Template schemas must see the same values the renderer will see. A
-    // hand-built document with a non-string value is left for the resolver's
-    // defence-in-depth render diagnostic instead of making validation throw.
-    let inputForValidation = input;
-    try {
-      inputForValidation = interpolateValues(input, values);
-    } catch (cause) {
-      if (cause instanceof ValueReferenceCollisionError) {
-        diagnostics.push(
-          error(
-            "value-reference-collision",
-            `agent "${agentId}" template "${templateId}": ${cause.message}`,
-            {
-              path: `/agents/${escapeJsonPointerSegment(agentId)}${cause.path
-                .map(
-                  (segment) => `/${escapeJsonPointerSegment(String(segment))}`,
-                )
-                .join("")}`,
-            },
-          ),
-        );
-        continue;
-      }
-      // The document schema rejects non-string values before normal resolution.
-    }
     diagnostics.push(
-      ...validateAgentInput(registry, templateId, inputForValidation, agentId),
+      ...validateAgentBinding(
+        document,
+        registry,
+        defaultTemplateId,
+        agentId,
+        binding,
+      ),
+    );
+  }
+
+  for (const [skillId, binding] of Object.entries(document.skills ?? {})) {
+    diagnostics.push(
+      ...validateSkillBinding(
+        document,
+        registry,
+        skillId,
+        binding as Record<string, unknown>,
+      ),
     );
   }
 

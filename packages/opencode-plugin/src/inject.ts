@@ -18,8 +18,20 @@ export function injectAgents(
   artifacts: AgentArtifact[],
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
-  config.agent ??= {};
-  const agents = config.agent;
+  const ownAgent = Object.hasOwn(config, "agent") ? config.agent : undefined;
+  const agents =
+    ownAgent && typeof ownAgent === "object"
+      ? ownAgent
+      : ({} as Record<string, HostAgentConfig>);
+
+  if (agents !== ownAgent) {
+    Object.defineProperty(config, "agent", {
+      configurable: true,
+      enumerable: true,
+      value: agents,
+      writable: true,
+    });
+  }
 
   for (const artifact of artifacts) {
     const existing = Object.hasOwn(agents, artifact.hostAgentId)
