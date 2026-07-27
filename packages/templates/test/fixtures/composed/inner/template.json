@@ -1,11 +1,7 @@
 {
-  "$schema": "https://atlante.sh/schema/template/v0.1/schema.json",
-  "id": "test/inner",
-  "inputSchema": {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "type": "object",
-    "properties": { "body": { "type": "string" } },
-    "required": ["body"],
-    "additionalProperties": false
-  }
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": { "body": { "type": "string" } },
+  "required": ["body"],
+  "additionalProperties": false
 }

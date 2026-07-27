@@ -1,12 +1,8 @@
 {
-  "$schema": "https://atlante.sh/schema/template/v0.1/schema.json",
-  "id": "test/dangling-holder",
-  "inputSchema": {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "type": "object",
-    "properties": {
-      "missingSlot": { "template": "test/does-not-exist" }
-    },
-    "additionalProperties": false
-  }
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "missingSlot": { "template": "test/does-not-exist" }
+  },
+  "additionalProperties": false
 }

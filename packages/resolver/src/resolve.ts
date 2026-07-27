@@ -48,7 +48,7 @@ export function resolve(
   const agents: AgentArtifact[] = [];
 
   for (const [hostAgentId, binding] of Object.entries(document.agents)) {
-    const templateId = binding.promptTemplate ?? DEFAULT_TEMPLATE_ID;
+    const templateId = binding.template ?? DEFAULT_TEMPLATE_ID;
     try {
       const values = mergeValues(document.values, binding.values);
       const resolvedValues = resolveSystemValues(values);

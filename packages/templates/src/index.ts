@@ -7,14 +7,6 @@ export type {
   TemplateRegistry,
 } from "./loader.js";
 export { loadTemplates } from "./loader.js";
-export type { TemplateManifest } from "./manifest.js";
-export {
-  inputSchemaSchema,
-  JSON_SCHEMA_DRAFT_2020_12_URI,
-  TEMPLATE_ID_PATTERN,
-  TEMPLATE_MANIFEST_URI,
-  templateManifestSchema,
-} from "./manifest.js";
 export type { RenderArgs } from "./renderer.js";
 export {
   InvalidValueReferenceError,
@@ -27,6 +19,11 @@ export {
   slotPartialName,
   ValueReferenceCollisionError,
 } from "./renderer.js";
+export {
+  JSON_SCHEMA_DRAFT_2020_12_URI,
+  TEMPLATE_ID_PATTERN,
+  TEMPLATE_NAME_PATTERN,
+} from "./schema.js";
 export {
   resolveSystemValues,
   SYSTEM_RESOLVERS,

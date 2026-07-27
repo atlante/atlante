@@ -15,7 +15,7 @@ import type { Diagnostic } from "./diagnostic.js";
 import { error, escapeJsonPointerSegment } from "./diagnostic.js";
 
 /** Binding metadata, not template input (SPECIFICATION.md §4.3). */
-const BINDING_KEYS = new Set(["promptTemplate", "values"]);
+const BINDING_KEYS = new Set(["template", "values"]);
 
 function unescapeJsonPointerSegment(segment: string): string {
   return segment.replaceAll("~1", "/").replaceAll("~0", "~");
@@ -67,13 +67,10 @@ export function expandInputSchema(
     };
   }
 
-  const schema = structuredClone(template.manifest.inputSchema) as Record<
-    string,
-    unknown
-  >;
+  const schema = structuredClone(template.inputSchema);
   const properties = schema.properties as Record<string, unknown> | undefined;
 
-  for (const slot of slotsOf(template.manifest)) {
+  for (const slot of slotsOf(template.inputSchema)) {
     const expanded = expandInputSchema(registry, slot.templateId, [
       ...stack,
       templateId,
@@ -202,7 +199,7 @@ export function validateTemplates(
   const diagnostics: Diagnostic[] = [];
 
   for (const [agentId, binding] of Object.entries(document.agents)) {
-    const templateId = binding.promptTemplate ?? defaultTemplateId;
+    const templateId = binding.template ?? defaultTemplateId;
     const input = promptInputOf(binding);
     let values: Record<string, unknown>;
     try {

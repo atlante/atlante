@@ -1,4 +1,4 @@
-import { listPresets, presetName, readPreset } from "@atlante/presets";
+import { listPresets, readPreset } from "@atlante/presets";
 import { error } from "./diagnostic.js";
 import { parseDocumentOverlay } from "./document.js";
 import type { PresetLoader } from "./expand.js";
@@ -8,9 +8,8 @@ export function createBundledPresetLoader(): PresetLoader {
   return {
     load(id: string) {
       const { presets, errors } = listPresets();
-      const manifest = presets.find((m) => m.id === id);
-      if (!manifest) {
-        const known = presets.map((m) => m.id).join(", ");
+      if (!presets.includes(id)) {
+        const known = presets.join(", ");
         const diags = errors.map((e) =>
           error("preset-load-error", `${e.directory}: ${e.message}`),
         );
@@ -26,15 +25,14 @@ export function createBundledPresetLoader(): PresetLoader {
         };
       }
 
-      const name = presetName(manifest);
-      const source = readPreset(name);
+      const source = readPreset(id);
       if (!source) {
         return {
           document: undefined,
           diagnostics: [
             error(
               "preset-load-error",
-              `preset "${id}": manifest found but document is missing or unreadable`,
+              `preset "${id}": document is missing or unreadable`,
             ),
           ],
         };

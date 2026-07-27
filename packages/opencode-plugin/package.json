@@ -32,7 +32,8 @@
     "LICENSE"
   ],
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./api": "./src/api.ts"
   },
   "scripts": {
     "build": "tsc --project tsconfig.build.json"

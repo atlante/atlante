@@ -13,32 +13,32 @@ const malformedSlotRoot = new URL("./fixtures/malformed-slot", import.meta.url)
 
 describe("slotsOf", () => {
   test("finds a top-level slot property", () => {
-    const { registry } = loadTemplates(cyclicRoot);
-    const manifest = registry.get("test/a");
-    if (!manifest) throw new Error("fixture missing");
-    expect(slotsOf(manifest.manifest)).toEqual([
+    const { registry } = loadTemplates(cyclicRoot, "test");
+    const template = registry.get("test/a");
+    if (!template) throw new Error("fixture missing");
+    expect(slotsOf(template.inputSchema)).toEqual([
       { property: "child", templateId: "test/b" },
     ]);
   });
 
   test("returns no slots for a template without them", () => {
-    const { registry } = loadTemplates(validRoot);
-    const manifest = registry.get("test/greeting");
-    if (!manifest) throw new Error("fixture missing");
-    expect(slotsOf(manifest.manifest)).toEqual([]);
+    const { registry } = loadTemplates(validRoot, "test");
+    const template = registry.get("test/greeting");
+    if (!template) throw new Error("fixture missing");
+    expect(slotsOf(template.inputSchema)).toEqual([]);
   });
 
   test("does not treat a nested template reference as a slot", () => {
-    const { registry } = loadTemplates(nestedSlotRoot);
-    const manifest = registry.get("test/nested-slot");
-    if (!manifest) throw new Error("fixture missing");
-    expect(slotsOf(manifest.manifest)).toEqual([]);
+    const { registry } = loadTemplates(nestedSlotRoot, "test");
+    const template = registry.get("test/holder");
+    if (!template) throw new Error("fixture missing");
+    expect(slotsOf(template.inputSchema)).toEqual([]);
   });
 });
 
 describe("walkComposition", () => {
   test("detects a cycle and reports the chain", () => {
-    const { registry } = loadTemplates(cyclicRoot);
+    const { registry } = loadTemplates(cyclicRoot, "test");
     const issues = walkComposition(registry, "test/a");
     expect(issues).toHaveLength(1);
     expect(issues[0]?.code).toBe("cyclic-template");
@@ -46,15 +46,15 @@ describe("walkComposition", () => {
   });
 
   test("reports an unknown template id passed as the root", () => {
-    const { registry } = loadTemplates(validRoot);
+    const { registry } = loadTemplates(validRoot, "test");
     const issues = walkComposition(registry, "test/missing");
     expect(issues).toHaveLength(1);
     expect(issues[0]?.code).toBe("unknown-template");
   });
 
   test("reports a slot referencing a template that does not exist, attributed to its property", () => {
-    const { registry } = loadTemplates(danglingSlotRoot);
-    const issues = walkComposition(registry, "test/dangling-holder");
+    const { registry } = loadTemplates(danglingSlotRoot, "test");
+    const issues = walkComposition(registry, "test/holder");
     expect(issues).toHaveLength(1);
     expect(issues[0]?.code).toBe("unknown-template");
     expect(issues[0]?.templateId).toBe("test/does-not-exist");
@@ -62,26 +62,26 @@ describe("walkComposition", () => {
   });
 
   test("returns no issues for a diamond composition (two slots sharing a template)", () => {
-    const { registry } = loadTemplates(diamondRoot);
+    const { registry } = loadTemplates(diamondRoot, "test");
     expect(walkComposition(registry, "test/diamond")).toEqual([]);
   });
 
   test("returns no issues for a template without slots", () => {
-    const { registry } = loadTemplates(validRoot);
+    const { registry } = loadTemplates(validRoot, "test");
     expect(walkComposition(registry, "test/greeting")).toEqual([]);
   });
 
   test("rejects a slot reference nested below the top level of inputSchema", () => {
-    const { registry } = loadTemplates(nestedSlotRoot);
-    const issues = walkComposition(registry, "test/nested-slot");
+    const { registry } = loadTemplates(nestedSlotRoot, "test");
+    const issues = walkComposition(registry, "test/holder");
     expect(issues).toHaveLength(1);
     expect(issues[0]?.code).toBe("invalid-input-schema");
     expect(issues[0]?.message).toContain("test/does-not-exist");
   });
 
   test("rejects malformed slot markers explicitly", () => {
-    const { registry } = loadTemplates(malformedSlotRoot);
-    const issues = walkComposition(registry, "test/malformed-slot");
+    const { registry } = loadTemplates(malformedSlotRoot, "test");
+    const issues = walkComposition(registry, "test/broken");
     expect(issues).toHaveLength(3);
     expect(issues.every((issue) => issue.code === "invalid-input-schema")).toBe(
       true,

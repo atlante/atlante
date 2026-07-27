@@ -55,7 +55,7 @@ An `atlante.jsonc` with two agents:
 
   "agents": {
     "implementer": {
-      "promptTemplate": "atlante/agent",
+      "template": "atlante/agent",
       "identity": "You are a senior implementer on {{values.project}}.",
       "mission": "Write clean, tested, production-ready code.",
       "responsibilities": [
@@ -66,7 +66,7 @@ An `atlante.jsonc` with two agents:
     },
 
     "reviewer": {
-      "promptTemplate": "atlante/agent",
+      "template": "atlante/agent",
       "identity": "You are a thorough code reviewer on {{values.project}}.",
       "mission": "Ensure code quality and adherence to standards.",
       "responsibilities": [
@@ -104,9 +104,9 @@ The reviewer gets the same structure with its own identity, mission, and
 responsibilities. Change `values.apiRule` once — both agents pick it up.
 
 The root document has exactly three fields: `$schema`, `values`, and `agents`.
-Inside an agent binding, `promptTemplate` and `values` are the only binding
+Inside an agent binding, `template` and `values` are the only binding
 metadata; every other key is prompt input, owned by the selected template's
-`inputSchema`.
+input schema.
 
 ### How values reach a prompt
 
@@ -120,7 +120,7 @@ Values flow through two layers:
    substituted into the prompt definition before template rendering.
 
 Templates never receive the values dictionary: a template's entire input
-contract is its `inputSchema`, so it cannot depend on keys that no schema
+contract is its JSON Schema, so it cannot depend on keys that no schema
 defines. The resolver substitutes references into the prompt definition before
 the template renders.
 
@@ -134,8 +134,8 @@ syntax is normal, and doing so must not corrupt them.
 
 1. You write an `atlante.jsonc` (or `atlante.json`) with agent bindings and
    values.
-2. Templates define how prompts render. Each is a Markdown file plus a manifest
-   declaring the input schema it accepts.
+2. Templates define how prompts render. Each is a Markdown file paired with a
+   `template.json` Draft 2020-12 input schema.
 3. The resolver merges values, substitutes references, renders templates, and
    produces host-independent prompt descriptors.
 4. An adapter delivers the rendered prompts to the host.
@@ -168,10 +168,8 @@ A slot is declared in a template's input schema as
 property as `{{> slot/property}}`; quote the partial name when the property
 contains spaces or other Handlebars delimiters. The property-specific partial
 name means two slots can safely use the same child template while receiving
-different input. For compatibility, the old `{{> namespace/name}}` partial
-alias also works when that child appears in only one slot. Composition is
-validated ahead of rendering: missing templates and cycles are rejected rather
-than discovered at runtime.
+different input. Composition is validated ahead of rendering: missing templates
+and cycles are rejected rather than discovered at runtime.
 
 ## Presets
 
@@ -179,7 +177,7 @@ A preset is a pre-filled `atlante.jsonc` to start from. A preset is a
 *document*; a template is a *renderer*. Presets are validated by exactly the
 same validators as user-authored configurations, so a broken preset cannot ship.
 
-- **`starter`** — a guide agent and a build agent, the default for `init`
+- **`starter`** — `architect` and `implement` agents, the default for `init`
 
 Presets use `{{sys.cwd.basename}}` for their `project` value so you get a
 sensible default without writing a `values` block. Add your own
@@ -192,10 +190,10 @@ Run `atlante init` to scaffold from the `starter` preset.
 | Package | Responsibility |
 | --- | --- |
 | `@atlante/schema` | Document structure and the generated, versioned JSON Schema |
-| `@atlante/templates` | Template manifests, loading, composition, rendering |
+| `@atlante/templates` | Template schemas, loading, composition, rendering |
 | `@atlante/validator` | Discovery, parsing, and two-level validation |
 | `@atlante/resolver` | Value merging, substitution, and artifact descriptors |
-| `@atlante/presets` | Bundled presets and their manifest schema |
+| `@atlante/presets` | Bundled preset documents and registry loading |
 | `@atlante/opencode-plugin` | Runtime prompt injection through OpenCode's `config` hook |
 | `@atlante/cli` | `init`, `validate`, `resolve` |
 

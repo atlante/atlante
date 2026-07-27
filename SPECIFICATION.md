@@ -74,21 +74,19 @@ code is not part of the configuration format.
   delegation instructions and may coordinate other agents through host
   capabilities. Orchestration is a template-defined role; version 0.1 does not
   require an orchestrator, reserve a host-agent ID, or define a dedicated field.
-- **Template**: a composable, namespaced Markdown renderer with an input schema;
-  templates define prompt semantics independently of the document schema.
+- **Template**: a composable, namespaced Markdown renderer paired with a JSON
+  Schema Draft 2020-12 input schema; templates define prompt semantics
+  independently of the document schema.
 - **Template ID**: a `namespace/name` identifier (e.g., `provider/template`);
   the namespace identifies the provider, the name identifies the template.
-- **Template manifest**: the `template.json` file declaring a template's
-  canonical `id`, optional `description`, and `inputSchema`.
-- **Template slot**: a property in a composable template's `inputSchema`
+- **Template slot**: a property in a composable template's input schema
   declared as `{ "template": "namespace/name" }`, indicating that the slot
   expects the rendering of another template.
 - **Preset**: a pre-configured root-level Atlante configuration bundled as a
   starting point for new projects; `atlante.jsonc` is the default form and
-  `atlante.json` is also supported. A preset carries a manifest declaring a
-  versioned `$schema` and a `namespace/name` `id`, so presets can later be
-  distributed by third parties on the same terms as templates. A preset is a
-  document, not a renderer, which is what distinguishes it from a **template**.
+  `atlante.json` is also supported. Its logical `namespace/name` ID is assigned
+  by the loader registry rather than serialized inside the document. A preset
+  is a document, not a renderer, which distinguishes it from a **template**.
 - **Extends**: an optional field at the document level that references
   a preset by its `namespace/name` id. When present, the referenced preset's
   configuration is loaded, expanded recursively, and merged with the local
@@ -145,8 +143,8 @@ dictionary. Its top-level shape is:
       "values": {
         "scope": "Workflow-agent-specific constraint.",
       },
-      // Prompt fields are defined by the selected template's inputSchema.
-      "promptTemplate": "provider/template",
+      // Prompt fields are defined by the selected template's input schema.
+      "template": "provider/template",
     },
   },
 }
@@ -196,10 +194,10 @@ expansion, before `{{values.x}}` interpolation; this ensures that
 opaque, non-empty string owned by the host adapter.
 
 Each value is a prompt definition. An agent MAY identify its prompt template
-with `promptTemplate`; when omitted, the implementation's configured default
-template is used. `promptTemplate` and `values` are binding metadata and are not
-passed as template input. The selected template's `inputSchema` is authoritative
-for the prompt definition's fields and value types. The document schema does not
+with `template`; when omitted, the implementation's configured default template
+is used. `template` and `values` are binding metadata and are not passed as
+template input. The selected template's JSON Schema is authoritative for the
+prompt definition's fields and value types. The document schema does not
 prescribe prompt field names, ordering, or content.
 
 The map key is the host-agent ID. Atlante MUST NOT define a second logical ID
@@ -214,8 +212,7 @@ contract is divided across four layers:
    `agents`, `values`) and publishes the versioned JSON Schema and corresponding
    TypeScript types; it does not define prompt semantics;
 2. `@atlante/templates` defines prompt semantics through composable templates;
-   each template carries a manifest with an input schema and a Markdown
-   renderer;
+   each template pairs a Draft 2020-12 input schema with a Markdown renderer;
 3. `@atlante/validator` applies structural checks on the document and semantic
    checks on templates, including reference validity and template input schema
    validation;
@@ -238,11 +235,14 @@ composable, namespaced Markdown renderers with typed input schemas.
 
 Each template consists of:
 
-- `template.json` — a manifest declaring the canonical `id` (`namespace/name`),
-  an optional `description`, and an `inputSchema` (JSON Schema Draft 2020-12)
-  that validates the template's inputs;
-- a Markdown renderer that produces the prompt text from validated inputs.
-  Renderer syntax and source layout are template-package concerns.
+- `template.json` — the JSON Schema Draft 2020-12 object that validates the
+  template's inputs and MAY use standard annotations such as `title` and
+  `description`;
+- `template.md` — the Markdown renderer that produces prompt text from validated
+  inputs.
+
+The loader registry supplies a namespace and derives the template name from its
+directory. The template does not serialize a second ID.
 
 ### 6.2 Template naming
 
@@ -253,32 +253,19 @@ Template IDs follow the `namespace/name` convention:
 
 The specification does not enumerate bundled templates or prescribe their prompt
 content. Implementations MAY distribute first-party templates through a template
-package; that package's manifests and documentation are authoritative for the
+package; that package's registry and documentation are authoritative for the
 templates it provides.
 
 ### 6.3 Template composition
 
-Composable templates MAY declare slot references in their `inputSchema`:
+Composable templates MAY declare slot references directly in `template.json`:
 
 ```json
 {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "properties": {
     "section": { "template": "provider/template" }
-  }
-}
-```
-
-The template manifest continues to identify the containing template:
-
-```json
-{
-  "$schema": "https://atlante.sh/schema/template/v0.1/schema.json",
-  "id": "provider/composite",
-  "description": "Composable prompt renderer.",
-  "inputSchema": {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "type": "object"
   }
 }
 ```
@@ -297,7 +284,7 @@ overrides take precedence over global values for that agent, using the
 key-by-key merge defined in §4.2.
 
 A template MUST NOT receive the `values` dictionary. A template's input contract
-is its `inputSchema` and nothing else: because `values` is a free-form,
+is its `template.json` schema and nothing else: because `values` is a free-form,
 user-authored dictionary whose keys the schema does not define, a template that
 read from it would produce output determined by data no schema can validate,
 defeating the two-level validation model of §8 and allowing a template to depend
@@ -314,9 +301,9 @@ to a template's own renderer source, which is a genuine template.
 ### 6.5 Agent prompt rendering
 
 The selected template receives the agent's prompt definition and renders the
-complete system prompt. The template's manifest and `inputSchema` define the
-accepted fields. Rendering order and optional content are template
-implementation concerns and are not part of the document schema.
+complete system prompt. The template's `template.json` defines the accepted
+fields. Rendering order and optional content are template implementation
+concerns and are not part of the document schema.
 
 A template MAY include workflow or delegation instructions that cause its bound
 agent to serve as an orchestrator. The role is determined by the selected
@@ -330,7 +317,7 @@ Atlante prompt; the Atlante configuration is the prompt source of truth.
 
 An agent binding associates one existing or materialized host agent with one
 canonical prompt definition. The prompt definition's fields are defined by the
-referenced template and its `inputSchema`.
+referenced template and its input schema.
 
 The adapter:
 
@@ -365,21 +352,23 @@ The validator MUST reject:
 - a present `values` field that is not an object;
 - unknown top-level fields;
 - unknown or invalid prompt inputs as defined by the selected template's
-  `inputSchema`;
+  input schema;
 - unsupported or unknown fields within version 0.1 entities.
 
 ### 8.2 Template-level validation
 
-Template validation operates on the template manifest and its composition graph.
+Template validation operates on each direct input schema and its composition
+graph.
 
 The validator MUST reject:
 
-- templates whose `template.json` manifest is missing or malformed;
-- templates with an invalid or missing `inputSchema`;
+- templates whose `template.json` is missing, malformed, or does not declare
+  JSON Schema Draft 2020-12;
+- templates whose `template.json` is not a valid input schema;
 - template slot references (`{ "template": "namespace/name" }`) that point to
   non-existent templates;
 - circular template composition (template A includes B which includes A);
-- input values that do not satisfy a template's `inputSchema`.
+- input values that do not satisfy a template's input schema.
 
 Validation SHOULD also detect statically incompatible values where a future
 runtime feature would consume them.
@@ -387,9 +376,9 @@ runtime feature would consume them.
 ### 8.3 Template distribution
 
 Template packages MAY distribute bundled templates. A validator MUST validate
-configurations against the manifests and input schemas of the templates selected
-for resolution. Templates required by a configuration MUST be available without
-network access during validation and resolution.
+configurations against the input schemas of templates selected for resolution.
+Templates required by a configuration MUST be available without network access
+during validation and resolution.
 
 ## 9. Resolution and Materialization
 
@@ -404,7 +393,7 @@ The resolver MUST:
    level reports an error;
 2. resolve global `values` and per-agent overrides;
 3. load the selected template for each agent binding, using the configured
-   default when `promptTemplate` is omitted;
+   default when `template` is omitted;
 4. substitute resolved `{{values.x}}` references into the prompt definition,
    then render it with the selected template;
 5. produce one agent artifact descriptor per binding;
@@ -429,17 +418,16 @@ The v1 implementation SHOULD preserve these package responsibilities:
 - `@atlante/schema`: document structure contract (`$schema`, `agents`,
   `values`), versioned JSON Schema, and TypeScript types; no prompt semantics,
   no template logic, no host or rendering logic;
-- `@atlante/templates`: versioned template-manifest schema; template loading,
+- `@atlante/templates`: direct Draft 2020-12 input schemas; template loading,
   parsing, composition, and Markdown rendering; `namespace/name` convention;
-  template manifests and input schemas; variable resolution and slot
-  composition;
+  variable resolution and slot composition;
 - `@atlante/validator`: document structural validation (references, required
-  fields, types) and template-level validation (manifest correctness, input
-  schema compliance, composition acyclicity);
+  fields, types) and template-level validation (input schema compliance and
+  composition acyclicity);
 - `@atlante/resolver`: normalization, template composition, value
   resolution, and host-independent artifact descriptors;
-- `@atlante/presets`: versioned preset-manifest schema; preset loading and the
-  bundled presets themselves;
+- `@atlante/presets`: registry-derived preset loading and the bundled preset
+  documents themselves;
 - `@atlante/opencode-plugin`: OpenCode materialization and future runtime;
 - `@atlante/cli`: validation, resolution, materialization, and
   `atlante init` entry point.
@@ -538,8 +526,8 @@ loader or registry MUST be injected so that CLI and host adapters can provide
 built-in or, later, plugin-contributed presets through the same path.
 
 Version 0.1 MUST include the `atlante/starter` preset as the default
-initialization target. The starter preset MUST provide at least a guide
-agent and a build agent.
+initialization target. The starter preset MUST provide at least an `architect`
+agent and an `implement` agent.
 
 ## 12. Compatibility and Evolution
 
@@ -549,12 +537,9 @@ Atlante uses separate version domains for separate contracts:
 
 - **Document schema**: the project document's `$schema` URI identifies the
   versioned Atlante document contract. Released document schemas are immutable.
-- **Template manifest schema**: a template manifest's `$schema` URI identifies
-  the versioned manifest format, independently of the document schema. Version
-  0.1 uses `https://atlante.sh/schema/template/v0.1/schema.json`.
-- **Template input schema**: each template's `inputSchema` MUST be valid JSON
-  Schema Draft 2020-12 and MUST declare that dialect with its own `$schema`
-  property. This identifies the schema language, not a template release.
+- **Template input schema**: each `template.json` MUST be valid JSON Schema Draft
+  2020-12 and MUST declare that dialect with its own `$schema` property. This
+  identifies the schema language, not a template release.
 - **Package release**: package versions identify implementation releases and
   MUST NOT be used as serialized document schema references. Template
   implementations MUST be selected reproducibly by an exact package version
@@ -567,9 +552,9 @@ or rendered output MUST use a new package version, template version, or digest.
 Such a change MUST NOT require a new document schema URI unless the document
 contract itself changes.
 
-Template manifests MUST declare an `id` using the `namespace/name` convention.
-The manifest ID MUST match the template's resolved identity. The `id` is the
-canonical template identity; it MUST NOT be inferred from a package version.
+Template registries MUST assign IDs using the `namespace/name` convention. The
+namespace is supplied by the registry and the name is derived from the template
+directory; package versions MUST NOT become template IDs.
 
 An implementation MUST reject a document whose `$schema` URI it does not
 support. Version 0.1 does not define migrations.
@@ -591,7 +576,7 @@ Version 0.1 is complete when a conforming implementation can:
 
 1. validate minimal `atlante.jsonc` and `atlante.json` documents;
 2. reject missing references and invalid template references;
-3. validate template manifests and their input schemas;
+3. validate template input schemas and their composition graph;
 4. resolve global values and per-agent overrides into prompt definitions;
 5. render a deterministic prompt from structured agent values using the selected
    template;

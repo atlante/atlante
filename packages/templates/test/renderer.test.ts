@@ -9,14 +9,13 @@ import {
   slotPartialName,
 } from "../src/index.js";
 import type { TemplateRegistry } from "../src/loader.js";
-import type { TemplateManifest } from "../src/manifest.js";
 
 const root = new URL("./fixtures/composed", import.meta.url).pathname;
 const cyclicRoot = new URL("./fixtures/cyclic", import.meta.url).pathname;
 const diamondRoot = new URL("./fixtures/diamond", import.meta.url).pathname;
 
 function render(input: Record<string, unknown>): string {
-  const { registry } = loadTemplates(root);
+  const { registry } = loadTemplates(root, "test");
   return renderTemplate({
     registry,
     templateId: "test/outer",
@@ -26,52 +25,51 @@ function render(input: Record<string, unknown>): string {
 
 /** Builds a one-off in-memory registry for a single inline template source. */
 function registryOf(source: string): TemplateRegistry {
-  const manifest: TemplateManifest = {
-    $schema: "https://atlante.sh/schema/template/v0.1/schema.json",
-    id: "test/probe",
-    inputSchema: {
-      $schema: "https://json-schema.org/draft/2020-12/schema",
-      type: "object",
-      properties: {},
-    },
+  const inputSchema = {
+    $schema: "https://json-schema.org/draft/2020-12/schema",
+    type: "object",
+    properties: {},
   };
   return {
     get: (id) =>
       id === "test/probe"
-        ? { manifest, source, directory: "<memory>" }
+        ? {
+            id,
+            inputSchema,
+            source,
+            directory: "<memory>",
+          }
         : undefined,
     ids: () => ["test/probe"],
   };
 }
 
 function slotRegistry(properties: string[], source: string): TemplateRegistry {
-  const rootManifest: TemplateManifest = {
-    $schema: "https://atlante.sh/schema/template/v0.1/schema.json",
-    id: "test/root",
-    inputSchema: {
-      $schema: "https://json-schema.org/draft/2020-12/schema",
-      type: "object",
-      properties: Object.fromEntries(
-        properties.map((property) => [property, { template: "test/child" }]),
-      ),
-    },
+  const rootInputSchema = {
+    $schema: "https://json-schema.org/draft/2020-12/schema",
+    type: "object",
+    properties: Object.fromEntries(
+      properties.map((property) => [property, { template: "test/child" }]),
+    ),
   };
-  const childManifest: TemplateManifest = {
-    $schema: "https://atlante.sh/schema/template/v0.1/schema.json",
-    id: "test/child",
-    inputSchema: {
-      $schema: "https://json-schema.org/draft/2020-12/schema",
-      type: "object",
-      properties: { value: { type: "string" } },
-    },
+  const childInputSchema = {
+    $schema: "https://json-schema.org/draft/2020-12/schema",
+    type: "object",
+    properties: { value: { type: "string" } },
   };
   return {
     get: (id) => {
       if (id === "test/root")
-        return { manifest: rootManifest, source, directory: "<memory>" };
+        return {
+          id,
+          inputSchema: rootInputSchema,
+          source,
+          directory: "<memory>",
+        };
       if (id === "test/child")
         return {
-          manifest: childManifest,
+          id,
+          inputSchema: childInputSchema,
           source: "Child: {{value}}",
           directory: "<memory>",
         };
@@ -93,7 +91,7 @@ describe("renderTemplate", () => {
   });
 
   test("renders repeated child templates with each slot's own input", () => {
-    const { registry } = loadTemplates(diamondRoot);
+    const { registry } = loadTemplates(diamondRoot, "test");
     const output = renderTemplate({
       registry,
       templateId: "test/diamond",
@@ -122,7 +120,7 @@ describe("renderTemplate", () => {
   });
 
   test("throws a clear error instead of a RangeError on a cyclic composition", () => {
-    const { registry } = loadTemplates(cyclicRoot);
+    const { registry } = loadTemplates(cyclicRoot, "test");
     const input = { child: { child: {} } };
     expect(() =>
       renderTemplate({ registry, templateId: "test/a", input }),
@@ -174,7 +172,7 @@ describe("renderTemplate", () => {
     expect(output).toBe(" ");
   });
 
-  test("handles arbitrary slot properties and preserves the single-slot alias", () => {
+  test("handles arbitrary slot properties", () => {
     const property = "part/name %";
     const registry = slotRegistry(
       [property],
@@ -186,24 +184,14 @@ describe("renderTemplate", () => {
       input: { [property]: { value: "encoded" } },
     });
     expect(output).toBe("Child: encoded");
-
-    const aliasOutput = renderTemplate({
-      registry: slotRegistry(["left"], "{{> test/child}}"),
-      templateId: "test/root",
-      input: { left: { value: "alias" } },
-    });
-    expect(aliasOutput).toBe("Child: alias");
   });
 
-  test("does not register an ambiguous old alias for duplicate child slots", () => {
+  test("does not register template-id aliases for slots", () => {
     expect(() =>
       renderTemplate({
-        registry: slotRegistry(["left", "right"], "{{> test/child}}"),
+        registry: slotRegistry(["left"], "{{> test/child}}"),
         templateId: "test/root",
-        input: {
-          left: { value: "left" },
-          right: { value: "right" },
-        },
+        input: { left: { value: "left" } },
       }),
     ).toThrow(/partial test\/child/);
   });

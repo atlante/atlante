@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { readdir } from "node:fs/promises";
+import { readdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 
 const ROOT = join(import.meta.dir, "..");
@@ -26,6 +26,7 @@ for (const pkg of PACKAGES) {
   }
 
   console.log(`Building @atlante/${pkg}...`);
+  await rm(join(cwd, "dist"), { force: true, recursive: true });
   await Bun.$`${TSC} --project tsconfig.build.json`.cwd(cwd);
 
   if (pkg === "cli") {

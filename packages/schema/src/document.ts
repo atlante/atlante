@@ -10,7 +10,7 @@ export const SCHEMA_URI = "https://atlante.sh/schema/v0.1/schema.json";
  * Unknown-field rejection happens at validation level 2 (SPECIFICATION.md §8.1).
  */
 const agentBindingBaseSchema = z.looseObject({
-  promptTemplate: z.string().min(1).optional(),
+  template: z.string().min(1).optional(),
   values: valuesMapSchema.optional(),
 });
 type AgentBindingOutput = z.infer<typeof agentBindingBaseSchema>;
@@ -37,7 +37,7 @@ export const agentBindingSchema = z
     const output: Record<string, unknown> = {};
     for (const key of Object.keys(input as Record<string, unknown>)) {
       const value =
-        key === "promptTemplate" || key === "values"
+        key === "template" || key === "values"
           ? parsed[key]
           : (input as Record<string, unknown>)[key];
       Object.defineProperty(output, key, {
@@ -67,7 +67,7 @@ export type AtlanteDocument = z.infer<typeof atlanteDocumentSchema>;
 
 /** An agent binding in an overlay document: allows `null` tombstones. */
 export type AgentBindingOverlay = {
-  promptTemplate?: string | null;
+  template?: string | null;
   values?: ValuesMapOverlay;
   [key: string]: unknown;
 };

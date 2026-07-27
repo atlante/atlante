@@ -6,5 +6,5 @@ export const BUNDLED_TEMPLATES_DIR = fileURLToPath(
 );
 
 export function loadBundledTemplates() {
-  return loadTemplates(BUNDLED_TEMPLATES_DIR);
+  return loadTemplates(BUNDLED_TEMPLATES_DIR, "atlante");
 }

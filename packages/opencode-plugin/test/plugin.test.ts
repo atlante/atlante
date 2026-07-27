@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SCHEMA_URI } from "@atlante/schema";
 import type { Config, PluginInput } from "@opencode-ai/plugin";
-import type { HostConfig } from "../src/index.js";
+import type { HostConfig } from "../src/api.js";
 import { AtlantePlugin, createAtlantePlugin } from "../src/plugin.js";
 
 const created: string[] = [];
@@ -236,6 +236,23 @@ describe("AtlantePlugin", () => {
     await hooks.config?.(config as unknown as Config);
 
     expect(config.agent?.reviewer?.prompt).toContain("You review.");
+  });
+
+  test("materializes both starter agents and preserves host fields", async () => {
+    const dir = project(`{
+      "$schema": "${SCHEMA_URI}",
+      "extends": "atlante/starter"
+    }`);
+    const config: HostConfig = {
+      agent: { architect: { model: "provider/model" } },
+    };
+
+    const hooks = await AtlantePlugin(pluginInput(dir));
+    await hooks.config?.(config as unknown as Config);
+
+    expect(config.agent?.architect?.model).toBe("provider/model");
+    expect(config.agent?.architect?.prompt).toContain("lead engineer");
+    expect(config.agent?.implement?.prompt).toContain("software engineer");
   });
 
   test("preserves host-owned fields on an existing agent", async () => {

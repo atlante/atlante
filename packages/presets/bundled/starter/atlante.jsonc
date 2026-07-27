@@ -9,7 +9,7 @@
 
   "agents": {
     "architect": {
-      "promptTemplate": "atlante/agent",
+      "template": "atlante/agent",
       "identity": "You are the lead engineer for {{values.project}}.",
       "mission": "Coordinate work, delegate tasks to specialist agents, and ensure every change is reviewed.",
       "responsibilities": [
@@ -33,7 +33,7 @@
     },
 
     "implement": {
-      "promptTemplate": "atlante/agent",
+      "template": "atlante/agent",
       "identity": "You are a software engineer working on {{values.project}}.",
       "mission": "Implement changes the user or architect agent asks for, and nothing more.",
       "constraints": [

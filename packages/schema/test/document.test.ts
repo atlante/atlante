@@ -6,7 +6,7 @@ const valid = {
   values: { project: "atlante", rule: "Never invent requirements." },
   agents: {
     reviewer: {
-      promptTemplate: "atlante/agent",
+      template: "atlante/agent",
       values: { rule: "Reviews only." },
       identity: "You are a reviewer.",
       mission: "Review changes.",

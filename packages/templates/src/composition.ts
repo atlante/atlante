@@ -1,5 +1,5 @@
 import type { TemplateRegistry } from "./loader.js";
-import { TEMPLATE_ID_PATTERN, type TemplateManifest } from "./manifest.js";
+import { TEMPLATE_ID_PATTERN } from "./schema.js";
 
 export type Slot = { property: string; templateId: string };
 
@@ -78,8 +78,8 @@ function markersOf(inputSchema: Record<string, unknown>): SlotMarker[] {
  * `{ "template": "namespace/name" }`. Nested slots are out of scope for v0.1;
  * recursion happens through template ids instead.
  */
-export function slotsOf(manifest: TemplateManifest): Slot[] {
-  return markersOf(manifest.inputSchema)
+export function slotsOf(inputSchema: Record<string, unknown>): Slot[] {
+  return markersOf(inputSchema)
     .filter(
       (marker): marker is SlotMarker & { template: string } =>
         marker.topLevel && isValidTemplateId(marker.template),
@@ -126,7 +126,7 @@ export function walkComposition(
 
   const issues: CompositionIssue[] = [];
 
-  for (const marker of markersOf(template.manifest.inputSchema)) {
+  for (const marker of markersOf(template.inputSchema)) {
     if (!marker.topLevel) {
       const suffix = isValidTemplateId(marker.template)
         ? `slot reference to "${marker.template}"`
@@ -156,7 +156,7 @@ export function walkComposition(
     }
   }
 
-  for (const slot of slotsOf(template.manifest)) {
+  for (const slot of slotsOf(template.inputSchema)) {
     issues.push(
       ...walkComposition(
         registry,

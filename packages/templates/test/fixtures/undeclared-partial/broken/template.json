@@ -1,10 +1,6 @@
 {
-  "$schema": "https://atlante.sh/schema/template/v0.1/schema.json",
-  "id": "test/undeclared-partial",
-  "inputSchema": {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "type": "object",
-    "properties": {},
-    "additionalProperties": false
-  }
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {},
+  "additionalProperties": false
 }

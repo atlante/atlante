@@ -39,7 +39,7 @@
     // Review Agent.
     // Custom, added on top of the preset.
     "review": {
-      "promptTemplate": "atlante/agent",
+      "template": "atlante/agent",
       "identity": "You are a code reviewer on {{values.project}}.",
       "mission": "Ensure every change is correct, well-tested, and respects the monorepo's package boundaries.",
       "responsibilities": [

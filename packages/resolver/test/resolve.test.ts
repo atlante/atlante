@@ -19,7 +19,7 @@ const document: AtlanteDocument = {
   values: { project: "atlante", rule: "Global constraint." },
   agents: {
     reviewer: {
-      promptTemplate: "atlante/agent",
+      template: "atlante/agent",
       identity: "You are a reviewer.",
       mission: "Review changes to {{values.project}}.",
       constraints: ["{{values.rule}}"],
@@ -58,7 +58,7 @@ describe("resolve", () => {
     expect(result.agents[0]?.prompt).toContain("Work on safe.");
   });
 
-  test("falls back to the default template when promptTemplate is omitted", () => {
+  test("falls back to the default template when template is omitted", () => {
     const { agents } = resolve(document, registry);
     expect(agents[1]?.templateId).toBe("atlante/agent");
   });
@@ -175,10 +175,13 @@ describe("resolve", () => {
   });
 
   test("returns a diagnostic instead of throwing when a template renders an undeclared partial", () => {
-    const { registry: brokenRegistry } = loadTemplates(undeclaredPartialRoot);
+    const { registry: brokenRegistry } = loadTemplates(
+      undeclaredPartialRoot,
+      "test",
+    );
     const broken: AtlanteDocument = {
       $schema: SCHEMA_URI,
-      agents: { a: { promptTemplate: "test/undeclared-partial" } },
+      agents: { a: { template: "test/broken" } },
     };
     const result = resolve(broken, brokenRegistry);
     expect(result.agents).toEqual([]);
@@ -186,7 +189,10 @@ describe("resolve", () => {
   });
 
   test("attributes a render failure to its agent and template and emits no partial artifacts", () => {
-    const { registry: brokenRegistry } = loadTemplates(undeclaredPartialRoot);
+    const { registry: brokenRegistry } = loadTemplates(
+      undeclaredPartialRoot,
+      "test",
+    );
     const combinedRegistry = {
       get: (id: string) => brokenRegistry.get(id) ?? registry.get(id),
       ids: () => [...new Set([...brokenRegistry.ids(), ...registry.ids()])],
@@ -195,14 +201,14 @@ describe("resolve", () => {
       $schema: SCHEMA_URI,
       agents: {
         good: { identity: "x", mission: "y" },
-        "bad/id~one": { promptTemplate: "test/undeclared-partial" },
+        "bad/id~one": { template: "test/broken" },
       },
     };
     const result = resolve(broken, combinedRegistry);
     expect(result.agents).toEqual([]);
     expect(result.diagnostics[0]?.code).toBe("template-render-failed");
     expect(result.diagnostics[0]?.message).toContain(
-      'agent "bad/id~one" template "test/undeclared-partial"',
+      'agent "bad/id~one" template "test/broken"',
     );
     expect(result.diagnostics[0]?.path).toBe("/agents/bad~1id~0one");
   });

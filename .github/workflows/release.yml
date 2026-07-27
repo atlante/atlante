@@ -79,7 +79,6 @@ jobs:
       - name: Copy schema files
         run: |
           cp -r packages/schema/schema website/
-          cp -r packages/templates/schema website/schema/template
       - name: Deploy to Vercel
         uses: amondnet/vercel-action@v42.3.0
         with:

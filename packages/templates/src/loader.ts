@@ -1,10 +1,13 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import type { TemplateManifest } from "./manifest.js";
-import { templateManifestSchema } from "./manifest.js";
+import {
+  JSON_SCHEMA_DRAFT_2020_12_URI,
+  TEMPLATE_NAME_PATTERN,
+} from "./schema.js";
 
 export type Template = {
-  manifest: TemplateManifest;
+  id: string;
+  inputSchema: Record<string, unknown>;
   source: string;
   directory: string;
 };
@@ -20,11 +23,15 @@ type TemplateLoaderDeps = {
   statSync?: (path: string) => { isDirectory(): boolean };
 };
 
-function loadOne(directory: string): Template | TemplateLoadError {
-  let manifestText: string;
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function loadOne(directory: string, id: string): Template | TemplateLoadError {
+  let schemaText: string;
   let source: string;
   try {
-    manifestText = readFileSync(join(directory, "template.json"), "utf8");
+    schemaText = readFileSync(join(directory, "template.json"), "utf8");
     source = readFileSync(join(directory, "template.md"), "utf8");
   } catch (error) {
     return { directory, message: `unreadable template: ${String(error)}` };
@@ -32,40 +39,42 @@ function loadOne(directory: string): Template | TemplateLoadError {
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(manifestText);
+    parsed = JSON.parse(schemaText);
   } catch (error) {
     return { directory, message: `malformed template.json: ${String(error)}` };
   }
 
-  const result = templateManifestSchema.safeParse(parsed);
-  if (!result.success) {
-    const issue = result.error.issues[0];
-    const path = issue?.path.join(".") ?? "<root>";
+  if (!isObject(parsed) || parsed.$schema !== JSON_SCHEMA_DRAFT_2020_12_URI) {
     return {
       directory,
-      message: `invalid template.json at "${path}": ${issue?.message ?? "unknown error"}`,
+      message: `invalid template.json at "$schema": expected JSON Schema Draft 2020-12 (${JSON_SCHEMA_DRAFT_2020_12_URI})`,
     };
   }
 
-  return { manifest: result.data as TemplateManifest, source, directory };
+  return { id, inputSchema: parsed, source, directory };
 }
 
-/**
- * Loads every immediate subdirectory of `rootDirectory` as a template.
- * Load failures are collected rather than thrown so the validator can turn
- * them into diagnostics.
- */
 export function loadTemplates(
   rootDirectory: string,
+  namespace: string,
   deps: TemplateLoaderDeps = {},
-): {
-  registry: TemplateRegistry;
-  errors: TemplateLoadError[];
-} {
+): { registry: TemplateRegistry; errors: TemplateLoadError[] } {
   const templates = new Map<string, Template>();
   const errors: TemplateLoadError[] = [];
 
-  let entries: string[] = [];
+  if (!TEMPLATE_NAME_PATTERN.test(namespace)) {
+    return {
+      registry: { get: () => undefined, ids: () => [] },
+      errors: [
+        {
+          directory: rootDirectory,
+          message: `invalid template namespace "${namespace}"`,
+        },
+      ],
+    };
+  }
+
+  let entries: string[];
   try {
     entries = readdirSync(rootDirectory).sort();
   } catch (error) {
@@ -89,22 +98,18 @@ export function loadTemplates(
     }
     if (!isDirectory) continue;
 
-    const loaded = loadOne(directory);
+    if (!TEMPLATE_NAME_PATTERN.test(entry)) {
+      errors.push({ directory, message: `invalid template name "${entry}"` });
+      continue;
+    }
+
+    const id = `${namespace}/${entry}`;
+    const loaded = loadOne(directory, id);
     if ("message" in loaded) {
       errors.push(loaded);
       continue;
     }
-
-    const existing = templates.get(loaded.manifest.id);
-    if (existing) {
-      errors.push({
-        directory,
-        message: `duplicate template id "${loaded.manifest.id}": "${directory}" collides with "${existing.directory}"`,
-      });
-      continue;
-    }
-
-    templates.set(loaded.manifest.id, loaded);
+    templates.set(id, loaded);
   }
 
   return {

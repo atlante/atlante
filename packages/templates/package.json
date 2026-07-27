@@ -2,7 +2,7 @@
   "name": "@atlante/templates",
   "version": "0.1.4",
   "type": "module",
-  "description": "Atlante template manifests, loading, composition, and rendering",
+  "description": "Atlante template schemas, loading, composition, and rendering",
   "license": "MIT",
   "contributors": [
     {
@@ -36,11 +36,9 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "generate": "bun scripts/generate.ts",
     "build": "tsc --project tsconfig.build.json"
   },
   "dependencies": {
-    "handlebars": "^4.7.8",
-    "zod": "^4.0.0"
+    "handlebars": "^4.7.8"
   }
 }

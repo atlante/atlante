@@ -49,31 +49,28 @@ describe("expandInputSchema", () => {
   });
 
   test("reports a cycle instead of recursing forever", () => {
-    const { registry } = loadTemplates(cyclicRoot);
+    const { registry } = loadTemplates(cyclicRoot, "test");
     const { schema, diagnostics } = expandInputSchema(registry, "test/a");
     expect(schema).toBeUndefined();
     expect(diagnostics[0]?.code).toBe("cyclic-template");
   });
 
   test("guards direct exported calls with a cyclic stack", () => {
-    const { registry } = loadTemplates(cyclicRoot);
+    const { registry } = loadTemplates(cyclicRoot, "test");
     const result = expandInputSchema(registry, "test/a", ["test/a"]);
     expect(result.schema).toBeUndefined();
     expect(result.diagnostics[0]?.code).toBe("cyclic-template");
   });
 
   test("reports a slot pointing at a template that does not exist", () => {
-    const { registry } = loadTemplates(cyclicRoot);
+    const { registry } = loadTemplates(cyclicRoot, "test");
     const { diagnostics } = expandInputSchema(registry, "test/nope");
     expect(diagnostics[0]?.code).toBe("unknown-template");
   });
 
   test("rejects a slot reference nested below the top level instead of ignoring it", () => {
-    const { registry } = loadTemplates(nestedSlotRoot);
-    const { schema, diagnostics } = expandInputSchema(
-      registry,
-      "test/nested-slot",
-    );
+    const { registry } = loadTemplates(nestedSlotRoot, "test");
+    const { schema, diagnostics } = expandInputSchema(registry, "test/holder");
     expect(schema).toBeUndefined();
     expect(diagnostics[0]?.code).toBe("invalid-input-schema");
   });
@@ -81,23 +78,23 @@ describe("expandInputSchema", () => {
 
 describe("validateAgentInput", () => {
   test("rejects a template with a structurally invalid inputSchema instead of throwing", () => {
-    const { registry } = loadTemplates(invalidSchemaRoot);
+    const { registry } = loadTemplates(invalidSchemaRoot, "test");
     const diagnostics = validateAgentInput(
       registry,
-      "test/invalid-schema",
+      "test/broken",
       {},
       "reviewer",
     );
     expect(diagnostics).toHaveLength(1);
     expect(diagnostics[0]?.code).toBe("invalid-input-schema");
-    expect(diagnostics[0]?.message).toContain("test/invalid-schema");
+    expect(diagnostics[0]?.message).toContain("test/broken");
     expect(diagnostics[0]?.message).not.toContain(
       "must be equal to one of the allowed values",
     );
   });
 
   test("retains agent and slot provenance with escaped JSON Pointer segments", () => {
-    const { registry } = loadTemplates(cyclicRoot);
+    const { registry } = loadTemplates(cyclicRoot, "test");
     const diagnostics = validateAgentInput(
       registry,
       "test/a",
@@ -110,10 +107,10 @@ describe("validateAgentInput", () => {
   });
 
   test("retains nested-slot provenance instead of replacing it with the agent path", () => {
-    const { registry } = loadTemplates(nestedSlotRoot);
+    const { registry } = loadTemplates(nestedSlotRoot, "test");
     const diagnostics = validateAgentInput(
       registry,
-      "test/nested-slot",
+      "test/holder",
       {},
       "agent/id~one",
     );
@@ -127,15 +124,12 @@ describe("validateAgentInput", () => {
       get: (id) =>
         id === "test/root"
           ? {
-              manifest: {
-                $schema: "https://atlante.sh/schema/template/v0.1/schema.json",
-                id: "test/root",
-                inputSchema: {
-                  $schema: "https://json-schema.org/draft/2020-12/schema",
-                  type: "object",
-                  properties: {
-                    "slot/a~b": { template: "test/missing" },
-                  },
+              id,
+              inputSchema: {
+                $schema: "https://json-schema.org/draft/2020-12/schema",
+                type: "object",
+                properties: {
+                  "slot/a~b": { template: "test/missing" },
                 },
               },
               source: "",
@@ -155,10 +149,10 @@ describe("validateAgentInput", () => {
   });
 
   test("rejects input under a nested slot instead of accepting it unchecked", () => {
-    const { registry } = loadTemplates(nestedSlotRoot);
+    const { registry } = loadTemplates(nestedSlotRoot, "test");
     const diagnostics = validateAgentInput(
       registry,
-      "test/nested-slot",
+      "test/holder",
       { outer: { inner: { anything: 123 } } },
       "reviewer",
     );
@@ -174,17 +168,17 @@ describe("validateTemplates", () => {
 
   test("accepts a valid agent binding", () => {
     expect(
-      check({ promptTemplate: "atlante/agent", identity: "x", mission: "y" }),
+      check({ template: "atlante/agent", identity: "x", mission: "y" }),
     ).toEqual([]);
   });
 
-  test("applies the default template when promptTemplate is omitted", () => {
+  test("applies the default template when template is omitted", () => {
     expect(check({ identity: "x", mission: "y" })).toEqual([]);
   });
 
-  test("rejects an unknown promptTemplate", () => {
+  test("rejects an unknown template", () => {
     const diagnostics = check({
-      promptTemplate: "atlante/nope",
+      template: "atlante/nope",
       identity: "x",
     });
     expect(diagnostics[0]?.code).toBe("unknown-template");
@@ -210,15 +204,26 @@ describe("validateTemplates", () => {
     expect(diagnostics[0]?.code).toBe("invalid-prompt-input");
   });
 
-  test("does not treat promptTemplate or values as prompt input", () => {
+  test("does not treat template or values as prompt input", () => {
     expect(
       check({
-        promptTemplate: "atlante/agent",
+        template: "atlante/agent",
         values: { project: "p" },
         identity: "x",
         mission: "y",
       }),
     ).toEqual([]);
+  });
+
+  test("does not retain promptTemplate as legacy binding metadata", () => {
+    const diagnostics = check({
+      promptTemplate: "atlante/agent",
+      identity: "x",
+      mission: "y",
+    });
+
+    expect(diagnostics[0]?.code).toBe("invalid-prompt-input");
+    expect(diagnostics[0]?.message).toContain("promptTemplate");
   });
 
   test("rejects an unknown values reference before rendering", () => {

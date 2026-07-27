@@ -1,17 +1,13 @@
 {
-  "$schema": "https://atlante.sh/schema/template/v0.1/schema.json",
-  "id": "test/nested-slot",
-  "inputSchema": {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "type": "object",
-    "properties": {
-      "outer": {
-        "type": "object",
-        "properties": {
-          "inner": { "template": "test/does-not-exist" }
-        }
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "outer": {
+      "type": "object",
+      "properties": {
+        "inner": { "template": "test/does-not-exist" }
       }
-    },
-    "additionalProperties": false
-  }
+    }
+  },
+  "additionalProperties": false
 }

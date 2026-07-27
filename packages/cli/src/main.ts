@@ -1,10 +1,10 @@
 import { Command } from "commander";
+import packageJson from "../package.json" with { type: "json" };
 import { runInit } from "./commands/init.js";
 import { runResolve } from "./commands/resolve.js";
 import { runValidate } from "./commands/validate.js";
 
-// Preserve the existing preset helpers as public aliases for CLI consumers.
-export { listPresets, presetName, readPreset } from "@atlante/presets";
+export { listPresets, readPreset } from "@atlante/presets";
 export { runInit } from "./commands/init.js";
 export { runResolve } from "./commands/resolve.js";
 export { runValidate } from "./commands/validate.js";
@@ -14,7 +14,7 @@ export function createProgram(): Command {
   const program = new Command()
     .name("atlante")
     .description("Structured, versionable prompts for AI coding harnesses")
-    .version("0.1.0");
+    .version(packageJson.version);
 
   program
     .command("validate")

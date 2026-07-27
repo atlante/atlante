@@ -45,14 +45,7 @@ export function renderTemplate(
   const handlebars = Handlebars.create();
   const nextStack = [...stack, templateId];
 
-  const slots = slotsOf(template.manifest);
-  const targetCounts = new Map<string, number>();
-  for (const slot of slots)
-    targetCounts.set(
-      slot.templateId,
-      (targetCounts.get(slot.templateId) ?? 0) + 1,
-    );
-
+  const slots = slotsOf(template.inputSchema);
   const renderedSlots = slots.map((slot) => {
     const slotInput = Object.hasOwn(input, slot.property)
       ? input[slot.property]
@@ -72,8 +65,6 @@ export function renderTemplate(
   });
 
   for (const { rendered, slot } of renderedSlots) {
-    if (targetCounts.get(slot.templateId) === 1)
-      handlebars.registerPartial(slot.templateId, () => rendered);
     handlebars.registerPartial(slotPartialName(slot.property), () => rendered);
   }
 

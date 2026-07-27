@@ -20,7 +20,7 @@ export function buildDocumentJsonSchema(): Record<string, unknown> {
   const agentBindingSchema = {
     type: "object",
     properties: {
-      promptTemplate: { type: "string", minLength: 1 },
+      template: { type: "string", minLength: 1 },
       values: valuesSchema,
       extends: { type: "string", minLength: 1 },
     },

@@ -12,7 +12,8 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SCHEMA_URI } from "@atlante/schema";
-import { runResolve, runValidate } from "../src/main.js";
+import packageJson from "../package.json" with { type: "json" };
+import { createProgram, runResolve, runValidate } from "../src/main.js";
 
 const created: string[] = [];
 
@@ -49,6 +50,10 @@ const emptyAgents = `{
 afterEach(() => {
   for (const dir of created.splice(0))
     rmSync(dir, { recursive: true, force: true });
+});
+
+test("reports the package manifest version", () => {
+  expect(createProgram().version()).toBe(packageJson.version);
 });
 
 test("the published launcher runs with Node when Bun is unavailable", () => {

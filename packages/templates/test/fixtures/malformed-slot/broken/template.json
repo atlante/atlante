@@ -1,13 +1,9 @@
 {
-  "$schema": "https://atlante.sh/schema/template/v0.1/schema.json",
-  "id": "test/malformed-slot",
-  "inputSchema": {
-    "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "type": "object",
-    "properties": {
-      "notString": { "template": 3 },
-      "empty": { "template": "" },
-      "notNamespaced": { "template": "workflow" }
-    }
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "notString": { "template": 3 },
+    "empty": { "template": "" },
+    "notNamespaced": { "template": "workflow" }
   }
 }
