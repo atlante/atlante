@@ -188,7 +188,7 @@ async function bump(pkgs: Pkg[], v: ReturnType<typeof parseVersion>) {
 async function commitAndTag(pkgs: Pkg[], v: ReturnType<typeof parseVersion>) {
   const paths = pkgs.map((p) => p.path.slice(ROOT.length + 1));
   await run`git add -- ${paths}`;
-  await run`git commit -m ${`release: v${v.raw}`}`;
+  await run`git commit --allow-empty -m ${`release: v${v.raw}`}`;
   await run`git tag -a ${`v${v.raw}`} -m ${`v${v.raw}`}`;
   console.log(`Created commit and annotated tag v${v.raw}`);
 }
