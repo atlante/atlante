@@ -10,7 +10,7 @@ first Atlante specification.
 ## 1. Scope
 
 Version 0.1 defines a provider-neutral configuration model for structured agent
-prompts and project-global Markdown skills. It defines a composable template
+prompts and Markdown skills. It defines a composable template
 system that owns prompt and skill-content semantics, a two-level validation
 model (document structure + template input schemas), deterministic resolution,
 and an OpenCode adapter that materializes resolved prompts into host agent
@@ -26,7 +26,7 @@ Version 0.1 includes:
 - a template protocol for prompt rendering and validation;
 - global values with per-agent overrides, resolved into prompt definitions via
   `{{values.x}}`;
-- project-global skill bindings with descriptions and template-owned Markdown
+- skill bindings with descriptions and template-owned Markdown
   content;
 - host-agent bindings whose prompt inputs are defined by templates;
 - two-level validation (document structure + template input schema);
@@ -74,9 +74,6 @@ code is not part of the configuration format.
 - **Skill binding**: the association between a root `skills` map key and a
   description plus template-owned skill-content input. The map key is the
   binding's `skillId`.
-- **Project-global skill**: a skill binding available independently of any one
-  host agent. It is content exposed through an adapter lookup, not an execution
-  task or an agent runtime.
 - **Prompt definition**: the structured, user-authored values from which Atlante
   renders an agent system prompt; prompt sections are defined by the referenced
   template, not by the schema.
@@ -166,7 +163,7 @@ collections. Its top-level shape is:
     },
   },
 
-  // Project-global Markdown skills — skillId → skill binding
+  // Skills — skillId → skill binding
   "skills": {
     "testing": {
       "description": "Testing guidance for {{values.project}}.",
@@ -386,8 +383,7 @@ When present, `skills` MUST be an object keyed by non-empty `skillId` strings.
 Each skill binding MUST contain a non-empty `description`; the description is
 metadata for lookup and is not passed to the template. `template` selects the
 skill content renderer and defaults to `atlante/skill`. `values` contains local
-value overrides. Every other field is template-owned input. Skills are global
-to the project and are not associated with a host-agent ID.
+value overrides. Every other field is template-owned input. Skills are not associated with a host-agent ID.
 
 Defining or resolving a skill MUST NOT execute its content. The OpenCode adapter
 exposes resolved skill content through `atlante_skill`.
@@ -563,7 +559,7 @@ configuration.
 ### 11.1 Skill lookup
 
 After successful resolution and materialization, the OpenCode adapter exposes
-an `atlante_skill` tool for project-global skills. The tool input MUST be exactly
+an `atlante_skill` tool for skill lookups. The tool input MUST be exactly
 an object with one string field, `{ "name": "<skillId>" }`; the name is looked
 up against the root `skills` map key. A successful known-name lookup returns
 only the resolved Markdown `content`; the skill `description` is not returned

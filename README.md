@@ -2,7 +2,7 @@
 
 Structured, versionable configuration for AI coding agents.
 
-Atlante lets you define agent prompts and project-global Markdown skills as a
+Atlante lets you define agent prompts and Markdown skills as a
 validated document. Instead of writing prompts by hand in each tool's format,
 you declare them once and let Atlante handle rendering, validation, and
 materialization to your host of choice (currently OpenCode).
@@ -111,7 +111,7 @@ Write clean, tested, production-ready code.
 The reviewer gets the same structure with its own identity, mission, and
 responsibilities. Change `values.apiRule` once — both agents pick it up.
 
-Skills are project-global Markdown content, not agents. The `testing` skill is
+Skills are Markdown content, not agents. The `testing` skill is
 available to every host agent through the OpenCode plugin's `atlante_skill`
 tool. A lookup uses exactly one object, `{ "name": "testing" }`, and returns
 only the skill's rendered Markdown content. Atlante does not execute skill

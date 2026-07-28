@@ -28,7 +28,7 @@ atlante --help
 - `atlante validate [path]` — validate the document and referenced template
   inputs without rendering
 - `atlante resolve [path] [--agent <id>] [--json]` — render resolved agent
-  prompts and project-global skills
+  prompts and skills
 
 `path` defaults to the current directory and may be a config file or project
 directory. Atlante discovers both `atlante.jsonc` and `atlante.json`.
