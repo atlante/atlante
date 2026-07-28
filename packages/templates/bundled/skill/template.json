@@ -1,10 +1,55 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "Markdown content exposed as a project skill.",
+  "description": "Structured project skill with a title, overview, and ordered content sections.",
   "type": "object",
   "properties": {
-    "content": { "type": "string" }
+    "title": { "type": "string", "minLength": 1 },
+    "overview": { "type": "string", "minLength": 1 },
+    "sections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "markdown": { "type": "string", "minLength": 1 },
+          "instructions": {
+            "type": "object",
+            "properties": {
+              "title": { "type": "string", "minLength": 1 },
+              "description": { "type": "string", "minLength": 1 },
+              "steps": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 },
+                "minItems": 1
+              }
+            },
+            "required": ["steps"],
+            "additionalProperties": false
+          },
+          "gotchas": {
+            "type": "object",
+            "properties": {
+              "title": { "type": "string", "minLength": 1 },
+              "description": { "type": "string", "minLength": 1 },
+              "items": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 },
+                "minItems": 1
+              }
+            },
+            "required": ["items"],
+            "additionalProperties": false
+          }
+        },
+        "oneOf": [
+          { "required": ["markdown"] },
+          { "required": ["instructions"] },
+          { "required": ["gotchas"] }
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 1
+    }
   },
-  "required": ["content"],
+  "required": ["title", "overview", "sections"],
   "additionalProperties": false
 }

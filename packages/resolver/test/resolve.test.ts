@@ -55,7 +55,9 @@ describe("resolve", () => {
             description:
               "Testing {{values.project}} with {{values.emphasis}} guidance",
             values: { emphasis: "local" },
-            content: "# Testing\n\nUse {{values.project}}.",
+            title: "Testing",
+            overview: "Run tests.",
+            sections: [{ markdown: "Use {{values.project}}." }],
           },
         },
       },
@@ -68,7 +70,7 @@ describe("resolve", () => {
         skillId: "testing",
         description: "Testing Atlante with local guidance",
         templateId: "atlante/skill",
-        content: "# Testing\n\nUse Atlante.",
+        content: "# Testing\n\n## Overview\n\nRun tests.\n\nUse Atlante.\n",
       },
     ]);
   });
@@ -84,9 +86,24 @@ describe("resolve", () => {
         $schema: SCHEMA_URI,
         agents: {},
         skills: {
-          "10": { description: "ten", content: "ten" },
-          "2": { description: "two", content: "two" },
-          alpha: { description: "alpha", content: "alpha" },
+          "10": {
+            description: "ten",
+            title: "Ten",
+            overview: "Overview",
+            sections: [{ markdown: "ten" }],
+          },
+          "2": {
+            description: "two",
+            title: "Two",
+            overview: "Overview",
+            sections: [{ markdown: "two" }],
+          },
+          alpha: {
+            description: "alpha",
+            title: "Alpha",
+            overview: "Overview",
+            sections: [{ markdown: "alpha" }],
+          },
         },
       },
       registry,
@@ -103,13 +120,20 @@ describe("resolve", () => {
       {
         $schema: SCHEMA_URI,
         agents: { reviewer: { identity: "x", mission: "y" } },
-        skills: { testing: { description: "Testing", content: 42 } as never },
+        skills: {
+          testing: {
+            description: "Testing",
+            title: "Testing",
+            overview: "Overview",
+            sections: 42,
+          } as never,
+        },
       },
       registry,
     );
     expect(result.agents).toEqual([]);
     expect(result.skills).toEqual([]);
-    expect(result.diagnostics[0]?.path).toBe("/skills/testing/content");
+    expect(result.diagnostics[0]?.path).toBe("/skills/testing/sections");
   });
 
   test("turns a skill render failure into a diagnostic without partial artifacts", () => {
@@ -132,7 +156,14 @@ describe("resolve", () => {
       {
         $schema: SCHEMA_URI,
         agents: { reviewer: { identity: "x" } },
-        skills: { testing: { description: "Testing", content: "content" } },
+        skills: {
+          testing: {
+            description: "Testing",
+            title: "Testing",
+            overview: "Overview",
+            sections: [{ markdown: "content" }],
+          },
+        },
       },
       registry,
     );

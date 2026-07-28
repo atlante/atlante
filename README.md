@@ -77,13 +77,6 @@ An `atlante.jsonc` with two agents:
     },
   },
 
-  "skills": {
-    "testing": {
-      "description": "Testing guidance for {{values.project}}.",
-      "template": "atlante/skill",
-      "content": "Run the focused test suite before reporting completion.\n\n{{values.apiRule}}",
-    },
-  },
 }
 ```
 
@@ -111,11 +104,11 @@ Write clean, tested, production-ready code.
 The reviewer gets the same structure with its own identity, mission, and
 responsibilities. Change `values.apiRule` once — both agents pick it up.
 
-Skills are Markdown content, not agents. The `testing` skill is
-available to every host agent through the OpenCode plugin's `atlante_skill`
-tool. A lookup uses exactly one object, `{ "name": "testing" }`, and returns
-only the skill's rendered Markdown content. Atlante does not execute skill
-content.
+Skills are structured template input rendered as Markdown, not agents. A
+resolved skill is available to every host agent through the OpenCode plugin's
+`atlante_skill` tool. A lookup uses exactly one object,
+`{ "name": "<skillId>" }`, and returns only the skill's rendered Markdown
+content. Atlante does not execute skill content.
 
 The root document has `$schema`, `values`, `agents`, and optional `skills`
 fields. Inside an agent binding, `template` and `values` are binding metadata;
@@ -179,7 +172,7 @@ Bundled templates live in the `atlante/` namespace:
 - **`atlante/agent`** — the root prompt renderer: identity, mission,
   responsibilities, constraints, and an optional `workflow` slot
 - **`atlante/workflow`** — an ordered procedure, composed into `atlante/agent`
-- **`atlante/skill`** — Markdown skill content with required `content` input
+- **`atlante/skill`** — structured skill input rendered as Markdown
 
 A slot is declared in a template's input schema as
 `{ "template": "namespace/name" }` and invoked from Markdown with its input

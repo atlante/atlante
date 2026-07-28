@@ -26,8 +26,7 @@ Version 0.1 includes:
 - a template protocol for prompt rendering and validation;
 - global values with per-agent overrides, resolved into prompt definitions via
   `{{values.x}}`;
-- skill bindings with descriptions and template-owned Markdown
-  content;
+- skill bindings with descriptions and template-owned input rendered as Markdown;
 - host-agent bindings whose prompt inputs are defined by templates;
 - two-level validation (document structure + template input schema);
 - deterministic prompt resolution;
@@ -72,8 +71,8 @@ code is not part of the configuration format.
 - **Agent binding**: the association between a host-agent ID and an Atlante
   prompt definition.
 - **Skill binding**: the association between a root `skills` map key and a
-  description plus template-owned skill-content input. The map key is the
-  binding's `skillId`.
+  description plus template-owned skill input. The map key is the binding's
+  `skillId`.
 - **Prompt definition**: the structured, user-authored values from which Atlante
   renders an agent system prompt; prompt sections are defined by the referenced
   template, not by the schema.
@@ -167,8 +166,8 @@ collections. Its top-level shape is:
   "skills": {
     "testing": {
       "description": "Testing guidance for {{values.project}}.",
-      "template": "atlante/skill",
-      "content": "Run the focused test suite.",
+      "template": "provider/template",
+      // Remaining fields are defined by the selected template.
     },
   },
 }
@@ -346,11 +345,11 @@ Atlante prompt; the Atlante configuration is the prompt source of truth.
 
 ### 6.6 Skill content rendering
 
-The bundled `atlante/skill` template has one required string input, `content`,
+The bundled `atlante/skill` template accepts structured, template-owned input
 and renders it as Markdown without executing it. A skill's `description` is
 resolved separately as binding metadata and listed in the tool description for
 discovery; successful `atlante_skill` execution returns only rendered Markdown
-`content`. The description is not template input. Skill content and skill
+content. The description is not template input. Skill content and skill
 execution are distinct contracts: version 0.1 defines content validation,
 interpolation, rendering, and lookup only, not execution, scheduling, runtime
 state, or remote loading.
@@ -709,8 +708,8 @@ Version 0.1 is complete when a conforming implementation can:
 8. report a warning when a non-empty host prompt is replaced;
 9. scaffold a project from the bundled `starter` preset via `atlante init`;
 10. validate a skill with required description, default `atlante/skill`, and
-    template-owned content;
-11. interpolate skill descriptions and content with global and local values;
+     template-owned input;
+11. interpolate skill descriptions and input with global and local values;
 12. resolve skill template composition and reject missing references, cycles,
     invalid input, missing values, and other template failures;
 13. apply preset skill inheritance, local precedence, and `null` tombstones;

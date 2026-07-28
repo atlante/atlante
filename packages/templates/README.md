@@ -15,6 +15,6 @@ Bundled templates use the `atlante/` namespace and include `atlante/agent`,
 `template.json` input schema with its `template.md` renderer; IDs derive from
 namespace and directory.
 
-`atlante/skill` requires a string `content` field and renders that field as
-Markdown. It supplies skill content only: it does not execute a skill, manage
-runtime state, or register a native OpenCode skill.
+`atlante/skill` accepts structured input and renders it as Markdown. It supplies
+skill content only: it does not execute a skill, manage runtime state, or
+register a native OpenCode skill.

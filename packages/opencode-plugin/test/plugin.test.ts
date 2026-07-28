@@ -42,7 +42,12 @@ const validWithSkill = `{
     "reviewer": { "identity": "You review.", "mission": "Find defects." }
   },
   "skills": {
-    "testing": { "description": "Testing guidance", "content": "Run tests." }
+    "testing": {
+      "description": "Testing guidance",
+      "title": "Testing",
+      "overview": "Testing guidance",
+      "sections": [{ "markdown": "Run tests." }]
+    }
   }
 }`;
 
@@ -117,7 +122,9 @@ describe("AtlantePlugin", () => {
     expect(calls).toEqual({ load: 0, templates: 1, expand: 1, resolve: 1 });
     await expect(
       skillTool?.execute({ name: "testing" }, {} as never),
-    ).resolves.toBe("Run tests.");
+    ).resolves.toBe(
+      "# Testing\n\n## Overview\n\nTesting guidance\n\nRun tests.\n",
+    );
   });
 
   test("does nothing when no atlante configuration exists", async () => {
@@ -465,7 +472,12 @@ describe("AtlantePlugin", () => {
       "$schema": "${SCHEMA_URI}",
       "agents": {},
       "skills": {
-        "testing": { "description": "Testing guidance", "content": "Run tests." }
+        "testing": {
+          "description": "Testing guidance",
+          "title": "Testing",
+          "overview": "Testing guidance",
+          "sections": [{ "markdown": "Run tests." }]
+        }
       }
     }`);
     const hooks = await AtlantePlugin(pluginInput(skillOnly));
@@ -478,7 +490,9 @@ describe("AtlantePlugin", () => {
     expect(config.skill).toEqual({ native: true });
     await expect(
       hooks.tool?.atlante_skill?.execute({ name: "testing" }, {} as never),
-    ).resolves.toBe("Run tests.");
+    ).resolves.toBe(
+      "# Testing\n\n## Overview\n\nTesting guidance\n\nRun tests.\n",
+    );
   });
 
   test("injects the expected prompt on a valid project", async () => {

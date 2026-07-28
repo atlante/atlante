@@ -166,11 +166,11 @@ describe("validateAgentInput", () => {
     const diagnostics = validateSkillInput(
       registry,
       "atlante/skill",
-      { content: 42 },
+      { title: "Testing", overview: "Run tests.", sections: 42 },
       "skill/id~one",
     );
     expect(diagnostics[0]?.code).toBe("invalid-prompt-input");
-    expect(diagnostics[0]?.path).toBe("/skills/skill~1id~0one/content");
+    expect(diagnostics[0]?.path).toBe("/skills/skill~1id~0one/sections");
   });
 });
 
@@ -352,7 +352,14 @@ describe("validateTemplates", () => {
       {
         $schema: SCHEMA_URI,
         agents: {},
-        skills: { testing: { description: "Testing", content: "Run tests." } },
+        skills: {
+          testing: {
+            description: "Testing",
+            title: "Testing",
+            overview: "Run tests.",
+            sections: [{ markdown: "Run tests." }],
+          },
+        },
       },
       registry,
       "atlante/agent",
@@ -365,7 +372,13 @@ describe("validateTemplates", () => {
       {
         $schema: SCHEMA_URI,
         agents: {},
-        skills: { testing: { content: "Run tests." } as never },
+        skills: {
+          testing: {
+            title: "Testing",
+            overview: "Run tests.",
+            sections: [{ markdown: "Run tests." }],
+          } as never,
+        },
       },
       registry,
       "atlante/agent",
@@ -385,7 +398,9 @@ describe("validateTemplates", () => {
             description:
               "Testing {{values.project}} with {{values.emphasis}} guidance",
             values: { emphasis: "repeatable" },
-            content: "Run tests.",
+            title: "Testing",
+            overview: "Run tests.",
+            sections: [{ markdown: "Run tests." }],
           },
         },
       },
@@ -404,7 +419,9 @@ describe("validateTemplates", () => {
         skills: {
           testing: {
             description: "{{values.description}}",
-            content: "Run tests.",
+            title: "Testing",
+            overview: "Run tests.",
+            sections: [{ markdown: "Run tests." }],
           },
         },
       },
@@ -424,7 +441,9 @@ describe("validateTemplates", () => {
         skills: {
           testing: {
             description: "{{values.description}}",
-            content: "{{values.missing}}",
+            title: "Testing",
+            overview: "Run tests.",
+            sections: [{ markdown: "{{values.missing}}" }],
           },
         },
       },
@@ -436,7 +455,7 @@ describe("validateTemplates", () => {
       "missing-value",
       "invalid-skill-description",
     ]);
-    expect(diagnostics[0]?.path).toBe("/skills/testing/content");
+    expect(diagnostics[0]?.path).toBe("/skills/testing/sections/0/markdown");
     expect(diagnostics[1]?.path).toBe("/skills/testing/description");
   });
 
@@ -449,7 +468,9 @@ describe("validateTemplates", () => {
         skills: {
           testing: {
             description: "{{values.description}}",
-            content: "Run tests.",
+            title: "Testing",
+            overview: "Run tests.",
+            sections: [{ markdown: "Run tests." }],
             "{{values.project}}": "first",
             atlante: "second",
           },
@@ -476,7 +497,9 @@ describe("validateTemplates", () => {
           testing: {
             description: "Testing",
             values: { project: "Atlante" },
-            content: "Run tests.",
+            title: "Testing",
+            overview: "Run tests.",
+            sections: [{ markdown: "Run tests." }],
           },
         },
       },
@@ -494,7 +517,9 @@ describe("validateTemplates", () => {
         skills: {
           "skill/id": {
             description: "Use {{values.missing}}",
-            content: "Run tests.",
+            title: "Testing",
+            overview: "Run tests.",
+            sections: [{ markdown: "Run tests." }],
           },
         },
       },
@@ -514,7 +539,9 @@ describe("validateTemplates", () => {
           testing: {
             description: "Testing",
             template: "atlante/nope",
-            content: "Run tests.",
+            title: "Testing",
+            overview: "Run tests.",
+            sections: [{ markdown: "Run tests." }],
           },
         },
       },
@@ -530,12 +557,44 @@ describe("validateTemplates", () => {
       $schema: SCHEMA_URI,
       agents: {},
       skills: {
-        testing: { description: "Testing", content: 42 },
+        testing: {
+          description: "Testing",
+          title: "Testing",
+          overview: "Run tests.",
+          sections: 42,
+        },
       },
     } as unknown as AtlanteDocument;
     const diagnostics = validateTemplates(document, registry, "atlante/agent");
     expect(diagnostics[0]?.code).toBe("invalid-prompt-input");
-    expect(diagnostics[0]?.path).toBe("/skills/testing/content");
+    expect(diagnostics[0]?.path).toBe("/skills/testing/sections");
+  });
+
+  test("requires exactly one kind of skill section", () => {
+    const diagnostics = validateTemplates(
+      {
+        $schema: SCHEMA_URI,
+        agents: {},
+        skills: {
+          testing: {
+            description: "Testing",
+            title: "Testing",
+            overview: "Run tests.",
+            sections: [
+              {
+                markdown: "Run tests.",
+                gotchas: { items: ["Do not skip validation."] },
+              },
+            ],
+          },
+        },
+      },
+      registry,
+      "atlante/agent",
+    );
+    expect(
+      diagnostics.some((issue) => issue.path === "/skills/testing/sections/0"),
+    ).toBe(true);
   });
 
   test("reports skill composition cycles", () => {
@@ -566,7 +625,9 @@ describe("validateTemplates", () => {
         skills: {
           testing: {
             description: "Testing",
-            content: "{{values.project.name}}",
+            title: "Testing",
+            overview: "Run tests.",
+            sections: [{ markdown: "{{values.project.name}}" }],
           },
         },
       },
@@ -574,6 +635,6 @@ describe("validateTemplates", () => {
       "atlante/agent",
     );
     expect(diagnostics[0]?.code).toBe("invalid-value-reference");
-    expect(diagnostics[0]?.path).toBe("/skills/testing/content");
+    expect(diagnostics[0]?.path).toBe("/skills/testing/sections/0/markdown");
   });
 });

@@ -188,7 +188,12 @@ describe("runResolve", () => {
         "reviewer": { "identity": "You review.", "mission": "Find defects." }
       },
       "skills": {
-        "testing": { "description": "Testing guidance", "content": "Run tests." }
+        "testing": {
+          "description": "Testing guidance",
+          "title": "Testing",
+          "overview": "Testing guidance",
+          "sections": [{ "markdown": "Run tests." }]
+        }
       }
     }`);
     const output: string[] = [];
@@ -212,7 +217,8 @@ describe("runResolve", () => {
           skillId: "testing",
           description: "Testing guidance",
           templateId: "atlante/skill",
-          content: "Run tests.",
+          content:
+            "# Testing\n\n## Overview\n\nTesting guidance\n\nRun tests.\n",
         },
       ],
       diagnostics: [],
@@ -226,7 +232,14 @@ describe("runResolve", () => {
         "reviewer": { "identity": "review", "mission": "review" },
         "planner": { "identity": "plan", "mission": "plan" }
       },
-      "skills": { "testing": { "description": "Testing", "content": "Run tests." } }
+       "skills": {
+         "testing": {
+           "description": "Testing",
+           "title": "Testing",
+           "overview": "Testing",
+           "sections": [{ "markdown": "Run tests." }]
+         }
+       }
     }`);
     const output: string[] = [];
     const original = console.log;
@@ -246,7 +259,14 @@ describe("runResolve", () => {
     const dir = project(`{
       "$schema": "${SCHEMA_URI}",
       "agents": { "reviewer": { "identity": "review", "mission": "review" } },
-      "skills": { "testing": { "description": "Testing guidance", "content": "Run tests." } }
+       "skills": {
+         "testing": {
+           "description": "Testing guidance",
+           "title": "Testing",
+           "overview": "Testing guidance",
+           "sections": [{ "markdown": "Run tests." }]
+         }
+       }
     }`);
     const output: string[] = [];
     const original = console.log;
@@ -260,6 +280,8 @@ describe("runResolve", () => {
     expect(human).toContain("--- Skills ---");
     expect(human).toContain("--- testing (atlante/skill) ---");
     expect(human).toContain("Description: Testing guidance");
+    expect(human).toContain("# Testing");
+    expect(human).toContain("## Overview");
     expect(human).toContain("Run tests.");
   });
 
