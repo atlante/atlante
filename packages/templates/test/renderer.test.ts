@@ -174,6 +174,53 @@ describe("renderTemplate", () => {
     expect(output).toBe("[first][second][third]");
   });
 
+  test("renders slots nested inside multiple arrays", () => {
+    const output = renderTemplate({
+      registry: templateRegistryOf({
+        "test/root": {
+          inputSchema: {
+            type: "object",
+            properties: {
+              sections: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    rows: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          detail: { template: "test/detail" },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          source: `{{#each sections}}{{#each rows}}${slotPartial(
+            "sections/rows/detail",
+          )}{{/each}}{{/each}}`,
+        },
+        "test/detail": {
+          inputSchema: {
+            type: "object",
+            properties: { value: { type: "string" } },
+          },
+          source: "Detail: {{value}}",
+        },
+      }),
+      templateId: "test/root",
+      input: {
+        sections: [{ rows: [{ detail: { value: "nested" } }] }],
+      },
+    });
+
+    expect(output).toBe("Detail: nested");
+  });
+
   test("renders a child from the selected oneOf branch data path", () => {
     const output = renderTemplate({
       registry: templateRegistryOf({

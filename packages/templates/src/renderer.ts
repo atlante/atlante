@@ -52,14 +52,17 @@ function descendSlotPath(
 
 function arrayItemPath(input: unknown, path: string[]): string[] | undefined {
   let current = input;
+  let lastArrayPathIndex = -1;
   for (let index = 0; index <= path.length; index++) {
-    if (Array.isArray(current)) return path.slice(index);
-    if (
-      index === path.length ||
-      typeof current !== "object" ||
-      current === null
-    )
-      return undefined;
+    if (Array.isArray(current)) {
+      lastArrayPathIndex = index;
+      current = current[0];
+    }
+    if (index === path.length)
+      return lastArrayPathIndex < 0
+        ? undefined
+        : path.slice(lastArrayPathIndex);
+    if (typeof current !== "object" || current === null) return undefined;
     current = (current as Record<string, unknown>)[path[index] ?? ""];
   }
   return undefined;
