@@ -85,9 +85,9 @@ code is not part of the configuration format.
   independently of the document schema.
 - **Template ID**: a `namespace/name` identifier (e.g., `provider/template`);
   the namespace identifies the provider, the name identifies the template.
-- **Template slot**: a property in a composable template's input schema
-  declared as `{ "template": "namespace/name" }`, indicating that the slot
-  expects the rendering of another template.
+- **Template slot**: a location in a composable template's input schema declared
+  as `{ "template": "namespace/name" }`, indicating that the slot expects the
+  rendering of another template.
 - **Preset**: a pre-configured root-level Atlante configuration bundled as a
   starting point for new projects; `atlante.jsonc` is the default form and
   `atlante.json` is also supported. Its logical `namespace/name` ID is assigned
@@ -288,21 +288,21 @@ templates it provides.
 
 ### 6.3 Template composition
 
-Composable templates MAY declare slot references directly in `template.json`:
+Composable templates MAY declare slot references directly in `template.json`.
+A declared slot is an object containing a `template` property whose value is a
+template ID. Slots MAY be nested within object properties, array item schemas,
+and declared schema branches such as `oneOf`.
 
-```json
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "type": "object",
-  "properties": {
-    "section": { "template": "provider/template" }
-  }
-}
-```
+Every declared slot reference MUST identify an available template, including
+references in branches not selected by a particular input. Circular composition,
+invalid slot declarations or schemas, and input that does not satisfy the
+composed template schemas MUST be rejected before rendering. An absent optional
+slot contributes no output.
 
-The referenced template's input schema MUST be loaded and validated before the
-containing template is rendered. The syntax used to invoke a slot is an
-implementation concern as long as the composition semantics are preserved.
+Composed output MUST preserve the order of array input. Only slot values present
+in the validated input contribute output. Child Markdown is opaque output: it
+MUST be preserved verbatim and MUST NOT be interpreted as parent template
+source. Resolution MUST produce deterministic output for the same valid input.
 
 ### 6.4 Variable resolution
 

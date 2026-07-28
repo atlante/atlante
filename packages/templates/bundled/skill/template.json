@@ -9,43 +9,25 @@
       "type": "array",
       "items": {
         "type": "object",
-        "properties": {
-          "markdown": { "type": "string", "minLength": 1 },
-          "instructions": {
-            "type": "object",
-            "properties": {
-              "title": { "type": "string", "minLength": 1 },
-              "description": { "type": "string", "minLength": 1 },
-              "steps": {
-                "type": "array",
-                "items": { "type": "string", "minLength": 1 },
-                "minItems": 1
-              }
-            },
-            "required": ["steps"],
+        "oneOf": [
+          {
+            "properties": { "markdown": { "template": "atlante/markdown" } },
+            "required": ["markdown"],
             "additionalProperties": false
           },
-          "gotchas": {
-            "type": "object",
+          {
             "properties": {
-              "title": { "type": "string", "minLength": 1 },
-              "description": { "type": "string", "minLength": 1 },
-              "items": {
-                "type": "array",
-                "items": { "type": "string", "minLength": 1 },
-                "minItems": 1
-              }
+              "instructions": { "template": "atlante/instructions" }
             },
-            "required": ["items"],
+            "required": ["instructions"],
+            "additionalProperties": false
+          },
+          {
+            "properties": { "gotchas": { "template": "atlante/gotchas" } },
+            "required": ["gotchas"],
             "additionalProperties": false
           }
-        },
-        "oneOf": [
-          { "required": ["markdown"] },
-          { "required": ["instructions"] },
-          { "required": ["gotchas"] }
-        ],
-        "additionalProperties": false
+        ]
       },
       "minItems": 1
     }

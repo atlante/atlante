@@ -75,6 +75,51 @@ describe("resolve", () => {
     ]);
   });
 
+  test("resolves bundled skill child sections and interpolated values", () => {
+    const result = resolve(
+      {
+        $schema: SCHEMA_URI,
+        values: { project: "Atlante", action: "check" },
+        agents: {},
+        skills: {
+          testing: {
+            description: "Testing {{values.project}}.",
+            title: "Testing",
+            overview: "Use {{values.project}}.",
+            sections: [
+              { markdown: "Run {{values.action}}." },
+              {
+                instructions: {
+                  steps: ["Read the {{values.project}} docs."],
+                },
+              },
+              {
+                gotchas: {
+                  items: ["Do not skip the {{values.action}}."],
+                },
+              },
+            ],
+          },
+        },
+      },
+      registry,
+    );
+
+    expect(result).toEqual({
+      diagnostics: [],
+      agents: [],
+      skills: [
+        {
+          skillId: "testing",
+          description: "Testing Atlante.",
+          templateId: "atlante/skill",
+          content:
+            "# Testing\n\n## Overview\n\nUse Atlante.\n\nRun check.\n\n## Instructions\n\nFollow these steps in order.\n\n1. Read the Atlante docs.\n\n## Gotchas\n\nWatch for these common mistakes.\n\n- Do not skip the check.\n",
+        },
+      ],
+    });
+  });
+
   test("resolves a document without binding maps as empty artifact collections", () => {
     const result = resolve({ $schema: SCHEMA_URI }, registry);
     expect(result).toEqual({ agents: [], skills: [], diagnostics: [] });

@@ -26,6 +26,12 @@ bun run lint:check              # lint + format check
 bun run build                   # build all packages
 ```
 
-## Rule
+## Rules
 
-Run `bun run type:check && bun run lint:check && bun test` before committing and after each task.
+1. Strictly follow DRY-KISS: no repetitions, minimal elegant code, only what's essential to the task.
+2. Always be informative: explain what you're doing, why, and what comes next. Include the user in significant choices and thinking — don't make one-sided decisions on architecture, approach, or tradeoffs.
+3. Delegate to sub-agents for substantial, multi-step, or cross-package tasks; handle small or straightforward tasks directly without delegation overhead.
+4. Before implementing substantial changes, first brainstorm with the user to find the best solution, then explore the codebase and propose a plan.
+5. Run `bun run type:check && bun run lint:check && bun test` before committing and after each task. For substantial code changes (not trivial edits like docs or config), also use the fallow MCP tools to review changed files (dead code, complexity, duplication) and confirm the verdict before committing.
+6. Follow red-green-refactor TDD when the task involves behavior changes: write focused tests first, run them to confirm failure, then implement only enough to pass before broader updates.
+7. Use templates under `.github/ISSUE_TEMPLATE/` and `.github/PULL_REQUEST_TEMPLATE/` when creating issues or PRs with `gh`. Apply labels (`--label`) and type (`--type`, e.g. `Bug`, `Feature`, `Refactor`, `Docs`, `Chore`) when creating issues.

@@ -172,15 +172,8 @@ Bundled templates live in the `atlante/` namespace:
 - **`atlante/agent`** — the root prompt renderer: identity, mission,
   responsibilities, constraints, and an optional `workflow` slot
 - **`atlante/workflow`** — an ordered procedure, composed into `atlante/agent`
-- **`atlante/skill`** — structured skill input rendered as Markdown
-
-A slot is declared in a template's input schema as
-`{ "template": "namespace/name" }` and invoked from Markdown with its input
-property as `{{> slot/property}}`; quote the partial name when the property
-contains spaces or other Handlebars delimiters. The property-specific partial
-name means two slots can safely use the same child template while receiving
-different input. Composition is validated ahead of rendering: missing templates
-and cycles are rejected rather than discovered at runtime.
+- **`atlante/skill`** — structured skill input rendered as Markdown with
+  ordered, reusable sections
 
 ## Presets
 

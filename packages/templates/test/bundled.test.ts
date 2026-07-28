@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { loadBundledTemplates, renderTemplate } from "../src/index.js";
+import {
+  loadBundledTemplates,
+  renderTemplate,
+  slotsOf,
+  walkComposition,
+} from "../src/index.js";
 
 describe("bundled templates", () => {
   test("load without errors", () => {
@@ -7,19 +12,52 @@ describe("bundled templates", () => {
     expect(errors).toEqual([]);
     expect(registry.ids()).toEqual([
       "atlante/agent",
+      "atlante/gotchas",
+      "atlante/instructions",
+      "atlante/markdown",
       "atlante/skill",
       "atlante/workflow",
     ]);
   });
 
-  test("loads the bundled skill template", () => {
+  test("composes reusable skill section templates under ordered sections", () => {
     const { registry, errors } = loadBundledTemplates();
     expect(errors).toEqual([]);
     expect(registry.ids()).toEqual([
       "atlante/agent",
+      "atlante/gotchas",
+      "atlante/instructions",
+      "atlante/markdown",
       "atlante/skill",
       "atlante/workflow",
     ]);
+
+    const skill = registry.get("atlante/skill");
+    if (!skill) throw new Error("bundled skill template is missing");
+    expect(
+      slotsOf(skill.inputSchema).map(({ templateId, path, arrayItems }) => ({
+        templateId,
+        path,
+        arrayItems,
+      })),
+    ).toEqual([
+      {
+        templateId: "atlante/markdown",
+        path: ["sections", "items", "oneOf", "0", "markdown"],
+        arrayItems: true,
+      },
+      {
+        templateId: "atlante/instructions",
+        path: ["sections", "items", "oneOf", "1", "instructions"],
+        arrayItems: true,
+      },
+      {
+        templateId: "atlante/gotchas",
+        path: ["sections", "items", "oneOf", "2", "gotchas"],
+        arrayItems: true,
+      },
+    ]);
+    expect(walkComposition(registry, "atlante/skill")).toEqual([]);
   });
 
   test("renders skill title, overview, and Markdown sections", () => {
@@ -90,6 +128,28 @@ describe("bundled templates", () => {
       }),
     ).toBe(
       "# Releasing\n\n## Overview\n\nPrepare a release.\n\nKeep the release repeatable.\n\n## Checklist\n\nComplete each item.\n\n1. Update the changelog.\n\n## Risks\n\nAvoid these failures.\n\n- Do not publish early.\n\nDocument the outcome.\n",
+    );
+  });
+
+  test("preserves mixed oneOf section order", () => {
+    const { registry } = loadBundledTemplates();
+    expect(
+      renderTemplate({
+        registry,
+        templateId: "atlante/skill",
+        input: {
+          title: "Ordered",
+          overview: "Keep every section in source order.",
+          sections: [
+            { markdown: "First." },
+            { gotchas: { items: ["Second."] } },
+            { instructions: { steps: ["Third."] } },
+            { markdown: "Fourth." },
+          ],
+        },
+      }),
+    ).toBe(
+      "# Ordered\n\n## Overview\n\nKeep every section in source order.\n\nFirst.\n\n## Gotchas\n\nWatch for these common mistakes.\n\n- Second.\n\n## Instructions\n\nFollow these steps in order.\n\n1. Third.\n\nFourth.\n",
     );
   });
 

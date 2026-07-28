@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { loadTemplates, slotsOf, walkComposition } from "../src/index.js";
+import {
+  loadTemplates,
+  slotsOf,
+  type TemplateRegistry,
+  walkComposition,
+} from "../src/index.js";
 
 const cyclicRoot = new URL("./fixtures/cyclic", import.meta.url).pathname;
 const validRoot = new URL("./fixtures/valid", import.meta.url).pathname;
@@ -10,6 +15,29 @@ const nestedSlotRoot = new URL("./fixtures/nested-slot", import.meta.url)
   .pathname;
 const malformedSlotRoot = new URL("./fixtures/malformed-slot", import.meta.url)
   .pathname;
+
+function registryOf(
+  definitions: Record<
+    string,
+    { inputSchema: Record<string, unknown>; source?: string }
+  >,
+): TemplateRegistry {
+  const entries = new Map(
+    Object.entries(definitions).map(([id, definition]) => [
+      id,
+      {
+        id,
+        source: definition.source ?? "",
+        directory: "<memory>",
+        inputSchema: definition.inputSchema,
+      },
+    ]),
+  );
+  return {
+    get: (id) => entries.get(id),
+    ids: () => [...entries.keys()],
+  };
+}
 
 describe("slotsOf", () => {
   test("finds a top-level slot property", () => {
@@ -28,11 +56,47 @@ describe("slotsOf", () => {
     expect(slotsOf(template.inputSchema)).toEqual([]);
   });
 
-  test("does not treat a nested template reference as a slot", () => {
+  test("finds a template reference at a nested object path", () => {
     const { registry } = loadTemplates(nestedSlotRoot, "test");
     const template = registry.get("test/holder");
     if (!template) throw new Error("fixture missing");
-    expect(slotsOf(template.inputSchema)).toEqual([]);
+    const slots = slotsOf(template.inputSchema);
+    expect(slots).toHaveLength(1);
+    expect(slots[0]?.templateId).toBe("test/does-not-exist");
+    expect(slots[0] as unknown).toMatchObject({
+      path: ["outer", "inner"],
+    });
+  });
+
+  test("finds slots declared in array items and oneOf branches", () => {
+    const slots = slotsOf({
+      type: "object",
+      properties: {
+        sections: {
+          type: "array",
+          items: { template: "test/section" },
+        },
+        choice: {
+          oneOf: [
+            {
+              type: "object",
+              properties: { markdown: { template: "test/markdown" } },
+            },
+            {
+              type: "object",
+              properties: { instructions: { template: "test/instructions" } },
+            },
+          ],
+        },
+      },
+    });
+
+    expect(slots).toHaveLength(3);
+    expect(slots.map(({ templateId }) => templateId)).toEqual([
+      "test/section",
+      "test/markdown",
+      "test/instructions",
+    ]);
   });
 });
 
@@ -71,12 +135,98 @@ describe("walkComposition", () => {
     expect(walkComposition(registry, "test/greeting")).toEqual([]);
   });
 
-  test("rejects a slot reference nested below the top level of inputSchema", () => {
+  test("reports an unknown template at its nested slot path", () => {
     const { registry } = loadTemplates(nestedSlotRoot, "test");
     const issues = walkComposition(registry, "test/holder");
     expect(issues).toHaveLength(1);
-    expect(issues[0]?.code).toBe("invalid-input-schema");
+    expect(issues[0]?.code).toBe("unknown-template");
+    expect(issues[0]?.property).toBe("inner");
+    expect(issues[0]?.slotPath).toEqual(["outer", "inner"]);
     expect(issues[0]?.message).toContain("test/does-not-exist");
+  });
+
+  test("detects cycles reached through nested object slots", () => {
+    const registry = registryOf({
+      "test/root": {
+        inputSchema: {
+          type: "object",
+          properties: {
+            envelope: {
+              type: "object",
+              properties: { child: { template: "test/a" } },
+            },
+          },
+        },
+      },
+      "test/a": {
+        inputSchema: {
+          type: "object",
+          properties: { payload: { template: "test/b" } },
+        },
+      },
+      "test/b": {
+        inputSchema: {
+          type: "object",
+          properties: { payload: { template: "test/a" } },
+        },
+      },
+    });
+
+    const issues = walkComposition(registry, "test/root");
+    expect(issues).toHaveLength(1);
+    expect(issues[0]?.code).toBe("cyclic-template");
+    expect(issues[0]?.chain).toEqual([
+      "test/root",
+      "test/a",
+      "test/b",
+      "test/a",
+    ]);
+    expect(issues[0]?.slotPath).toEqual([
+      "envelope",
+      "child",
+      "payload",
+      "payload",
+    ]);
+  });
+
+  test("reports malformed markers at nested object, array, and oneOf paths", () => {
+    const issues = walkComposition(
+      registryOf({
+        "test/root": {
+          inputSchema: {
+            type: "object",
+            properties: {
+              metadata: {
+                type: "object",
+                properties: {
+                  invalid: { template: 42 },
+                  sections: { type: "array", items: { template: "" } },
+                  choice: {
+                    oneOf: [
+                      {
+                        type: "object",
+                        properties: { branch: { template: "not-namespaced" } },
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+      "test/root",
+    );
+
+    expect(issues).toHaveLength(3);
+    expect(issues.every((issue) => issue.code === "invalid-input-schema")).toBe(
+      true,
+    );
+    expect(issues.map((issue) => issue.slotPath)).toEqual([
+      ["metadata", "invalid"],
+      ["metadata", "sections", "items"],
+      ["metadata", "choice", "oneOf", "0", "branch"],
+    ]);
   });
 
   test("rejects malformed slot markers explicitly", () => {
