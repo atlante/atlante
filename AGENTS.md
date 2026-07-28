@@ -26,6 +26,7 @@ bun run lint:check              # lint + format check
 bun run build                   # build all packages
 ```
 
-## Rule
+## Rules
 
-Run `bun run type:check && bun run lint:check && bun test` before committing and after each task.
+1. Run `bun run type:check && bun run lint:check && bun test` before committing and after each task.
+2. Use templates under `.github/ISSUE_TEMPLATE/` and `.github/PULL_REQUEST_TEMPLATE/` when creating issues or PRs with `gh`.
