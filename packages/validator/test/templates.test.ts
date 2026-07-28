@@ -69,7 +69,7 @@ describe("expandInputSchema", () => {
       string,
       { properties?: unknown }
     >;
-    expect(properties.workflow?.properties).toHaveProperty("steps");
+    expect(properties.sections).toBeDefined();
   });
 
   test("expands slots in nested objects, array items, and oneOf branches", () => {
@@ -414,6 +414,16 @@ describe("validateTemplates", () => {
     ).toEqual([]);
   });
 
+  test("accepts an agent instructions section", () => {
+    expect(
+      check({
+        identity: "x",
+        mission: "y",
+        sections: [{ instructions: { steps: ["Do the work."] } }],
+      }),
+    ).toEqual([]);
+  });
+
   test("applies the default template when template is omitted", () => {
     expect(check({ identity: "x", mission: "y" })).toEqual([]);
   });
@@ -441,7 +451,7 @@ describe("validateTemplates", () => {
     const diagnostics = check({
       identity: "x",
       mission: "y",
-      workflow: { steps: [] },
+      sections: [{ workflow: { phases: [] } }],
     });
     expect(diagnostics[0]?.code).toBe("invalid-prompt-input");
   });

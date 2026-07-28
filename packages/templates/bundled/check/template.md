@@ -1,0 +1,1 @@
+{{#if description}}{{description}}{{#if command}} Run `{{command}}`.{{/if}}{{else}}Verify the expected condition is met by running `{{command}}`.{{/if}}

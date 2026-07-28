@@ -16,4 +16,8 @@
 
 {{> slot/sections/gotchas}}
 {{/if}}
+{{#if workflow}}
+
+{{> slot/sections/workflow}}
+{{/if}}
 {{/each}}

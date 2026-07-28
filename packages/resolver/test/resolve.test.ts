@@ -38,7 +38,28 @@ const document: AtlanteDocument = {
       identity: "You are a planner.",
       mission: "Plan work.",
       constraints: ["{{values.rule}}"],
-      workflow: { steps: ["Read the request.", "Draft a plan."] },
+      sections: [
+        {
+          workflow: {
+            phases: [
+              {
+                name: "Plan",
+                tasks: [
+                  {
+                    name: "Read the request",
+                    description: "Read the request.",
+                  },
+                  {
+                    name: "Draft a plan",
+                    description: "Draft a plan.",
+                    needs: ["Read the request"],
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      ],
     },
   },
 };
@@ -265,8 +286,8 @@ describe("resolve", () => {
 
   test("renders the workflow slot only where it is bound", () => {
     const { agents } = resolve(document, registry);
-    expect(agents[1]?.prompt).toContain("# Workflow");
-    expect(agents[0]?.prompt).not.toContain("# Workflow");
+    expect(agents[1]?.prompt).toContain("## Workflow");
+    expect(agents[0]?.prompt).not.toContain("## Workflow");
   });
 
   test("resolves values referenced inside document fields", () => {
@@ -290,7 +311,23 @@ describe("resolve", () => {
         a: {
           identity: "x",
           mission: "y",
-          workflow: { steps: ["Build {{values.project}}."] },
+          sections: [
+            {
+              workflow: {
+                phases: [
+                  {
+                    name: "Build",
+                    tasks: [
+                      {
+                        name: "Build the project",
+                        description: "Build {{values.project}}.",
+                      },
+                    ],
+                  },
+                ],
+              },
+            },
+          ],
         },
       },
     };

@@ -22,14 +22,48 @@
         "Never guess; when you are unsure, ask the user instead.",
         "Keep each delegation focused and self-contained."
       ],
-      "workflow": {
-        "steps": [
-          "Read and understand the user's request.",
-          "Plan the work: what needs to happen, in what order, and who should do it.",
-          "Delegate implementation and review subtasks to the appropriate agents.",
-          "Collect results and present a clear summary to the user."
-        ]
-      }
+      "sections": [
+        {
+          "workflow": {
+            "title": "Execution workflow",
+            "description": "Coordinate the work in phases and keep dependencies explicit.",
+            "phases": [
+              {
+                "name": "Plan",
+                "description": "Understand the request before assigning work.",
+                "tasks": [
+                  {
+                    "name": "Understand the request",
+                    "description": "Read and understand the user's request."
+                  },
+                  {
+                    "name": "Plan the work",
+                    "description": "Decide what needs to happen, in what order, and who should do it.",
+                    "needs": ["Understand the request"]
+                  }
+                ]
+              },
+              {
+                "name": "Execute",
+                "description": "Delegate the work, review the results, and report the outcome.",
+                "tasks": [
+                  {
+                    "name": "Delegate and review",
+                    "agent": "implement",
+                    "description": "Delegate implementation and review subtasks to the appropriate agents.",
+                    "needs": ["Plan the work"]
+                  },
+                  {
+                    "name": "Report the outcome",
+                    "description": "Collect results and present a clear summary to the user.",
+                    "needs": ["Delegate and review"]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
     },
 
     "implement": {

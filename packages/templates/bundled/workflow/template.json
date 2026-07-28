@@ -1,14 +1,29 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "Ordered procedure the agent follows.",
+  "description": "Multi-phase workflow with task-level dependencies.",
   "type": "object",
   "properties": {
-    "steps": {
+    "title": { "type": "string", "minLength": 1 },
+    "description": { "type": "string", "minLength": 1 },
+    "phases": {
       "type": "array",
-      "items": { "type": "string", "minLength": 1 },
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "description": { "type": "string", "minLength": 1 },
+          "tasks": {
+            "type": "array",
+            "items": { "template": "atlante/task" },
+            "minItems": 1
+          }
+        },
+        "required": ["name", "tasks"],
+        "additionalProperties": false
+      },
       "minItems": 1
     }
   },
-  "required": ["steps"],
+  "required": ["phases"],
   "additionalProperties": false
 }

@@ -1,0 +1,1 @@
+{{description}}{{#if filePath}} The artifact should be stored at {{filePath}}.{{/if}}

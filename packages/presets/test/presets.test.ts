@@ -36,6 +36,14 @@ describe("bundled presets", () => {
     expect(readPreset("atlante/starter")).toContain("$schema");
   });
 
+  test("starter migrates the architect workflow to ordered phases", () => {
+    const preset = readPreset("atlante/starter");
+    expect(preset).toContain('"phases": [');
+    expect(preset).toContain('"name": "Plan"');
+    expect(preset).toContain('"name": "Execute"');
+    expect(preset).not.toContain('"workflow": {\n        "steps"');
+  });
+
   test("returns raw preset text containing skills without filtering it", () => {
     const contents = `{
       "$schema": "https://atlante.sh/schema/v0.1/schema.json",

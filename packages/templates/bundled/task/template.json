@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A discrete unit of work with optional agent, dependencies, steps, and quality gates.",
+  "type": "object",
+  "properties": {
+    "name": { "type": "string", "minLength": 1 },
+    "agent": { "type": "string", "minLength": 1 },
+    "description": { "type": "string", "minLength": 1 },
+    "needs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "steps": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "output": { "template": "atlante/artifact" },
+    "check": { "template": "atlante/check" }
+  },
+  "required": ["name", "description"],
+  "additionalProperties": false
+}

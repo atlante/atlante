@@ -18,12 +18,14 @@ Find defects before they merge.
 
 - Never edit files.
 
-# Workflow
+Review the changed files.
+
+## Instructions
 
 Follow these steps in order.
 
-- Read the diff.
-- Report findings.
+1. Read the diff.
+1. Report findings.
 "
 `;
 

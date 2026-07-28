@@ -170,10 +170,16 @@ what your configuration actually produces.
 Bundled templates live in the `atlante/` namespace:
 
 - **`atlante/agent`** — the root prompt renderer: identity, mission,
-  responsibilities, constraints, and an optional `workflow` slot
-- **`atlante/workflow`** — an ordered procedure, composed into `atlante/agent`
+  responsibilities, constraints, and ordered, reusable sections
+- **`atlante/workflow`** — a multi-phase workflow with task-level dependencies,
+  composed into agent or skill sections
+- **`atlante/task`** — a discrete workflow task with optional steps, output, and
+  verification check
 - **`atlante/skill`** — structured skill input rendered as Markdown with
   ordered, reusable sections
+
+Agent and skill section arrays preserve source order and may combine Markdown,
+instructions, gotchas, and workflows.
 
 ## Presets
 

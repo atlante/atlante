@@ -103,6 +103,7 @@ export function renderTemplate(
   }
 
   const handlebars = Handlebars.create();
+  handlebars.registerHelper("increment", (value: unknown) => Number(value) + 1);
   const nextStack = [...stack, templateId];
 
   const slots = slotsOf(template.inputSchema);
