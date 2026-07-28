@@ -41,7 +41,7 @@ jobs:
             const { agents } = require("/tmp/resolved.json");
             const ids = agents.map(({ hostAgentId }) => hostAgentId).sort();
             if (JSON.stringify(ids) !== JSON.stringify(["architect", "implement"])) process.exit(1);
-            if (!agents.some(({ prompt }) => prompt.includes("# Workflow"))) process.exit(1);
+            if (!agents.some(({ prompt }) => prompt.includes("## Execution workflow"))) process.exit(1);
             if (!agents.some(({ prompt }) => prompt.includes("Do not change code that is not related to the task"))) process.exit(1);
           '
 
