@@ -85,9 +85,10 @@ code is not part of the configuration format.
   independently of the document schema.
 - **Template ID**: a `namespace/name` identifier (e.g., `provider/template`);
   the namespace identifies the provider, the name identifies the template.
-- **Template slot**: a property in a composable template's input schema
-  declared as `{ "template": "namespace/name" }`, indicating that the slot
-  expects the rendering of another template.
+- **Template slot**: a location in a composable template's input schema declared
+  as `{ "template": "namespace/name" }`, indicating that the slot expects the
+  rendering of another template. A slot has a schema path (where its marker is
+  declared) and a data path (where its input value is found).
 - **Preset**: a pre-configured root-level Atlante configuration bundled as a
   starting point for new projects; `atlante.jsonc` is the default form and
   `atlante.json` is also supported. Its logical `namespace/name` ID is assigned
@@ -288,21 +289,68 @@ templates it provides.
 
 ### 6.3 Template composition
 
-Composable templates MAY declare slot references directly in `template.json`:
+Composable templates MAY declare slot references directly in `template.json`.
+A declared slot is an object containing a `template` property whose value is a
+template ID. The marker MAY occur at a top-level object property or nested
+below object `properties`, array `items`, or a schema composition keyword such
+as `oneOf`. The marker is Atlante composition metadata and is replaced by the
+referenced template's input schema before JSON Schema validation:
 
 ```json
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "properties": {
-    "section": { "template": "provider/template" }
+    "sections": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "markdown": { "template": "provider/markdown" }
+            },
+            "required": ["markdown"],
+            "additionalProperties": false
+          }
+        ]
+      }
+    }
   }
 }
 ```
 
-The referenced template's input schema MUST be loaded and validated before the
-containing template is rendered. The syntax used to invoke a slot is an
-implementation concern as long as the composition semantics are preserved.
+Implementations MUST distinguish the slot's schema path from its data path.
+The schema path describes where the marker occurs and includes schema-only
+segments such as `items`, `oneOf`, and a `oneOf` branch index. Object property
+names are represented directly; the literal `properties` keyword is omitted.
+In the example, the schema path is `sections/items/oneOf/0/markdown`. The data
+path describes where the value is found in template input and contains only
+object property names; the corresponding data path is `sections/markdown`,
+with `sections` being an array boundary. Diagnostics for composition and
+schema expansion MUST use the schema path. Diagnostics for invalid user input
+MUST use the input data path, including an array index when available.
+
+For each array item, an implementation MUST preserve the original array order.
+When an array item is validated against `oneOf`, exactly one branch MUST be
+active; only the active branch's slot data is rendered. Slot declarations in
+all branches still participate in composition loading, validation, and cycle
+checking, even when a branch is inactive for a particular input. A missing
+optional slot contributes no output.
+
+The selected child template MUST be loaded, its nested composition MUST be
+expanded, and its input MUST be validated before rendering. A missing template,
+malformed marker, invalid schema, or cycle in the transitive composition graph
+MUST fail validation before any artifact is rendered. Composition cycles MUST
+be rejected even when the cycle is reachable only through a schema branch that
+is inactive for the current input.
+
+The renderer's slot invocation syntax is implementation-defined. A renderer
+MAY expose a partial whose name is derived from the data path; if a template
+iterates an array containing mixed branches, it MUST invoke the branch partial
+against each item so branch grouping cannot reorder output. Rendered child
+Markdown is opaque: it MUST be inserted verbatim and MUST NOT be parsed as
+parent template source or evaluated a second time.
 
 ### 6.4 Variable resolution
 
@@ -345,14 +393,18 @@ Atlante prompt; the Atlante configuration is the prompt source of truth.
 
 ### 6.6 Skill content rendering
 
-The bundled `atlante/skill` template accepts structured, template-owned input
-and renders it as Markdown without executing it. A skill's `description` is
-resolved separately as binding metadata and listed in the tool description for
-discovery; successful `atlante_skill` execution returns only rendered Markdown
-content. The description is not template input. Skill content and skill
-execution are distinct contracts: version 0.1 defines content validation,
-interpolation, rendering, and lookup only, not execution, scheduling, runtime
-state, or remote loading.
+The bundled `atlante/skill` template accepts a title, overview, and ordered
+`sections` array. Each section selects exactly one of the reusable
+`atlante/markdown`, `atlante/instructions`, or `atlante/gotchas` templates via
+`sections[].oneOf`. The bundled section templates preserve the established
+Markdown output and default labels (`Instructions`, `Gotchas`, and their
+default descriptions). A skill's `description` is resolved separately as
+binding metadata and listed in the tool description for discovery; successful
+`atlante_skill` execution returns only rendered Markdown content. The
+description is not template input. Skill content and skill execution are
+distinct contracts: version 0.1 defines content validation, interpolation,
+rendering, and lookup only, not execution, scheduling, runtime state, or remote
+loading.
 
 ## 7. Agent Bindings
 

@@ -79,6 +79,28 @@ function slotRegistry(properties: string[], source: string): TemplateRegistry {
   };
 }
 
+function templateRegistryOf(
+  definitions: Record<
+    string,
+    { inputSchema: Record<string, unknown>; source: string }
+  >,
+): TemplateRegistry {
+  const entries = new Map(
+    Object.entries(definitions).map(([id, definition]) => [
+      id,
+      { id, directory: "<memory>", ...definition },
+    ]),
+  );
+  return {
+    get: (id) => entries.get(id),
+    ids: () => [...entries.keys()],
+  };
+}
+
+function slotPartial(path: string): string {
+  return `{{> ${slotPartialName(path)}}}`;
+}
+
 describe("renderTemplate", () => {
   test("renders template input into the output", () => {
     const output = render({ title: "Report" });
@@ -88,6 +110,147 @@ describe("renderTemplate", () => {
   test("renders a slot's child with the slot's own input", () => {
     const output = render({ title: "Report", detail: { body: "ok" } });
     expect(output).toContain("Detail: ok");
+  });
+
+  test("renders a child from a nested object data path", () => {
+    const output = renderTemplate({
+      registry: templateRegistryOf({
+        "test/root": {
+          inputSchema: {
+            type: "object",
+            properties: {
+              container: {
+                type: "object",
+                properties: { child: { template: "test/child" } },
+              },
+            },
+          },
+          source: slotPartial("container/child"),
+        },
+        "test/child": {
+          inputSchema: {
+            type: "object",
+            properties: { label: { type: "string" } },
+          },
+          source: "Child: {{label}}",
+        },
+      }),
+      templateId: "test/root",
+      input: { container: { child: { label: "nested" } } },
+    });
+
+    expect(output).toBe("Child: nested");
+  });
+
+  test("renders array-item children in input order", () => {
+    const output = renderTemplate({
+      registry: templateRegistryOf({
+        "test/root": {
+          inputSchema: {
+            type: "object",
+            properties: {
+              sections: {
+                type: "array",
+                items: { template: "test/section" },
+              },
+            },
+          },
+          source: slotPartial("sections"),
+        },
+        "test/section": {
+          inputSchema: {
+            type: "object",
+            properties: { label: { type: "string" } },
+          },
+          source: "[{{label}}]",
+        },
+      }),
+      templateId: "test/root",
+      input: {
+        sections: [{ label: "first" }, { label: "second" }, { label: "third" }],
+      },
+    });
+
+    expect(output).toBe("[first][second][third]");
+  });
+
+  test("renders a child from the selected oneOf branch data path", () => {
+    const output = renderTemplate({
+      registry: templateRegistryOf({
+        "test/root": {
+          inputSchema: {
+            type: "object",
+            properties: {
+              choice: {
+                oneOf: [
+                  {
+                    type: "object",
+                    properties: { markdown: { template: "test/markdown" } },
+                  },
+                  {
+                    type: "object",
+                    properties: {
+                      instructions: { template: "test/instructions" },
+                    },
+                  },
+                ],
+              },
+            },
+          },
+          source: `{{#if choice.instructions}}${slotPartial(
+            "choice/instructions",
+          )}{{/if}}`,
+        },
+        "test/markdown": {
+          inputSchema: {
+            type: "object",
+            properties: { text: { type: "string" } },
+          },
+          source: "Markdown: {{text}}",
+        },
+        "test/instructions": {
+          inputSchema: {
+            type: "object",
+            properties: { text: { type: "string" } },
+          },
+          source: "Instructions: {{text}}",
+        },
+      }),
+      templateId: "test/root",
+      input: { choice: { instructions: { text: "selected" } } },
+    });
+
+    expect(output).toBe("Instructions: selected");
+  });
+
+  test("inserts child Markdown as opaque output", () => {
+    const output = renderTemplate({
+      registry: templateRegistryOf({
+        "test/root": {
+          inputSchema: {
+            type: "object",
+            properties: {
+              content: {
+                type: "object",
+                properties: { body: { template: "test/child" } },
+              },
+            },
+          },
+          source: `Before ${slotPartial("content/body")} After`,
+        },
+        "test/child": {
+          inputSchema: {
+            type: "object",
+            properties: { markdown: { type: "string" } },
+          },
+          source: "{{markdown}}",
+        },
+      }),
+      templateId: "test/root",
+      input: { content: { body: { markdown: "{{parent}} & *markdown*" } } },
+    });
+
+    expect(output).toBe("Before {{parent}} & *markdown* After");
   });
 
   test("renders repeated child templates with each slot's own input", () => {

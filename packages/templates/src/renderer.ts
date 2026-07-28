@@ -1,5 +1,5 @@
 import Handlebars from "handlebars";
-import { slotsOf } from "./composition.js";
+import { slotsOf, walkComposition } from "./composition.js";
 import type { TemplateRegistry } from "./loader.js";
 import { analyzeValueReferences, isValidValueKey } from "./values.js";
 
@@ -13,6 +13,56 @@ export const SLOT_PARTIAL_PREFIX = "slot/";
 
 export function slotPartialName(property: string): string {
   return `${SLOT_PARTIAL_PREFIX}${property}`;
+}
+
+function slotInputs(
+  input: unknown,
+  path: string[],
+  arrayItems: boolean,
+): unknown[] {
+  if (Array.isArray(input))
+    return arrayItems ? arraySlotInputs(input, path) : [];
+  if (path.length === 0) return presentSlotInput(input);
+  return descendSlotPath(input, path, arrayItems);
+}
+
+function arraySlotInputs(input: unknown[], path: string[]): unknown[] {
+  return input.flatMap((item) => slotInputs(item, path, true));
+}
+
+function presentSlotInput(input: unknown): unknown[] {
+  return input === null || input === undefined ? [] : [input];
+}
+
+function descendSlotPath(
+  input: unknown,
+  path: string[],
+  arrayItems: boolean,
+): unknown[] {
+  if (typeof input !== "object" || input === null) return [];
+  const segment = path[0];
+  if (segment === undefined) return [];
+  if (!Object.hasOwn(input, segment)) return [];
+  return slotInputs(
+    (input as Record<string, unknown>)[segment],
+    path.slice(1),
+    arrayItems,
+  );
+}
+
+function arrayItemPath(input: unknown, path: string[]): string[] | undefined {
+  let current = input;
+  for (let index = 0; index <= path.length; index++) {
+    if (Array.isArray(current)) return path.slice(index);
+    if (
+      index === path.length ||
+      typeof current !== "object" ||
+      current === null
+    )
+      return undefined;
+    current = (current as Record<string, unknown>)[path[index] ?? ""];
+  }
+  return undefined;
 }
 
 /**
@@ -42,30 +92,46 @@ export function renderTemplate(
   const template = registry.get(templateId);
   if (!template) throw new Error(`unknown template: ${templateId}`);
 
+  if (stack.length === 0) {
+    const cycle = walkComposition(registry, templateId).find(
+      (issue) => issue.code === "cyclic-template",
+    );
+    if (cycle) throw new Error(cycle.message);
+  }
+
   const handlebars = Handlebars.create();
   const nextStack = [...stack, templateId];
 
   const slots = slotsOf(template.inputSchema);
   const renderedSlots = slots.map((slot) => {
-    const slotInput = Object.hasOwn(input, slot.property)
-      ? input[slot.property]
-      : undefined;
-    const rendered =
-      slotInput === undefined || slotInput === null
-        ? ""
-        : renderTemplate(
+    const path = slot.dataPath ?? [slot.property];
+    const renderSlot = (context: unknown): string => {
+      const contextPath =
+        slot.arrayItems && context !== input
+          ? arrayItemPath(input, path)
+          : undefined;
+      const slotInputsForRender = contextPath
+        ? slotInputs(context, contextPath, false)
+        : slotInputs(input, path, slot.arrayItems ?? false);
+      return slotInputsForRender
+        .map((slotInput) =>
+          renderTemplate(
             {
               registry,
               templateId: slot.templateId,
               input: slotInput as Record<string, unknown>,
             },
             nextStack,
-          );
-    return { rendered, slot };
+          ),
+        )
+        .join("");
+    };
+    return { renderSlot, slot };
   });
 
-  for (const { rendered, slot } of renderedSlots) {
-    handlebars.registerPartial(slotPartialName(slot.property), () => rendered);
+  for (const { renderSlot, slot } of renderedSlots) {
+    const path = (slot.dataPath ?? [slot.property]).join("/");
+    handlebars.registerPartial(slotPartialName(path), renderSlot);
   }
 
   const compiled = handlebars.compile(template.source, {

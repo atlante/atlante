@@ -27,6 +27,29 @@ const nestedSlotRoot = new URL(
   import.meta.url,
 ).pathname;
 
+function registryOf(
+  definitions: Record<
+    string,
+    { inputSchema: Record<string, unknown>; source?: string }
+  >,
+): TemplateRegistry {
+  const entries = new Map(
+    Object.entries(definitions).map(([id, definition]) => [
+      id,
+      {
+        id,
+        source: definition.source ?? "",
+        directory: "<memory>",
+        inputSchema: definition.inputSchema,
+      },
+    ]),
+  );
+  return {
+    get: (id) => entries.get(id),
+    ids: () => [...entries.keys()],
+  };
+}
+
 function documentWith(agent: Record<string, unknown>) {
   return {
     $schema: SCHEMA_URI,
@@ -49,6 +72,65 @@ describe("expandInputSchema", () => {
     expect(properties.workflow?.properties).toHaveProperty("steps");
   });
 
+  test("expands slots in nested objects, array items, and oneOf branches", () => {
+    const childSchema = {
+      type: "object",
+      properties: { text: { type: "string" } },
+      required: ["text"],
+      additionalProperties: false,
+    };
+    const { schema, diagnostics } = expandInputSchema(
+      registryOf({
+        "test/root": {
+          inputSchema: {
+            $schema: SCHEMA_URI,
+            type: "object",
+            properties: {
+              metadata: {
+                type: "object",
+                properties: { summary: { template: "test/child" } },
+              },
+              sections: {
+                type: "array",
+                items: { template: "test/child" },
+              },
+              choice: {
+                oneOf: [
+                  {
+                    type: "object",
+                    properties: { markdown: { template: "test/child" } },
+                  },
+                  {
+                    type: "object",
+                    properties: { instructions: { template: "test/child" } },
+                  },
+                ],
+              },
+            },
+          },
+        },
+        "test/child": { inputSchema: childSchema },
+      }),
+      "test/root",
+    );
+
+    expect(diagnostics).toEqual([]);
+    if (!schema) throw new Error("expanded schema missing");
+    const root = schema.properties as {
+      metadata: { properties: { summary: unknown } };
+      sections: { items: unknown };
+      choice: {
+        oneOf: Array<{
+          properties: Record<string, unknown>;
+        }>;
+      };
+    };
+    expect(root.metadata.properties.summary).toEqual(childSchema);
+    expect(root.sections.items).toEqual(childSchema);
+    expect(root.choice.oneOf[0]?.properties.markdown).toEqual(childSchema);
+    expect(root.choice.oneOf[1]?.properties.instructions).toEqual(childSchema);
+  });
+
   test("reports a cycle instead of recursing forever", () => {
     const { registry } = loadTemplates(cyclicRoot, "test");
     const { schema, diagnostics } = expandInputSchema(registry, "test/a");
@@ -69,11 +151,90 @@ describe("expandInputSchema", () => {
     expect(diagnostics[0]?.code).toBe("unknown-template");
   });
 
-  test("rejects a slot reference nested below the top level instead of ignoring it", () => {
+  test("reports an unknown nested template at its schema path", () => {
     const { registry } = loadTemplates(nestedSlotRoot, "test");
     const { schema, diagnostics } = expandInputSchema(registry, "test/holder");
     expect(schema).toBeUndefined();
-    expect(diagnostics[0]?.code).toBe("invalid-input-schema");
+    expect(diagnostics[0]?.code).toBe("unknown-template");
+    expect(diagnostics[0]?.path).toBe("/outer/inner");
+    expect(diagnostics[0]?.message).toContain("test/does-not-exist");
+  });
+
+  test("reports nested cycles with the complete schema slot path", () => {
+    const { schema, diagnostics } = expandInputSchema(
+      registryOf({
+        "test/root": {
+          inputSchema: {
+            type: "object",
+            properties: {
+              envelope: {
+                type: "object",
+                properties: { child: { template: "test/a" } },
+              },
+            },
+          },
+        },
+        "test/a": {
+          inputSchema: {
+            type: "object",
+            properties: { payload: { template: "test/b" } },
+          },
+        },
+        "test/b": {
+          inputSchema: {
+            type: "object",
+            properties: { payload: { template: "test/a" } },
+          },
+        },
+      }),
+      "test/root",
+    );
+
+    expect(schema).toBeUndefined();
+    expect(diagnostics[0]?.code).toBe("cyclic-template");
+    expect(diagnostics[0]?.path).toBe("/envelope/child/payload/payload");
+  });
+
+  test("reports malformed nested markers at their schema paths", () => {
+    const { diagnostics } = expandInputSchema(
+      registryOf({
+        "test/root": {
+          inputSchema: {
+            type: "object",
+            properties: {
+              metadata: {
+                type: "object",
+                properties: {
+                  invalid: { template: 42 },
+                  sections: { type: "array", items: { template: "" } },
+                  choice: {
+                    oneOf: [
+                      {
+                        type: "object",
+                        properties: { branch: { template: "not-namespaced" } },
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+      "test/root",
+    );
+
+    expect(diagnostics).toHaveLength(3);
+    expect(
+      diagnostics.every(
+        (diagnostic) => diagnostic.code === "invalid-input-schema",
+      ),
+    ).toBe(true);
+    expect(diagnostics.map((diagnostic) => diagnostic.path)).toEqual([
+      "/metadata/invalid",
+      "/metadata/sections/items",
+      "/metadata/choice/oneOf/0/branch",
+    ]);
   });
 });
 
@@ -149,7 +310,7 @@ describe("validateAgentInput", () => {
     expect(diagnostics[0]?.path).toBe("/agents/agent~1id~0one/slot~1a~0b");
   });
 
-  test("rejects input under a nested slot instead of accepting it unchecked", () => {
+  test("reports input under an unknown nested slot instead of accepting it unchecked", () => {
     const { registry } = loadTemplates(nestedSlotRoot, "test");
     const diagnostics = validateAgentInput(
       registry,
@@ -158,7 +319,75 @@ describe("validateAgentInput", () => {
       "reviewer",
     );
     expect(diagnostics).toHaveLength(1);
-    expect(diagnostics[0]?.code).toBe("invalid-input-schema");
+    expect(diagnostics[0]?.code).toBe("unknown-template");
+    expect(diagnostics[0]?.path).toBe("/agents/reviewer/outer/inner");
+  });
+
+  test("reports invalid child input at its nested object data path", () => {
+    const childSchema = {
+      type: "object",
+      properties: { title: { type: "string" } },
+      required: ["title"],
+      additionalProperties: false,
+    };
+    const diagnostics = validateAgentInput(
+      registryOf({
+        "test/root": {
+          inputSchema: {
+            type: "object",
+            properties: {
+              metadata: {
+                type: "object",
+                properties: { summary: { template: "test/child" } },
+              },
+            },
+          },
+        },
+        "test/child": { inputSchema: childSchema },
+      }),
+      "test/root",
+      { metadata: { summary: {} } },
+      "reviewer",
+    );
+
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]?.code).toBe("invalid-prompt-input");
+    expect(diagnostics[0]?.path).toBe(
+      "/agents/reviewer/metadata/summary/title",
+    );
+  });
+
+  test("reports invalid array child input at its indexed data path", () => {
+    const diagnostics = validateAgentInput(
+      registryOf({
+        "test/root": {
+          inputSchema: {
+            type: "object",
+            properties: {
+              sections: {
+                type: "array",
+                items: { template: "test/section" },
+              },
+            },
+          },
+        },
+        "test/section": {
+          inputSchema: {
+            type: "object",
+            properties: { title: { type: "string" } },
+            required: ["title"],
+            additionalProperties: false,
+          },
+        },
+      }),
+      "test/root",
+      { sections: [{ title: "first" }, {}] },
+      "reviewer",
+    );
+
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]?.code).toBe("invalid-prompt-input");
+    expect(diagnostics[0]?.path).toBe("/agents/reviewer/sections/1/title");
   });
 
   test("validates skill input with skill paths", () => {

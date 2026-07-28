@@ -172,15 +172,22 @@ Bundled templates live in the `atlante/` namespace:
 - **`atlante/agent`** — the root prompt renderer: identity, mission,
   responsibilities, constraints, and an optional `workflow` slot
 - **`atlante/workflow`** — an ordered procedure, composed into `atlante/agent`
-- **`atlante/skill`** — structured skill input rendered as Markdown
+- **`atlante/skill`** — structured skill input rendered as Markdown, composed
+  from `atlante/markdown`, `atlante/instructions`, and `atlante/gotchas`
+- **`atlante/markdown`** — a reusable Markdown section
+- **`atlante/instructions`** — an ordered instruction section
+- **`atlante/gotchas`** — a common-mistakes section
 
 A slot is declared in a template's input schema as
-`{ "template": "namespace/name" }` and invoked from Markdown with its input
-property as `{{> slot/property}}`; quote the partial name when the property
-contains spaces or other Handlebars delimiters. The property-specific partial
-name means two slots can safely use the same child template while receiving
-different input. Composition is validated ahead of rendering: missing templates
-and cycles are rejected rather than discovered at runtime.
+`{ "template": "namespace/name" }`. Markers may be nested below object
+properties, array `items`, and `oneOf` branches. Invoke a slot with its data
+path as `{{> slot/property}}`; schema-only path segments such as `items`,
+`oneOf`, and branch indexes are not part of the data path. For an array-item
+slot, invoke the partial from the template's array iteration to preserve the
+source order of mixed `oneOf` branches. Child Markdown is opaque output and is
+not evaluated again. Composition is validated ahead of rendering: referenced
+schemas are expanded, input is validated against the active branch, and missing
+templates or cycles are rejected.
 
 ## Presets
 

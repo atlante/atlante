@@ -10,6 +10,7 @@ import {
   walkComposition,
   walkValueReferences,
 } from "@atlante/templates";
+import type { ErrorObject } from "ajv";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import type { Diagnostic } from "./diagnostic.js";
 import { error, escapeJsonPointerSegment } from "./diagnostic.js";
@@ -21,6 +22,92 @@ const DEFAULT_SKILL_TEMPLATE_ID = "atlante/skill";
 
 function unescapeJsonPointerSegment(segment: string): string {
   return segment.replaceAll("~1", "/").replaceAll("~0", "~");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+type SchemaContainer = Record<string, unknown> | unknown[];
+type SchemaLocation = { parent: SchemaContainer; key: string };
+
+const MISSING_SCHEMA_CHILD = Symbol("missing schema child");
+
+function isSchemaContainer(value: unknown): value is SchemaContainer {
+  return isRecord(value) || Array.isArray(value);
+}
+
+function schemaChild(
+  current: SchemaContainer,
+  segment: string,
+): unknown | typeof MISSING_SCHEMA_CHILD {
+  if (isRecord(current)) {
+    if (
+      isRecord(current.properties) &&
+      Object.hasOwn(current.properties, segment)
+    )
+      return current.properties[segment];
+    if (Array.isArray(current) && /^\d+$/.test(segment))
+      return current[Number(segment)];
+    if (Object.hasOwn(current, segment)) return current[segment];
+  }
+  return MISSING_SCHEMA_CHILD;
+}
+
+function schemaLocation(
+  schema: Record<string, unknown>,
+  path: string[],
+): SchemaLocation | undefined {
+  let current: unknown = schema;
+  let location: SchemaLocation | undefined;
+
+  for (const segment of path) {
+    if (!isSchemaContainer(current)) return undefined;
+    const child = schemaChild(current, segment);
+    if (child === MISSING_SCHEMA_CHILD) return undefined;
+    location = { parent: current, key: segment };
+    current = child;
+  }
+  return location;
+}
+
+function defineSchemaValue(
+  target: Record<string, unknown>,
+  key: string,
+  value: Record<string, unknown>,
+): void {
+  Object.defineProperty(target, key, {
+    configurable: true,
+    enumerable: true,
+    value,
+    writable: true,
+  });
+}
+
+function replaceSchemaValue(
+  parent: SchemaContainer,
+  key: string,
+  value: Record<string, unknown>,
+): void {
+  if (Array.isArray(parent)) {
+    parent[Number(key)] = value;
+    return;
+  }
+  const properties = parent.properties;
+  const target =
+    isRecord(properties) && Object.hasOwn(properties, key)
+      ? properties
+      : parent;
+  defineSchemaValue(target, key, value);
+}
+
+function setSchemaPath(
+  schema: Record<string, unknown>,
+  path: string[],
+  value: Record<string, unknown>,
+): void {
+  const location = schemaLocation(schema, path);
+  if (location) replaceSchemaValue(location.parent, location.key, value);
 }
 
 /**
@@ -70,7 +157,6 @@ export function expandInputSchema(
   }
 
   const schema = structuredClone(template.inputSchema);
-  const properties = schema.properties as Record<string, unknown> | undefined;
 
   for (const slot of slotsOf(template.inputSchema)) {
     const expanded = expandInputSchema(registry, slot.templateId, [
@@ -78,7 +164,7 @@ export function expandInputSchema(
       templateId,
     ]);
     if (!expanded.schema) return expanded;
-    if (properties) properties[slot.property] = expanded.schema;
+    setSchemaPath(schema, slot.path ?? [slot.property], expanded.schema);
   }
 
   // The dialect key is only meaningful on the root document.
@@ -95,6 +181,47 @@ function bindingPath(
   return `/${root}/${escapeJsonPointerSegment(bindingId)}${segments
     .map((segment) => `/${escapeJsonPointerSegment(String(segment))}`)
     .join("")}`;
+}
+
+function issueProperty(
+  issue: ErrorObject,
+  key: "additionalProperty" | "missingProperty",
+): string | undefined {
+  return issue.params && key in issue.params
+    ? String(issue.params[key])
+    : undefined;
+}
+
+function issueMessageSuffix(issue: ErrorObject): string {
+  return [
+    issueProperty(issue, "additionalProperty"),
+    issueProperty(issue, "missingProperty"),
+  ]
+    .filter((property): property is string => property !== undefined)
+    .map((property) => ` (${property})`)
+    .join("");
+}
+
+function issuePathSuffix(issue: ErrorObject): string {
+  const property =
+    issueProperty(issue, "missingProperty") ??
+    issueProperty(issue, "additionalProperty");
+  return property === undefined ? "" : `/${escapeJsonPointerSegment(property)}`;
+}
+
+function invalidPromptDiagnostic(
+  subject: "agent" | "skill",
+  bindingId: string,
+  root: "agents" | "skills",
+  issue: ErrorObject,
+): Diagnostic {
+  return error(
+    "invalid-prompt-input",
+    `${subject} "${bindingId}": ${issue.instancePath || "<root>"} ${issue.message ?? "is invalid"}${issueMessageSuffix(issue)}`,
+    {
+      path: `${bindingPath(root, bindingId)}${issue.instancePath}${issuePathSuffix(issue)}`,
+    },
+  );
 }
 
 function validateBindingInput(
@@ -142,23 +269,12 @@ function validateBindingInput(
   }
   if (validate(input)) return [];
 
-  return (validate.errors ?? []).map((issue) =>
-    error(
-      "invalid-prompt-input",
-      `${subject} "${bindingId}": ${issue.instancePath || "<root>"} ${issue.message ?? "is invalid"}${
-        issue.params && "additionalProperty" in issue.params
-          ? ` (${String(issue.params.additionalProperty)})`
-          : ""
-      }${
-        issue.params && "missingProperty" in issue.params
-          ? ` (${String(issue.params.missingProperty)})`
-          : ""
-      }`,
-      {
-        path: `${bindingPath(root, bindingId)}${issue.instancePath}`,
-      },
-    ),
-  );
+  const inputDiagnostics: Diagnostic[] = [];
+  for (const issue of validate.errors ?? [])
+    inputDiagnostics.push(
+      invalidPromptDiagnostic(subject, bindingId, root, issue),
+    );
+  return inputDiagnostics;
 }
 
 export function validateAgentInput(
