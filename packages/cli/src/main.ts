@@ -29,7 +29,7 @@ export function createProgram(): Command {
     .argument("[path]", "config file or project directory", process.cwd())
     .option("--agent <id>", "render only this host agent")
     .option("--json", "emit artifact descriptors as JSON")
-    .description("render the resolved agent prompts")
+    .description("render resolved agent prompts and project skills")
     .action(
       async (path: string, options: { agent?: string; json?: boolean }) => {
         process.exitCode = await runResolve(path, options);

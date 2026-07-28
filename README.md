@@ -2,10 +2,10 @@
 
 Structured, versionable configuration for AI coding agents.
 
-Atlante lets you define agent prompts as a validated document that renders to
-Markdown system prompts. Instead of writing prompts by hand in each tool's
-format, you declare your agents once and let Atlante handle rendering,
-validation, and materialization to your host of choice (currently OpenCode).
+Atlante lets you define agent prompts and Markdown skills as a
+validated document. Instead of writing prompts by hand in each tool's format,
+you declare them once and let Atlante handle rendering, validation, and
+materialization to your host of choice (currently OpenCode).
 
 Atlante is to AI coding harnesses what Terraform is to infrastructure — not the
 host tool, not the agent itself, but the declarative layer in between.
@@ -76,6 +76,7 @@ An `atlante.jsonc` with two agents:
       "constraints": ["{{values.apiRule}}"],
     },
   },
+
 }
 ```
 
@@ -103,12 +104,19 @@ Write clean, tested, production-ready code.
 The reviewer gets the same structure with its own identity, mission, and
 responsibilities. Change `values.apiRule` once — both agents pick it up.
 
-The root document has exactly three fields: `$schema`, `values`, and `agents`.
-Inside an agent binding, `template` and `values` are the only binding
-metadata; every other key is prompt input, owned by the selected template's
+Skills are structured template input rendered as Markdown, not agents. A
+resolved skill is available to every host agent through the OpenCode plugin's
+`atlante_skill` tool. A lookup uses exactly one object,
+`{ "name": "<skillId>" }`, and returns only the skill's rendered Markdown
+content. Atlante does not execute skill content.
+
+The root document has `$schema`, `values`, `agents`, and optional `skills`
+fields. Inside an agent binding, `template` and `values` are binding metadata;
+inside a skill binding, `description`, `template`, and `values` are reserved
+metadata. All other binding keys are input owned by the selected template's
 input schema.
 
-### How values reach a prompt
+### How values reach a prompt or skill
 
 Values flow through two layers:
 
@@ -132,24 +140,26 @@ syntax is normal, and doing so must not corrupt them.
 
 ## How it works
 
-1. You write an `atlante.jsonc` (or `atlante.json`) with agent bindings and
-   values.
+1. You write an `atlante.jsonc` (or `atlante.json`) with agent and optional
+   skill bindings and values.
 2. Templates define how prompts render. Each is a Markdown file paired with a
    `template.json` Draft 2020-12 input schema.
 3. The resolver merges values, substitutes references, renders templates, and
-   produces host-independent prompt descriptors.
+   produces host-independent agent and skill artifact descriptors.
 4. An adapter delivers the rendered prompts to the host.
 
 ```
-atlante.jsonc  →  resolve  →  rendered Markdown  →  adapter  →  host agent
-                 (templates + values)
+atlante.jsonc  →  resolve  →  rendered Markdown  →  adapter  →  host agent/tool
+                  (templates + values)
 ```
 
-For OpenCode, step 4 happens **in memory at startup**: the plugin's `config`
-hook writes each rendered prompt into the host's agent configuration. No agent
-files are generated, so nothing on disk can drift away from your Atlante
-configuration — it genuinely is the single source of truth for prompts, rather
-than merely their origin. Only the `prompt` field is written; model,
+For OpenCode, step 4 happens **once in memory during initialization**: the
+plugin's `config` hook stages the rendered prompts in the host's agent
+configuration and makes resolved skills available through `atlante_skill`. No
+agent or skill files are generated, and skill content is not put in a cache or
+registered as a native OpenCode skill. Nothing on disk can drift away from your
+Atlante configuration — it genuinely is the single source of truth for prompt
+and skill content. Only the agent `prompt` field is written; model,
 permissions, tools and mode stay owned by the host.
 
 Because nothing is materialized to disk, `atlante resolve` is how you inspect
@@ -162,6 +172,7 @@ Bundled templates live in the `atlante/` namespace:
 - **`atlante/agent`** — the root prompt renderer: identity, mission,
   responsibilities, constraints, and an optional `workflow` slot
 - **`atlante/workflow`** — an ordered procedure, composed into `atlante/agent`
+- **`atlante/skill`** — structured skill input rendered as Markdown
 
 A slot is declared in a template's input schema as
 `{ "template": "namespace/name" }` and invoked from Markdown with its input
@@ -174,10 +185,12 @@ and cycles are rejected rather than discovered at runtime.
 ## Presets
 
 A preset is a pre-filled `atlante.jsonc` to start from. A preset is a
-*document*; a template is a *renderer*. Presets are validated by exactly the
-same validators as user-authored configurations, so a broken preset cannot ship.
+*document*; a template is a *renderer*. Presets are raw documents: the
+consuming validator expands and validates them through the same path used for
+user-authored overlays, so a broken preset is rejected when consumed.
 
-- **`starter`** — `architect` and `implement` agents, the default for `init`
+- **`starter`** — `architect` and `implement` agents, the default for `init`;
+  presets may also provide global skills
 
 Presets use `{{sys.cwd.basename}}` for their `project` value so you get a
 sensible default without writing a `values` block. Add your own
@@ -192,9 +205,9 @@ Run `atlante init` to scaffold from the `starter` preset.
 | `@atlante/schema` | Document structure and the generated, versioned JSON Schema |
 | `@atlante/templates` | Template schemas, loading, composition, rendering |
 | `@atlante/validator` | Discovery, parsing, and two-level validation |
-| `@atlante/resolver` | Value merging, substitution, and artifact descriptors |
+| `@atlante/resolver` | Value merging, substitution, and agent/skill artifact descriptors |
 | `@atlante/presets` | Bundled preset documents and registry loading |
-| `@atlante/opencode-plugin` | Runtime prompt injection through OpenCode's `config` hook |
+| `@atlante/opencode-plugin` | In-memory agent injection and `atlante_skill` through OpenCode's `config` hook |
 | `@atlante/cli` | `init`, `validate`, `resolve` |
 
 `@atlante/templates` and `@atlante/presets` are the two content packages and
@@ -207,16 +220,17 @@ templates and presets without pulling in the core.
 
 - Minimal document structure with composable, namespaced templates
 - Global values with per-agent overrides
+- Project-global Markdown skills resolved through the `atlante_skill` adapter tool
 - Two-level validation: document structure, then template input schemas
 - Deterministic prompt resolution
-- OpenCode adapter for prompt materialization
+- OpenCode adapter for in-memory prompt and skill materialization
 - Bundled `starter` preset via `atlante init`
 
 **Does not include:**
 
 - Model selection, effort, permissions, or host-agent configuration
 - User-defined templates or third-party template authoring
-- Rules or skills
+- Skill execution, runtime skill state, and remote skill loading
 - LLM inference or direct agent execution
 - Preset export, sharing, or remote registry
 

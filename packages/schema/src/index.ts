@@ -4,11 +4,15 @@ export type {
   AgentsOverlay,
   AtlanteDocument,
   AtlanteDocumentOverlay,
+  SkillBinding,
+  SkillBindingOverlay,
+  SkillsOverlay,
 } from "./document.js";
 export {
   agentBindingSchema,
   atlanteDocumentSchema,
   SCHEMA_URI,
+  skillBindingSchema,
 } from "./document.js";
 export type { Value, ValuesMap, ValuesMapOverlay } from "./values.js";
 export {

@@ -15,51 +15,85 @@ const agentBindingBaseSchema = z.looseObject({
 });
 type AgentBindingOutput = z.infer<typeof agentBindingBaseSchema>;
 
-export const agentBindingSchema = z
-  .unknown()
-  .superRefine((input, context) => {
-    if (typeof input !== "object" || input === null || Array.isArray(input)) {
-      context.addIssue({ code: "custom", message: "expected an object" });
-      return;
-    }
-    const result = agentBindingBaseSchema.safeParse(input);
-    if (!result.success) {
-      for (const issue of result.error.issues)
-        context.addIssue({
-          code: "custom",
-          message: issue.message,
-          path: issue.path,
+/**
+ * A skill binding reserves metadata fields while leaving its content fields to
+ * the selected template, just like an agent binding.
+ */
+const skillBindingBaseSchema = z.looseObject({
+  description: z.string().min(1),
+  template: z.string().min(1).optional(),
+  values: valuesMapSchema.optional(),
+});
+type SkillBindingOutput = z.infer<typeof skillBindingBaseSchema>;
+
+function bindingSchema<Output>(
+  baseSchema: z.ZodType<Output>,
+  reservedKeys: ReadonlySet<string>,
+) {
+  return z
+    .unknown()
+    .superRefine((input, context) => {
+      if (typeof input !== "object" || input === null || Array.isArray(input)) {
+        context.addIssue({ code: "custom", message: "expected an object" });
+        return;
+      }
+      const result = baseSchema.safeParse(input);
+      if (!result.success) {
+        for (const issue of result.error.issues)
+          context.addIssue({
+            code: "custom",
+            message: issue.message,
+            path: issue.path,
+          });
+      }
+    })
+    .transform((input) => {
+      const parsed = baseSchema.parse(input) as Record<string, unknown>;
+      const source = input as Record<string, unknown>;
+      const output: Record<string, unknown> = {};
+      for (const key of Object.keys(source)) {
+        const value = reservedKeys.has(key) ? parsed[key] : source[key];
+        Object.defineProperty(output, key, {
+          configurable: true,
+          enumerable: true,
+          value,
+          writable: true,
         });
-    }
-  })
-  .transform((input) => {
-    const parsed = agentBindingBaseSchema.parse(input);
-    const output: Record<string, unknown> = {};
-    for (const key of Object.keys(input as Record<string, unknown>)) {
-      const value =
-        key === "template" || key === "values"
-          ? parsed[key]
-          : (input as Record<string, unknown>)[key];
-      Object.defineProperty(output, key, {
-        configurable: true,
-        enumerable: true,
-        value,
-        writable: true,
-      });
-    }
-    return output as AgentBindingOutput;
-  });
+      }
+      return output as Output;
+    });
+}
+
+export const agentBindingSchema = bindingSchema<AgentBindingOutput>(
+  agentBindingBaseSchema,
+  new Set(["template", "values"]),
+);
+
+export const skillBindingSchema = bindingSchema<SkillBindingOutput>(
+  skillBindingBaseSchema,
+  new Set(["description", "template", "values"]),
+);
 
 /** Canonical document — after expansion, no `extends` or tombstone `null`s. */
 export const atlanteDocumentSchema = z.strictObject({
   $schema: z.literal(SCHEMA_URI),
   values: valuesMapSchema.optional(),
-  agents: safeRecord(z.string().min(1), agentBindingSchema),
+  agents: safeRecord(z.string().min(1), agentBindingSchema).default({}),
+  skills: safeRecord(z.string().min(1), skillBindingSchema).default({}),
 });
 
 export type AgentBinding = z.infer<typeof agentBindingSchema>;
+export type SkillBinding = z.infer<typeof skillBindingSchema>;
 
-export type AtlanteDocument = z.infer<typeof atlanteDocumentSchema>;
+type AtlanteDocumentOutput = z.infer<typeof atlanteDocumentSchema>;
+
+export type AtlanteDocument = Omit<
+  AtlanteDocumentOutput,
+  "agents" | "skills"
+> & {
+  agents?: AtlanteDocumentOutput["agents"];
+  skills?: AtlanteDocumentOutput["skills"];
+};
 
 // ---------------------------------------------------------------------------
 // Overlay types — used during expansion before canonical validation
@@ -75,6 +109,17 @@ export type AgentBindingOverlay = {
 /** Agents map in an overlay document: values can be `null` (tombstone). */
 export type AgentsOverlay = Record<string, AgentBindingOverlay | null>;
 
+/** A skill binding in an overlay document: allows `null` tombstones. */
+export type SkillBindingOverlay = {
+  description?: string | null;
+  template?: string | null;
+  values?: ValuesMapOverlay;
+  [key: string]: unknown;
+};
+
+/** Skills map in an overlay document: values can be `null` (tombstone). */
+export type SkillsOverlay = Record<string, SkillBindingOverlay | null>;
+
 /** Raw overlay document before expansion: allows document-level `extends` and tombstone `null`s.
  * `agents` is optional — it can be inherited from a preset. */
 export type AtlanteDocumentOverlay = {
@@ -82,4 +127,5 @@ export type AtlanteDocumentOverlay = {
   extends?: string;
   values?: ValuesMapOverlay;
   agents?: AgentsOverlay;
+  skills?: SkillsOverlay;
 };

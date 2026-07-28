@@ -9,19 +9,12 @@ export function createBundledPresetLoader(): PresetLoader {
     load(id: string) {
       const { presets, errors } = listPresets();
       if (!presets.includes(id)) {
-        const known = presets.join(", ");
         const diags = errors.map((e) =>
           error("preset-load-error", `${e.directory}: ${e.message}`),
         );
         return {
           document: undefined,
-          diagnostics: [
-            error(
-              "unknown-preset",
-              `preset "${id}" not found${known ? `; available: ${known}` : ""}`,
-            ),
-            ...diags,
-          ],
+          diagnostics: diags,
         };
       }
 

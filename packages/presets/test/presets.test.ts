@@ -36,6 +36,17 @@ describe("bundled presets", () => {
     expect(readPreset("atlante/starter")).toContain("$schema");
   });
 
+  test("returns raw preset text containing skills without filtering it", () => {
+    const contents = `{
+      "$schema": "https://atlante.sh/schema/v0.1/schema.json",
+      "agents": {},
+      "skills": { "testing": { "description": "Run tests", "content": "bun test" } }
+    }`;
+    const root = presetsRootWith("skills", "atlante.jsonc", contents);
+
+    expect(readPreset("atlante/skills", root)).toBe(contents);
+  });
+
   test("does not accept short names or path traversal as ids", () => {
     expect(readPreset("starter")).toBeUndefined();
     expect(readPreset("atlante/../../../etc/passwd")).toBeUndefined();

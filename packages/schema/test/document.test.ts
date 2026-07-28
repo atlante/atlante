@@ -28,14 +28,73 @@ describe("atlanteDocumentSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  test("accepts a document with a skill binding", () => {
+    const result = atlanteDocumentSchema.safeParse({
+      $schema: SCHEMA_URI,
+      agents: {},
+      skills: {
+        testing: {
+          description: "Testing guidance",
+          template: "atlante/skill",
+          content: "Run the tests.",
+        },
+      },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  test("accepts a skill-only document and normalizes agents to an empty map", () => {
+    const result = atlanteDocumentSchema.safeParse({
+      $schema: SCHEMA_URI,
+      skills: {
+        testing: { description: "Testing guidance", content: "Run tests." },
+      },
+    });
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.agents).toEqual({});
+  });
+
+  test("requires a non-empty skill description", () => {
+    const result = atlanteDocumentSchema.safeParse({
+      $schema: SCHEMA_URI,
+      agents: {},
+      skills: { testing: { description: "", content: "Run the tests." } },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  test("accepts a document without skills and normalizes skills to an empty map", () => {
+    const result = atlanteDocumentSchema.safeParse({
+      $schema: SCHEMA_URI,
+      agents: {},
+    });
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.skills).toEqual({});
+  });
+
+  test("rejects an unknown root field while allowing skills", () => {
+    const result = atlanteDocumentSchema.safeParse({
+      $schema: SCHEMA_URI,
+      agents: {},
+      skills: {},
+      rules: [],
+    });
+    expect(result.success).toBe(false);
+  });
+
   test("rejects an unknown root field", () => {
     const result = atlanteDocumentSchema.safeParse({ ...valid, rules: [] });
     expect(result.success).toBe(false);
   });
 
-  test("rejects a missing agents object", () => {
+  test("accepts a document without agents or skills and normalizes both maps", () => {
     const result = atlanteDocumentSchema.safeParse({ $schema: SCHEMA_URI });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.agents).toEqual({});
+    expect(result.data.skills).toEqual({});
   });
 
   test("rejects an unsupported $schema URI", () => {

@@ -10,32 +10,35 @@ first Atlante specification.
 ## 1. Scope
 
 Version 0.1 defines a provider-neutral configuration model for structured agent
-prompts. It defines a composable template system that owns prompt semantics, a
-two-level validation model (document structure + template input schemas),
-deterministic resolution, and an OpenCode adapter that materializes the resolved
-prompts into host agent definitions.
+prompts and Markdown skills. It defines a composable template
+system that owns prompt and skill-content semantics, a two-level validation
+model (document structure + template input schemas), deterministic resolution,
+and an OpenCode adapter that materializes resolved prompts into host agent
+definitions and exposes resolved skills through the `atlante_skill` adapter
+tool.
 
 Version 0.1 includes:
 
-- a minimal document structure (`$schema`, `agents`, `values`);
+- a minimal document structure (`$schema` plus optional `agents`, `values`, and
+  `skills`);
 - a composable, namespaced template system (`namespace/name`) with Markdown
   rendering and variable resolution;
 - a template protocol for prompt rendering and validation;
 - global values with per-agent overrides, resolved into prompt definitions via
   `{{values.x}}`;
+- skill bindings with descriptions and template-owned input rendered as Markdown;
 - host-agent bindings whose prompt inputs are defined by templates;
 - two-level validation (document structure + template input schema);
 - deterministic prompt resolution;
-- OpenCode prompt materialization;
+- OpenCode prompt materialization and the `atlante_skill` lookup tool;
 - bundled `starter` preset (`atlante init`).
 
 Version 0.1 does not include:
 
 - model selection, effort, permissions, or other host-agent configuration;
 - user-defined prompt templates or third-party template authoring;
-- rules or skills;
 - LLM inference or direct agent execution;
-- Atlante runtime tools;
+- skill execution, skill runtime state, and remote skill loading;
 - preset export, sharing, or remote registry.
 
 The excluded runtime capabilities remain possible future extensions of the
@@ -67,6 +70,9 @@ code is not part of the configuration format.
 - **Host agent**: an agent identified and configured by the host.
 - **Agent binding**: the association between a host-agent ID and an Atlante
   prompt definition.
+- **Skill binding**: the association between a root `skills` map key and a
+  description plus template-owned skill input. The map key is the binding's
+  `skillId`.
 - **Prompt definition**: the structured, user-authored values from which Atlante
   renders an agent system prompt; prompt sections are defined by the referenced
   template, not by the schema.
@@ -120,12 +126,20 @@ be preferred when comments are useful. `atlante.json` MUST contain strict JSON;
 `atlante.jsonc` MAY contain JSONC comments. Both filenames MUST validate against
 the same document schema and resolve to the same canonical document model.
 
+Configuration files are first parsed as raw overlay input for preset expansion. A
+raw overlay MAY contain `extends` and MAY omit `agents` or `skills`. During
+expansion, omission preserves inherited bindings when present. After expansion,
+`extends` is consumed and the result MUST be a strict canonical document; the
+field restrictions below apply to that canonical document, not to the raw
+overlay's expansion metadata.
+
 When no explicit configuration path is provided, the CLI MUST discover either
 root-level filename. If both files exist, the CLI MUST report an ambiguous
 configuration and require an explicit path rather than choosing silently.
 
-The document MUST contain exactly one agent map and MAY contain a values
-dictionary. Its top-level shape is:
+The document MUST contain `$schema` and MAY contain `values`, `agents`, and
+`skills` maps. Missing `agents` and `skills` maps normalize to empty
+collections. Its top-level shape is:
 
 ```jsonc
 {
@@ -147,11 +161,26 @@ dictionary. Its top-level shape is:
       "template": "provider/template",
     },
   },
+
+  // Skills — skillId → skill binding
+  "skills": {
+    "testing": {
+      "description": "Testing guidance for {{values.project}}.",
+      "template": "provider/template",
+      // Remaining fields are defined by the selected template.
+    },
+  },
 }
 ```
 
 The document MUST NOT contain fields other than `$schema`, `values`, and
-`agents`. Unknown top-level fields MUST be rejected.
+optional `agents` and `skills`. Unknown top-level fields MUST be rejected.
+When present, `skills` is an object whose non-empty keys are `skillId` values.
+Each skill binding MUST contain a non-empty string `description`; `template`
+defaults to `atlante/skill` and, when present, MUST be a non-empty template ID.
+`description`, `template`, and `values` are reserved binding metadata. Every
+other skill field is template-owned input and MUST be validated against the
+selected template's input schema.
 
 ### 4.1 Schema reference
 
@@ -190,8 +219,8 @@ expansion, before `{{values.x}}` interpolation; this ensures that
 
 ### 4.3 Agent map
 
-`agents` MUST be an object whose keys are host-agent IDs. A host-agent ID is an
-opaque, non-empty string owned by the host adapter.
+When present, `agents` MUST be an object whose keys are host-agent IDs. A
+host-agent ID is an opaque, non-empty string owned by the host adapter.
 
 Each value is a prompt definition. An agent MAY identify its prompt template
 with `template`; when omitted, the implementation's configured default template
@@ -209,8 +238,9 @@ The Atlante JSONC document is a declarative language for agent prompts. Its
 contract is divided across four layers:
 
 1. `@atlante/schema` defines the serializable document shape (`$schema`,
-   `agents`, `values`) and publishes the versioned JSON Schema and corresponding
-   TypeScript types; it does not define prompt semantics;
+   optional `agents`, `values`, and `skills`) and publishes the versioned JSON
+   Schema and corresponding TypeScript types; it does not define prompt or
+   skill semantics;
 2. `@atlante/templates` defines prompt semantics through composable templates;
    each template pairs a Draft 2020-12 input schema with a Markdown renderer;
 3. `@atlante/validator` applies structural checks on the document and semantic
@@ -313,6 +343,17 @@ specification does not require every configuration to define an orchestrator.
 Host agent files MUST NOT contain an independent prompt that competes with the
 Atlante prompt; the Atlante configuration is the prompt source of truth.
 
+### 6.6 Skill content rendering
+
+The bundled `atlante/skill` template accepts structured, template-owned input
+and renders it as Markdown without executing it. A skill's `description` is
+resolved separately as binding metadata and listed in the tool description for
+discovery; successful `atlante_skill` execution returns only rendered Markdown
+content. The description is not template input. Skill content and skill
+execution are distinct contracts: version 0.1 defines content validation,
+interpolation, rendering, and lookup only, not execution, scheduling, runtime
+state, or remote loading.
+
 ## 7. Agent Bindings
 
 An agent binding associates one existing or materialized host agent with one
@@ -335,6 +376,17 @@ The exact warning channel and host-specific file format are adapter concerns.
 The default adapter SHOULD report warnings through resolver, CLI, or plugin
 diagnostics rather than creating an additional warning file.
 
+### 7.1 Skill bindings
+
+When present, `skills` MUST be an object keyed by non-empty `skillId` strings.
+Each skill binding MUST contain a non-empty `description`; the description is
+metadata for lookup and is not passed to the template. `template` selects the
+skill content renderer and defaults to `atlante/skill`. `values` contains local
+value overrides. Every other field is template-owned input. Skills are not associated with a host-agent ID.
+
+Defining or resolving a skill MUST NOT execute its content. The OpenCode adapter
+exposes resolved skill content through `atlante_skill`.
+
 ## 8. Validation
 
 Validation MUST happen before resolution or materialization. Validation operates
@@ -348,12 +400,21 @@ possible.
 The validator MUST reject:
 
 - invalid JSON or an unsupported `$schema` URI;
-- a missing required `agents` object;
 - a present `values` field that is not an object;
+- a present `skills` field that is not an object, an empty skill ID, or a skill
+  binding without a non-empty string `description`;
 - unknown top-level fields;
 - unknown or invalid prompt inputs as defined by the selected template's
   input schema;
 - unsupported or unknown fields within version 0.1 entities.
+
+For every skill, validation MUST use paths rooted at
+`/skills/<skillId>`. It MUST interpolate `description` with the same resolved
+global-plus-local values used by the skill input, reject missing or invalid
+value references, and reject a description that is empty after interpolation.
+The reserved fields `description`, `template`, and `values` MUST be removed
+from the input presented to the selected skill template; all remaining fields
+are template-owned input.
 
 ### 8.2 Template-level validation
 
@@ -369,6 +430,12 @@ The validator MUST reject:
   non-existent templates;
 - circular template composition (template A includes B which includes A);
 - input values that do not satisfy a template's input schema.
+
+The same template and composition failures apply to skills: unknown default or
+explicit templates, missing slot references, circular composition, malformed or
+invalid Draft 2020-12 input schemas, invalid skill input, unsupported value
+references, missing values, value-reference collisions, and unknown system
+values MUST fail validation with diagnostics at the relevant skill JSON Pointer.
 
 Validation SHOULD also detect statically incompatible values where a future
 runtime feature would consume them.
@@ -399,6 +466,23 @@ The resolver MUST:
 5. produce one agent artifact descriptor per binding;
 6. preserve host-agent IDs in every descriptor.
 
+For skills, the resolver MUST:
+
+1. select the explicit `template` or default to `atlante/skill`;
+2. merge global values with skill-local `values`, resolve system values, and
+   interpolate both `description` and template-owned input before rendering;
+3. remove reserved skill metadata (`description`, `template`, and `values`) from
+   template input;
+4. produce one resolved descriptor per binding containing `skillId`,
+   `templateId`, `description`, and rendered Markdown `content`.
+
+Resolved output MUST contain `agents`, `skills`, and `diagnostics`. Resolution
+is globally fail-closed: if any agent or skill validation, value interpolation,
+composition, or rendering fails, it MUST return no partial agent or skill
+descriptors, MUST return empty `agents` and `skills` arrays, and MUST report
+diagnostics. An empty `skills` array is a successful result when the document
+contains no skills.
+
 Materialization is performed by an adapter. The OpenCode adapter MUST:
 
 - locate an existing host agent by its configured ID;
@@ -408,6 +492,10 @@ Materialization is performed by an adapter. The OpenCode adapter MUST:
 - report prompt replacement warnings;
 - avoid executing the agent or any command.
 
+Materialization MUST be atomic. A failure MUST leave the host configuration
+unchanged; no partial agent injection or partial skill availability is
+permitted.
+
 Repeated materialization from the same valid document SHOULD produce the same
 host artifacts and MUST NOT duplicate agents.
 
@@ -415,9 +503,10 @@ host artifacts and MUST NOT duplicate agents.
 
 The v1 implementation SHOULD preserve these package responsibilities:
 
-- `@atlante/schema`: document structure contract (`$schema`, `agents`,
-  `values`), versioned JSON Schema, and TypeScript types; no prompt semantics,
-  no template logic, no host or rendering logic;
+- `@atlante/schema`: document structure contract (`$schema`, `values`, and
+  optional `agents` and `skills`), versioned JSON Schema, and TypeScript types;
+  no prompt or skill-content semantics, no template logic, no host or rendering
+  logic;
 - `@atlante/templates`: direct Draft 2020-12 input schemas; template loading,
   parsing, composition, and Markdown rendering; `namespace/name` convention;
   variable resolution and slot composition;
@@ -428,20 +517,33 @@ The v1 implementation SHOULD preserve these package responsibilities:
   resolution, and host-independent artifact descriptors;
 - `@atlante/presets`: registry-derived preset loading and the bundled preset
   documents themselves;
-- `@atlante/opencode-plugin`: OpenCode materialization and future runtime;
+- `@atlante/opencode-plugin`: OpenCode prompt materialization and skill lookup;
 - `@atlante/cli`: validation, resolution, materialization, and
   `atlante init` entry point.
 
 `@atlante/templates` and `@atlante/presets` are the two content packages and
 MUST remain leaves of the dependency graph: neither depends on any other Atlante
 package. `@atlante/presets` therefore loads and exposes presets but MUST NOT
-validate them — a preset is an Atlante document, so validating it belongs to the
-validator and to whoever consumes the preset. Keeping both content packages
-dependency-free is what allows third parties to distribute templates and presets
-without depending on the core.
+validate or expand them. Validation of a preset MUST be performed by the
+consuming validator as part of the uniform overlay-expansion path for the
+document that uses it. Keeping both content packages dependency-free is what
+allows third parties to distribute templates and presets without depending on
+the core.
 
 An adapter MUST receive resolved descriptors and MUST NOT contain a separate
 execution branch for each renderer.
+
+### 10.1 CLI JSON output
+
+For `atlante resolve --json`, the CLI MUST emit exactly one JSON object to
+standard output with exactly these top-level fields: `agents`, `skills`, and
+`diagnostics`. The `agents` and `skills` fields contain the resolved artifact
+arrays, and `diagnostics` contains the diagnostic array. The `--agent` option
+filters only `agents`; it MUST NOT filter `skills`.
+
+JSON-mode failures MUST also emit this envelope to standard output, with empty
+`agents` and `skills` arrays and the reported diagnostics. JSON-mode diagnostics
+MUST NOT be duplicated on standard error.
 
 ## 11. OpenCode Adapter Profile
 
@@ -453,7 +555,21 @@ The adapter MUST treat the Atlante configuration as the only source of truth for
 prompts. Users SHOULD not maintain a competing prompt in OpenCode agent
 configuration.
 
-### 11.1 Preset inheritance
+### 11.1 Skill lookup
+
+After successful resolution and materialization, the OpenCode adapter exposes
+an `atlante_skill` tool for skill lookups. The tool input MUST be exactly
+an object with one string field, `{ "name": "<skillId>" }`; the name is looked
+up against the root `skills` map key. A successful known-name lookup returns
+only the resolved Markdown `content`; the skill `description` is not returned
+by the tool.
+
+If overlay expansion, validation, or resolution fails, `atlante_skill` MUST be
+unavailable and the host configuration MUST remain unchanged. Malformed input
+and unknown names MUST return explicit errors without partial skill content.
+Skill content is returned as data and is not executed.
+
+### 11.2 Preset inheritance
 
 `atlante init` scaffolds a project configuration that extends a bundled preset
 via the `extends` field. The generated configuration carries only the document
@@ -495,16 +611,23 @@ taking precedence:
 - `values` merge by key; agent-local values override document-level values.
 - `agents` merge by agent ID; new IDs are added and existing IDs are
   recursively overridden.
+- `skills` merge by `skillId`; new IDs are added and existing IDs are
+  recursively overridden.
+- Objects merge recursively by key, scalars replace inherited values, arrays
+  replace inherited arrays, and the local layer always takes precedence for
+  skills exactly as it does for agents.
 - `null` removes an inherited property, value entry, or agent binding.
-  Tombstones are consumed during expansion and MUST NOT reach the canonical
-  resolved document.
+- `null` also removes an inherited skill binding or skill property. Tombstones
+  are consumed during expansion and MUST NOT reach the canonical resolved
+  document.
 - `extends` is consumed during expansion and MUST NOT be passed to a prompt
   template.
 
 #### Validation and resolution
 
-The implementation MUST apply one shared expansion path before validation and
-resolution:
+Every entry point that accepts a raw configuration overlay, including the CLI
+and host adapters, MUST apply the same shared expansion path before validation
+and resolution:
 
 1. Parse the local document as an overlay that may contain `extends` and
    tombstone `null` values.
@@ -565,7 +688,7 @@ Future versions MAY add:
 - prompt extension namespaces;
 - runtime tools and state;
 - preset export, sharing, and remote registry;
-- rules and skills.
+- skill execution, runtime skill state, and remote skill loading.
 
 These additions MUST preserve the distinction between Atlante-owned prompt
 content (templates) and host-owned execution settings.
@@ -583,4 +706,17 @@ Version 0.1 is complete when a conforming implementation can:
 6. create a missing OpenCode agent with host defaults;
 7. replace an existing agent prompt while preserving host-owned fields;
 8. report a warning when a non-empty host prompt is replaced;
-9. scaffold a project from the bundled `starter` preset via `atlante init`.
+9. scaffold a project from the bundled `starter` preset via `atlante init`;
+10. validate a skill with required description, default `atlante/skill`, and
+     template-owned input;
+11. interpolate skill descriptions and input with global and local values;
+12. resolve skill template composition and reject missing references, cycles,
+    invalid input, missing values, and other template failures;
+13. apply preset skill inheritance, local precedence, and `null` tombstones;
+14. expose the exact CLI `--json` envelope containing only `agents`, `skills`,
+     and `diagnostics`, with JSON failures on stdout and no duplicate stderr
+     diagnostics, while `--agent` filters only agents;
+15. expose `atlante_skill` with the `{ "name": "<skillId>" }` lookup returning
+    rendered Markdown content only and make it unavailable when preparation
+    fails; and
+16. materialize atomically and leave the host unchanged on failure.

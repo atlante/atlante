@@ -62,7 +62,7 @@ export function validateDocumentText(
   sourcePath: string,
 ): { document?: AtlanteDocument; diagnostics: Diagnostic[] } {
   const { raw, diagnostics } = parseConfigSource(text, sourcePath);
-  if (!raw) return { diagnostics };
+  if (raw === undefined) return { diagnostics };
   return validateParsedDocument(raw, sourcePath);
 }
 
@@ -110,67 +110,21 @@ export function parseDocumentOverlay(
   diagnostics: Diagnostic[];
 } {
   const { raw, diagnostics } = parseConfigSource(text, sourcePath);
-  if (!raw) return { overlay: undefined, diagnostics };
+  if (raw === undefined) return { overlay: undefined, diagnostics };
   return parseOverlay(raw, sourcePath);
 }
 
-function parseOverlayValues(rawValues: unknown): Record<string, string | null> {
-  const values: Record<string, string | null> = Object.create(null);
-  if (
-    typeof rawValues !== "object" ||
-    rawValues === null ||
-    Array.isArray(rawValues)
-  ) {
-    return values;
-  }
-
-  for (const [key, value] of Object.entries(
-    rawValues as Record<string, unknown>,
-  )) {
-    if (value === null || typeof value === "string") {
-      values[key] = value;
-    }
-  }
-  return values;
-}
-
-function parseOverlayAgent(binding: unknown): Record<string, unknown> | null {
-  if (binding === null) return null;
-
-  if (
-    typeof binding !== "object" ||
-    Array.isArray(binding) ||
-    binding === null
-  ) {
-    return undefined as unknown as Record<string, unknown>; // caller filters undefined
-  }
-
-  const agentBinding = binding as Record<string, unknown>;
-  const agentValues: Record<string, string | null> = {};
-
-  if (
-    agentBinding.values !== undefined &&
-    typeof agentBinding.values === "object" &&
-    agentBinding.values !== null &&
-    !Array.isArray(agentBinding.values)
-  ) {
-    for (const [key, value] of Object.entries(
-      agentBinding.values as Record<string, unknown>,
-    )) {
-      if (value === null || typeof value === "string") {
-        agentValues[key] = value;
-      }
-    }
-  }
-
-  const base: Record<string, unknown> = { ...agentBinding };
-  if (Object.keys(agentValues).length > 0) {
-    base.values = agentValues;
-  } else if (!Object.hasOwn(agentBinding, "values")) {
-    delete base.values;
-  }
-
-  return base;
+function own(
+  target: Record<string, unknown>,
+  key: string,
+  value: unknown,
+): void {
+  Object.defineProperty(target, key, {
+    configurable: true,
+    enumerable: true,
+    value,
+    writable: true,
+  });
 }
 
 function parseOverlay(
@@ -205,50 +159,13 @@ function parseOverlay(
     };
   }
 
-  const extends_ =
-    typeof obj.extends === "string" && obj.extends.length > 0
-      ? obj.extends
-      : undefined;
-
-  const values = parseOverlayValues(obj.values);
-
-  const agents: Record<string, Record<string, unknown> | null> =
-    Object.create(null);
-  if (obj.agents !== undefined) {
-    if (
-      typeof obj.agents !== "object" ||
-      obj.agents === null ||
-      Array.isArray(obj.agents)
-    ) {
-      return {
-        overlay: undefined,
-        diagnostics: [
-          error(
-            "invalid-document",
-            `${sourcePath}: "agents" must be an object`,
-            { path: "/agents" },
-          ),
-        ],
-      };
-    }
-
-    for (const [agentId, binding] of Object.entries(
-      obj.agents as Record<string, unknown>,
-    )) {
-      const parsed = parseOverlayAgent(binding);
-      if (parsed !== undefined) {
-        agents[agentId] = parsed;
-      }
-    }
+  const overlay: Record<string, unknown> = Object.create(null);
+  for (const key of Object.getOwnPropertyNames(obj)) {
+    own(overlay, key, obj[key]);
   }
 
   return {
-    overlay: {
-      $schema: schemaUri as string,
-      extends: extends_,
-      values: Object.keys(values).length > 0 ? values : undefined,
-      agents: agents as AtlanteDocumentOverlay["agents"],
-    },
+    overlay: overlay as AtlanteDocumentOverlay,
     diagnostics: [],
   };
 }

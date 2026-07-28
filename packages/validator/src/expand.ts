@@ -1,11 +1,5 @@
-import type {
-  AgentBinding,
-  AgentsOverlay,
-  AtlanteDocument,
-  AtlanteDocumentOverlay,
-  ValuesMapOverlay,
-} from "@atlante/schema";
-import { atlanteDocumentSchema } from "@atlante/schema";
+import type { AtlanteDocument, AtlanteDocumentOverlay } from "@atlante/schema";
+import { atlanteDocumentSchema, VALUE_KEY_PATTERN } from "@atlante/schema";
 import type { Diagnostic } from "./diagnostic.js";
 import { error, escapeJsonPointerSegment } from "./diagnostic.js";
 
@@ -26,11 +20,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return proto === Object.prototype || proto === null;
 }
 
-/**
- * Safely assigns a property that may be `__proto__` without side effects.
- * Uses `Object.defineProperty` so the assignment is always an own data property.
- */
-function own<T>(target: Record<string, T>, key: string, value: T): void {
+/** Safely assigns a property that may be `__proto__`. */
+function own(
+  target: Record<string, unknown>,
+  key: string,
+  value: unknown,
+): void {
   Object.defineProperty(target, key, {
     configurable: true,
     enumerable: true,
@@ -39,74 +34,113 @@ function own<T>(target: Record<string, T>, key: string, value: T): void {
   });
 }
 
-/**
- * Creates an object with no inherited properties. All keys assigned via
- * `own()` are safely stored as own properties.
- */
+/** Creates an object whose inherited properties cannot affect expansion. */
 function safeObject(): Record<string, unknown> {
   return Object.create(null);
 }
 
-function asRecord(value: unknown): Record<string, unknown> {
-  return isRecord(value) ? (value as Record<string, unknown>) : safeObject();
+function copyNonNullEntries(
+  value: Record<string, unknown>,
+): Record<string, unknown> {
+  const output = safeObject();
+  for (const [key, entry] of Object.entries(value)) {
+    if (entry !== null) own(output, key, entry);
+  }
+  return output;
 }
 
-/** Strips null entries from a values overlay after merge. */
-function canonicalizeValues(
-  overlay: ValuesMapOverlay | undefined,
-): Record<string, string> | undefined {
-  if (!overlay) return undefined;
-  const result: Record<string, string> = {};
-  for (const [key, value] of Object.entries(overlay)) {
-    if (value !== null) own(result, key, value);
+/** Removes tombstones from the root values map without hiding malformed input. */
+function canonicalizeValues(value: unknown): unknown {
+  if (value === undefined) return undefined;
+  if (!isRecord(value)) return value;
+
+  const output = safeObject();
+  for (const [key, entry] of Object.entries(value)) {
+    if (entry === null && VALUE_KEY_PATTERN.test(key)) continue;
+    own(output, key, entry);
   }
-  return Object.keys(result).length > 0 ? result : undefined;
+  return Object.keys(output).length > 0 ? output : undefined;
+}
+
+/** Removes direct tombstones while preserving malformed runtime shapes. */
+function stripBindingTombstones(value: unknown): unknown {
+  if (value === null) return null;
+  if (!isRecord(value)) return value;
+
+  return copyNonNullEntries(value);
+}
+
+type MergeMode = "document" | "values" | "bindings" | "nested";
+
+function childMergeMode(mode: MergeMode, key: string): MergeMode {
+  if (key === "values") return "values";
+  if (mode !== "document") return "nested";
+  if (key === "agents" || key === "skills") return "bindings";
+  return "nested";
+}
+
+function preservesNull(mode: MergeMode, key: string): boolean {
+  if (mode === "document") return true;
+  if (mode === "values") return !VALUE_KEY_PATTERN.test(key);
+  if (mode === "bindings") return key.length === 0;
+  return false;
 }
 
 /**
- * JSON Merge Patch: local takes precedence.
- * - `null` removes the key.
- * - Scalars replace.
- * - Objects merge recursively (when both are plain objects).
- * - Arrays replace completely.
- * - When override is a plain object and base is absent/non-object, merge
- *   against an empty object (full JSON Merge Patch semantics).
+ * Applies JSON Merge Patch semantics to two object values.
+ * Null deletes, objects recurse, and all other values replace.
  */
 function deepMerge(
   base: Record<string, unknown>,
   override: Record<string, unknown>,
+  mode: MergeMode = "nested",
 ): Record<string, unknown> {
   const result = safeObject();
   const allKeys = new Set([...Object.keys(base), ...Object.keys(override)]);
 
   for (const key of allKeys) {
+    if (!Object.hasOwn(override, key)) {
+      own(result, key, base[key]);
+      continue;
+    }
+
     const overrideValue = override[key];
-    if (overrideValue === null) continue;
+    if (overrideValue === null) {
+      if (preservesNull(mode, key)) own(result, key, overrideValue);
+      continue;
+    }
 
     const baseValue = base[key];
-    const hasOwnOverride = Object.hasOwn(override, key);
-
-    if (hasOwnOverride) {
-      if (isRecord(overrideValue) && !Array.isArray(overrideValue)) {
-        const mergedBase =
-          isRecord(baseValue) && !Array.isArray(baseValue)
-            ? baseValue
-            : safeObject();
-        own(result, key, deepMerge(mergedBase, overrideValue));
-      } else {
-        own(result, key, overrideValue);
-      }
+    if (isRecord(overrideValue)) {
+      const mergedBase = isRecord(baseValue) ? baseValue : safeObject();
+      own(
+        result,
+        key,
+        deepMerge(mergedBase, overrideValue, childMergeMode(mode, key)),
+      );
     } else {
-      own(result, key, baseValue);
+      own(result, key, overrideValue);
     }
   }
 
   return result;
 }
 
-/**
- * Recursively expands extends chains for the document level.
- */
+function canonicalizeBindings(value: unknown): unknown {
+  if (!isRecord(value)) return value;
+
+  const output = safeObject();
+  for (const [key, entry] of Object.entries(value)) {
+    if (entry === null) {
+      if (key.length === 0) own(output, key, entry);
+      continue;
+    }
+    own(output, key, stripBindingTombstones(entry));
+  }
+  return output;
+}
+
+/** Recursively expands a preset chain, retaining the complete overlay shape. */
 function expandDocumentChain(
   overlay: AtlanteDocumentOverlay,
   presetLoader: PresetLoader,
@@ -114,26 +148,37 @@ function expandDocumentChain(
   depth: number,
   diagnostics: Diagnostic[],
 ): AtlanteDocumentOverlay | undefined {
-  if (!overlay.extends) return overlay;
+  const rawOverlay = overlay as unknown as Record<string, unknown>;
+  if (!Object.hasOwn(rawOverlay, "extends")) return overlay;
 
+  const presetId = rawOverlay.extends;
+  if (typeof presetId !== "string" || presetId.length === 0) {
+    diagnostics.push(
+      error("invalid-document", '"extends" must be a non-empty string', {
+        path: "/extends",
+      }),
+    );
+    return undefined;
+  }
+
+  const nextChain = [...chain, presetId];
   if (depth >= MAX_PRESET_DEPTH) {
     diagnostics.push(
       error(
         "preset-depth-exceeded",
-        `preset inheritance depth limit of ${MAX_PRESET_DEPTH} exceeded`,
+        `preset inheritance depth limit of ${MAX_PRESET_DEPTH} exceeded: ${nextChain.join(" -> ")}`,
+        { path: "/extends" },
       ),
     );
     return undefined;
   }
 
-  const presetId = overlay.extends;
-
   if (chain.includes(presetId)) {
-    const cycleChain = [...chain, presetId];
     diagnostics.push(
       error(
         "preset-cycle",
-        `circular preset inheritance: ${cycleChain.join(" -> ")}`,
+        `circular preset inheritance: ${nextChain.join(" -> ")}`,
+        { path: "/extends" },
       ),
     );
     return undefined;
@@ -141,12 +186,13 @@ function expandDocumentChain(
 
   const loaded = presetLoader.load(presetId);
   diagnostics.push(...loaded.diagnostics);
-
   if (!loaded.document) {
     diagnostics.push(
-      error("unknown-preset", `preset "${presetId}" could not be loaded`, {
-        path: "/extends",
-      }),
+      error(
+        "unknown-preset",
+        `preset inheritance chain ${nextChain.join(" -> ")}: preset "${presetId}" could not be loaded`,
+        { path: "/extends" },
+      ),
     );
     return undefined;
   }
@@ -154,34 +200,22 @@ function expandDocumentChain(
   const expandedBase = expandDocumentChain(
     loaded.document,
     presetLoader,
-    [...chain, overlay.extends],
+    nextChain,
     depth + 1,
     diagnostics,
   );
   if (!expandedBase) return undefined;
 
-  // Merge values: key-by-key, with null removal handled by canonicalizeValues later.
-  const mergedValues: ValuesMapOverlay = {
-    ...(expandedBase.values ?? {}),
-    ...(overlay.values ?? {}),
-  };
-
-  // Merge agents: key-by-key, null removes.
-  const mergedAgents = deepMerge(
-    asRecord(expandedBase.agents ?? {}),
-    asRecord(overlay.agents ?? {}),
-  );
-
-  return {
-    $schema: overlay.$schema,
-    values: Object.keys(mergedValues).length > 0 ? mergedValues : undefined,
-    agents: mergedAgents as AgentsOverlay,
-  };
+  return deepMerge(
+    expandedBase as unknown as Record<string, unknown>,
+    rawOverlay,
+    "document",
+  ) as AtlanteDocumentOverlay;
 }
 
 /**
- * Main entry point: expands an overlay document into a canonical
- * `AtlanteDocument` and validates the result against the canonical schema.
+ * Expands an overlay document into a canonical document and validates the
+ * complete result against the canonical schema.
  */
 export function expandDocument(
   overlay: AtlanteDocumentOverlay,
@@ -191,8 +225,6 @@ export function expandDocument(
   diagnostics: Diagnostic[];
 } {
   const diagnostics: Diagnostic[] = [];
-
-  // Step 1: Expand top-level extends chain.
   const expandedBase = expandDocumentChain(
     overlay,
     presetLoader,
@@ -202,29 +234,34 @@ export function expandDocument(
   );
   if (!expandedBase) return { document: undefined, diagnostics };
 
-  // Step 2: Clean up agent bindings (strip null tombstones).
-  const expandedAgents: Record<string, AgentBinding> = Object.create(null);
+  // Apply tombstones even when there is no preset, then remove inheritance.
+  const merged = deepMerge(
+    safeObject(),
+    expandedBase as unknown as Record<string, unknown>,
+    "document",
+  );
+  delete merged.extends;
 
-  for (const [agentId, binding] of Object.entries(expandedBase.agents ?? {})) {
-    if (binding === null) continue; // tombstoned agent
-
-    const cleaned: Record<string, unknown> = safeObject();
-    for (const [key, value] of Object.entries(binding)) {
-      if (value !== null) {
-        own(cleaned, key, value);
-      }
-    }
-    expandedAgents[agentId] = cleaned as unknown as AgentBinding;
+  const canonical: Record<string, unknown> = safeObject();
+  for (const [key, value] of Object.entries(merged)) {
+    own(canonical, key, value);
   }
 
-  // Step 3: Build canonical document.
-  const canonical: AtlanteDocument = {
-    $schema: overlay.$schema as AtlanteDocument["$schema"],
-    values: canonicalizeValues(expandedBase.values),
-    agents: expandedAgents,
-  };
+  // The user's schema declaration always wins over inherited metadata.
+  own(canonical, "$schema", overlay.$schema);
 
-  // Step 4: Validate against the canonical schema.
+  if (Object.hasOwn(canonical, "values")) {
+    const values = canonicalizeValues(canonical.values);
+    if (values === undefined) delete canonical.values;
+    else own(canonical, "values", values);
+  }
+  if (Object.hasOwn(canonical, "agents")) {
+    own(canonical, "agents", canonicalizeBindings(canonical.agents));
+  }
+  if (Object.hasOwn(canonical, "skills")) {
+    own(canonical, "skills", canonicalizeBindings(canonical.skills));
+  }
+
   const result = atlanteDocumentSchema.safeParse(canonical);
   if (!result.success) {
     for (const issue of result.error.issues) {

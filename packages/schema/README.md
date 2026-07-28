@@ -8,7 +8,12 @@ TypeScript types, Zod schemas, and the versioned JSON Schema. Requires Node.js
 npm install @atlante/schema
 ```
 
-The package exports `atlanteDocumentSchema`, `agentBindingSchema`, value
-schemas, their TypeScript types, `SCHEMA_URI`, and `documentJsonSchema`.
+The package exports `atlanteDocumentSchema`, `agentBindingSchema`,
+`skillBindingSchema`, value schemas, their TypeScript types, `SCHEMA_URI`, and
+`documentJsonSchema`. The root document's optional `skills` map is keyed by
+`skillId`; each skill reserves `description`, `template`, and `values` while
+leaving its content fields to the selected template.
 
-The generated JSON Schema is also available as `@atlante/schema/schema.json`.
+The generated JSON Schema is also available at
+`@atlante/schema/schema.json` (the source generated path is
+`packages/schema/schema/v0.1/schema.json`).

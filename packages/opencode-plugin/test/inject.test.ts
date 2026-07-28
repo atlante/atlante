@@ -1,17 +1,37 @@
 import { describe, expect, test } from "bun:test";
 import type { AgentArtifact } from "@atlante/resolver";
 import type { HostConfig } from "../src/api.js";
-import { injectAgents } from "../src/api.js";
+import {
+  createSkillTool as apiCreateSkillTool,
+  injectAgents,
+} from "../src/api.js";
+import { createSkillTool } from "../src/skill-tool.js";
 
 const artifacts: AgentArtifact[] = [
   { hostAgentId: "reviewer", templateId: "atlante/agent", prompt: "PROMPT" },
 ];
 
 describe("injectAgents", () => {
+  test("re-exports the skill tool factory from the explicit API", () => {
+    expect(apiCreateSkillTool).toBe(createSkillTool);
+  });
+
   test("creates a missing agent with host defaults", () => {
     const config: HostConfig = {};
     const diagnostics = injectAgents(config, artifacts);
     expect(diagnostics).toEqual([]);
+    expect(config.agent?.reviewer).toEqual({ prompt: "PROMPT" });
+  });
+
+  test("does not mutate an inherited agent map", () => {
+    const inheritedAgents = { existing: { model: "host" } };
+    const config = Object.create({ agent: inheritedAgents }) as HostConfig;
+
+    injectAgents(config, artifacts);
+
+    expect(Object.hasOwn(config, "agent")).toBe(true);
+    expect(config.agent).not.toBe(inheritedAgents);
+    expect(inheritedAgents).toEqual({ existing: { model: "host" } });
     expect(config.agent?.reviewer).toEqual({ prompt: "PROMPT" });
   });
 
