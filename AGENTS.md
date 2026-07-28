@@ -34,4 +34,4 @@ bun run build                   # build all packages
 4. Before implementing substantial changes, first brainstorm with the user to find the best solution, then explore the codebase and propose a plan.
 5. Run `bun run type:check && bun run lint:check && bun test` before committing and after each task. Before committing also use the fallow MCP tools to review changed files (dead code, complexity, duplication) and confirm the verdict.
 6. Follow red-green-refactor TDD when the task involves behavior changes: write focused tests first, run them to confirm failure, then implement only enough to pass before broader updates.
-7. Use templates under `.github/ISSUE_TEMPLATE/` and `.github/PULL_REQUEST_TEMPLATE/` when creating issues or PRs with `gh`. Apply labels when creating issues (use `gh issue create --label`).
+7. Use templates under `.github/ISSUE_TEMPLATE/` and `.github/PULL_REQUEST_TEMPLATE/` when creating issues or PRs with `gh`. Apply labels (`--label`) and type (`--type`, e.g. `Bug`, `Feature`, `Refactor`, `Docs`, `Chore`) when creating issues.
