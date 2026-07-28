@@ -1,9 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": [
-    "../packages/opencode-plugin/dist/index.js",
-    "superpowers@git+https://github.com/obra/superpowers.git"
-  ],
+  "plugin": ["../packages/opencode-plugin/dist/index.js"],
 
   // Disable OpenCode's user-facing default agents so the roster is Atlante's
   // own (architect / implement / review, injected by the plugin). The internal
