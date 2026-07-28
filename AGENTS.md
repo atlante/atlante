@@ -28,5 +28,7 @@ bun run build                   # build all packages
 
 ## Rules
 
-1. Run `bun run type:check && bun run lint:check && bun test` before committing and after each task.
-2. Use templates under `.github/ISSUE_TEMPLATE/` and `.github/PULL_REQUEST_TEMPLATE/` when creating issues or PRs with `gh`.
+1. Before implementing substantial changes, first brainstorm with the user to find the best solution, then explore the codebase and propose a plan.
+2. Run `bun run type:check && bun run lint:check && bun test` before committing and after each task. Before committing also run `fallow` and perform a broad review of the changes.
+3. Follow red-green-refactor TDD when the task involves behavior changes: write focused tests first, run them to confirm failure, then implement only enough to pass before broader updates.
+4. Use templates under `.github/ISSUE_TEMPLATE/` and `.github/PULL_REQUEST_TEMPLATE/` when creating issues or PRs with `gh`. Apply labels when creating issues (use `gh issue create --label`).
