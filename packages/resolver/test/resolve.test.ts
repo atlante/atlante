@@ -31,34 +31,15 @@ const document: AtlanteDocument = {
       template: "atlante/agent",
       identity: "You are a reviewer.",
       mission: "Review changes to {{values.project}}.",
-      constraints: ["{{values.rule}}"],
+      sections: [{ constraints: ["{{values.rule}}"] }],
     },
     planner: {
       values: { rule: "Planner constraint." },
       identity: "You are a planner.",
       mission: "Plan work.",
-      constraints: ["{{values.rule}}"],
       sections: [
-        {
-          workflow: {
-            phases: [
-              {
-                name: "Plan",
-                tasks: [
-                  {
-                    name: "Read the request",
-                    description: "Read the request.",
-                  },
-                  {
-                    name: "Draft a plan",
-                    description: "Draft a plan.",
-                    needs: ["Read the request"],
-                  },
-                ],
-              },
-            ],
-          },
-        },
+        { constraints: ["{{values.rule}}"] },
+        { responsibilities: ["Read the request.", "Draft a plan."] },
       ],
     },
   },
@@ -284,9 +265,10 @@ describe("resolve", () => {
     }
   });
 
-  test("renders the workflow slot only where it is bound", () => {
+  test("renders reusable sections in agent prompts", () => {
     const { agents } = resolve(document, registry);
-    expect(agents[1]?.prompt).toContain("## Workflow");
+    expect(agents[1]?.prompt).toContain("# Responsibilities");
+    expect(agents[1]?.prompt).toContain("# Constraints");
     expect(agents[0]?.prompt).not.toContain("## Workflow");
   });
 
@@ -303,7 +285,7 @@ describe("resolve", () => {
     expect(agents[0]?.prompt).not.toContain("{{values.project}}");
   });
 
-  test("resolves values inside slot input too", () => {
+  test("resolves values inside section input too", () => {
     const withReference: AtlanteDocument = {
       $schema: SCHEMA_URI,
       values: { project: "atlante" },
@@ -313,19 +295,7 @@ describe("resolve", () => {
           mission: "y",
           sections: [
             {
-              workflow: {
-                phases: [
-                  {
-                    name: "Build",
-                    tasks: [
-                      {
-                        name: "Build the project",
-                        description: "Build {{values.project}}.",
-                      },
-                    ],
-                  },
-                ],
-              },
+              responsibilities: ["Build {{values.project}}."],
             },
           ],
         },

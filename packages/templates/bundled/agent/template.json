@@ -1,18 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "Root agent prompt renderer with identity, mission, responsibilities, constraints, and ordered sections.",
+  "description": "Root agent prompt renderer with identity, mission, and ordered sections.",
   "type": "object",
   "properties": {
     "identity": { "type": "string", "minLength": 1 },
     "mission": { "type": "string", "minLength": 1 },
-    "responsibilities": {
-      "type": "array",
-      "items": { "type": "string", "minLength": 1 }
-    },
-    "constraints": {
-      "type": "array",
-      "items": { "type": "string", "minLength": 1 }
-    },
     "sections": {
       "type": "array",
       "items": {
@@ -31,13 +23,30 @@
             "additionalProperties": false
           },
           {
+            "properties": {
+              "responsibilities": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 },
+                "minItems": 1
+              }
+            },
+            "required": ["responsibilities"],
+            "additionalProperties": false
+          },
+          {
             "properties": { "gotchas": { "template": "atlante/gotchas" } },
             "required": ["gotchas"],
             "additionalProperties": false
           },
           {
-            "properties": { "workflow": { "template": "atlante/workflow" } },
-            "required": ["workflow"],
+            "properties": {
+              "constraints": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 },
+                "minItems": 1
+              }
+            },
+            "required": ["constraints"],
             "additionalProperties": false
           }
         ]

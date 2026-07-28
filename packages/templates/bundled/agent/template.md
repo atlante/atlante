@@ -5,6 +5,7 @@
 # Mission
 
 {{mission}}
+{{#each sections}}
 {{#if responsibilities}}
 
 # Responsibilities
@@ -21,7 +22,6 @@
 - {{this}}
 {{/each}}
 {{/if}}
-{{#each sections}}
 {{#if markdown}}
 
 {{> slot/sections/markdown}}
@@ -33,9 +33,5 @@
 {{#if gotchas}}
 
 {{> slot/sections/gotchas}}
-{{/if}}
-{{#if workflow}}
-
-{{> slot/sections/workflow}}
 {{/if}}
 {{/each}}

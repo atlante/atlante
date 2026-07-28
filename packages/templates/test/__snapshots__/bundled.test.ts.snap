@@ -19,13 +19,6 @@ Find defects before they merge.
 - Never edit files.
 
 Review the changed files.
-
-## Instructions
-
-Follow these steps in order.
-
-1. Read the diff.
-1. Report findings.
 "
 `;
 

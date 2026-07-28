@@ -96,12 +96,7 @@ describe("bundled templates", () => {
       },
       {
         templateId: "atlante/gotchas",
-        path: ["sections", "items", "oneOf", "2", "gotchas"],
-        arrayItems: true,
-      },
-      {
-        templateId: "atlante/workflow",
-        path: ["sections", "items", "oneOf", "3", "workflow"],
+        path: ["sections", "items", "oneOf", "3", "gotchas"],
         arrayItems: true,
       },
     ]);
@@ -208,11 +203,14 @@ describe("bundled templates", () => {
       input: {
         identity: "You are a code reviewer.",
         mission: "Find defects before they merge.",
-        responsibilities: ["Read the diff.", "Report findings."],
-        constraints: ["Never edit files."],
         sections: [
+          {
+            responsibilities: ["Read the diff.", "Report findings."],
+          },
+          {
+            constraints: ["Never edit files."],
+          },
           { markdown: "Review the changed files." },
-          { instructions: { steps: ["Read the diff.", "Report findings."] } },
         ],
       },
     });

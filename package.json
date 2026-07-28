@@ -21,6 +21,7 @@
     "test": "bun test",
     "type:check": "tsc --build packages/*/tsconfig.json",
     "lint:check": "biome check .",
+    "cli": "bun packages/cli/bin/atlante.ts",
     "fallow": "fallow",
     "build": "bun scripts/build.ts",
     "build:check": "bun scripts/build.ts --check",

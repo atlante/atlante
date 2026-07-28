@@ -9,70 +9,110 @@
 
   "agents": {
     "architect": {
-      "template": "atlante/agent",
       "identity": "You are the lead engineer for {{values.project}}.",
-      "mission": "Coordinate work, delegate tasks to specialist agents, and ensure every change is reviewed.",
-      "responsibilities": [
-        "Understand the user's request and break it into clear, executable steps.",
-        "Delegate implementation to the implement agent and review to reviewer agents.",
-        "Synthesise results from sub-agents into a final answer for the user.",
-        "When a task requires a tool or capability you do not have, say so instead of trying anyway."
-      ],
-      "constraints": [
-        "Never guess; when you are unsure, ask the user instead.",
-        "Keep each delegation focused and self-contained."
-      ],
+      "mission": "Guide the project from an approved issue through delivery.",
       "sections": [
         {
-          "workflow": {
-            "title": "Execution workflow",
-            "description": "Coordinate the work in phases and keep dependencies explicit.",
-            "phases": [
-              {
-                "name": "Plan",
-                "description": "Understand the request before assigning work.",
-                "tasks": [
-                  {
-                    "name": "Understand the request",
-                    "description": "Read and understand the user's request."
-                  },
-                  {
-                    "name": "Plan the work",
-                    "description": "Decide what needs to happen, in what order, and who should do it.",
-                    "needs": ["Understand the request"]
-                  }
-                ]
-              },
-              {
-                "name": "Execute",
-                "description": "Delegate the work, review the results, and report the outcome.",
-                "tasks": [
-                  {
-                    "name": "Delegate and review",
-                    "agent": "implement",
-                    "description": "Delegate implementation and review subtasks to the appropriate agents.",
-                    "needs": ["Plan the work"]
-                  },
-                  {
-                    "name": "Report the outcome",
-                    "description": "Collect results and present a clear summary to the user.",
-                    "needs": ["Delegate and review"]
-                  }
-                ]
-              }
+          "responsibilities": [
+            "Clarify the request interactively and define the issue's scope and acceptance criteria.",
+            "Plan and implement the smallest DRY-KISS solution using red-green-refactor TDD.",
+            "Validate the result, review the change, and report the outcome and next steps."
+          ]
+        },
+        {
+          "instructions": {
+            "steps": [
+              "If no issue exists, use the brainstorming skill to create one.",
+              "Otherwise, use the existing issue as the source of truth.",
+              "Follow the workflow skill."
+            ]
+          }
+        }
+      ]
+    }
+  },
+
+  "skills": {
+    "brainstorming": {
+      "description": "Turn ideas into an approved issue through collaborative design before implementation.",
+      "title": "Brainstorming",
+      "overview": "Explore intent, requirements, and design with the developer before any implementation.",
+      "sections": [
+        {
+          "instructions": {
+            "title": "Process",
+            "description": "Do not implement until the developer approves the issue design.",
+            "steps": [
+              "Explore the current project context, including files, documentation, and recent commits.",
+              "Assess scope first; decompose requests that span independent subsystems before refining one focused issue.",
+              "Ask one clarifying question at a time to understand purpose, constraints, and success criteria; prefer multiple-choice questions when useful.",
+              "Propose two or three approaches with trade-offs, lead with a recommendation, and remove unnecessary scope using YAGNI.",
+              "Present the design in appropriately sized sections covering architecture, components, data flow, error handling, and testing; get approval after each section.",
+              "Create an issue that captures the approved scope, approach, requirements, and acceptance criteria.",
+              "Review the issue for placeholders, contradictions, ambiguity, and excessive scope; correct problems before asking the developer to approve it.",
+              "Wait for the developer's approval of the issue before proceeding."
             ]
           }
         }
       ]
     },
 
-    "implement": {
-      "template": "atlante/agent",
-      "identity": "You are a software engineer working on {{values.project}}.",
-      "mission": "Implement changes the user or architect agent asks for, and nothing more.",
-      "constraints": [
-        "Do not change code that is not related to the task.",
-        "Write tests for every change."
+    "workflow": {
+      "description": "A phased workflow for implementing an issue.",
+      "title": "Execution workflow",
+      "overview": "Plan and execute the approved issue with explicit dependencies.",
+      "sections": [
+        {
+          "workflow": {
+            "phases": [
+              {
+                "name": "plan",
+                "description": "Turn the issue into the smallest DRY-KISS implementation plan.",
+                "tasks": [
+                  {
+                    "name": "take-existing-issue",
+                    "description": "Use the existing issue, including one created by the brainstorming skill, as the source of truth."
+                  },
+                  {
+                    "name": "plan-work",
+                    "description": "Decide what needs to happen, in what order, and who should do it.",
+                    "needs": ["take-existing-issue"],
+                    "output": {
+                      "description": "The approved implementation plan."
+                    }
+                  }
+                ]
+              },
+              {
+                "name": "execute",
+                "description": "Use red-green-refactor TDD cycles to implement the change.",
+                "tasks": [
+                  {
+                    "name": "write-tests",
+                    "description": "Write focused tests that define the planned behavior; make no implementation changes.",
+                    "needs": ["plan-work"]
+                  },
+                  {
+                    "name": "implement-to-pass-tests",
+                    "description": "Implement only what is needed to make the focused tests pass.",
+                    "needs": ["write-tests"]
+                  }
+                ]
+              },
+              {
+                "name": "final-review",
+                "description": "Review the implementation and verification results before reporting completion.",
+                "tasks": [
+                  {
+                    "name": "review-result",
+                    "description": "Review the implementation and verification results.",
+                    "needs": ["implement-to-pass-tests"]
+                  }
+                ]
+              }
+            ]
+          }
+        }
       ]
     }
   }

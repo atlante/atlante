@@ -36,12 +36,26 @@ describe("bundled presets", () => {
     expect(readPreset("atlante/starter")).toContain("$schema");
   });
 
-  test("starter migrates the architect workflow to ordered phases", () => {
+  test("starter exposes the workflow as a skill with ordered phases", () => {
     const preset = readPreset("atlante/starter");
-    expect(preset).toContain('"phases": [');
-    expect(preset).toContain('"name": "Plan"');
-    expect(preset).toContain('"name": "Execute"');
-    expect(preset).not.toContain('"workflow": {\n        "steps"');
+    if (!preset) throw new Error("starter preset is missing");
+    expect(preset).toContain('"skills": {');
+    expect(preset).toContain('"brainstorming": {');
+    expect(preset).toContain('"workflow": {');
+    expect(preset).toContain('"title": "Process"');
+    expect(preset).not.toContain('"name": "create-issue"');
+    expect(preset).toContain('"title": "Brainstorming"');
+    expect(preset).toContain("Ask one clarifying question at a time");
+    expect(preset).toContain('"name": "plan"');
+    expect(preset).toContain('"name": "execute"');
+    expect(preset).toContain('"name": "final-review"');
+    expect(preset).toContain('"name": "write-tests"');
+    expect(preset).toContain('"name": "implement-to-pass-tests"');
+    expect(preset).toContain('"name": "review-result"');
+    expect(preset).toContain('"title": "Execution workflow"');
+    expect(preset).toContain(
+      '"overview": "Plan and execute the approved issue with explicit dependencies."',
+    );
   });
 
   test("returns raw preset text containing skills without filtering it", () => {
