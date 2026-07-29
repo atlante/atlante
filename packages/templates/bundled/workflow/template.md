@@ -28,6 +28,6 @@ The orchestrator handles this phase.
 Phase output: {{> slot/phases/output}}
 {{/if}}{{#if validation}}
 
-Phase validation: {{#if validation.description}}{{validation.description}}{{#if validation.command}} Run `{{validation.command}}`.{{/if}}{{else}}Verify the expected condition is met by running `{{validation.command}}`.{{/if}}
+Phase validation: {{validation}}
 {{/if}}
 {{/each}}

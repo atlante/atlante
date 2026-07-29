@@ -4,7 +4,9 @@
   // Project-wide values. Reference them from any string below as {{values.x}};
   // the resolver substitutes them before the template is rendered.
   "values": {
-    "project": "{{sys.cwd.basename}}"
+    "project": "{{sys.cwd.basename}}",
+    "quick-check": "",
+    "full-check": ""
   },
 
   "agents": {
@@ -83,32 +85,47 @@
               {
                 "name": "plan",
                 "description": "Turn the issue into the smallest DRY-KISS implementation plan.",
-                "output": {
-                  "description": "The approved implementation plan."
-                },
                 "instructions": [
-                  "Use the existing issue, including one created by the brainstorming skill, as the source of truth.",
+                  "Use an existing issue or task defined by the user, as the source of truth.",
                   "Read applicable project instructions and inspect the relevant code and tests.",
-                  "Decide what needs to happen, in what order, and who should do it."
-                ]
+                  "Break the implementation into the smallest essential tasks."
+                ],
+                "output": {
+                  "description": "The approved implementation plan, organized into tasks that run sequentially or in parallel as their dependencies require.",
+                  "filePath": ".atlante/plan-<issue-number>.md"
+                },
+                "validation": "Review the output plan before presenting it."
               },
               {
                 "name": "execute",
-                "description": "Use focused red-green-refactor TDD cycles for behavior changes.",
+                "description": "Execute the approved tasks with focused implementation, verification, review, and bounded correction loops, then complete a whole-change review.",
                 "instructions": [
-                  "For behavior changes, write focused tests that define the planned behavior; make no implementation changes.",
-                  "Implement only what is needed to satisfy the plan."
-                ]
+                  "Treat the approved plan and acceptance criteria as the source of truth; track task progress and do not repeat completed tasks.",
+                  "Execute tasks according to their dependencies. Delegate each task to a fresh implementer with only its necessary context; parallelize only independent tasks that cannot conflict.",
+                  "For behavior changes, write a focused failing test before implementation; then make the smallest change needed, run covering tests, self-review, and report the evidence.",
+                  "After each task, perform a separate review for specification compliance and code quality. Return findings for correction and re-review; do not proceed with unresolved critical or important findings.",
+                  "Limit correction to five rounds per task. At the limit, record explicit rulings for deferred findings and stop with a blocker if a load-bearing issue remains.",
+                  "After all tasks, perform one whole-change review against the acceptance criteria, including deferred findings, before declaring the work complete.",
+                  "Preserve unrelated changes and keep implementation within the approved scope."
+                ],
+                "validation": "After each task, run and record a quick check with `{{values.quick-check}}`, including after any correction round. After all tasks and the whole-change review, run and record the full check with `{{values.full-check}}`. Report commands, results, and any checks that could not run; do not claim completion while acceptance criteria or required review findings remain unresolved."
               },
               {
-                "name": "final-review",
-                "description": "Review the implementation and verification results before completing the change.",
-                "output": {
-                  "description": "A completion report covering the change, acceptance-criteria status, validation commands and results, residual risks or blockers, and next steps."
-                },
+                "name": "review",
+                "description": "Obtain an independent review of the completed change before declaring it complete.",
+
                 "instructions": [
-                  "Review the implementation and verification results against the acceptance criteria."
-                ]
+                  "Prepare precise review context: the change summary, approved plan and acceptance criteria, applicable project instructions, relevant validation results, and the appropriate base and head revisions or current diff.",
+                  "Dispatch a fresh reviewer with only that context; do not rely on the coordinator's session history or substitute a self-review.",
+                  "Ask the reviewer to assess specification compliance, correctness, maintainability, regressions, compatibility, security, and test coverage, and to classify findings as critical, important, or minor.",
+                  "Fix critical findings immediately and fix important findings before completion. Re-review after corrections, up to the task correction limit; record a technical rationale for any validly deferred minor finding or disputed finding.",
+                  "Do not declare the change complete while unresolved critical or important findings remain.",
+                  "Preserve unrelated changes and do not create, amend, or push commits unless the developer explicitly requests it."
+                ],
+                "output": {
+                  "description": "A completion report covering the change, acceptance-criteria status, validation commands and results, residual risks or blockers, and next steps.",
+                  "filePath": ".atlante/review-<issue-number>.md"
+                }
               }
             ]
           }

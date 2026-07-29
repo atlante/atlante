@@ -508,7 +508,11 @@ describe("AtlantePlugin", () => {
   test("materializes the starter agent and exposes the workflow skill", async () => {
     const dir = project(`{
       "$schema": "${SCHEMA_URI}",
-      "extends": "atlante/starter"
+      "extends": "atlante/starter",
+      "values": {
+        "quick-check": "bun test packages/changed",
+        "full-check": "bun test"
+      }
     }`);
     const config: HostConfig = {
       agent: { architect: { model: "provider/model" } },
@@ -530,6 +534,12 @@ describe("AtlantePlugin", () => {
     expect(
       workflow.match(/The orchestrator handles this phase\./g),
     ).toHaveLength(3);
+    expect(workflow).toContain(
+      "After each task, run and record a quick check with `bun test packages/changed`, including after any correction round.",
+    );
+    expect(workflow).toContain(
+      "Dispatch a fresh reviewer with only that context; do not rely on the coordinator's session history or substitute a self-review.",
+    );
     const brainstorming = await hooks.tool?.atlante_skill?.execute(
       { name: "brainstorming" },
       {} as never,

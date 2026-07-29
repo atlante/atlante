@@ -23,18 +23,7 @@
             "items": { "type": "string", "minLength": 1 },
             "minItems": 1
           },
-          "validation": {
-            "type": "object",
-            "properties": {
-              "description": { "type": "string", "minLength": 1 },
-              "command": { "type": "string", "minLength": 1 }
-            },
-            "anyOf": [
-              { "required": ["description"] },
-              { "required": ["command"] }
-            ],
-            "additionalProperties": false
-          }
+          "validation": { "type": "string" }
         },
         "required": ["name", "instructions"],
         "additionalProperties": false

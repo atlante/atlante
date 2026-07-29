@@ -519,7 +519,7 @@ describe("validateTemplates", () => {
     expect(diagnostics[0]?.code).toBe("invalid-prompt-input");
   });
 
-  test("accepts phase instructions, output, and inline validation", () => {
+  test("accepts phase instructions, output, and string validation", () => {
     expect(
       validateSkillInput(
         registry,
@@ -535,10 +535,7 @@ describe("validateTemplates", () => {
                     name: "Execute",
                     subagent: "implement",
                     output: { description: "The aggregate result." },
-                    validation: {
-                      description: "Confirm the phase result.",
-                      command: "bun test",
-                    },
+                    validation: "Confirm the phase result. Run `bun test`.",
                     instructions: ["Make the change."],
                   },
                 ],
@@ -551,43 +548,43 @@ describe("validateTemplates", () => {
     ).toEqual([]);
   });
 
-  test.each([
-    { description: "Confirm the phase result." },
-    { command: "bun test" },
-    { description: "Confirm the phase result.", command: "bun test" },
-  ])("accepts validation with description, command, or both", (validation) => {
-    expect(
-      validateSkillInput(
-        registry,
-        "atlante/skill",
-        {
-          title: "Workflow",
-          overview: "Coordinate the change.",
-          sections: [
-            {
-              workflow: {
-                phases: [
-                  {
-                    name: "Execute",
-                    instructions: ["Make the change."],
-                    validation,
-                  },
-                ],
+  test.each(["", "Confirm the phase result.", "Run `bun test`."])(
+    "accepts string validation %j",
+    (validation) => {
+      expect(
+        validateSkillInput(
+          registry,
+          "atlante/skill",
+          {
+            title: "Workflow",
+            overview: "Coordinate the change.",
+            sections: [
+              {
+                workflow: {
+                  phases: [
+                    {
+                      name: "Execute",
+                      instructions: ["Make the change."],
+                      validation,
+                    },
+                  ],
+                },
               },
-            },
-          ],
-        },
-        "workflow",
-      ),
-    ).toEqual([]);
-  });
+            ],
+          },
+          "workflow",
+        ),
+      ).toEqual([]);
+    },
+  );
 
   test.each([
     {},
-    { description: "" },
-    { command: "" },
-    { description: "Valid", extra: "not allowed" },
-  ])("rejects invalid inline validation %j", (validation) => {
+    { description: "Confirm the phase result." },
+    { command: "bun test" },
+    { description: "Confirm the phase result.", command: "bun test" },
+    1,
+  ])("rejects non-string validation %j", (validation) => {
     const diagnostics = validateSkillInput(
       registry,
       "atlante/skill",

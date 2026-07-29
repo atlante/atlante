@@ -5,4 +5,5 @@ dist/
 .fallow/
 website/schema/
 docs/
-.worktrees
+.worktrees/
+.atlante/

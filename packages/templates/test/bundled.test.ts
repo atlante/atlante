@@ -236,10 +236,7 @@ describe("bundled templates", () => {
               "Read the project guidance.",
             ],
             output: { description: "The discovery result." },
-            validation: {
-              description: "Confirm the context is complete.",
-              command: "bun test",
-            },
+            validation: "Confirm the context is complete. Run `bun test`.",
           },
           {
             name: "Delivery",
@@ -302,7 +299,7 @@ describe("bundled templates", () => {
     expect(prompt).not.toContain("should be used for this task.");
   });
 
-  test("renders command-only and description-only phase validation", () => {
+  test("renders string phase validation", () => {
     const { registry } = loadBundledTemplates();
     const prompt = renderTemplate({
       registry,
@@ -310,22 +307,14 @@ describe("bundled templates", () => {
       input: {
         phases: [
           {
-            name: "Command",
-            instructions: ["Run the command."],
-            validation: { command: "bun test" },
-          },
-          {
             name: "Description",
             instructions: ["Review the result."],
-            validation: { description: "Confirm the result." },
+            validation: "Confirm the result.",
           },
         ],
       },
     });
 
-    expect(prompt).toContain(
-      "Phase validation: Verify the expected condition is met by running `bun test`.",
-    );
     expect(prompt).toContain("Phase validation: Confirm the result.");
   });
 });

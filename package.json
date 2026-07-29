@@ -25,6 +25,8 @@
     "fallow": "fallow",
     "build": "bun scripts/build.ts",
     "build:check": "bun scripts/build.ts --check",
+    "quick:check": "bun run type:check && bun run lint:check && bun run test",
+    "full:check": "bun run quick:check && bun run build:check",
     "prepack": "bun run build",
     "release": "bun scripts/release.ts"
   },
