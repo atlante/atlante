@@ -44,7 +44,7 @@ jobs:
             if (JSON.stringify(ids) !== JSON.stringify(["architect"])) process.exit(1);
             if (!agents.some(({ prompt }) => prompt.includes("You are the lead engineer"))) process.exit(1);
             if (JSON.stringify(skillIds) !== JSON.stringify(["brainstorming", "workflow"])) process.exit(1);
-            if (!skills.some(({ content }) => content.includes("# Execution workflow"))) process.exit(1);
+            if (!skills.some(({ content }) => content.includes("# Workflow"))) process.exit(1);
           '
 
           # A broken configuration must fail loudly rather than exit 0.
