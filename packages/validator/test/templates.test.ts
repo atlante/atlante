@@ -53,7 +53,9 @@ function registryOf(
 function documentWith(agent: Record<string, unknown>) {
   return {
     $schema: SCHEMA_URI,
-    agents: { reviewer: agent },
+    agents: {
+      reviewer: { description: "Reviews changes.", ...agent },
+    },
   } as const;
 }
 
@@ -699,6 +701,7 @@ describe("validateTemplates", () => {
         values: { project: "p" },
         agents: {
           "agent/id~one": {
+            description: "Reviews changes.",
             identity: "work on {{values.missing}}",
             mission: "y",
           },
@@ -719,6 +722,7 @@ describe("validateTemplates", () => {
         values: { identity: "" },
         agents: {
           reviewer: {
+            description: "Reviews changes.",
             identity: "{{values.identity}}",
             mission: "y",
           },
@@ -739,6 +743,7 @@ describe("validateTemplates", () => {
         $schema: SCHEMA_URI,
         agents: {
           reviewer: {
+            description: "Reviews changes.",
             identity: "{{values.project.name}}",
             mission: "y",
           },
@@ -765,6 +770,7 @@ describe("validateTemplates", () => {
         $schema: SCHEMA_URI,
         agents: {
           reviewer: {
+            description: "Reviews changes.",
             identity: "x",
             mission: "y",
             "{{values.missing}}": "field",
@@ -785,6 +791,7 @@ describe("validateTemplates", () => {
         values: { project: "atlante" },
         agents: {
           reviewer: {
+            description: "Reviews changes.",
             identity: "x",
             mission: "y",
             "{{values.project}}": "first",

@@ -8,7 +8,12 @@ import {
 import { createSkillTool } from "../src/skill-tool.js";
 
 const artifacts: AgentArtifact[] = [
-  { hostAgentId: "reviewer", templateId: "atlante/agent", prompt: "PROMPT" },
+  {
+    hostAgentId: "reviewer",
+    templateId: "atlante/agent",
+    description: "DESCRIPTION",
+    prompt: "PROMPT",
+  },
 ];
 
 describe("injectAgents", () => {
@@ -20,7 +25,10 @@ describe("injectAgents", () => {
     const config: HostConfig = {};
     const diagnostics = injectAgents(config, artifacts);
     expect(diagnostics).toEqual([]);
-    expect(config.agent?.reviewer).toEqual({ prompt: "PROMPT" });
+    expect(config.agent?.reviewer).toEqual({
+      prompt: "PROMPT",
+      description: "DESCRIPTION",
+    });
   });
 
   test("does not mutate an inherited agent map", () => {
@@ -32,20 +40,28 @@ describe("injectAgents", () => {
     expect(Object.hasOwn(config, "agent")).toBe(true);
     expect(config.agent).not.toBe(inheritedAgents);
     expect(inheritedAgents).toEqual({ existing: { model: "host" } });
-    expect(config.agent?.reviewer).toEqual({ prompt: "PROMPT" });
+    expect(config.agent?.reviewer).toEqual({
+      prompt: "PROMPT",
+      description: "DESCRIPTION",
+    });
   });
 
   test("injects __proto__ as an own agent without changing the agent map prototype", () => {
     const config: HostConfig = { agent: {} };
     const prototype = Object.getPrototypeOf(config.agent);
     injectAgents(config, [
-      { hostAgentId: "__proto__", templateId: "atlante/agent", prompt: "P" },
+      {
+        hostAgentId: "__proto__",
+        templateId: "atlante/agent",
+        description: "D",
+        prompt: "P",
+      },
     ]);
     expect(Object.getPrototypeOf(config.agent)).toBe(prototype);
     expect(Object.hasOwn(config.agent ?? {}, "__proto__")).toBe(true);
     expect(
       Object.getOwnPropertyDescriptor(config.agent ?? {}, "__proto__")?.value,
-    ).toEqual({ prompt: "P" });
+    ).toEqual({ prompt: "P", description: "D" });
   });
 
   test("preserves host-owned fields on an existing agent", () => {
@@ -55,6 +71,7 @@ describe("injectAgents", () => {
           model: "anthropic/claude-sonnet-5",
           mode: "subagent",
           permission: { edit: "deny" },
+          description: "OLD DESCRIPTION",
         },
       },
     };
@@ -64,6 +81,7 @@ describe("injectAgents", () => {
       mode: "subagent",
       permission: { edit: "deny" },
       prompt: "PROMPT",
+      description: "DESCRIPTION",
     });
   });
 

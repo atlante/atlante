@@ -56,6 +56,7 @@ An `atlante.jsonc` with two agents:
   "agents": {
     "implementer": {
       "template": "atlante/agent",
+      "description": "Implements requested changes in the project.",
       "identity": "You are a senior implementer on {{values.project}}.",
       "mission": "Write clean, tested, production-ready code.",
       "responsibilities": [
@@ -67,6 +68,7 @@ An `atlante.jsonc` with two agents:
 
     "reviewer": {
       "template": "atlante/agent",
+      "description": "Reviews changes for defects and design issues.",
       "identity": "You are a thorough code reviewer on {{values.project}}.",
       "mission": "Ensure code quality and adherence to standards.",
       "responsibilities": [
@@ -111,7 +113,8 @@ resolved skill is available to every host agent through the OpenCode plugin's
 content. Atlante does not execute skill content.
 
 The root document has `$schema`, `values`, `agents`, and optional `skills`
-fields. Inside an agent binding, `template` and `values` are binding metadata;
+fields. Inside an agent binding, `description`, `template`, and `values` are
+binding metadata;
 inside a skill binding, `description`, `template`, and `values` are reserved
 metadata. All other binding keys are input owned by the selected template's
 input schema.
@@ -159,8 +162,8 @@ configuration and makes resolved skills available through `atlante_skill`. No
 agent or skill files are generated, and skill content is not put in a cache or
 registered as a native OpenCode skill. Nothing on disk can drift away from your
 Atlante configuration — it genuinely is the single source of truth for prompt
-and skill content. Only the agent `prompt` field is written; model,
-permissions, tools and mode stay owned by the host.
+and skill content. Only the agent `prompt` and `description` fields are written;
+model, permissions, tools and mode stay owned by the host.
 
 Because nothing is materialized to disk, `atlante resolve` is how you inspect
 what your configuration actually produces.

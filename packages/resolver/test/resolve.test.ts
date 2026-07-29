@@ -28,12 +28,14 @@ const document: AtlanteDocument = {
   values: { project: "atlante", rule: "Global constraint." },
   agents: {
     reviewer: {
+      description: "Reviews changes to {{values.project}}.",
       template: "atlante/agent",
       identity: "You are a reviewer.",
       mission: "Review changes to {{values.project}}.",
       sections: [{ constraints: ["{{values.rule}}"] }],
     },
     planner: {
+      description: "Plans work for {{values.project}}.",
       values: { rule: "Planner constraint." },
       identity: "You are a planner.",
       mission: "Plan work.",
@@ -158,7 +160,13 @@ describe("resolve", () => {
     const result = resolve(
       {
         $schema: SCHEMA_URI,
-        agents: { reviewer: { identity: "x", mission: "y" } },
+        agents: {
+          reviewer: {
+            description: "Reviews changes.",
+            identity: "x",
+            mission: "y",
+          },
+        },
         skills: {
           testing: {
             description: "Testing",
@@ -194,7 +202,9 @@ describe("resolve", () => {
     const result = resolve(
       {
         $schema: SCHEMA_URI,
-        agents: { reviewer: { identity: "x" } },
+        agents: {
+          reviewer: { description: "Reviews changes.", identity: "x" },
+        },
         skills: {
           testing: {
             description: "Testing",
@@ -222,9 +232,28 @@ describe("resolve", () => {
     expect(agents[0]?.templateId).toBe("atlante/agent");
   });
 
+  test("resolves the agent description alongside the rendered prompt", () => {
+    const result = resolve(
+      {
+        $schema: SCHEMA_URI,
+        agents: {
+          reviewer: {
+            description: "Reviews {{values.project}} changes.",
+            identity: "You review.",
+            mission: "Find defects.",
+          },
+        },
+        values: { project: "Atlante" },
+      },
+      registry,
+    );
+    expect(result.diagnostics).toEqual([]);
+    expect(result.agents[0]?.description).toBe("Reviews Atlante changes.");
+  });
+
   test("resolves a valid __proto__ value and agent ID end to end", () => {
     const protoDocument = JSON.parse(
-      `{"$schema":"${SCHEMA_URI}","values":{"__proto__":"safe"},"agents":{"__proto__":{"identity":"Work on {{values.__proto__}}.","mission":"Help."}}}`,
+      `{"$schema":"${SCHEMA_URI}","values":{"__proto__":"safe"},"agents":{"__proto__":{"description":"Works safely.","identity":"Work on {{values.__proto__}}.","mission":"Help."}}}`,
     ) as AtlanteDocument;
     const result = resolve(protoDocument, registry);
     expect(result.diagnostics).toEqual([]);
@@ -269,7 +298,11 @@ describe("resolve", () => {
       $schema: SCHEMA_URI,
       values: { project: "atlante" },
       agents: {
-        a: { identity: "You work on {{values.project}}.", mission: "Help." },
+        a: {
+          description: "Works on {{values.project}}.",
+          identity: "You work on {{values.project}}.",
+          mission: "Help.",
+        },
       },
     };
     const { agents } = resolve(withReference, registry);
@@ -283,6 +316,7 @@ describe("resolve", () => {
       values: { project: "atlante" },
       agents: {
         a: {
+          description: "Builds the requested change.",
           identity: "x",
           mission: "y",
           sections: [
@@ -307,7 +341,7 @@ describe("resolve", () => {
   test("returns diagnostics and no artifacts on invalid input", () => {
     const broken: AtlanteDocument = {
       $schema: SCHEMA_URI,
-      agents: { a: { identity: "x" } },
+      agents: { a: { description: "Agent", identity: "x" } },
     };
     const result = resolve(broken, registry);
     expect(result.agents).toEqual([]);
@@ -319,7 +353,11 @@ describe("resolve", () => {
       $schema: SCHEMA_URI,
       values: { identity: "" },
       agents: {
-        reviewer: { identity: "{{values.identity}}", mission: "Help." },
+        reviewer: {
+          description: "Reviews changes.",
+          identity: "{{values.identity}}",
+          mission: "Help.",
+        },
       },
     };
     const result = resolve(emptyResolved, registry);
@@ -335,6 +373,7 @@ describe("resolve", () => {
       values: { "project-name": "atlante" },
       agents: {
         reviewer: {
+          description: "Reviews changes.",
           identity: "Work on {{values.project-name}}.",
           mission: "Help.",
         },
@@ -349,7 +388,11 @@ describe("resolve", () => {
     const invalidReference: AtlanteDocument = {
       $schema: SCHEMA_URI,
       agents: {
-        reviewer: { identity: "{{values.project.name}}", mission: "Help." },
+        reviewer: {
+          description: "Reviews changes.",
+          identity: "{{values.project.name}}",
+          mission: "Help.",
+        },
       },
     };
     const result = resolve(invalidReference, registry);
@@ -360,7 +403,7 @@ describe("resolve", () => {
   test("returns a diagnostic instead of throwing when a template renders an undeclared partial", () => {
     const broken: AtlanteDocument = {
       $schema: SCHEMA_URI,
-      agents: { a: { template: "test/broken" } },
+      agents: { a: { description: "Broken agent.", template: "test/broken" } },
     };
     const result = resolve(broken, brokenRegistry);
     expect(result.agents).toEqual([]);
@@ -371,8 +414,11 @@ describe("resolve", () => {
     const broken: AtlanteDocument = {
       $schema: SCHEMA_URI,
       agents: {
-        good: { identity: "x", mission: "y" },
-        "bad/id~one": { template: "test/broken" },
+        good: { description: "Good agent.", identity: "x", mission: "y" },
+        "bad/id~one": {
+          description: "Broken agent.",
+          template: "test/broken",
+        },
       },
     };
     const result = resolve(broken, combinedRegistry);
@@ -389,6 +435,7 @@ describe("resolve", () => {
       $schema: SCHEMA_URI,
       agents: {
         "bad/id~one": {
+          description: "Reviews changes.",
           identity: "Work on {{values.missing}}.",
           mission: "Help.",
         },
@@ -404,9 +451,9 @@ describe("resolve", () => {
     const integerKeys: AtlanteDocument = {
       $schema: SCHEMA_URI,
       agents: {
-        "10": { identity: "ten", mission: "y" },
-        "2": { identity: "two", mission: "y" },
-        alpha: { identity: "alpha", mission: "y" },
+        "10": { description: "Ten.", identity: "ten", mission: "y" },
+        "2": { description: "Two.", identity: "two", mission: "y" },
+        alpha: { description: "Alpha.", identity: "alpha", mission: "y" },
       },
     };
     const result = resolve(integerKeys, registry);
@@ -427,7 +474,11 @@ describe("resolve", () => {
       $schema: SCHEMA_URI,
       values: { list: ["one", "two"] },
       agents: {
-        a: { identity: "{{values.list}}", mission: "y" },
+        a: {
+          description: "Agent.",
+          identity: "{{values.list}}",
+          mission: "y",
+        },
       },
     } as unknown as AtlanteDocument;
     const result = resolve(handBuilt, registry);

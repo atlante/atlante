@@ -28,7 +28,7 @@ const valid = `{
   "$schema": "${SCHEMA_URI}",
   "values": { "project": "demo" },
   "agents": {
-    "reviewer": { "identity": "You review.", "mission": "Find defects." }
+    "reviewer": { "description": "Reviews changes.", "identity": "You review.", "mission": "Find defects." }
   }
 }`;
 
@@ -36,8 +36,8 @@ const twoAgents = `{
   "$schema": "${SCHEMA_URI}",
   "values": { "project": "demo" },
   "agents": {
-    "reviewer": { "identity": "You review.", "mission": "Find defects." },
-    "planner": { "identity": "You plan.", "mission": "Plan work." }
+    "reviewer": { "description": "Reviews changes.", "identity": "You review.", "mission": "Find defects." },
+    "planner": { "description": "Plans changes.", "identity": "You plan.", "mission": "Plan work." }
   }
 }`;
 
@@ -185,7 +185,7 @@ describe("runResolve", () => {
     const dir = project(`{
       "$schema": "${SCHEMA_URI}",
       "agents": {
-        "reviewer": { "identity": "You review.", "mission": "Find defects." }
+        "reviewer": { "description": "Reviews changes.", "identity": "You review.", "mission": "Find defects." }
       },
       "skills": {
         "testing": {
@@ -209,6 +209,7 @@ describe("runResolve", () => {
         {
           hostAgentId: "reviewer",
           templateId: "atlante/agent",
+          description: "Reviews changes.",
           prompt: expect.any(String),
         },
       ],
@@ -229,8 +230,8 @@ describe("runResolve", () => {
     const dir = project(`{
       "$schema": "${SCHEMA_URI}",
       "agents": {
-        "reviewer": { "identity": "review", "mission": "review" },
-        "planner": { "identity": "plan", "mission": "plan" }
+        "reviewer": { "description": "Reviews changes.", "identity": "review", "mission": "review" },
+        "planner": { "description": "Plans changes.", "identity": "plan", "mission": "plan" }
       },
        "skills": {
          "testing": {
@@ -258,7 +259,7 @@ describe("runResolve", () => {
   test("human output includes project skills", async () => {
     const dir = project(`{
       "$schema": "${SCHEMA_URI}",
-      "agents": { "reviewer": { "identity": "review", "mission": "review" } },
+      "agents": { "reviewer": { "description": "Reviews changes.", "identity": "review", "mission": "review" } },
        "skills": {
          "testing": {
            "description": "Testing guidance",
@@ -396,7 +397,7 @@ describe("runResolve", () => {
 
   test("--json emits a failure envelope for invalid prompt input", async () => {
     const dir = project(
-      `{ "$schema": "${SCHEMA_URI}", "agents": { "broken": { "identity": "only identity" } } }`,
+      `{ "$schema": "${SCHEMA_URI}", "agents": { "broken": { "description": "Broken agent.", "identity": "only identity" } } }`,
     );
     const output: string[] = [];
     const original = console.log;

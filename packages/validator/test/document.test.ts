@@ -12,7 +12,7 @@ import {
 const valid = `{
   // a comment, because this is JSONC
   "$schema": "${SCHEMA_URI}",
-  "agents": { "reviewer": { "identity": "x", "mission": "y" } }
+   "agents": { "reviewer": { "description": "Agent", "identity": "x", "mission": "y" } }
 }`;
 
 describe("validateDocumentText", () => {
@@ -25,7 +25,9 @@ describe("validateDocumentText", () => {
   test("accepts a strict JSON document, per acceptance criterion 1", () => {
     const strict = JSON.stringify({
       $schema: SCHEMA_URI,
-      agents: { reviewer: { identity: "x", mission: "y" } },
+      agents: {
+        reviewer: { description: "Agent", identity: "x", mission: "y" },
+      },
     });
     const result = validateDocumentText(strict, "atlante.json");
     expect(result.diagnostics).toEqual([]);
@@ -111,7 +113,7 @@ describe("validateDocumentText", () => {
 
   test("accepts agent and skill bindings together", () => {
     const result = validateDocumentText(
-      `{ "$schema": "${SCHEMA_URI}", "agents": { "reviewer": { "identity": "x", "mission": "y" } }, "skills": { "testing": { "description": "Run tests", "content": "bun test" } } }`,
+      `{ "$schema": "${SCHEMA_URI}", "agents": { "reviewer": { "description": "Agent", "identity": "x", "mission": "y" } }, "skills": { "testing": { "description": "Run tests", "content": "bun test" } } }`,
       "atlante.jsonc",
     );
     expect(result.diagnostics).toEqual([]);

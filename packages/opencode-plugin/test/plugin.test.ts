@@ -32,14 +32,14 @@ afterEach(() => {
 const valid = `{
   "$schema": "${SCHEMA_URI}",
   "agents": {
-    "reviewer": { "identity": "You review.", "mission": "Find defects." }
+    "reviewer": { "description": "Reviews changes.", "identity": "You review.", "mission": "Find defects." }
   }
 }`;
 
 const validWithSkill = `{
   "$schema": "${SCHEMA_URI}",
   "agents": {
-    "reviewer": { "identity": "You review.", "mission": "Find defects." }
+    "reviewer": { "description": "Reviews changes.", "identity": "You review.", "mission": "Find defects." }
   },
   "skills": {
     "testing": {
@@ -195,7 +195,7 @@ describe("AtlantePlugin", () => {
     // field the atlante/agent template's inputSchema requires: this fails
     // inside resolve(), not inside loadDocument().
     const dir = project(
-      `{ "$schema": "${SCHEMA_URI}", "agents": { "a": { "identity": "x" } } }`,
+      `{ "$schema": "${SCHEMA_URI}", "agents": { "a": { "description": "Agent", "identity": "x" } } }`,
     );
     const config: HostConfig = { agent: { existing: { model: "x" } } };
     const before = structuredClone(config);

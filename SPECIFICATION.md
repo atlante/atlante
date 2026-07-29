@@ -24,7 +24,8 @@ Version 0.1 includes:
 - a composable, namespaced template system (`namespace/name`) with Markdown
   rendering and variable resolution;
 - a template protocol for prompt rendering and validation;
-- global values with per-agent overrides, resolved into prompt definitions via
+- binding descriptions and global values with per-agent overrides, resolved into
+  agent metadata and prompt definitions via
   `{{values.x}}`;
 - skill bindings with descriptions and template-owned input rendered as Markdown;
 - host-agent bindings whose prompt inputs are defined by templates;
@@ -69,7 +70,7 @@ code is not part of the configuration format.
 - **Host**: the AI coding harness that executes agents, such as OpenCode.
 - **Host agent**: an agent identified and configured by the host.
 - **Agent binding**: the association between a host-agent ID and an Atlante
-  prompt definition.
+  description plus prompt definition.
 - **Skill binding**: the association between a root `skills` map key and a
   description plus template-owned skill input. The map key is the binding's
   `skillId`.
@@ -151,9 +152,10 @@ collections. Its top-level shape is:
     "language": "TypeScript",
   },
 
-  // Agent bindings — host-agent-ID → prompt definition
+  // Agent bindings — host-agent-ID → description plus prompt definition
   "agents": {
     "workflow-agent": {
+      "description": "Coordinates the project workflow.",
       "values": {
         "scope": "Workflow-agent-specific constraint.",
       },
@@ -222,12 +224,13 @@ expansion, before `{{values.x}}` interpolation; this ensures that
 When present, `agents` MUST be an object whose keys are host-agent IDs. A
 host-agent ID is an opaque, non-empty string owned by the host adapter.
 
-Each value is a prompt definition. An agent MAY identify its prompt template
-with `template`; when omitted, the implementation's configured default template
-is used. `template` and `values` are binding metadata and are not passed as
-template input. The selected template's JSON Schema is authoritative for the
-prompt definition's fields and value types. The document schema does not
-prescribe prompt field names, ordering, or content.
+Each value is a binding with a required, non-empty string `description` and a
+prompt definition. An agent MAY identify its prompt template with `template`; when
+omitted, the implementation's configured default template is used. `description`,
+`template`, and `values` are binding metadata and are not passed as template input.
+The selected template's JSON Schema is authoritative for the prompt definition's
+fields and value types. The document schema does not prescribe prompt field names,
+ordering, or content.
 
 The map key is the host-agent ID. Atlante MUST NOT define a second logical ID
 for the same binding in version 0.1.
@@ -306,12 +309,12 @@ source. Resolution MUST produce deterministic output for the same valid input.
 
 ### 6.4 Variable resolution
 
-Values are resolved into the prompt definition before rendering, not exposed to
-templates. The resolver MUST merge global and per-agent values, then MUST
-replace every `{{values.key}}` reference appearing in the prompt definition with
-the resolved value, before the selected template is rendered. Per-agent
-overrides take precedence over global values for that agent, using the
-key-by-key merge defined in §4.2.
+Values are resolved into binding metadata and the prompt definition before
+rendering, not exposed to templates. The resolver MUST merge global and per-agent
+values, then MUST replace every `{{values.key}}` reference appearing in the
+agent's `description` and prompt definition with the resolved value, before the
+selected template is rendered. Per-agent overrides take precedence over global
+values for that agent, using the key-by-key merge defined in §4.2.
 
 A template MUST NOT receive the `values` dictionary. A template's input contract
 is its `template.json` schema and nothing else: because `values` is a free-form,
@@ -331,9 +334,10 @@ to a template's own renderer source, which is a genuine template.
 ### 6.5 Agent prompt rendering
 
 The selected template receives the agent's prompt definition and renders the
-complete system prompt. The template's `template.json` defines the accepted
-fields. Rendering order and optional content are template implementation
-concerns and are not part of the document schema.
+complete system prompt. The agent's `description` is resolved separately as
+binding metadata and is not template input. The template's `template.json`
+defines the accepted fields. Rendering order and optional content are template
+implementation concerns and are not part of the document schema.
 
 A template MAY include workflow or delegation instructions that cause its bound
 agent to serve as an orchestrator. The role is determined by the selected
@@ -372,8 +376,8 @@ state, or remote loading.
 ## 7. Agent Bindings
 
 An agent binding associates one existing or materialized host agent with one
-canonical prompt definition. The prompt definition's fields are defined by the
-referenced template and its input schema.
+canonical description and prompt definition. The prompt definition's fields are
+defined by the referenced template and its input schema.
 
 The adapter:
 
@@ -381,10 +385,12 @@ The adapter:
 - MUST render the prompt definition using the resolved template;
 - MUST resolve all `{{values.x}}` references before rendering, applying
   per-agent overrides where present;
+- MUST resolve the binding `description` with the same values and overrides;
 - MUST NOT change host-owned model, effort, permission, or tool settings;
 - MUST create a host agent definition when the host agent does not exist, using
   host-specific defaults for fields outside the Atlante schema;
 - MUST replace the host agent's prompt with the rendered Atlante prompt;
+- MUST replace the host agent's description with the resolved Atlante description;
 - SHOULD emit a warning when replacing a non-empty existing host prompt.
 
 The exact warning channel and host-specific file format are adapter concerns.
@@ -416,6 +422,8 @@ The validator MUST reject:
 
 - invalid JSON or an unsupported `$schema` URI;
 - a present `values` field that is not an object;
+- a present `agents` field that is not an object, an empty agent ID, or an
+  agent binding without a non-empty string `description`;
 - a present `skills` field that is not an object, an empty skill ID, or a skill
   binding without a non-empty string `description`;
 - unknown top-level fields;
@@ -423,13 +431,15 @@ The validator MUST reject:
   input schema;
 - unsupported or unknown fields within version 0.1 entities.
 
-For every skill, validation MUST use paths rooted at
-`/skills/<skillId>`. It MUST interpolate `description` with the same resolved
-global-plus-local values used by the skill input, reject missing or invalid
-value references, and reject a description that is empty after interpolation.
-The reserved fields `description`, `template`, and `values` MUST be removed
-from the input presented to the selected skill template; all remaining fields
-are template-owned input.
+For every agent and skill, validation MUST use paths rooted at
+`/agents/<agentId>` or `/skills/<skillId>`. It MUST interpolate `description`
+with the same resolved global-plus-local values used by the template input,
+reject missing or invalid value references, and reject a description that is
+empty after interpolation. The reserved fields `description`, `template`, and
+`values` MUST be removed from the input presented to the selected agent or skill
+template; all remaining fields are template-owned input. Agent-specific
+diagnostics MUST retain the `agent` subject and `/agents/<agentId>` path; skill
+diagnostics MUST retain the `skill` subject and `/skills/<skillId>` path.
 
 ### 8.2 Template-level validation
 
@@ -446,11 +456,12 @@ The validator MUST reject:
 - circular template composition (template A includes B which includes A);
 - input values that do not satisfy a template's input schema.
 
-The same template and composition failures apply to skills: unknown default or
-explicit templates, missing slot references, circular composition, malformed or
-invalid Draft 2020-12 input schemas, invalid skill input, unsupported value
-references, missing values, value-reference collisions, and unknown system
-values MUST fail validation with diagnostics at the relevant skill JSON Pointer.
+The same template and composition failures apply to agents and skills: unknown
+default or explicit templates, missing slot references, circular composition,
+malformed or invalid Draft 2020-12 input schemas, invalid template input,
+unsupported value references, missing values, value-reference collisions, and
+unknown system values MUST fail validation with diagnostics at the relevant
+entity JSON Pointer.
 
 Validation SHOULD also detect statically incompatible values where a future
 runtime feature would consume them.
@@ -476,10 +487,11 @@ The resolver MUST:
 2. resolve global `values` and per-agent overrides;
 3. load the selected template for each agent binding, using the configured
    default when `template` is omitted;
-4. substitute resolved `{{values.x}}` references into the prompt definition,
-   then render it with the selected template;
+4. substitute resolved `{{values.x}}` references into the binding description and
+   prompt definition, then render the prompt definition with the selected
+   template;
 5. produce one agent artifact descriptor per binding;
-6. preserve host-agent IDs in every descriptor.
+6. preserve host-agent IDs and resolved descriptions in every descriptor.
 
 For skills, the resolver MUST:
 
@@ -502,7 +514,8 @@ Materialization is performed by an adapter. The OpenCode adapter MUST:
 
 - locate an existing host agent by its configured ID;
 - create a missing host agent using OpenCode defaults where necessary;
-- write the rendered Atlante prompt as that agent's system prompt;
+- write the rendered Atlante prompt and resolved description as Atlante-owned
+  agent fields;
 - preserve host-owned configuration fields;
 - report prompt replacement warnings;
 - avoid executing the agent or any command.
@@ -518,8 +531,9 @@ host artifacts and MUST NOT duplicate agents.
 
 The v1 implementation SHOULD preserve these package responsibilities:
 
-- `@atlante/schema`: document structure contract (`$schema`, `values`, and
-  optional `agents` and `skills`), versioned JSON Schema, and TypeScript types;
+- `@atlante/schema`: document structure contract (`$schema`, `values`, binding
+  descriptions, and optional `agents` and `skills`), versioned JSON Schema, and
+  TypeScript types;
   no prompt or skill-content semantics, no template logic, no host or rendering
   logic;
 - `@atlante/templates`: direct Draft 2020-12 input schemas; template loading,
@@ -553,8 +567,10 @@ execution branch for each renderer.
 For `atlante resolve --json`, the CLI MUST emit exactly one JSON object to
 standard output with exactly these top-level fields: `agents`, `skills`, and
 `diagnostics`. The `agents` and `skills` fields contain the resolved artifact
-arrays, and `diagnostics` contains the diagnostic array. The `--agent` option
-filters only `agents`; it MUST NOT filter `skills`.
+arrays. Each agent artifact includes `hostAgentId`, `templateId`, `description`,
+and `prompt`; each skill artifact includes `skillId`, `templateId`,
+`description`, and `content`. `diagnostics` contains the diagnostic array. The
+`--agent` option filters only `agents`; it MUST NOT filter `skills`.
 
 JSON-mode failures MUST also emit this envelope to standard output, with empty
 `agents` and `skills` arrays and the reported diagnostics. JSON-mode diagnostics
@@ -715,11 +731,13 @@ Version 0.1 is complete when a conforming implementation can:
 1. validate minimal `atlante.jsonc` and `atlante.json` documents;
 2. reject missing references and invalid template references;
 3. validate template input schemas and their composition graph;
-4. resolve global values and per-agent overrides into prompt definitions;
+4. resolve global values and per-agent overrides into agent descriptions and
+   prompt definitions;
 5. render a deterministic prompt from structured agent values using the selected
    template;
 6. create a missing OpenCode agent with host defaults;
-7. replace an existing agent prompt while preserving host-owned fields;
+7. replace an existing agent prompt and description while preserving host-owned
+   fields;
 8. report a warning when a non-empty host prompt is replaced;
 9. scaffold a project from the bundled `starter` preset via `atlante init`;
 10. validate a skill with required description, default `atlante/skill`, and
