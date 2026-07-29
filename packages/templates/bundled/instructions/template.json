@@ -1,16 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "An ordered instruction section.",
-  "type": "object",
-  "properties": {
-    "title": { "type": "string", "minLength": 1 },
-    "description": { "type": "string", "minLength": 1 },
-    "steps": {
-      "type": "array",
-      "items": { "type": "string", "minLength": 1 },
-      "minItems": 1
-    }
-  },
-  "required": ["steps"],
-  "additionalProperties": false
+  "description": "An ordered instruction list.",
+  "type": "array",
+  "items": { "type": "string", "minLength": 1 },
+  "minItems": 1
 }

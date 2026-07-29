@@ -1,11 +1,7 @@
-## {{#if title}}{{title}}{{else}}Gotchas{{/if}}
+## Gotchas
 
-{{#if description}}
-{{description}}
-{{else}}
 Watch for these common mistakes.
-{{/if}}
 
-{{#each items}}
+{{#each (input)}}
 - {{this}}
 {{/each}}

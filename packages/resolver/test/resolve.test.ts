@@ -90,16 +90,8 @@ describe("resolve", () => {
             overview: "Use {{values.project}}.",
             sections: [
               { markdown: "Run {{values.action}}." },
-              {
-                instructions: {
-                  steps: ["Read the {{values.project}} docs."],
-                },
-              },
-              {
-                gotchas: {
-                  items: ["Do not skip the {{values.action}}."],
-                },
-              },
+              { instructions: ["Read the {{values.project}} docs."] },
+              { gotchas: ["Do not skip the {{values.action}}."] },
             ],
           },
         },

@@ -8,7 +8,7 @@
 {{#each sections}}
 {{#if responsibilities}}
 
-# Responsibilities
+## Responsibilities
 
 {{#each responsibilities}}
 - {{this}}
@@ -16,7 +16,7 @@
 {{/if}}
 {{#if constraints}}
 
-# Constraints
+## Constraints
 
 {{#each constraints}}
 - {{this}}
@@ -28,10 +28,10 @@
 {{/if}}
 {{#if instructions}}
 
-{{> slot/sections/instructions}}
+{{> slot/sections/instructions instructions}}
 {{/if}}
 {{#if gotchas}}
 
-{{> slot/sections/gotchas}}
+{{> slot/sections/gotchas gotchas}}
 {{/if}}
 {{/each}}

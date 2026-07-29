@@ -1,12 +1,7 @@
-## {{#if title}}{{title}}{{else}}Instructions{{/if}}
-{{#if description}}
-
-{{description}}
-{{else}}
+## Instructions
 
 Follow these steps in order.
-{{/if}}
 
-{{#each steps}}
+{{#each (input)}}
 1. {{this}}
 {{/each}}

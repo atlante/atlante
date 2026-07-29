@@ -22,8 +22,9 @@ skill content only: it does not execute a skill, manage runtime state, or
 register a native OpenCode skill.
 
 Both `atlante/agent` and `atlante/skill` preserve the order of their section
-arrays. Sections may compose Markdown, instructions, gotchas, or multi-phase
-workflows.
+arrays. Agent sections may compose responsibilities, constraints, Markdown,
+instructions, and gotchas; skill sections may compose Markdown, instructions,
+gotchas, and multi-phase workflows.
 
 Templates may declare nested slots with a `{ "template": "namespace/name" }`
 marker inside an object property, array `items`, or `oneOf` branch. A slot's

@@ -25,6 +25,7 @@
           {
             "properties": {
               "responsibilities": {
+                "description": "Positive, ongoing outcomes the agent owns throughout its work. Use responsibilities for what the agent must accomplish, not for behavioral limits.",
                 "type": "array",
                 "items": { "type": "string", "minLength": 1 },
                 "minItems": 1
@@ -41,6 +42,7 @@
           {
             "properties": {
               "constraints": {
+                "description": "Non-negotiable limits on how the agent may act. Use constraints for prohibitions, approval gates, and invariants, not outcomes.",
                 "type": "array",
                 "items": { "type": "string", "minLength": 1 },
                 "minItems": 1

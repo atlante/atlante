@@ -178,8 +178,9 @@ Bundled templates live in the `atlante/` namespace:
 - **`atlante/skill`** — structured skill input rendered as Markdown with
   ordered, reusable sections
 
-Agent and skill section arrays preserve source order and may combine Markdown,
-instructions, gotchas, and workflows.
+Agent and skill section arrays preserve source order. Agent sections may combine
+responsibilities, constraints, Markdown, instructions, and gotchas. Skill
+sections may combine Markdown, instructions, gotchas, and workflows.
 
 ## Presets
 

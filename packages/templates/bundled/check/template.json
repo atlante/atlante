@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "A quality check with an optional command or description.",
+  "description": "A quality check with a description, a command, or both.",
   "type": "object",
   "properties": {
     "description": { "type": "string", "minLength": 1 },

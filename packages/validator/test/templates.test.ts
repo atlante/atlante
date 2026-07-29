@@ -401,6 +401,24 @@ describe("validateAgentInput", () => {
     expect(diagnostics[0]?.code).toBe("invalid-prompt-input");
     expect(diagnostics[0]?.path).toBe("/skills/skill~1id~0one/sections");
   });
+
+  test("rejects object-shaped instruction and gotcha sections", () => {
+    const { registry } = loadBundledTemplates();
+
+    for (const section of [
+      { instructions: { steps: ["Do the work."] } },
+      { gotchas: { items: ["Do the work."] } },
+    ]) {
+      expect(
+        validateSkillInput(
+          registry,
+          "atlante/skill",
+          { title: "Testing", overview: "Run tests.", sections: [section] },
+          "testing",
+        ),
+      ).not.toEqual([]);
+    }
+  });
 });
 
 describe("validateTemplates", () => {
@@ -419,7 +437,7 @@ describe("validateTemplates", () => {
       check({
         identity: "x",
         mission: "y",
-        sections: [{ instructions: { steps: ["Do the work."] } }],
+        sections: [{ instructions: ["Do the work."] }],
       }),
     ).toEqual([]);
   });
@@ -822,7 +840,7 @@ describe("validateTemplates", () => {
             sections: [
               {
                 markdown: "Run tests.",
-                gotchas: { items: ["Do not skip validation."] },
+                gotchas: ["Do not skip validation."],
               },
             ],
           },
