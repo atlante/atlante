@@ -14,6 +14,7 @@ describe("bundled templates", () => {
       "atlante/agent",
       "atlante/artifact",
       "atlante/check",
+      "atlante/constraints",
       "atlante/gotchas",
       "atlante/instructions",
       "atlante/markdown",
@@ -30,6 +31,7 @@ describe("bundled templates", () => {
       "atlante/agent",
       "atlante/artifact",
       "atlante/check",
+      "atlante/constraints",
       "atlante/gotchas",
       "atlante/instructions",
       "atlante/markdown",
@@ -67,6 +69,11 @@ describe("bundled templates", () => {
         path: ["sections", "items", "oneOf", "3", "workflow"],
         arrayItems: true,
       },
+      {
+        templateId: "atlante/constraints",
+        path: ["sections", "items", "oneOf", "4", "constraints"],
+        arrayItems: true,
+      },
     ]);
     expect(walkComposition(registry, "atlante/skill")).toEqual([]);
   });
@@ -97,6 +104,11 @@ describe("bundled templates", () => {
       {
         templateId: "atlante/gotchas",
         path: ["sections", "items", "oneOf", "3", "gotchas"],
+        arrayItems: true,
+      },
+      {
+        templateId: "atlante/constraints",
+        path: ["sections", "items", "oneOf", "4", "constraints"],
         arrayItems: true,
       },
     ]);
@@ -135,7 +147,26 @@ describe("bundled templates", () => {
         },
       }),
     ).toBe(
-      "# Testing\n\n## Overview\n\nRun the test suite.\n\n## Instructions\n\nFollow these steps in order.\n\n1. Read the brief.\n1. Run the checks.\n\n## Gotchas\n\nWatch for these common mistakes.\n\n- Do not skip validation.\n",
+      "# Testing\n\n## Overview\n\nRun the test suite.\n\n## Instructions\n\nThese are required actions for completing the work. Perform them in order unless a constraint or explicit developer direction requires otherwise.\n\n1. Read the brief.\n1. Run the checks.\n\n## Gotchas\n\nThese are risks and failure modes that require active attention. Account for each one while working; do not dismiss one because the task appears straightforward.\n\n- Do not skip validation.\n",
+    );
+  });
+
+  test("renders reusable constraints sections in skills", () => {
+    const { registry } = loadBundledTemplates();
+    expect(
+      renderTemplate({
+        registry,
+        templateId: "atlante/skill",
+        input: {
+          title: "Planning",
+          overview: "Plan before acting.",
+          sections: [
+            { constraints: ["Wait for approval.", "Keep scope focused."] },
+          ],
+        },
+      }),
+    ).toBe(
+      "# Planning\n\n## Overview\n\nPlan before acting.\n\n## Constraints\n\nThese are non-negotiable limits on how you may act. Follow every constraint throughout your work; do not treat them as suggested outcomes or trade them off for convenience.\n\n- Wait for approval.\n- Keep scope focused.\n",
     );
   });
 
@@ -157,7 +188,7 @@ describe("bundled templates", () => {
         },
       }),
     ).toBe(
-      "# Ordered\n\n## Overview\n\nKeep every section in source order.\n\nFirst.\n\n## Gotchas\n\nWatch for these common mistakes.\n\n- Second.\n\n## Instructions\n\nFollow these steps in order.\n\n1. Third.\n\nFourth.\n",
+      "# Ordered\n\n## Overview\n\nKeep every section in source order.\n\nFirst.\n\n## Gotchas\n\nThese are risks and failure modes that require active attention. Account for each one while working; do not dismiss one because the task appears straightforward.\n\n- Second.\n\n## Instructions\n\nThese are required actions for completing the work. Perform them in order unless a constraint or explicit developer direction requires otherwise.\n\n1. Third.\n\nFourth.\n",
     );
   });
 

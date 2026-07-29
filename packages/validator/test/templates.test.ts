@@ -402,12 +402,47 @@ describe("validateAgentInput", () => {
     expect(diagnostics[0]?.path).toBe("/skills/skill~1id~0one/sections");
   });
 
-  test("rejects object-shaped instruction and gotcha sections", () => {
+  test("accepts a skill constraints section", () => {
+    const { registry } = loadBundledTemplates();
+    expect(
+      validateSkillInput(
+        registry,
+        "atlante/skill",
+        {
+          title: "Testing",
+          overview: "Run tests.",
+          sections: [{ constraints: ["Keep scope focused."] }],
+        },
+        "testing",
+      ),
+    ).toEqual([]);
+  });
+
+  test("rejects empty skill constraints", () => {
+    const { registry } = loadBundledTemplates();
+    const diagnostics = validateSkillInput(
+      registry,
+      "atlante/skill",
+      {
+        title: "Testing",
+        overview: "Run tests.",
+        sections: [{ constraints: [""] }],
+      },
+      "testing",
+    );
+
+    expect(diagnostics.map((diagnostic) => diagnostic.path)).toContain(
+      "/skills/testing/sections/0/constraints/0",
+    );
+  });
+
+  test("rejects object-shaped instruction, gotcha, and constraint sections", () => {
     const { registry } = loadBundledTemplates();
 
     for (const section of [
       { instructions: { steps: ["Do the work."] } },
       { gotchas: { items: ["Do the work."] } },
+      { constraints: { items: ["Do the work."] } },
     ]) {
       expect(
         validateSkillInput(
@@ -438,6 +473,16 @@ describe("validateTemplates", () => {
         identity: "x",
         mission: "y",
         sections: [{ instructions: ["Do the work."] }],
+      }),
+    ).toEqual([]);
+  });
+
+  test("accepts an agent constraints section", () => {
+    expect(
+      check({
+        identity: "x",
+        mission: "y",
+        sections: [{ constraints: ["Do the work."] }],
       }),
     ).toEqual([]);
   });

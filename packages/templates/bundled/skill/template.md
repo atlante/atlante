@@ -20,4 +20,8 @@
 
 {{> slot/sections/workflow}}
 {{/if}}
+{{#if constraints}}
+
+{{> slot/sections/constraints constraints}}
+{{/if}}
 {{/each}}

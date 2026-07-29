@@ -41,12 +41,7 @@
           },
           {
             "properties": {
-              "constraints": {
-                "description": "Non-negotiable limits on how the agent may act. Use constraints for prohibitions, approval gates, and invariants, not outcomes.",
-                "type": "array",
-                "items": { "type": "string", "minLength": 1 },
-                "minItems": 1
-              }
+              "constraints": { "template": "atlante/constraints" }
             },
             "required": ["constraints"],
             "additionalProperties": false

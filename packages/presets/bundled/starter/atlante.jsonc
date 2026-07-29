@@ -30,7 +30,7 @@
         },
         {
           "instructions": [
-            "If no approved issue exists, retrieve and follow the brainstorming skill; do not implement until the issue is approved.",
+            "If no approved issue exists, retrieve and follow the brainstorming skill to produce one; do not implement until the issue is approved.",
             "When an approved issue is available, retrieve and follow the workflow skill."
           ]
         }
@@ -39,22 +39,27 @@
   },
 
   "skills": {
+    // Inspired by https://github.com/obra/superpowers/blob/main/skills/brainstorming/SKILL.md
     "brainstorming": {
-      "description": "Turn ideas into an approved issue through collaborative design before implementation.",
+      "description": "Before any creative or implementation work, collaboratively explore intent, requirements, and design until the developer approves a clear direction.",
       "title": "Brainstorming",
-      "overview": "Explore intent, requirements, and design with the developer before any implementation.",
+      "overview": "Help turn ideas into fully formed designs and specifications through natural, collaborative dialogue. Start by understanding the project context, then ask one question at a time to refine the idea; present the resulting design and wait for developer approval.",
       "sections": [
         {
+          "constraints": [
+            "Do not begin workflow, implementation, or file modifications until the presented design is approved by the developer.",
+            "Apply this gate even to simple work; the design may be brief when the work is simple."
+          ]
+        },
+        {
           "instructions": [
-            "Do not implement until the developer approves the issue design.",
             "Explore the current project context, including files, documentation, and recent commits.",
-            "Assess scope first; decompose requests that span independent subsystems before refining one focused issue.",
-            "Ask one clarifying question at a time to understand purpose, constraints, and success criteria; prefer multiple-choice questions when useful.",
+            "Assess scope before detailed questions; decompose requests that span independent subsystems into focused issues and refine one at a time.",
+            "Ask exactly one question at a time to understand purpose, constraints, and success criteria; prefer multiple-choice questions when useful.",
             "Propose two or three approaches with trade-offs, lead with a recommendation, and remove unnecessary scope using YAGNI.",
-            "Present the design in appropriately sized sections covering architecture, components, data flow, error handling, and testing; get approval after each section.",
-            "Create an issue that captures the approved scope, approach, requirements, and acceptance criteria.",
-            "Review the issue for placeholders, contradictions, ambiguity, and excessive scope; correct problems before asking the developer to approve it.",
-            "Wait for the developer's approval of the issue before proceeding."
+            "Present the design in sections sized to the work, covering relevant architecture, components, data flow, error handling, and testing; validate the developer's understanding and approval after each section.",
+            "After the developer approves the design, produce the artifact they requested—such as an issue or file—that records the approved scope, approach, requirements, and acceptance criteria as the implementation handoff.",
+            "Review the issue artifact for placeholders, contradictions, ambiguity, and excessive scope; resolve any problems before handing it off."
           ]
         }
       ]

@@ -108,7 +108,7 @@ describe("resolve", () => {
           description: "Testing Atlante.",
           templateId: "atlante/skill",
           content:
-            "# Testing\n\n## Overview\n\nUse Atlante.\n\nRun check.\n\n## Instructions\n\nFollow these steps in order.\n\n1. Read the Atlante docs.\n\n## Gotchas\n\nWatch for these common mistakes.\n\n- Do not skip the check.\n",
+            "# Testing\n\n## Overview\n\nUse Atlante.\n\nRun check.\n\n## Instructions\n\nThese are required actions for completing the work. Perform them in order unless a constraint or explicit developer direction requires otherwise.\n\n1. Read the Atlante docs.\n\n## Gotchas\n\nThese are risks and failure modes that require active attention. Account for each one while working; do not dismiss one because the task appears straightforward.\n\n- Do not skip the check.\n",
         },
       ],
     });

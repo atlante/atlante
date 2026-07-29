@@ -523,6 +523,18 @@ describe("AtlantePlugin", () => {
     await expect(
       hooks.tool?.atlante_skill?.execute({ name: "workflow" }, {} as never),
     ).resolves.toContain("### 1. plan");
+    const brainstorming = await hooks.tool?.atlante_skill?.execute(
+      { name: "brainstorming" },
+      {} as never,
+    );
+    if (typeof brainstorming !== "string")
+      throw new Error("brainstorming skill did not return Markdown");
+    expect(brainstorming).toContain(
+      "Do not begin workflow, implementation, or file modifications until the presented design is approved by the developer.",
+    );
+    expect(brainstorming.indexOf("## Constraints")).toBeLessThan(
+      brainstorming.indexOf("## Instructions"),
+    );
   });
 
   test("preserves host-owned fields on an existing agent", async () => {

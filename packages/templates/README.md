@@ -13,7 +13,7 @@ The package exports registry loaders, composition validation, bundled Draft
 Bundled templates use the `atlante/` namespace and include `atlante/agent`,
 `atlante/workflow`, `atlante/task`, `atlante/artifact`, `atlante/check`,
 `atlante/skill`, and the reusable section templates `atlante/markdown`,
-`atlante/instructions`, and `atlante/gotchas`. Each template directory pairs a
+`atlante/instructions`, `atlante/constraints`, and `atlante/gotchas`. Each template directory pairs a
 direct `template.json` input schema with its `template.md` renderer; IDs derive
 from namespace and directory.
 
@@ -23,8 +23,8 @@ register a native OpenCode skill.
 
 Both `atlante/agent` and `atlante/skill` preserve the order of their section
 arrays. Agent sections may compose responsibilities, constraints, Markdown,
-instructions, and gotchas; skill sections may compose Markdown, instructions,
-gotchas, and multi-phase workflows.
+instructions, and gotchas; skill sections may compose Markdown, constraints,
+instructions, gotchas, and multi-phase workflows.
 
 Templates may declare nested slots with a `{ "template": "namespace/name" }`
 marker inside an object property, array `items`, or `oneOf` branch. A slot's

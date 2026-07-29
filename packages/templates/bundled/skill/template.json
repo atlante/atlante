@@ -31,6 +31,13 @@
             "properties": { "workflow": { "template": "atlante/workflow" } },
             "required": ["workflow"],
             "additionalProperties": false
+          },
+          {
+            "properties": {
+              "constraints": { "template": "atlante/constraints" }
+            },
+            "required": ["constraints"],
+            "additionalProperties": false
           }
         ]
       },

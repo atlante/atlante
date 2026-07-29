@@ -180,7 +180,7 @@ Bundled templates live in the `atlante/` namespace:
 
 Agent and skill section arrays preserve source order. Agent sections may combine
 responsibilities, constraints, Markdown, instructions, and gotchas. Skill
-sections may combine Markdown, instructions, gotchas, and workflows.
+sections may combine Markdown, constraints, instructions, gotchas, and workflows.
 
 ## Presets
 

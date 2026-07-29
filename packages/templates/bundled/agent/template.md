@@ -16,11 +16,7 @@
 {{/if}}
 {{#if constraints}}
 
-## Constraints
-
-{{#each constraints}}
-- {{this}}
-{{/each}}
+{{> slot/sections/constraints constraints}}
 {{/if}}
 {{#if markdown}}
 
