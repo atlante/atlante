@@ -9,10 +9,11 @@ npm install @atlante/schema
 ```
 
 The package exports `atlanteDocumentSchema`, `agentBindingSchema`,
-`skillBindingSchema`, value schemas, their TypeScript types, `SCHEMA_URI`, and
-`documentJsonSchema`. The root document's optional `skills` map is keyed by
-`skillId`; each skill reserves `description`, `template`, and `values` while
-leaving its content fields to the selected template.
+`skillBindingSchema`, the shared `bindingDescriptionSchema`, value schemas, their
+TypeScript types, `SCHEMA_URI`, and `documentJsonSchema`. Every agent and skill
+binding requires a non-empty `description`; each binding reserves
+`description`, `template`, and `values` while leaving its content fields to the
+selected template.
 
 The generated JSON Schema is also available at
 `@atlante/schema/schema.json` (the source generated path is

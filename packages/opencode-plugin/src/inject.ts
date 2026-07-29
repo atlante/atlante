@@ -2,13 +2,16 @@ import type { AgentArtifact } from "@atlante/resolver";
 import type { Diagnostic } from "@atlante/validator";
 import { warning } from "@atlante/validator";
 
-export type HostAgentConfig = { prompt?: string } & Record<string, unknown>;
+export type HostAgentConfig = {
+  prompt?: string;
+  description?: string;
+} & Record<string, unknown>;
 export type HostConfig = {
   agent?: Record<string, HostAgentConfig>;
 } & Record<string, unknown>;
 
 /**
- * Writes only `prompt`. Spreading the existing entry covers both cases in one
+ * Writes Atlante-owned `prompt` and `description`. Spreading the existing entry covers both cases in one
  * expression: a missing agent is created with OpenCode defaults, and an
  * existing one keeps its host-owned model, mode, permission and tool settings
  * (SPECIFICATION.md §7).
@@ -47,7 +50,11 @@ export function injectAgents(
       );
     }
 
-    const replacement = { ...existing, prompt: artifact.prompt };
+    const replacement = {
+      ...existing,
+      prompt: artifact.prompt,
+      description: artifact.description,
+    };
     Object.defineProperty(agents, artifact.hostAgentId, {
       configurable: true,
       enumerable: true,

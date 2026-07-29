@@ -63,6 +63,21 @@ describe("document JSON Schema", () => {
     expect(binding.properties).toHaveProperty("values");
   });
 
+  test("requires description in the generated agent binding schema", () => {
+    const properties = buildDocumentJsonSchema().properties as Record<
+      string,
+      unknown
+    >;
+    const agents = properties.agents as {
+      additionalProperties: {
+        oneOf: [{ required: string[]; properties: Record<string, unknown> }];
+      };
+    };
+    const binding = agents.additionalProperties.oneOf[0];
+    expect(binding.required).toContain("description");
+    expect(binding.properties).toHaveProperty("description");
+  });
+
   test("the committed file matches the generated output", () => {
     expect(documentJsonSchema).toEqual(buildDocumentJsonSchema());
   });

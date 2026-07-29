@@ -6,6 +6,7 @@ const valid = {
   values: { project: "atlante", rule: "Never invent requirements." },
   agents: {
     reviewer: {
+      description: "Reviews changes.",
       template: "atlante/agent",
       values: { rule: "Reviews only." },
       identity: "You are a reviewer.",
@@ -23,9 +24,17 @@ describe("atlanteDocumentSchema", () => {
   test("accepts a document without values", () => {
     const result = atlanteDocumentSchema.safeParse({
       $schema: SCHEMA_URI,
-      agents: { a: { identity: "x", mission: "y" } },
+      agents: { a: { description: "Agent", identity: "x", mission: "y" } },
     });
     expect(result.success).toBe(true);
+  });
+
+  test("requires a non-empty agent description", () => {
+    const result = atlanteDocumentSchema.safeParse({
+      $schema: SCHEMA_URI,
+      agents: { reviewer: { identity: "x", mission: "y" } },
+    });
+    expect(result.success).toBe(false);
   });
 
   test("accepts a document with a skill binding", () => {
@@ -161,7 +170,7 @@ describe("atlanteDocumentSchema", () => {
   test("round-trips literal sentinel-like keys", () => {
     const result = atlanteDocumentSchema.safeParse(
       JSON.parse(
-        `{"$schema":"${SCHEMA_URI}","values":{"$__atlante_key_61":"value","__proto__":"safe"},"agents":{"$__atlante_unknown_61":{"identity":"x","mission":"y"}}}`,
+        `{"$schema":"${SCHEMA_URI}","values":{"$__atlante_key_61":"value","__proto__":"safe"},"agents":{"$__atlante_unknown_61":{"description":"Agent","identity":"x","mission":"y"}}}`,
       ),
     );
     expect(result.success).toBe(true);
@@ -210,7 +219,7 @@ describe("atlanteDocumentSchema", () => {
 
   test("preserves own __proto__ values and agent IDs without changing prototypes", () => {
     const raw = JSON.parse(
-      `{"$schema":"${SCHEMA_URI}","values":{"__proto__":"safe"},"agents":{"__proto__":{"identity":"x","mission":"y"}}}`,
+      `{"$schema":"${SCHEMA_URI}","values":{"__proto__":"safe"},"agents":{"__proto__":{"description":"Agent","identity":"x","mission":"y"}}}`,
     );
     const result = atlanteDocumentSchema.safeParse(raw);
     expect(result.success).toBe(true);

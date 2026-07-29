@@ -17,18 +17,23 @@ export function buildDocumentJsonSchema(): Record<string, unknown> {
     },
     additionalProperties: { oneOf: [{ type: "string" }, { type: "null" }] },
   };
+  const bindingDescription = {
+    description: { type: "string", minLength: 1 },
+  };
   const agentBindingSchema = {
     type: "object",
     properties: {
+      ...bindingDescription,
       template: { type: "string", minLength: 1 },
       values: valuesSchema,
     },
+    required: ["description"],
     additionalProperties: {},
   };
   const skillBindingSchema = {
     type: "object",
     properties: {
-      description: { type: "string", minLength: 1 },
+      ...bindingDescription,
       template: { type: "string", minLength: 1 },
       values: valuesSchema,
     },
@@ -57,11 +62,15 @@ export function buildDocumentJsonSchema(): Record<string, unknown> {
   };
 }
 
+function serializeDocumentJsonSchema(schema: Record<string, unknown>): string {
+  return `${JSON.stringify(schema, null, 2).replaceAll(
+    /"required": \[\n\s+"([^"\n]+)"\n\s+\]/g,
+    '"required": ["$1"]',
+  )}\n`;
+}
+
 if (import.meta.main) {
   const out = new URL("../schema/v0.1/schema.json", import.meta.url);
-  await Bun.write(
-    out,
-    `${JSON.stringify(buildDocumentJsonSchema(), null, 2)}\n`,
-  );
+  await Bun.write(out, serializeDocumentJsonSchema(buildDocumentJsonSchema()));
   console.log(`wrote ${out.pathname}`);
 }

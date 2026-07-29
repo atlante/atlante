@@ -12,7 +12,13 @@ describe("expandDocument", () => {
             ? {
                 $schema: SCHEMA_URI,
                 values: { project: "base", removeMe: "gone" },
-                agents: { inherited: { identity: "x", mission: "y" } },
+                agents: {
+                  inherited: {
+                    description: "Inherited agent",
+                    identity: "x",
+                    mission: "y",
+                  },
+                },
                 skills: {
                   inherited: { description: "base", content: "base content" },
                   removed: { description: "remove", content: "remove" },
@@ -118,6 +124,7 @@ describe("expandDocument", () => {
         $schema: SCHEMA_URI,
         agents: {
           reviewer: {
+            description: "Reviewer",
             identity: "x",
             mission: "y",
             values: { "bad key": null },

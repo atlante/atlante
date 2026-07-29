@@ -9,8 +9,9 @@ npm install @atlante/resolver
 
 Use `resolve` to validate and render an Atlante document into host-neutral agent
 and skill artifact descriptors. An `AgentArtifact` contains `hostAgentId`,
-`templateId`, and `prompt`. A `SkillArtifact` contains `skillId`, `templateId`,
-`description`, and rendered `content`; `ResolvedHarness.skills` contains the
+`templateId`, `description`, and `prompt`. A `SkillArtifact` contains
+`skillId`, `templateId`, `description`, and rendered `content`;
+`ResolvedHarness.skills` contains the
 skill artifacts in root-map order alongside `ResolvedHarness.agents`.
 
 Descriptions and skill content use the same global-plus-local value merge and

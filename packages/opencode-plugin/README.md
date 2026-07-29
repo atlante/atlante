@@ -2,9 +2,9 @@
 
 OpenCode host adapter for [Atlante](https://github.com/atlante/atlante). It
 resolves an Atlante document once during OpenCode initialization, atomically
-stages the resulting agent prompts in the in-memory host config, and exposes
-skills through the `atlante_skill` tool. Requires Node.js 22 or
-later.
+stages the resulting agent prompts and descriptions in the in-memory host
+config, and exposes skills through the `atlante_skill` tool. Requires Node.js 22
+or later.
 
 Register the plugin in `opencode.jsonc`:
 

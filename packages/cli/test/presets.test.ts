@@ -40,7 +40,7 @@ describe("bundled presets as user configurations", () => {
       `{
         "$schema": "${SCHEMA_URI}",
         "agents": {
-          "reviewer": { "identity": "Review", "mission": "Find defects" }
+          "reviewer": { "description": "Reviews changes.", "identity": "Review", "mission": "Find defects" }
         },
         "skills": {
           "testing": { "description": "Testing guidance", "content": "Run tests." }

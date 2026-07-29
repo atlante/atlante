@@ -16,8 +16,7 @@ import type { Diagnostic } from "./diagnostic.js";
 import { error, escapeJsonPointerSegment } from "./diagnostic.js";
 
 /** Binding metadata, not template input (SPECIFICATION.md §4.3). */
-const BINDING_KEYS = new Set(["template", "values"]);
-const SKILL_BINDING_KEYS = new Set(["description", "template", "values"]);
+const BINDING_KEYS = new Set(["description", "template", "values"]);
 const DEFAULT_SKILL_TEMPLATE_ID = "atlante/skill";
 
 function unescapeJsonPointerSegment(segment: string): string {
@@ -394,6 +393,19 @@ function validateAgentBinding(
     "agents",
     "agent",
   );
+  const descriptionDiagnostics = bindingDescriptionValidation(
+    binding.description,
+    values,
+    agentId,
+    templateId,
+    "agents",
+    "agent",
+  );
+  diagnostics.push(
+    ...descriptionDiagnostics.valueDiagnostics,
+    ...valueDiagnostics,
+    ...descriptionDiagnostics.emptyDiagnostics,
+  );
   if (valueDiagnostics.length > 0) {
     // Keep template/composition failures, but do not report schema failures
     // against raw `{{values.x}}` placeholders when a value is missing.
@@ -401,7 +413,6 @@ function validateAgentBinding(
       ...validateAgentInput(registry, templateId, input, agentId).filter(
         (diagnostic) => diagnostic.code !== "invalid-prompt-input",
       ),
-      ...valueDiagnostics,
     );
     return diagnostics;
   }
@@ -433,31 +444,68 @@ function validateAgentBinding(
   return diagnostics;
 }
 
-function emptySkillDescriptionDiagnostics(
-  description: unknown,
-  descriptionValueDiagnostics: Diagnostic[],
-  values: Record<string, unknown>,
-  skillId: string,
+type BindingSubject = "agent" | "skill";
+
+function invalidDescriptionDiagnostic(
+  subject: BindingSubject,
+  bindingId: string,
   templateId: string,
-): Diagnostic[] {
-  if (typeof description !== "string" || descriptionValueDiagnostics.length > 0)
-    return [];
+  root: "agents" | "skills",
+): Diagnostic {
+  return error(
+    `invalid-${subject}-description`,
+    `${subject} "${bindingId}" template "${templateId}": description must be a non-empty string`,
+    { path: bindingPath(root, bindingId, ["description"]) },
+  );
+}
+
+function bindingDescriptionValidation(
+  description: unknown,
+  values: Record<string, unknown>,
+  bindingId: string,
+  templateId: string,
+  root: "agents" | "skills",
+  subject: BindingSubject,
+): { valueDiagnostics: Diagnostic[]; emptyDiagnostics: Diagnostic[] } {
+  if (typeof description !== "string") {
+    return {
+      valueDiagnostics: [
+        invalidDescriptionDiagnostic(subject, bindingId, templateId, root),
+      ],
+      emptyDiagnostics: [],
+    };
+  }
+
+  const descriptionValueDiagnostics = missingValueDiagnostics(
+    description,
+    values,
+    bindingId,
+    templateId,
+    root,
+    subject,
+    ["description"],
+  );
+  if (descriptionValueDiagnostics.length > 0)
+    return {
+      valueDiagnostics: descriptionValueDiagnostics,
+      emptyDiagnostics: [],
+    };
 
   let interpolatedDescription = description;
   try {
-    interpolatedDescription = interpolateValues(description, values);
+    interpolatedDescription = interpolateValues(description, values) as string;
   } catch {
-    return [];
+    return { valueDiagnostics: [], emptyDiagnostics: [] };
   }
-  if (interpolatedDescription.length !== 0) return [];
+  if (interpolatedDescription.length !== 0)
+    return { valueDiagnostics: [], emptyDiagnostics: [] };
 
-  return [
-    error(
-      "invalid-skill-description",
-      `skill "${skillId}" template "${templateId}": description must be a non-empty string`,
-      { path: bindingPath("skills", skillId, ["description"]) },
-    ),
-  ];
+  return {
+    valueDiagnostics: [],
+    emptyDiagnostics: [
+      invalidDescriptionDiagnostic(subject, bindingId, templateId, root),
+    ],
+  };
 }
 
 function interpolatedSkillInput(
@@ -520,7 +568,7 @@ function validateSkillBinding(
   const diagnostics: Diagnostic[] = [];
   const templateId = (rawBinding.template ??
     DEFAULT_SKILL_TEMPLATE_ID) as string;
-  const input = promptInputOf(rawBinding, SKILL_BINDING_KEYS);
+  const input = promptInputOf(rawBinding);
   const resolvedValues = skillValues(document, rawBinding, skillId, templateId);
   if (resolvedValues.diagnostic) {
     diagnostics.push(resolvedValues.diagnostic);
@@ -528,29 +576,14 @@ function validateSkillBinding(
   }
   const { values } = resolvedValues;
 
-  const description = rawBinding.description;
-  if (typeof description !== "string") {
-    diagnostics.push(
-      error(
-        "invalid-skill-description",
-        `skill "${skillId}" template "${templateId}": description must be a non-empty string`,
-        { path: bindingPath("skills", skillId, ["description"]) },
-      ),
-    );
-  }
-
-  const descriptionValueDiagnostics =
-    typeof description === "string"
-      ? missingValueDiagnostics(
-          description,
-          values,
-          skillId,
-          templateId,
-          "skills",
-          "skill",
-          ["description"],
-        )
-      : [];
+  const descriptionDiagnostics = bindingDescriptionValidation(
+    rawBinding.description,
+    values,
+    skillId,
+    templateId,
+    "skills",
+    "skill",
+  );
   const inputValueDiagnostics = missingValueDiagnostics(
     input,
     values,
@@ -559,15 +592,10 @@ function validateSkillBinding(
     "skills",
     "skill",
   );
-  diagnostics.push(...descriptionValueDiagnostics, ...inputValueDiagnostics);
   diagnostics.push(
-    ...emptySkillDescriptionDiagnostics(
-      description,
-      descriptionValueDiagnostics,
-      values,
-      skillId,
-      templateId,
-    ),
+    ...descriptionDiagnostics.valueDiagnostics,
+    ...inputValueDiagnostics,
+    ...descriptionDiagnostics.emptyDiagnostics,
   );
 
   if (inputValueDiagnostics.length > 0) {

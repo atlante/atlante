@@ -19,11 +19,10 @@ import { mergeValues } from "./values.js";
 export const DEFAULT_TEMPLATE_ID = "atlante/agent";
 export const DEFAULT_SKILL_TEMPLATE_ID = "atlante/skill";
 
-const SKILL_BINDING_KEYS = new Set(["description", "template", "values"]);
-
 export type AgentArtifact = {
   hostAgentId: string;
   templateId: string;
+  description: string;
   prompt: string;
 };
 
@@ -42,8 +41,19 @@ export type ResolvedHarness = {
 
 type PreparedBinding = {
   input: Record<string, unknown>;
-  description?: string;
+  description: string;
 };
+
+function interpolateBindingDescription(
+  binding: Record<string, unknown>,
+  values: Record<string, unknown>,
+  subject: "agent" | "skill",
+): string {
+  const description = interpolateValues(binding.description, values);
+  if (typeof description !== "string" || description.length === 0)
+    throw new Error(`${subject} description must be a non-empty string`);
+  return description;
+}
 
 function renderBinding(
   registry: TemplateRegistry,
@@ -110,12 +120,14 @@ export function resolve(
         (values) => ({
           // §6.4 and §7: resolve every {{values.x}} reference before rendering.
           input: interpolateValues(promptInputOf(binding), values),
+          description: interpolateBindingDescription(binding, values, "agent"),
         }),
       );
 
       agents.push({
         hostAgentId,
         templateId,
+        description: rendered.description,
         prompt: rendered.content,
       });
     } catch (cause) {
@@ -147,15 +159,15 @@ export function resolve(
         binding,
         templateId,
         (values) => {
-          const description = interpolateValues(binding.description, values);
-          const input = interpolateValues(
-            promptInputOf(binding, SKILL_BINDING_KEYS),
-            values,
-          );
-          if (typeof description !== "string" || description.length === 0) {
-            throw new Error("skill description must be a non-empty string");
-          }
-          return { description, input };
+          const input = interpolateValues(promptInputOf(binding), values);
+          return {
+            description: interpolateBindingDescription(
+              binding,
+              values,
+              "skill",
+            ),
+            input,
+          };
         },
       );
 

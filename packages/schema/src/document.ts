@@ -4,12 +4,18 @@ import { safeRecord, valuesMapSchema } from "./values.js";
 
 export const SCHEMA_URI = "https://atlante.sh/schema/v0.1/schema.json";
 
+/** Binding metadata shared by every template-backed binding. */
+const bindingDescriptionSchema = z.object({
+  description: z.string().min(1),
+});
+
 /**
  * An agent binding cannot be strict here: its prompt fields are owned by the
  * selected template's inputSchema, which this package knows nothing about.
  * Unknown-field rejection happens at validation level 2 (SPECIFICATION.md §8.1).
  */
 const agentBindingBaseSchema = z.looseObject({
+  ...bindingDescriptionSchema.shape,
   template: z.string().min(1).optional(),
   values: valuesMapSchema.optional(),
 });
@@ -20,7 +26,7 @@ type AgentBindingOutput = z.infer<typeof agentBindingBaseSchema>;
  * the selected template, just like an agent binding.
  */
 const skillBindingBaseSchema = z.looseObject({
-  description: z.string().min(1),
+  ...bindingDescriptionSchema.shape,
   template: z.string().min(1).optional(),
   values: valuesMapSchema.optional(),
 });
@@ -66,7 +72,7 @@ function bindingSchema<Output>(
 
 export const agentBindingSchema = bindingSchema<AgentBindingOutput>(
   agentBindingBaseSchema,
-  new Set(["template", "values"]),
+  new Set(["description", "template", "values"]),
 );
 
 export const skillBindingSchema = bindingSchema<SkillBindingOutput>(
@@ -101,6 +107,7 @@ export type AtlanteDocument = Omit<
 
 /** An agent binding in an overlay document: allows `null` tombstones. */
 export type AgentBindingOverlay = {
+  description?: string | null;
   template?: string | null;
   values?: ValuesMapOverlay;
   [key: string]: unknown;

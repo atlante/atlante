@@ -49,6 +49,7 @@ on stderr, and failed results contain empty `agents` and `skills` arrays:
     {
       "hostAgentId": "implementer",
       "templateId": "atlante/agent",
+      "description": "Implements requested changes.",
       "prompt": "..."
     }
   ],
