@@ -13,13 +13,11 @@ describe("bundled templates", () => {
     expect(registry.ids()).toEqual([
       "atlante/agent",
       "atlante/artifact",
-      "atlante/check",
       "atlante/constraints",
       "atlante/gotchas",
       "atlante/instructions",
       "atlante/markdown",
       "atlante/skill",
-      "atlante/task",
       "atlante/workflow",
     ]);
   });
@@ -30,13 +28,11 @@ describe("bundled templates", () => {
     expect(registry.ids()).toEqual([
       "atlante/agent",
       "atlante/artifact",
-      "atlante/check",
       "atlante/constraints",
       "atlante/gotchas",
       "atlante/instructions",
       "atlante/markdown",
       "atlante/skill",
-      "atlante/task",
       "atlante/workflow",
     ]);
 
@@ -226,7 +222,7 @@ describe("bundled templates", () => {
     expect(prompt).not.toContain("# Responsibilities");
   });
 
-  test("renders one-based workflow phase labels and optional task wording", () => {
+  test("renders sequential phases with inline instructions and validation", () => {
     const { registry } = loadBundledTemplates();
     const prompt = renderTemplate({
       registry,
@@ -235,17 +231,19 @@ describe("bundled templates", () => {
         phases: [
           {
             name: "Discovery",
-            tasks: [
-              {
-                name: "Inspect",
-                description: "Inspect the repository.",
-                needs: ["Plan"],
-              },
+            instructions: [
+              "Inspect the repository.",
+              "Read the project guidance.",
             ],
+            output: { description: "The discovery result." },
+            validation: {
+              description: "Confirm the context is complete.",
+              command: "bun test",
+            },
           },
           {
             name: "Delivery",
-            tasks: [{ name: "Implement", description: "Make the change." }],
+            instructions: ["Make the change."],
           },
         ],
       },
@@ -254,9 +252,80 @@ describe("bundled templates", () => {
     expect(prompt).toContain("### 1. Discovery");
     expect(prompt).toContain("### 2. Delivery");
     expect(prompt).not.toContain("### 0.");
-    expect(prompt).toContain("Tasks may specify the responsible agent");
-    expect(prompt).toContain("depends on those tasks' outputs");
-    expect(prompt).toContain("the output of task 'Plan'");
-    expect(prompt).not.toContain("task 'Plan's output");
+    expect(prompt).toContain("Execute phases sequentially in the order listed");
+    expect(prompt).toContain("Inspect the repository.");
+    expect(prompt).toContain("1. Inspect the repository.");
+    expect(prompt).toContain("1. Read the project guidance.");
+    expect(prompt).toContain("Phase output: The discovery result.");
+    expect(prompt).toContain(
+      "Phase validation: Confirm the context is complete. Run `bun test`.",
+    );
+    expect(prompt).not.toContain("## Instructions");
+    expect(prompt).not.toContain("Check after task");
+    expect(prompt.indexOf("Inspect the repository.")).toBeLessThan(
+      prompt.indexOf("Phase output: The discovery result."),
+    );
+    expect(prompt.indexOf("Phase output: The discovery result.")).toBeLessThan(
+      prompt.indexOf("Phase validation: Confirm the context is complete."),
+    );
+    expect(prompt).not.toContain("depends on");
+    expect(prompt).not.toContain("task 'Plan'");
+  });
+
+  test("renders phase-level subagent delegation without task-level routing", () => {
+    const { registry } = loadBundledTemplates();
+    const prompt = renderTemplate({
+      registry,
+      templateId: "atlante/workflow",
+      input: {
+        phases: [
+          {
+            name: "Plan",
+            instructions: ["Plan the change."],
+          },
+          {
+            name: "Execute",
+            subagent: "implement",
+            instructions: ["Make the change."],
+          },
+        ],
+      },
+    });
+
+    expect(prompt).toContain(
+      "a phase without one is handled by the orchestrator",
+    );
+    expect(prompt).toContain(
+      'The subagent "implement" should handle this phase.',
+    );
+    expect(prompt).toContain("The orchestrator handles this phase.");
+    expect(prompt).not.toContain("should be used for this task.");
+  });
+
+  test("renders command-only and description-only phase validation", () => {
+    const { registry } = loadBundledTemplates();
+    const prompt = renderTemplate({
+      registry,
+      templateId: "atlante/workflow",
+      input: {
+        phases: [
+          {
+            name: "Command",
+            instructions: ["Run the command."],
+            validation: { command: "bun test" },
+          },
+          {
+            name: "Description",
+            instructions: ["Review the result."],
+            validation: { description: "Confirm the result." },
+          },
+        ],
+      },
+    });
+
+    expect(prompt).toContain(
+      "Phase validation: Verify the expected condition is met by running `bun test`.",
+    );
+    expect(prompt).toContain("Phase validation: Confirm the result.");
   });
 });

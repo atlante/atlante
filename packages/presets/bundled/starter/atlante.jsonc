@@ -41,9 +41,9 @@
   "skills": {
     // Inspired by https://github.com/obra/superpowers/blob/main/skills/brainstorming/SKILL.md
     "brainstorming": {
-      "description": "Before any creative or implementation work, collaboratively explore intent, requirements, and design until the developer approves a clear direction.",
+      "description": "Use before creative or implementation work to collaboratively clarify intent, requirements, and design, then produce an approved implementation handoff.",
       "title": "Brainstorming",
-      "overview": "Help turn ideas into fully formed designs and specifications through natural, collaborative dialogue. Start by understanding the project context, then ask one question at a time to refine the idea; present the resulting design and wait for developer approval.",
+      "overview": "Create a shared foundation for deliberate, well-scoped work by turning early uncertainty into a coherent direction the developer can confidently carry forward.",
       "sections": [
         {
           "constraints": [
@@ -66,64 +66,48 @@
     },
 
     "workflow": {
-      "description": "A phased workflow for implementing an issue.",
+      "description": "Use when an approved issue is ready for implementation: deliver a focused, verified change that satisfies its acceptance criteria.",
       "title": "Workflow",
-      "overview": "Plan and execute the approved issue with explicit dependencies.",
+      "overview": "Provide a disciplined delivery framework that keeps approved work scoped, maintainable, and accountable from handoff through completion, with decisions and outcomes grounded in the issue's acceptance criteria.",
       "sections": [
         {
+          "constraints": [
+            "Do not begin implementation until the developer approves the implementation plan.",
+            "For behavior changes, do not make implementation changes before a focused test demonstrates the planned behavior."
+          ]
+        },
+        {
           "workflow": {
+            "title": "Phases",
             "phases": [
               {
                 "name": "plan",
                 "description": "Turn the issue into the smallest DRY-KISS implementation plan.",
-                "tasks": [
-                  {
-                    "name": "take-existing-issue",
-                    "description": "Use the existing issue, including one created by the brainstorming skill, as the source of truth."
-                  },
-                  {
-                    "name": "inspect-project-context",
-                    "description": "Read applicable project instructions and inspect the relevant code and tests.",
-                    "needs": ["take-existing-issue"]
-                  },
-                  {
-                    "name": "plan-work",
-                    "description": "Decide what needs to happen, in what order, and who should do it.",
-                    "needs": ["take-existing-issue", "inspect-project-context"],
-                    "output": {
-                      "description": "The approved implementation plan."
-                    }
-                  }
+                "output": {
+                  "description": "The approved implementation plan."
+                },
+                "instructions": [
+                  "Use the existing issue, including one created by the brainstorming skill, as the source of truth.",
+                  "Read applicable project instructions and inspect the relevant code and tests.",
+                  "Decide what needs to happen, in what order, and who should do it."
                 ]
               },
               {
                 "name": "execute",
                 "description": "Use focused red-green-refactor TDD cycles for behavior changes.",
-                "tasks": [
-                  {
-                    "name": "write-tests",
-                    "description": "For behavior changes, write focused tests that define the planned behavior; make no implementation changes.",
-                    "needs": ["plan-work"]
-                  },
-                  {
-                    "name": "implement-change",
-                    "description": "Implement only what is needed to satisfy the plan.",
-                    "needs": ["write-tests"]
-                  }
+                "instructions": [
+                  "For behavior changes, write focused tests that define the planned behavior; make no implementation changes.",
+                  "Implement only what is needed to satisfy the plan."
                 ]
               },
               {
                 "name": "final-review",
                 "description": "Review the implementation and verification results before completing the change.",
-                "tasks": [
-                  {
-                    "name": "review-result",
-                    "description": "Review the implementation and verification results against the acceptance criteria.",
-                    "needs": ["implement-change"],
-                    "output": {
-                      "description": "A completion report covering the change, acceptance-criteria status, validation commands and results, residual risks or blockers, and next steps."
-                    }
-                  }
+                "output": {
+                  "description": "A completion report covering the change, acceptance-criteria status, validation commands and results, residual risks or blockers, and next steps."
+                },
+                "instructions": [
+                  "Review the implementation and verification results against the acceptance criteria."
                 ]
               }
             ]

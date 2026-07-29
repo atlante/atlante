@@ -519,6 +519,160 @@ describe("validateTemplates", () => {
     expect(diagnostics[0]?.code).toBe("invalid-prompt-input");
   });
 
+  test("accepts phase instructions, output, and inline validation", () => {
+    expect(
+      validateSkillInput(
+        registry,
+        "atlante/skill",
+        {
+          title: "Workflow",
+          overview: "Coordinate the change.",
+          sections: [
+            {
+              workflow: {
+                phases: [
+                  {
+                    name: "Execute",
+                    subagent: "implement",
+                    output: { description: "The aggregate result." },
+                    validation: {
+                      description: "Confirm the phase result.",
+                      command: "bun test",
+                    },
+                    instructions: ["Make the change."],
+                  },
+                ],
+              },
+            },
+          ],
+        },
+        "workflow",
+      ),
+    ).toEqual([]);
+  });
+
+  test.each([
+    { description: "Confirm the phase result." },
+    { command: "bun test" },
+    { description: "Confirm the phase result.", command: "bun test" },
+  ])("accepts validation with description, command, or both", (validation) => {
+    expect(
+      validateSkillInput(
+        registry,
+        "atlante/skill",
+        {
+          title: "Workflow",
+          overview: "Coordinate the change.",
+          sections: [
+            {
+              workflow: {
+                phases: [
+                  {
+                    name: "Execute",
+                    instructions: ["Make the change."],
+                    validation,
+                  },
+                ],
+              },
+            },
+          ],
+        },
+        "workflow",
+      ),
+    ).toEqual([]);
+  });
+
+  test.each([
+    {},
+    { description: "" },
+    { command: "" },
+    { description: "Valid", extra: "not allowed" },
+  ])("rejects invalid inline validation %j", (validation) => {
+    const diagnostics = validateSkillInput(
+      registry,
+      "atlante/skill",
+      {
+        title: "Workflow",
+        overview: "Coordinate the change.",
+        sections: [
+          {
+            workflow: {
+              phases: [
+                {
+                  name: "Execute",
+                  instructions: ["Make the change."],
+                  validation,
+                },
+              ],
+            },
+          },
+        ],
+      },
+      "workflow",
+    );
+
+    expect(diagnostics[0]?.code).toBe("invalid-prompt-input");
+  });
+
+  test.each(["tasks", "check"])(
+    "rejects removed workflow property %s",
+    (property) => {
+      const diagnostics = validateSkillInput(
+        registry,
+        "atlante/skill",
+        {
+          title: "Workflow",
+          overview: "Coordinate the change.",
+          sections: [
+            {
+              workflow: {
+                phases: [
+                  {
+                    name: "Execute",
+                    instructions: ["Make the change."],
+                    [property]:
+                      property === "tasks"
+                        ? [{ description: "removed task object" }]
+                        : { command: "bun test" },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+        "workflow",
+      );
+
+      expect(diagnostics[0]?.code).toBe("invalid-prompt-input");
+    },
+  );
+
+  test("rejects task objects in the phase instructions array", () => {
+    const diagnostics = validateSkillInput(
+      registry,
+      "atlante/skill",
+      {
+        title: "Workflow",
+        overview: "Coordinate the change.",
+        sections: [
+          {
+            workflow: {
+              phases: [
+                {
+                  name: "Execute",
+                  instructions: [{ description: "Make the change." }],
+                },
+              ],
+            },
+          },
+        ],
+      },
+      "workflow",
+    );
+
+    expect(diagnostics[0]?.code).toBe("invalid-prompt-input");
+  });
+
   test("does not treat template or values as prompt input", () => {
     expect(
       check({

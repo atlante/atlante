@@ -340,6 +340,21 @@ agent to serve as an orchestrator. The role is determined by the selected
 template and its inputs, not by a reserved host-agent ID or schema field. The
 specification does not require every configuration to define an orchestrator.
 
+The bundled `atlante/workflow` template defines a sequential workflow. It has a
+`phases` array; each phase requires a non-empty `name` and a non-empty
+`instructions` array of non-empty strings, and may include a non-empty
+`description`, `subagent`, `output`, or inline `validation`. A phase that
+includes `subagent` delegates the entire phase to the named configured or
+delegable agent. When `subagent` is omitted, the orchestrator handles the phase.
+A phase `output` is the aggregate artifact for the phase, and a phase
+`validation` is its final quality gate. Validation may include a non-empty
+`description`, a non-empty `command`, or both, and rejects all other fields.
+
+Phase instructions execute sequentially in their containing phase as an ordered
+Markdown list. They are inline strings rather than task objects, and the
+workflow template does not compose the reusable `atlante/instructions` template
+inside a phase.
+
 Host agent files MUST NOT contain an independent prompt that competes with the
 Atlante prompt; the Atlante configuration is the prompt source of truth.
 

@@ -520,9 +520,16 @@ describe("AtlantePlugin", () => {
     expect(config.agent?.architect?.model).toBe("provider/model");
     expect(config.agent?.architect?.prompt).toContain("lead engineer");
     expect(config.agent?.implement).toBeUndefined();
-    await expect(
-      hooks.tool?.atlante_skill?.execute({ name: "workflow" }, {} as never),
-    ).resolves.toContain("### 1. plan");
+    const workflow = await hooks.tool?.atlante_skill?.execute(
+      { name: "workflow" },
+      {} as never,
+    );
+    if (typeof workflow !== "string")
+      throw new Error("workflow skill did not return Markdown");
+    expect(workflow).toContain("### 1. plan");
+    expect(
+      workflow.match(/The orchestrator handles this phase\./g),
+    ).toHaveLength(3);
     const brainstorming = await hooks.tool?.atlante_skill?.execute(
       { name: "brainstorming" },
       {} as never,

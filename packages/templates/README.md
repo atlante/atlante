@@ -11,7 +11,7 @@ The package exports registry loaders, composition validation, bundled Draft
 2020-12 template schemas, system-value resolution, and rendering helpers.
 
 Bundled templates use the `atlante/` namespace and include `atlante/agent`,
-`atlante/workflow`, `atlante/task`, `atlante/artifact`, `atlante/check`,
+`atlante/workflow`, and `atlante/artifact`,
 `atlante/skill`, and the reusable section templates `atlante/markdown`,
 `atlante/instructions`, `atlante/constraints`, and `atlante/gotchas`. Each template directory pairs a
 direct `template.json` input schema with its `template.md` renderer; IDs derive
@@ -25,6 +25,13 @@ Both `atlante/agent` and `atlante/skill` preserve the order of their section
 arrays. Agent sections may compose responsibilities, constraints, Markdown,
 instructions, and gotchas; skill sections may compose Markdown, constraints,
 instructions, gotchas, and multi-phase workflows.
+
+`atlante/workflow` executes phases and their required, non-empty inline
+`instructions` sequentially. Each phase may also have an aggregate `output` and
+final inline `validation` with a description, a command, or both. An optional
+`subagent` on a phase names the configured agent delegated that phase; when
+omitted, the orchestrator handles it. Delegation is supported at the phase
+level only.
 
 Templates may declare nested slots with a `{ "template": "namespace/name" }`
 marker inside an object property, array `items`, or `oneOf` branch. A slot's

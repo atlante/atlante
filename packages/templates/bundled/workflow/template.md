@@ -4,7 +4,7 @@
 {{description}}
 {{/if}}
 
-Follow phases in the order listed. Within a phase, a task that lists other tasks in its needs depends on those tasks' outputs; tasks without needs have no declared dependencies. Tasks may specify the responsible agent, an output, and a verification check.
+Execute phases sequentially in the order listed. A phase with a `subagent` delegates the entire phase to that configured agent; a phase without one is handled by the orchestrator. Follow each phase's inline instructions in order. A phase output records the aggregate result and a phase validation is the final quality gate.
 {{#each phases}}
 
 ### {{increment @index}}. {{name}}
@@ -12,8 +12,22 @@ Follow phases in the order listed. Within a phase, a task that lists other tasks
 
 {{description}}
 {{/if}}
-{{#each tasks}}
+{{#if subagent}}
 
-{{> slot/phases/tasks}}
+The subagent "{{subagent}}" should handle this phase.
+{{else}}
+
+The orchestrator handles this phase.
+{{/if}}
+{{#each instructions}}
+
+1. {{this}}
 {{/each}}
+{{#if output}}
+
+Phase output: {{> slot/phases/output}}
+{{/if}}{{#if validation}}
+
+Phase validation: {{#if validation.description}}{{validation.description}}{{#if validation.command}} Run `{{validation.command}}`.{{/if}}{{else}}Verify the expected condition is met by running `{{validation.command}}`.{{/if}}
+{{/if}}
 {{/each}}
