@@ -505,10 +505,14 @@ describe("AtlantePlugin", () => {
     expect(config.agent?.reviewer?.prompt).toContain("You review.");
   });
 
-  test("materializes both starter agents and preserves host fields", async () => {
+  test("materializes the starter agent and exposes the workflow skill", async () => {
     const dir = project(`{
       "$schema": "${SCHEMA_URI}",
-      "extends": "atlante/starter"
+      "extends": "atlante/starter",
+      "values": {
+        "quick-check": "bun test packages/changed",
+        "full-check": "bun test"
+      }
     }`);
     const config: HostConfig = {
       agent: { architect: { model: "provider/model" } },
@@ -519,7 +523,42 @@ describe("AtlantePlugin", () => {
 
     expect(config.agent?.architect?.model).toBe("provider/model");
     expect(config.agent?.architect?.prompt).toContain("lead engineer");
-    expect(config.agent?.implement?.prompt).toContain("software engineer");
+    expect(config.agent?.implement).toBeUndefined();
+    const workflow = await hooks.tool?.atlante_skill?.execute(
+      { name: "workflow" },
+      {} as never,
+    );
+    if (typeof workflow !== "string")
+      throw new Error("workflow skill did not return Markdown");
+    expect(workflow).toContain("### 1. plan");
+    expect(
+      workflow.match(/The orchestrator handles this phase\./g),
+    ).toHaveLength(3);
+    expect(workflow).toContain(
+      "After each task, run and record a quick check with `bun test packages/changed`, including after any correction round.",
+    );
+    expect(workflow).toContain(
+      "After all tasks and the whole-change review, run and record the full check with `bun test`.",
+    );
+    expect(workflow).toContain("### 3. review");
+    expect(workflow).toContain(
+      "Dispatch a fresh reviewer with only that context; do not rely on the coordinator's session history or substitute a self-review.",
+    );
+    expect(workflow).toContain(
+      "The artifact should be stored at .atlante/review-<issue-number>.md.",
+    );
+    const brainstorming = await hooks.tool?.atlante_skill?.execute(
+      { name: "brainstorming" },
+      {} as never,
+    );
+    if (typeof brainstorming !== "string")
+      throw new Error("brainstorming skill did not return Markdown");
+    expect(brainstorming).toContain(
+      "Do not begin workflow, implementation, or file modifications until the presented design is approved by the developer.",
+    );
+    expect(brainstorming.indexOf("## Constraints")).toBeLessThan(
+      brainstorming.indexOf("## Instructions"),
+    );
   });
 
   test("preserves host-owned fields on an existing agent", async () => {

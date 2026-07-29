@@ -6,7 +6,7 @@ import { analyzeValueReferences, isValidValueKey } from "./values.js";
 export type RenderArgs = {
   registry: TemplateRegistry;
   templateId: string;
-  input: Record<string, unknown>;
+  input: unknown;
 };
 
 export const SLOT_PARTIAL_PREFIX = "slot/";
@@ -68,6 +68,32 @@ function arrayItemPath(input: unknown, path: string[]): string[] | undefined {
   return undefined;
 }
 
+function unwrapArrayTemplateInput(
+  input: unknown,
+  property: string,
+  inputSchema: unknown,
+): unknown {
+  if (
+    typeof inputSchema !== "object" ||
+    inputSchema === null ||
+    (inputSchema as { type?: unknown }).type !== "array" ||
+    typeof input !== "object" ||
+    input === null ||
+    !Object.hasOwn(input, property)
+  ) {
+    return input;
+  }
+  return (input as Record<string, unknown>)[property];
+}
+
+function isArrayInputSchema(inputSchema: unknown): boolean {
+  return (
+    typeof inputSchema === "object" &&
+    inputSchema !== null &&
+    (inputSchema as { type?: unknown }).type === "array"
+  );
+}
+
 /**
  * Renders a template depth-first: each slot's child is rendered first and its
  * Markdown is registered as a partial function, so the child's output is
@@ -103,12 +129,24 @@ export function renderTemplate(
   }
 
   const handlebars = Handlebars.create();
+  handlebars.registerHelper("increment", (value: unknown) => Number(value) + 1);
+  handlebars.registerHelper("input", () => input);
   const nextStack = [...stack, templateId];
 
   const slots = slotsOf(template.inputSchema);
   const renderedSlots = slots.map((slot) => {
     const path = slot.dataPath ?? [slot.property];
+    const childTemplate = registry.get(slot.templateId);
     const renderSlot = (context: unknown): string => {
+      if (
+        isArrayInputSchema(childTemplate?.inputSchema) &&
+        Array.isArray(context)
+      ) {
+        return renderTemplate(
+          { registry, templateId: slot.templateId, input: context },
+          nextStack,
+        );
+      }
       const contextPath =
         slot.arrayItems && context !== input
           ? arrayItemPath(input, path)
@@ -122,7 +160,11 @@ export function renderTemplate(
             {
               registry,
               templateId: slot.templateId,
-              input: slotInput as Record<string, unknown>,
+              input: unwrapArrayTemplateInput(
+                slotInput,
+                slot.property,
+                childTemplate?.inputSchema,
+              ),
             },
             nextStack,
           ),

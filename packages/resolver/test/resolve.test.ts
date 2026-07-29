@@ -31,14 +31,16 @@ const document: AtlanteDocument = {
       template: "atlante/agent",
       identity: "You are a reviewer.",
       mission: "Review changes to {{values.project}}.",
-      constraints: ["{{values.rule}}"],
+      sections: [{ constraints: ["{{values.rule}}"] }],
     },
     planner: {
       values: { rule: "Planner constraint." },
       identity: "You are a planner.",
       mission: "Plan work.",
-      constraints: ["{{values.rule}}"],
-      workflow: { steps: ["Read the request.", "Draft a plan."] },
+      sections: [
+        { constraints: ["{{values.rule}}"] },
+        { responsibilities: ["Read the request.", "Draft a plan."] },
+      ],
     },
   },
 };
@@ -88,16 +90,8 @@ describe("resolve", () => {
             overview: "Use {{values.project}}.",
             sections: [
               { markdown: "Run {{values.action}}." },
-              {
-                instructions: {
-                  steps: ["Read the {{values.project}} docs."],
-                },
-              },
-              {
-                gotchas: {
-                  items: ["Do not skip the {{values.action}}."],
-                },
-              },
+              { instructions: ["Read the {{values.project}} docs."] },
+              { gotchas: ["Do not skip the {{values.action}}."] },
             ],
           },
         },
@@ -114,7 +108,7 @@ describe("resolve", () => {
           description: "Testing Atlante.",
           templateId: "atlante/skill",
           content:
-            "# Testing\n\n## Overview\n\nUse Atlante.\n\nRun check.\n\n## Instructions\n\nFollow these steps in order.\n\n1. Read the Atlante docs.\n\n## Gotchas\n\nWatch for these common mistakes.\n\n- Do not skip the check.\n",
+            "# Testing\n\n## Overview\n\nUse Atlante.\n\nRun check.\n\n## Instructions\n\nThese are required actions for completing the work. Perform them in order unless a constraint or explicit developer direction requires otherwise.\n\n1. Read the Atlante docs.\n\n## Gotchas\n\nThese are risks and failure modes that require active attention. Account for each one while working; do not dismiss one because the task appears straightforward.\n\n- Do not skip the check.\n",
         },
       ],
     });
@@ -263,10 +257,11 @@ describe("resolve", () => {
     }
   });
 
-  test("renders the workflow slot only where it is bound", () => {
+  test("renders reusable sections in agent prompts", () => {
     const { agents } = resolve(document, registry);
-    expect(agents[1]?.prompt).toContain("# Workflow");
-    expect(agents[0]?.prompt).not.toContain("# Workflow");
+    expect(agents[1]?.prompt).toContain("# Responsibilities");
+    expect(agents[1]?.prompt).toContain("# Constraints");
+    expect(agents[0]?.prompt).not.toContain("## Workflow");
   });
 
   test("resolves values referenced inside document fields", () => {
@@ -282,7 +277,7 @@ describe("resolve", () => {
     expect(agents[0]?.prompt).not.toContain("{{values.project}}");
   });
 
-  test("resolves values inside slot input too", () => {
+  test("resolves values inside section input too", () => {
     const withReference: AtlanteDocument = {
       $schema: SCHEMA_URI,
       values: { project: "atlante" },
@@ -290,7 +285,11 @@ describe("resolve", () => {
         a: {
           identity: "x",
           mission: "y",
-          workflow: { steps: ["Build {{values.project}}."] },
+          sections: [
+            {
+              responsibilities: ["Build {{values.project}}."],
+            },
+          ],
         },
       },
     };

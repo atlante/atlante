@@ -12,6 +12,8 @@ describe("bundled templates", () => {
     expect(errors).toEqual([]);
     expect(registry.ids()).toEqual([
       "atlante/agent",
+      "atlante/artifact",
+      "atlante/constraints",
       "atlante/gotchas",
       "atlante/instructions",
       "atlante/markdown",
@@ -25,6 +27,8 @@ describe("bundled templates", () => {
     expect(errors).toEqual([]);
     expect(registry.ids()).toEqual([
       "atlante/agent",
+      "atlante/artifact",
+      "atlante/constraints",
       "atlante/gotchas",
       "atlante/instructions",
       "atlante/markdown",
@@ -56,8 +60,54 @@ describe("bundled templates", () => {
         path: ["sections", "items", "oneOf", "2", "gotchas"],
         arrayItems: true,
       },
+      {
+        templateId: "atlante/workflow",
+        path: ["sections", "items", "oneOf", "3", "workflow"],
+        arrayItems: true,
+      },
+      {
+        templateId: "atlante/constraints",
+        path: ["sections", "items", "oneOf", "4", "constraints"],
+        arrayItems: true,
+      },
     ]);
     expect(walkComposition(registry, "atlante/skill")).toEqual([]);
+  });
+
+  test("supports ordered composable sections in agent prompts", () => {
+    const { registry, errors } = loadBundledTemplates();
+    expect(errors).toEqual([]);
+    const agent = registry.get("atlante/agent");
+    if (!agent) throw new Error("bundled agent template is missing");
+
+    expect(
+      slotsOf(agent.inputSchema).map(({ templateId, path, arrayItems }) => ({
+        templateId,
+        path,
+        arrayItems,
+      })),
+    ).toEqual([
+      {
+        templateId: "atlante/markdown",
+        path: ["sections", "items", "oneOf", "0", "markdown"],
+        arrayItems: true,
+      },
+      {
+        templateId: "atlante/instructions",
+        path: ["sections", "items", "oneOf", "1", "instructions"],
+        arrayItems: true,
+      },
+      {
+        templateId: "atlante/gotchas",
+        path: ["sections", "items", "oneOf", "3", "gotchas"],
+        arrayItems: true,
+      },
+      {
+        templateId: "atlante/constraints",
+        path: ["sections", "items", "oneOf", "4", "constraints"],
+        arrayItems: true,
+      },
+    ]);
   });
 
   test("renders skill title, overview, and Markdown sections", () => {
@@ -87,47 +137,32 @@ describe("bundled templates", () => {
           title: "Testing",
           overview: "Run the test suite.",
           sections: [
-            { instructions: { steps: ["Read the brief.", "Run the checks."] } },
-            { gotchas: { items: ["Do not skip validation."] } },
+            { instructions: ["Read the brief.", "Run the checks."] },
+            { gotchas: ["Do not skip validation."] },
           ],
         },
       }),
     ).toBe(
-      "# Testing\n\n## Overview\n\nRun the test suite.\n\n## Instructions\n\nFollow these steps in order.\n\n1. Read the brief.\n1. Run the checks.\n\n## Gotchas\n\nWatch for these common mistakes.\n\n- Do not skip validation.\n",
+      "# Testing\n\n## Overview\n\nRun the test suite.\n\n## Instructions\n\nThese are required actions for completing the work. Perform them in order unless a constraint or explicit developer direction requires otherwise.\n\n1. Read the brief.\n1. Run the checks.\n\n## Gotchas\n\nThese are risks and failure modes that require active attention. Account for each one while working; do not dismiss one because the task appears straightforward.\n\n- Do not skip validation.\n",
     );
   });
 
-  test("renders custom labels and descriptions in section order", () => {
+  test("renders reusable constraints sections in skills", () => {
     const { registry } = loadBundledTemplates();
     expect(
       renderTemplate({
         registry,
         templateId: "atlante/skill",
         input: {
-          title: "Releasing",
-          overview: "Prepare a release.",
+          title: "Planning",
+          overview: "Plan before acting.",
           sections: [
-            { markdown: "Keep the release repeatable." },
-            {
-              instructions: {
-                title: "Checklist",
-                description: "Complete each item.",
-                steps: ["Update the changelog."],
-              },
-            },
-            {
-              gotchas: {
-                title: "Risks",
-                description: "Avoid these failures.",
-                items: ["Do not publish early."],
-              },
-            },
-            { markdown: "Document the outcome." },
+            { constraints: ["Wait for approval.", "Keep scope focused."] },
           ],
         },
       }),
     ).toBe(
-      "# Releasing\n\n## Overview\n\nPrepare a release.\n\nKeep the release repeatable.\n\n## Checklist\n\nComplete each item.\n\n1. Update the changelog.\n\n## Risks\n\nAvoid these failures.\n\n- Do not publish early.\n\nDocument the outcome.\n",
+      "# Planning\n\n## Overview\n\nPlan before acting.\n\n## Constraints\n\nThese are non-negotiable limits on how you may act. Follow every constraint throughout your work; do not treat them as suggested outcomes or trade them off for convenience.\n\n- Wait for approval.\n- Keep scope focused.\n",
     );
   });
 
@@ -142,14 +177,14 @@ describe("bundled templates", () => {
           overview: "Keep every section in source order.",
           sections: [
             { markdown: "First." },
-            { gotchas: { items: ["Second."] } },
-            { instructions: { steps: ["Third."] } },
+            { gotchas: ["Second."] },
+            { instructions: ["Third."] },
             { markdown: "Fourth." },
           ],
         },
       }),
     ).toBe(
-      "# Ordered\n\n## Overview\n\nKeep every section in source order.\n\nFirst.\n\n## Gotchas\n\nWatch for these common mistakes.\n\n- Second.\n\n## Instructions\n\nFollow these steps in order.\n\n1. Third.\n\nFourth.\n",
+      "# Ordered\n\n## Overview\n\nKeep every section in source order.\n\nFirst.\n\n## Gotchas\n\nThese are risks and failure modes that require active attention. Account for each one while working; do not dismiss one because the task appears straightforward.\n\n- Second.\n\n## Instructions\n\nThese are required actions for completing the work. Perform them in order unless a constraint or explicit developer direction requires otherwise.\n\n1. Third.\n\nFourth.\n",
     );
   });
 
@@ -161,9 +196,15 @@ describe("bundled templates", () => {
       input: {
         identity: "You are a code reviewer.",
         mission: "Find defects before they merge.",
-        responsibilities: ["Read the diff.", "Report findings."],
-        constraints: ["Never edit files."],
-        workflow: { steps: ["Read the diff.", "Report findings."] },
+        sections: [
+          {
+            responsibilities: ["Read the diff.", "Report findings."],
+          },
+          {
+            constraints: ["Never edit files."],
+          },
+          { markdown: "Review the changed files." },
+        ],
       },
     });
     expect(prompt).toMatchSnapshot();
@@ -179,5 +220,100 @@ describe("bundled templates", () => {
     expect(prompt).toMatchSnapshot();
     expect(prompt).not.toContain("# Workflow");
     expect(prompt).not.toContain("# Responsibilities");
+  });
+
+  test("renders sequential phases with inline instructions and validation", () => {
+    const { registry } = loadBundledTemplates();
+    const prompt = renderTemplate({
+      registry,
+      templateId: "atlante/workflow",
+      input: {
+        phases: [
+          {
+            name: "Discovery",
+            instructions: [
+              "Inspect the repository.",
+              "Read the project guidance.",
+            ],
+            output: { description: "The discovery result." },
+            validation: "Confirm the context is complete. Run `bun test`.",
+          },
+          {
+            name: "Delivery",
+            instructions: ["Make the change."],
+          },
+        ],
+      },
+    });
+
+    expect(prompt).toContain("### 1. Discovery");
+    expect(prompt).toContain("### 2. Delivery");
+    expect(prompt).not.toContain("### 0.");
+    expect(prompt).toContain("Execute phases sequentially in the order listed");
+    expect(prompt).toContain("Inspect the repository.");
+    expect(prompt).toContain("1. Inspect the repository.");
+    expect(prompt).toContain("1. Read the project guidance.");
+    expect(prompt).toContain("Phase output: The discovery result.");
+    expect(prompt).toContain(
+      "Phase validation: Confirm the context is complete. Run `bun test`.",
+    );
+    expect(prompt).not.toContain("## Instructions");
+    expect(prompt).not.toContain("Check after task");
+    expect(prompt.indexOf("Inspect the repository.")).toBeLessThan(
+      prompt.indexOf("Phase output: The discovery result."),
+    );
+    expect(prompt.indexOf("Phase output: The discovery result.")).toBeLessThan(
+      prompt.indexOf("Phase validation: Confirm the context is complete."),
+    );
+    expect(prompt).not.toContain("depends on");
+    expect(prompt).not.toContain("task 'Plan'");
+  });
+
+  test("renders phase-level subagent delegation without task-level routing", () => {
+    const { registry } = loadBundledTemplates();
+    const prompt = renderTemplate({
+      registry,
+      templateId: "atlante/workflow",
+      input: {
+        phases: [
+          {
+            name: "Plan",
+            instructions: ["Plan the change."],
+          },
+          {
+            name: "Execute",
+            subagent: "implement",
+            instructions: ["Make the change."],
+          },
+        ],
+      },
+    });
+
+    expect(prompt).toContain(
+      "a phase without one is handled by the orchestrator",
+    );
+    expect(prompt).toContain(
+      'The subagent "implement" should handle this phase.',
+    );
+    expect(prompt).toContain("The orchestrator handles this phase.");
+    expect(prompt).not.toContain("should be used for this task.");
+  });
+
+  test("omits validation when a phase does not define one", () => {
+    const { registry } = loadBundledTemplates();
+    const prompt = renderTemplate({
+      registry,
+      templateId: "atlante/workflow",
+      input: {
+        phases: [
+          {
+            name: "Delivery",
+            instructions: ["Review the result."],
+          },
+        ],
+      },
+    });
+
+    expect(prompt).not.toContain("Phase validation:");
   });
 });

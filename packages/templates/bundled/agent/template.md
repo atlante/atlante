@@ -5,9 +5,10 @@
 # Mission
 
 {{mission}}
+{{#each sections}}
 {{#if responsibilities}}
 
-# Responsibilities
+## Responsibilities
 
 {{#each responsibilities}}
 - {{this}}
@@ -15,13 +16,18 @@
 {{/if}}
 {{#if constraints}}
 
-# Constraints
+{{> slot/sections/constraints constraints}}
+{{/if}}
+{{#if markdown}}
 
-{{#each constraints}}
-- {{this}}
+{{> slot/sections/markdown}}
+{{/if}}
+{{#if instructions}}
+
+{{> slot/sections/instructions instructions}}
+{{/if}}
+{{#if gotchas}}
+
+{{> slot/sections/gotchas gotchas}}
+{{/if}}
 {{/each}}
-{{/if}}
-{{#if workflow}}
-
-{{> slot/workflow}}
-{{/if}}

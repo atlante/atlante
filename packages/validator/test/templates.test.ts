@@ -69,7 +69,7 @@ describe("expandInputSchema", () => {
       string,
       { properties?: unknown }
     >;
-    expect(properties.workflow?.properties).toHaveProperty("steps");
+    expect(properties.sections).toBeDefined();
   });
 
   test("expands slots in nested objects, array items, and oneOf branches", () => {
@@ -401,6 +401,59 @@ describe("validateAgentInput", () => {
     expect(diagnostics[0]?.code).toBe("invalid-prompt-input");
     expect(diagnostics[0]?.path).toBe("/skills/skill~1id~0one/sections");
   });
+
+  test("accepts a skill constraints section", () => {
+    const { registry } = loadBundledTemplates();
+    expect(
+      validateSkillInput(
+        registry,
+        "atlante/skill",
+        {
+          title: "Testing",
+          overview: "Run tests.",
+          sections: [{ constraints: ["Keep scope focused."] }],
+        },
+        "testing",
+      ),
+    ).toEqual([]);
+  });
+
+  test("rejects empty skill constraints", () => {
+    const { registry } = loadBundledTemplates();
+    const diagnostics = validateSkillInput(
+      registry,
+      "atlante/skill",
+      {
+        title: "Testing",
+        overview: "Run tests.",
+        sections: [{ constraints: [""] }],
+      },
+      "testing",
+    );
+
+    expect(diagnostics.map((diagnostic) => diagnostic.path)).toContain(
+      "/skills/testing/sections/0/constraints/0",
+    );
+  });
+
+  test("rejects object-shaped instruction, gotcha, and constraint sections", () => {
+    const { registry } = loadBundledTemplates();
+
+    for (const section of [
+      { instructions: { steps: ["Do the work."] } },
+      { gotchas: { items: ["Do the work."] } },
+      { constraints: { items: ["Do the work."] } },
+    ]) {
+      expect(
+        validateSkillInput(
+          registry,
+          "atlante/skill",
+          { title: "Testing", overview: "Run tests.", sections: [section] },
+          "testing",
+        ),
+      ).not.toEqual([]);
+    }
+  });
 });
 
 describe("validateTemplates", () => {
@@ -411,6 +464,26 @@ describe("validateTemplates", () => {
   test("accepts a valid agent binding", () => {
     expect(
       check({ template: "atlante/agent", identity: "x", mission: "y" }),
+    ).toEqual([]);
+  });
+
+  test("accepts an agent instructions section", () => {
+    expect(
+      check({
+        identity: "x",
+        mission: "y",
+        sections: [{ instructions: ["Do the work."] }],
+      }),
+    ).toEqual([]);
+  });
+
+  test("accepts an agent constraints section", () => {
+    expect(
+      check({
+        identity: "x",
+        mission: "y",
+        sections: [{ constraints: ["Do the work."] }],
+      }),
     ).toEqual([]);
   });
 
@@ -441,8 +514,159 @@ describe("validateTemplates", () => {
     const diagnostics = check({
       identity: "x",
       mission: "y",
-      workflow: { steps: [] },
+      sections: [{ workflow: { phases: [] } }],
     });
+    expect(diagnostics[0]?.code).toBe("invalid-prompt-input");
+  });
+
+  test("accepts phase instructions, output, and string validation", () => {
+    expect(
+      validateSkillInput(
+        registry,
+        "atlante/skill",
+        {
+          title: "Workflow",
+          overview: "Coordinate the change.",
+          sections: [
+            {
+              workflow: {
+                phases: [
+                  {
+                    name: "Execute",
+                    subagent: "implement",
+                    output: { description: "The aggregate result." },
+                    validation: "Confirm the phase result. Run `bun test`.",
+                    instructions: ["Make the change."],
+                  },
+                ],
+              },
+            },
+          ],
+        },
+        "workflow",
+      ),
+    ).toEqual([]);
+  });
+
+  test.each(["Confirm the phase result.", "Run `bun test`."])(
+    "accepts string validation %j",
+    (validation) => {
+      expect(
+        validateSkillInput(
+          registry,
+          "atlante/skill",
+          {
+            title: "Workflow",
+            overview: "Coordinate the change.",
+            sections: [
+              {
+                workflow: {
+                  phases: [
+                    {
+                      name: "Execute",
+                      instructions: ["Make the change."],
+                      validation,
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+          "workflow",
+        ),
+      ).toEqual([]);
+    },
+  );
+
+  test.each([
+    {},
+    { description: "Confirm the phase result." },
+    { command: "bun test" },
+    { description: "Confirm the phase result.", command: "bun test" },
+    1,
+  ])("rejects non-string validation %j", (validation) => {
+    const diagnostics = validateSkillInput(
+      registry,
+      "atlante/skill",
+      {
+        title: "Workflow",
+        overview: "Coordinate the change.",
+        sections: [
+          {
+            workflow: {
+              phases: [
+                {
+                  name: "Execute",
+                  instructions: ["Make the change."],
+                  validation,
+                },
+              ],
+            },
+          },
+        ],
+      },
+      "workflow",
+    );
+
+    expect(diagnostics[0]?.code).toBe("invalid-prompt-input");
+  });
+
+  test.each(["tasks", "check"])(
+    "rejects unknown workflow property %s",
+    (property) => {
+      const diagnostics = validateSkillInput(
+        registry,
+        "atlante/skill",
+        {
+          title: "Workflow",
+          overview: "Coordinate the change.",
+          sections: [
+            {
+              workflow: {
+                phases: [
+                  {
+                    name: "Execute",
+                    instructions: ["Make the change."],
+                    [property]:
+                      property === "tasks"
+                        ? [{ description: "removed task object" }]
+                        : { command: "bun test" },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+        "workflow",
+      );
+
+      expect(diagnostics[0]?.code).toBe("invalid-prompt-input");
+    },
+  );
+
+  test("rejects task objects in the phase instructions array", () => {
+    const diagnostics = validateSkillInput(
+      registry,
+      "atlante/skill",
+      {
+        title: "Workflow",
+        overview: "Coordinate the change.",
+        sections: [
+          {
+            workflow: {
+              phases: [
+                {
+                  name: "Execute",
+                  instructions: [{ description: "Make the change." }],
+                },
+              ],
+            },
+          },
+        ],
+      },
+      "workflow",
+    );
+
     expect(diagnostics[0]?.code).toBe("invalid-prompt-input");
   });
 
@@ -812,7 +1036,7 @@ describe("validateTemplates", () => {
             sections: [
               {
                 markdown: "Run tests.",
-                gotchas: { items: ["Do not skip validation."] },
+                gotchas: ["Do not skip validation."],
               },
             ],
           },
