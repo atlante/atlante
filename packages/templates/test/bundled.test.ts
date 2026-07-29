@@ -299,7 +299,7 @@ describe("bundled templates", () => {
     expect(prompt).not.toContain("should be used for this task.");
   });
 
-  test("renders string phase validation", () => {
+  test("omits validation when a phase does not define one", () => {
     const { registry } = loadBundledTemplates();
     const prompt = renderTemplate({
       registry,
@@ -307,14 +307,13 @@ describe("bundled templates", () => {
       input: {
         phases: [
           {
-            name: "Description",
+            name: "Delivery",
             instructions: ["Review the result."],
-            validation: "Confirm the result.",
           },
         ],
       },
     });
 
-    expect(prompt).toContain("Phase validation: Confirm the result.");
+    expect(prompt).not.toContain("Phase validation:");
   });
 });

@@ -538,7 +538,14 @@ describe("AtlantePlugin", () => {
       "After each task, run and record a quick check with `bun test packages/changed`, including after any correction round.",
     );
     expect(workflow).toContain(
+      "After all tasks and the whole-change review, run and record the full check with `bun test`.",
+    );
+    expect(workflow).toContain("### 3. review");
+    expect(workflow).toContain(
       "Dispatch a fresh reviewer with only that context; do not rely on the coordinator's session history or substitute a self-review.",
+    );
+    expect(workflow).toContain(
+      "The artifact should be stored at .atlante/review-<issue-number>.md.",
     );
     const brainstorming = await hooks.tool?.atlante_skill?.execute(
       { name: "brainstorming" },

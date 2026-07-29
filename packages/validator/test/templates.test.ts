@@ -548,7 +548,7 @@ describe("validateTemplates", () => {
     ).toEqual([]);
   });
 
-  test.each(["", "Confirm the phase result.", "Run `bun test`."])(
+  test.each(["Confirm the phase result.", "Run `bun test`."])(
     "accepts string validation %j",
     (validation) => {
       expect(
@@ -612,7 +612,7 @@ describe("validateTemplates", () => {
   });
 
   test.each(["tasks", "check"])(
-    "rejects removed workflow property %s",
+    "rejects unknown workflow property %s",
     (property) => {
       const diagnostics = validateSkillInput(
         registry,
