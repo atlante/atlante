@@ -417,33 +417,25 @@ describe("runInit", () => {
     expect(existsSync(join(dir, "atlante.jsonc"))).toBe(false);
   });
 
-  test("rejects a string plugin value without spreading it", async () => {
-    const dir = tempDir();
-    const path = join(dir, "opencode.jsonc");
-    const original = '{ "plugin": "existing-plugin" }';
-    writeFileSync(path, original);
+  test.each([
+    ["string-valued", "existing-plugin"],
+    ["object-valued", { name: "existing-plugin" }],
+  ] as const)(
+    "rejects %s plugin values without modifying them",
+    async (_kind, plugin) => {
+      const dir = tempDir();
+      const path = join(dir, "opencode.jsonc");
+      const original = JSON.stringify({ plugin });
+      writeFileSync(path, original);
 
-    const result = await captureErrors(() => runInit(dir, {}));
+      const result = await captureErrors(() => runInit(dir, {}));
 
-    expect(result.result).toBe(1);
-    expect(result.errors.join("\n")).toContain("array of strings");
-    expect(readFileSync(path, "utf8")).toBe(original);
-    expect(existsSync(join(dir, "atlante.jsonc"))).toBe(false);
-  });
-
-  test("rejects an object plugin value without modifying it", async () => {
-    const dir = tempDir();
-    const path = join(dir, "opencode.jsonc");
-    const original = '{ "plugin": { "name": "existing-plugin" } }';
-    writeFileSync(path, original);
-
-    const result = await captureErrors(() => runInit(dir, {}));
-
-    expect(result.result).toBe(1);
-    expect(result.errors.join("\n")).toContain("array of strings");
-    expect(readFileSync(path, "utf8")).toBe(original);
-    expect(existsSync(join(dir, "atlante.jsonc"))).toBe(false);
-  });
+      expect(result.result).toBe(1);
+      expect(result.errors.join("\n")).toContain("array of strings");
+      expect(readFileSync(path, "utf8")).toBe(original);
+      expect(existsSync(join(dir, "atlante.jsonc"))).toBe(false);
+    },
+  );
 
   test("preserves tuple plugin entries while registering the plugin", async () => {
     const dir = tempDir();

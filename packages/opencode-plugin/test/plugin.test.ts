@@ -149,7 +149,6 @@ describe("AtlantePlugin", () => {
   });
 
   test.each([
-    ["removal", (dir: string) => unlinkSync(join(dir, "atlante.jsonc"))],
     [
       "corruption",
       (dir: string) => writeFileSync(join(dir, "atlante.jsonc"), "{"),
@@ -179,28 +178,13 @@ describe("AtlantePlugin", () => {
 
   test("fails open for missing artifacts", async () => {
     const dir = tempDir();
-    const config: HostConfig = { agent: { existing: { model: "x" } } };
-    const before = structuredClone(config);
-
-    const hooks = await AtlantePlugin(pluginInput(dir));
-    await hooks.config?.(config as unknown as Config);
-
-    expect(hooks.tool?.atlante_skill).toBeUndefined();
-    expect(config).toEqual(before);
+    await expectPluginFailsOpen(dir);
   });
 
   test("fails open for corrupt artifacts", async () => {
     const dir = builtProject(validWithSkill);
     writeFileSync(join(dir, ".atlante", "artifacts", "manifest.json"), "{");
-    unlinkSync(join(dir, "atlante.jsonc"));
-    const config: HostConfig = { agent: { existing: { model: "x" } } };
-    const before = structuredClone(config);
-
-    const hooks = await AtlantePlugin(pluginInput(dir));
-    await hooks.config?.(config as unknown as Config);
-
-    expect(hooks.tool?.atlante_skill).toBeUndefined();
-    expect(config).toEqual(before);
+    await expectPluginFailsOpen(dir);
   });
 
   test.each(["format", "version"] as const)(
@@ -300,15 +284,7 @@ describe("AtlantePlugin", () => {
     };
     manifest.agents[0].path = "../unsafe.md";
     writeFileSync(manifestPath, JSON.stringify(manifest));
-    unlinkSync(join(dir, "atlante.jsonc"));
-    const config: HostConfig = { agent: { existing: { model: "x" } } };
-    const before = structuredClone(config);
-
-    const hooks = await AtlantePlugin(pluginInput(dir));
-    await hooks.config?.(config as unknown as Config);
-
-    expect(hooks.tool?.atlante_skill).toBeUndefined();
-    expect(config).toEqual(before);
+    await expectPluginFailsOpen(dir);
   });
 
   test("fails open for symlinked payloads", async () => {

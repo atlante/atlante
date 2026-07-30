@@ -17,8 +17,6 @@ type ArtifactAgentInput = {
   hostAgentId: string;
   description: string;
   prompt: string;
-  /** Accepted as build provenance, but deliberately omitted from the manifest. */
-  templateId?: string;
 };
 
 /** The source fields needed to create an on-disk skill artifact. */
@@ -26,8 +24,6 @@ type ArtifactSkillInput = {
   skillId: string;
   description: string;
   content: string;
-  /** Accepted as build provenance, but deliberately omitted from the manifest. */
-  templateId?: string;
 };
 
 type ArtifactInputs = {

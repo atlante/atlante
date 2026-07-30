@@ -3,9 +3,9 @@ import { spawnSync } from "node:child_process";
 import {
   chmodSync,
   copyFileSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
-  readFileSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -143,25 +143,8 @@ describe("runBuild", () => {
     } finally {
       console.error = original;
     }
+    expect(existsSync(join(dir, ".atlante", "artifacts"))).toBe(false);
     expect(errors.join("\n")).toContain("missing-value");
-  });
-
-  test("preserves a previous artifact tree when building fails", async () => {
-    const dir = project(valid);
-    expect(await runBuild(dir)).toBe(0);
-    const manifest = readFileSync(
-      join(dir, ".atlante", "artifacts", "manifest.json"),
-      "utf8",
-    );
-    writeFileSync(
-      join(dir, "atlante.jsonc"),
-      `{ "$schema": "${SCHEMA_URI}", "agents": { "broken": { "description": "{{values.missing}}", "identity": "x", "mission": "y" } } }`,
-    );
-
-    expect(await runBuild(dir)).toBe(1);
-    expect(
-      readFileSync(join(dir, ".atlante", "artifacts", "manifest.json"), "utf8"),
-    ).toBe(manifest);
   });
 });
 

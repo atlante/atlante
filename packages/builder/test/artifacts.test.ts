@@ -35,7 +35,6 @@ const input: ArtifactInput = {
       hostAgentId: "reviewer",
       description: "Reviews changes.",
       prompt: "# Review\n\nFind defects.\n",
-      templateId: "atlante/agent",
     },
   ],
   skills: [
@@ -43,7 +42,6 @@ const input: ArtifactInput = {
       skillId: "workflow",
       description: "A useful workflow.",
       content: "# Workflow\n\n1. Check the change.\n",
-      templateId: "atlante/skill",
     },
   ],
 };

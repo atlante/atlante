@@ -28,10 +28,6 @@ const defaultDeps: AtlantePluginDeps = {
   injectAgents,
 };
 
-type Preparation =
-  | { kind: "none" }
-  | { kind: "ready"; artifacts: VerifiedArtifacts };
-
 function restoreConfig(
   config: HostConfig,
   snapshot: PropertyDescriptorMap,
@@ -89,22 +85,22 @@ function reportFailure(warnings: readonly InjectionWarning[]): void {
   }
 }
 
-function prepare(directory: string, deps: AtlantePluginDeps): Preparation {
+function prepare(
+  directory: string,
+  deps: AtlantePluginDeps,
+): VerifiedArtifacts | undefined {
   try {
     const artifacts = (deps.readArtifacts ?? readArtifacts)(directory);
-    if (!artifacts) return { kind: "none" };
+    if (!artifacts) return undefined;
 
     // Keep initialization output independent from the builder's arrays.
     return {
-      kind: "ready",
-      artifacts: {
-        agents: artifacts.agents.map((artifact) => ({ ...artifact })),
-        skills: artifacts.skills.map((artifact) => ({ ...artifact })),
-      },
+      agents: artifacts.agents.map((artifact) => ({ ...artifact })),
+      skills: artifacts.skills.map((artifact) => ({ ...artifact })),
     };
   } catch {
     // A missing, corrupt, or unsafe publication must not stop OpenCode.
-    return { kind: "none" };
+    return undefined;
   }
 }
 
@@ -117,11 +113,10 @@ export function createAtlantePlugin(
   deps: AtlantePluginDeps = defaultDeps,
 ): Plugin {
   return async ({ directory }) => {
-    const preparation = prepare(directory, deps);
-    if (preparation.kind === "none") {
+    const artifacts = prepare(directory, deps);
+    if (!artifacts) {
       return { config: async () => {} };
     }
-    const { artifacts } = preparation;
     const state: SkillToolState = { status: "inactive" };
     const skillTool =
       artifacts.skills.length > 0
