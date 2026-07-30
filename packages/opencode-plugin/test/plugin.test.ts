@@ -531,9 +531,7 @@ describe("AtlantePlugin", () => {
     if (typeof workflow !== "string")
       throw new Error("workflow skill did not return Markdown");
     expect(workflow).toContain("### 1. plan");
-    expect(
-      workflow.match(/The orchestrator handles this phase\./g),
-    ).toHaveLength(3);
+    expect(workflow.match(/The orchestrator handles this phase\./g)).toBeNull();
     expect(workflow).toContain(
       "After each task, run and record a quick check with `bun test packages/changed`, including after any correction round.",
     );

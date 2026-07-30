@@ -33,8 +33,10 @@
         },
         {
           "instructions": [
-            "If no approved issue exists, retrieve and follow the brainstorming skill to produce one; do not implement until the issue is approved.",
-            "When an approved issue is available, retrieve and follow the workflow skill."
+            "Check whether an approved issue or task was provided with the request.",
+            "If none was provided, ask the developer whether they want to brainstorm a new design or already have an issue or task to work from.",
+            "If brainstorming was chosen, load and follow the brainstorming skill.",
+            "When an approved issue or task is available, load and follow the workflow skill."
           ]
         }
       ]
@@ -71,12 +73,13 @@
     "workflow": {
       "description": "Use when an approved issue is ready for implementation: deliver a focused, verified change that satisfies its acceptance criteria.",
       "title": "Workflow",
-      "overview": "Provide a disciplined delivery framework that keeps approved work scoped, maintainable, and accountable from handoff through completion, with decisions and outcomes grounded in the issue's acceptance criteria.",
+      "overview": "Provide a disciplined delivery framework that keeps approved work scoped, maintainable, and accountable from handoff through completion, with decisions and outcomes grounded in the issue's acceptance criteria. This workflow is driven by an orchestrator that delegates each task to a focused sub-agent, coordinates their outputs, and never implements or reviews directly.",
       "sections": [
         {
           "constraints": [
             "Do not begin implementation until the developer approves the implementation plan.",
-            "For behavior changes, do not make implementation changes before a focused test demonstrates the planned behavior."
+            "For behavior changes, do not make implementation changes before a focused test demonstrates the planned behavior.",
+            "The orchestrator drives all phases but never plans, implements, or reviews directly — it delegates to sub-agents, tracks progress, and integrates results."
           ]
         },
         {
@@ -88,8 +91,9 @@
                 "description": "Turn the issue into the smallest DRY-KISS implementation plan.",
                 "instructions": [
                   "Use an existing issue or task defined by the user, as the source of truth.",
-                  "Read applicable project instructions and inspect the relevant code and tests.",
-                  "Break the implementation into the smallest essential tasks."
+                  "The orchestrator dispatches a sub-agent to read applicable project instructions and inspect the relevant code and tests.",
+                  "The sub-agent breaks the implementation into the smallest essential tasks and produces the plan.",
+                  "The orchestrator reviews the plan and presents it to the developer for approval before proceeding."
                 ],
                 "output": {
                   "description": "The approved implementation plan, organized into tasks that run sequentially or in parallel as their dependencies require.",
@@ -102,11 +106,11 @@
                 "description": "Execute the approved tasks with focused implementation, verification, review, and bounded correction loops, then complete a whole-change review.",
                 "instructions": [
                   "Treat the approved plan and acceptance criteria as the source of truth; track task progress and do not repeat completed tasks.",
-                  "Execute tasks according to their dependencies. Delegate each task to a fresh implementer with only its necessary context; parallelize only independent tasks that cannot conflict.",
-                  "For behavior changes, write a focused failing test before implementation; then make the smallest change needed, run covering tests, self-review, and report the evidence.",
-                  "After each task, perform a separate review for specification compliance and code quality. Return findings for correction and re-review; do not proceed with unresolved critical or important findings.",
-                  "Limit correction to five rounds per task. At the limit, record explicit rulings for deferred findings and stop with a blocker if a load-bearing issue remains.",
-                  "After all tasks, perform one whole-change review against the acceptance criteria, including deferred findings, before declaring the work complete.",
+                  "The orchestrator executes tasks according to their dependencies, delegating each one to a fresh sub-agent with only its necessary context. Parallelize only independent tasks that cannot conflict.",
+                  "For behavior changes, write a focused failing test before implementation; then make the smallest change needed, run covering tests, and report the evidence.",
+                  "After each task, the orchestrator dispatches a separate review for specification compliance and code quality. Return findings for correction and re-review; do not proceed with unresolved critical or important findings.",
+                  "Limit correction to five rounds per task. At the limit, the orchestrator records explicit rulings for deferred findings and stops with a blocker if a load-bearing issue remains.",
+                  "After all tasks, the orchestrator performs one whole-change review against the acceptance criteria, including deferred findings, before declaring the work complete.",
                   "Preserve unrelated changes and keep implementation within the approved scope."
                 ],
                 "validation": "After each task, run and record a quick check with `{{values.quick-check}}`, including after any correction round. After all tasks and the whole-change review, run and record the full check with `{{values.full-check}}`. Report commands, results, and any checks that could not run; do not claim completion while acceptance criteria or required review findings remain unresolved."
@@ -118,13 +122,14 @@
                 "instructions": [
                   "Prepare precise review context: the change summary, approved plan and acceptance criteria, applicable project instructions, relevant validation results, and the appropriate base and head revisions or current diff.",
                   "Dispatch a fresh reviewer with only that context; do not rely on the coordinator's session history or substitute a self-review.",
+                  "The reviewer must not modify any file. Their sole job is to inspect and report.",
                   "Ask the reviewer to assess specification compliance, correctness, maintainability, regressions, compatibility, security, and test coverage, and to classify findings as critical, important, or minor.",
-                  "Fix critical findings immediately and fix important findings before completion. Re-review after corrections, up to the task correction limit; record a technical rationale for any validly deferred minor finding or disputed finding.",
-                  "Do not declare the change complete while unresolved critical or important findings remain.",
-                  "Preserve unrelated changes and do not create, amend, or push commits unless the developer explicitly requests it."
+                  "The review report is the output. Do not fix, re-review, or loop — return the report as-is.",
+                  "If the report contains findings that require changes, the orchestrator goes back to the execute phase with the review report as its plan.",
+                  "Only declare the change complete when the review report has no unresolved critical or important findings."
                 ],
                 "output": {
-                  "description": "A completion report covering the change, acceptance-criteria status, validation commands and results, residual risks or blockers, and next steps.",
+                  "description": "A review report listing all findings, classified by severity. Serves as the execution plan for the orchestrator if changes are needed.",
                   "filePath": ".atlante/review-<issue-number>.md"
                 }
               }

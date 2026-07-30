@@ -290,12 +290,9 @@ describe("bundled templates", () => {
     });
 
     expect(prompt).toContain(
-      "a phase without one is handled by the orchestrator",
-    );
-    expect(prompt).toContain(
       'The subagent "implement" should handle this phase.',
     );
-    expect(prompt).toContain("The orchestrator handles this phase.");
+    expect(prompt).not.toContain("The orchestrator handles this phase.");
     expect(prompt).not.toContain("should be used for this task.");
   });
 
