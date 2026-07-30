@@ -93,13 +93,13 @@
                 "instructions": [
                   "Use an existing issue or task defined by the user, as the source of truth.",
                   "The orchestrator dispatches a sub-agent to read applicable project instructions and inspect the relevant code and tests.",
-                  "The sub-agent breaks the implementation into the smallest essential tasks and produces the plan.",
+                  "The sub-agent breaks the implementation into the smallest essential tasks and writes the plan.",
                   "The orchestrator reviews the plan and presents it to the developer for approval before proceeding.",
                   "When the plan needs updating during or after execution, the orchestrator recalls the same plan sub-agent rather than dispatching a fresh one, so the update preserves existing context and plan structure."
                 ],
                 "output": {
                   "description": "The approved implementation plan, organized into tasks that run sequentially or in parallel as their dependencies require.",
-                  "filePath": ".atlante/plan-<issue-number>.md"
+                  "filePath": ".atlante/plans/plan-<issue-number>.md"
                 },
                 "validation": "Review the output plan before presenting it."
               },
@@ -124,7 +124,7 @@
                 "instructions": [
                   "Prepare precise review context: the change summary, approved plan and acceptance criteria, applicable project instructions, relevant validation results, and the appropriate base and head revisions or current diff.",
                   "Dispatch a fresh reviewer with only that context; do not rely on the coordinator's session history or substitute a self-review.",
-                  "The reviewer must not modify any file. Their sole job is to inspect and report.",
+                  "The reviewer must not modify any source file. Their sole job is to inspect, report, and write the review report.",
                   "Ask the reviewer to assess specification compliance, correctness, maintainability, regressions, compatibility, security, and test coverage, and to classify findings as critical, important, or minor.",
                   "The review report is the output. Do not fix, re-review, or loop — return the report as-is.",
                   "If the report contains findings that require changes, the orchestrator goes back to the execute phase with the review report as its plan.",
@@ -132,7 +132,7 @@
                 ],
                 "output": {
                   "description": "A review report listing all findings, classified by severity. Serves as the execution plan for the orchestrator if changes are needed.",
-                  "filePath": ".atlante/review-<issue-number>.md"
+                  "filePath": ".atlante/reviews/review-<issue-number>.md"
                 }
               }
             ]
