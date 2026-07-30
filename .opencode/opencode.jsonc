@@ -26,6 +26,6 @@
       }
     },
     "build": { "disable": true },
-    "plan": { "disable": true },
+    "plan": { "disable": true }
   }
 }
