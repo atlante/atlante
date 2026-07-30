@@ -3,7 +3,7 @@
   "extends": "atlante/starter",
   "values": {
     "project": "Atlante",
-    "quick-check": "bun run quick:check",
-    "full-check": "bun run full:check"
+    "quick-check": "`bun run quick:check`",
+    "full-check": "`bun run full:check` and fallow mcp"
   }
 }

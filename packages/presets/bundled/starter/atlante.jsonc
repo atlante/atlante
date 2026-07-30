@@ -113,7 +113,7 @@
                   "After all tasks, the orchestrator performs one whole-change review against the acceptance criteria, including deferred findings, before declaring the work complete.",
                   "Preserve unrelated changes and keep implementation within the approved scope."
                 ],
-                "validation": "After each task, run and record a quick check with `{{values.quick-check}}`, including after any correction round. After all tasks and the whole-change review, run and record the full check with `{{values.full-check}}`. Report commands, results, and any checks that could not run; do not claim completion while acceptance criteria or required review findings remain unresolved."
+                "validation": "After each task, run and record a quick check with {{values.quick-check}}, including after any correction round. After all tasks and the whole-change review, run and record the full check with {{values.full-check}}. Report commands, results, and any checks that could not run; do not claim completion while acceptance criteria or required review findings remain unresolved."
               },
               {
                 "name": "review",
