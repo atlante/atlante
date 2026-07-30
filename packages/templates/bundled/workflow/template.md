@@ -18,7 +18,7 @@ The subagent "{{subagent}}" should handle this phase.
 {{/if}}
 {{#each instructions}}
 
-1. {{this}}
+{{increment @index}}. {{this}}
 {{/each}}
 {{#if output}}
 
