@@ -16,6 +16,7 @@
   // because OpenCode relies on them for context compaction, session summaries,
   // and title generation.
   "agent": {
+    "architect": { "mode": "primary" },
     "build": { "disable": true },
     "plan": { "disable": true },
     "general": { "disable": true }
