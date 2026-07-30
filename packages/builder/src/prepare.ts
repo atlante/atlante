@@ -1,10 +1,11 @@
 import type { AtlanteDocument, ValuesMap } from "@atlante/schema";
-import type { TemplateRegistry } from "@atlante/templates";
 import {
   interpolateValues,
+  loadBundledTemplates,
   MissingValueError,
   renderTemplate,
   resolveSystemValues,
+  type TemplateRegistry,
 } from "@atlante/templates";
 import type { Diagnostic } from "@atlante/validator";
 import {
@@ -12,12 +13,14 @@ import {
   escapeJsonPointerSegment,
   hasErrors,
   promptInputOf,
+  templateLoadDiagnostics,
   validateTemplates,
 } from "@atlante/validator";
+import { loadProject, type ProjectContext } from "./project.js";
 import { mergeValues } from "./values.js";
 
 export const DEFAULT_TEMPLATE_ID = "atlante/agent";
-export const DEFAULT_SKILL_TEMPLATE_ID = "atlante/skill";
+const DEFAULT_SKILL_TEMPLATE_ID = "atlante/skill";
 
 export type AgentArtifact = {
   hostAgentId: string;
@@ -33,11 +36,24 @@ export type SkillArtifact = {
   content: string;
 };
 
-export type ResolvedHarness = {
+export type PreparedProject = {
   agents: AgentArtifact[];
   skills: SkillArtifact[];
   diagnostics: Diagnostic[];
 };
+
+function isTemplateRegistry(value: unknown): value is TemplateRegistry {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as TemplateRegistry).get === "function" &&
+    typeof (value as TemplateRegistry).ids === "function"
+  );
+}
+
+function failedPreparation(diagnostics: Diagnostic[]): PreparedProject {
+  return { agents: [], skills: [], diagnostics };
+}
 
 type PreparedBinding = {
   input: Record<string, unknown>;
@@ -92,19 +108,18 @@ function renderDiagnostic(
 }
 
 /**
- * SPECIFICATION.md §9: validate, resolve values, load templates, render, emit
- * one descriptor per binding. Artifacts follow ECMAScript property-enumeration
- * order, which is stable across parses of the same input.
+ * Validate, resolve, and render one canonical document. Preparation is
+ * globally fail-closed: a failure in any binding discards every descriptor.
  */
-export function resolve(
+export function prepareDocument(
   document: AtlanteDocument,
   registry: TemplateRegistry,
-): ResolvedHarness {
-  const diagnostics = validateTemplates(
-    document,
-    registry,
-    DEFAULT_TEMPLATE_ID,
-  );
+  initialDiagnostics: Diagnostic[] = [],
+): PreparedProject {
+  const diagnostics = [
+    ...initialDiagnostics,
+    ...validateTemplates(document, registry, DEFAULT_TEMPLATE_ID),
+  ];
   if (hasErrors(diagnostics)) return { agents: [], skills: [], diagnostics };
 
   const agents: AgentArtifact[] = [];
@@ -173,7 +188,7 @@ export function resolve(
 
       skills.push({
         skillId,
-        description: rendered.description as string,
+        description: rendered.description,
         templateId,
         content: rendered.content,
       });
@@ -196,4 +211,28 @@ export function resolve(
   }
 
   return { agents, skills, diagnostics };
+}
+
+export function prepareProject(
+  target: string | AtlanteDocument,
+  context?: ProjectContext | TemplateRegistry,
+): PreparedProject {
+  if (typeof target !== "string") {
+    const loaded = isTemplateRegistry(context)
+      ? { registry: context, errors: [] }
+      : (context?.loadTemplates ?? loadBundledTemplates)();
+    if (loaded.errors.length > 0) {
+      return failedPreparation(templateLoadDiagnostics(loaded.errors));
+    }
+    return prepareDocument(target, loaded.registry);
+  }
+
+  const projectContext: ProjectContext | undefined = isTemplateRegistry(context)
+    ? { loadTemplates: () => ({ registry: context, errors: [] }) }
+    : (context as ProjectContext | undefined);
+  const loaded = loadProject(target, projectContext);
+  if (!loaded.document || !loaded.registry || hasErrors(loaded.diagnostics)) {
+    return failedPreparation(loaded.diagnostics);
+  }
+  return prepareDocument(loaded.document, loaded.registry, loaded.diagnostics);
 }

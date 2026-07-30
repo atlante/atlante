@@ -1,7 +1,7 @@
 # `@atlante/opencode-plugin`
 
 OpenCode host adapter for [Atlante](https://github.com/atlante/atlante). It
-resolves an Atlante document once during OpenCode initialization, atomically
+reads and verifies the host-neutral artifact tree built by Atlante, atomically
 stages the resulting agent prompts and descriptions in the in-memory host
 config, and exposes skills through the `atlante_skill` tool. Requires Node.js 22
 or later.
@@ -15,8 +15,9 @@ Register the plugin in `opencode.jsonc`:
 }
 ```
 
-Running `npx @atlante/cli init` creates this registration automatically while
-preserving existing OpenCode settings.
+Running `npx @atlante/cli init` creates this registration and builds artifacts
+automatically while preserving existing OpenCode settings. Run
+`npx @atlante/cli build` after changing the source configuration.
 
 `atlante_skill` accepts exactly `{ "name": "skill-id" }` and looks up the
 resolved root `skills` map by that name. A successful lookup returns the skill's
@@ -25,13 +26,14 @@ Invalid input, an unknown name, and an inactive, unavailable, or failed tool
 return an error rather than partial content. Skill content is informational
 Markdown: the adapter does not execute it.
 
-During initialization, the plugin expands the raw overlay and performs the
-complete validation and resolution preparation before materialization. If that
-preparation fails, the `atlante_skill` tool is omitted and the host config is
-unchanged. After the staged result is materialized, the tool is active; a
-failure after materialization, including a runtime failure, moves it to the
-failed lifecycle state. Resolution and injection are fail-closed: the host
-config is updated only from a complete staged result, so a failure cannot
-partially mutate the host. The plugin writes no agent or skill files, creates no
-skill cache, and does not register a native OpenCode `skill`; the native `skill`
-tool can coexist with `atlante_skill` without either replacing the other.
+During initialization, the plugin reads `.atlante/artifacts/manifest.json` and
+verifies every declared path, payload encoding, and SHA-256 digest before
+materialization. If artifacts are absent, malformed, unsupported, or changed,
+the `atlante_skill` tool is omitted and the host config is unchanged. After the
+staged result is materialized, the tool is active; a failure after
+materialization, including a runtime failure, moves it to the failed lifecycle
+state. Verification and injection are fail-closed: the host config is updated
+only from a complete verified artifact set, so a failure cannot partially
+mutate the host. The plugin never loads or renders source configuration. The
+native `skill` tool can coexist with `atlante_skill` without either replacing
+the other.

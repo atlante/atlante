@@ -43,8 +43,7 @@
   "dependencies": {
     "@atlante/presets": "workspace:*",
     "@atlante/schema": "workspace:*",
-    "@atlante/resolver": "workspace:*",
-    "@atlante/templates": "workspace:*",
+    "@atlante/builder": "workspace:*",
     "@atlante/validator": "workspace:*",
     "commander": "^12.1.0",
     "jsonc-parser": "^3.3.1"

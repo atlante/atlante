@@ -4,11 +4,16 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { BuildResult } from "@atlante/builder";
+import { buildProject } from "@atlante/builder";
+import { readArtifacts } from "@atlante/builder/artifacts";
+import { SCHEMA_URI } from "@atlante/schema";
 import {
   type InitDependencies,
   runInitWithDependencies,
@@ -47,7 +52,307 @@ describe("runInit", () => {
     const dir = tempDir();
     expect(await runInit(dir, {})).toBe(0);
     expect(existsSync(join(dir, "atlante.jsonc"))).toBe(true);
+    expect(
+      existsSync(join(dir, ".atlante", "artifacts", "manifest.json")),
+    ).toBe(true);
     expect(await runValidate(dir)).toBe(0);
+  });
+
+  test("rejects a symlinked project root before changing init targets", async () => {
+    const realRoot = tempDir();
+    const linkParent = tempDir();
+    const linkedRoot = join(linkParent, "linked-project");
+    const target = join(realRoot, "atlante.jsonc");
+    const opencode = join(realRoot, "opencode.jsonc");
+    const originalTarget = '{ "existing": "config" }';
+    const originalOpenCode = '{ "plugin": ["existing-plugin"] }';
+    writeFileSync(target, originalTarget);
+    writeFileSync(opencode, originalOpenCode);
+    symlinkSync(realRoot, linkedRoot);
+
+    const result = await captureErrors(() =>
+      runInitWithDependencies(
+        linkedRoot,
+        { force: true },
+        {
+          buildProject: () => {
+            throw new Error("builder should not run");
+          },
+        },
+      ),
+    );
+
+    expect(result.result).toBe(1);
+    expect(result.errors.join("\n")).toContain(
+      "project root must not be a symlink",
+    );
+    expect(readFileSync(target, "utf8")).toBe(originalTarget);
+    expect(readFileSync(opencode, "utf8")).toBe(originalOpenCode);
+  });
+
+  test("builds artifacts before reporting successful initialization", async () => {
+    const dir = tempDir();
+    const calls: string[] = [];
+    const buildProject = (target: string): BuildResult => {
+      calls.push(target);
+      return {
+        projectRoot: dir,
+        artifactsPath: join(dir, ".atlante", "artifacts"),
+        diagnostics: [],
+        warnings: [],
+      };
+    };
+
+    expect(await runInitWithDependencies(dir, {}, { buildProject })).toBe(0);
+    expect(calls).toEqual([dir]);
+  });
+
+  test("reports builder warnings after successful initialization", async () => {
+    const dir = tempDir();
+    let injected = false;
+    const result = await captureErrors(() =>
+      runInitWithDependencies(
+        dir,
+        {},
+        {
+          buildProject: (projectRoot) =>
+            buildProject(
+              projectRoot,
+              {},
+              {
+                fault: (operation, path) => {
+                  if (
+                    !injected &&
+                    operation === "sync-directory" &&
+                    path === join(projectRoot, ".atlante")
+                  ) {
+                    injected = true;
+                    throw new Error("injected publication warning");
+                  }
+                },
+              },
+            ),
+        },
+      ),
+    );
+
+    expect(result.result).toBe(0);
+    expect(result.errors.join("\n")).toContain(
+      "warning: unable to sync published artifact directory: injected publication warning",
+    );
+    expect(
+      existsSync(join(dir, ".atlante", "artifacts", "manifest.json")),
+    ).toBe(true);
+  });
+
+  test("rolls back init-managed files when the build reports diagnostics", async () => {
+    const dir = tempDir();
+    const target = join(dir, "atlante.jsonc");
+    const alternate = join(dir, "atlante.json");
+    const opencode = join(dir, "opencode.jsonc");
+    const originalAlternate = '{ "legacy": true }';
+    const originalOpenCode = '{ "model": "demo" }';
+    writeFileSync(alternate, originalAlternate);
+    writeFileSync(opencode, originalOpenCode);
+
+    const result = await captureErrors(() =>
+      runInitWithDependencies(
+        dir,
+        { force: true },
+        {
+          buildProject: () => ({
+            projectRoot: dir,
+            artifactsPath: join(dir, ".atlante", "artifacts"),
+            diagnostics: [
+              {
+                severity: "error",
+                code: "injected-build-failure",
+                message: "build failed",
+              },
+            ],
+            warnings: [],
+          }),
+        },
+      ),
+    );
+
+    expect(result.result).toBe(1);
+    expect(result.errors.join("\n")).toContain("injected-build-failure");
+    expect(existsSync(target)).toBe(false);
+    expect(readFileSync(alternate, "utf8")).toBe(originalAlternate);
+    expect(readFileSync(opencode, "utf8")).toBe(originalOpenCode);
+  });
+
+  test("restores init state and existing artifacts after a preparation diagnostic", async () => {
+    const dir = tempDir();
+    const target = join(dir, "atlante.jsonc");
+    const alternate = join(dir, "atlante.json");
+    const opencode = join(dir, "opencode.jsonc");
+    const originalAlternate = '{ "legacy": true }';
+    const originalOpenCode = '{ "model": "demo" }';
+
+    writeFileSync(
+      target,
+      JSON.stringify({
+        $schema: SCHEMA_URI,
+        agents: {
+          existing: {
+            description: "Existing description",
+            identity: "Existing prompt.",
+            mission: "Do the work.",
+          },
+        },
+      }),
+    );
+    buildProject(dir);
+    const originalManifest = readFileSync(
+      join(dir, ".atlante", "artifacts", "manifest.json"),
+      "utf8",
+    );
+    const originalArtifacts = readArtifacts(dir);
+    unlinkSync(target);
+    writeFileSync(alternate, originalAlternate);
+    writeFileSync(opencode, originalOpenCode);
+
+    const result = await captureErrors(() =>
+      runInitWithDependencies(
+        dir,
+        { force: true },
+        {
+          buildProject: () => ({
+            projectRoot: dir,
+            artifactsPath: join(dir, ".atlante", "artifacts"),
+            diagnostics: [
+              {
+                severity: "error",
+                code: "preparation-failed",
+                message: "injected preparation diagnostic",
+              },
+            ],
+            warnings: [],
+          }),
+        },
+      ),
+    );
+
+    expect(result.result).toBe(1);
+    expect(result.errors.join("\n")).toContain("preparation-failed");
+    expect(existsSync(target)).toBe(false);
+    expect(readFileSync(alternate, "utf8")).toBe(originalAlternate);
+    expect(readFileSync(opencode, "utf8")).toBe(originalOpenCode);
+    expect(
+      readFileSync(join(dir, ".atlante", "artifacts", "manifest.json"), "utf8"),
+    ).toBe(originalManifest);
+    expect(readArtifacts(dir)).toEqual(originalArtifacts);
+  });
+
+  test("rolls back before a throwing diagnostic reporter runs", async () => {
+    const dir = tempDir();
+    const target = join(dir, "atlante.jsonc");
+    const alternate = join(dir, "atlante.json");
+    const opencode = join(dir, "opencode.jsonc");
+    const originalAlternate = '{ "legacy": true }';
+    const originalOpenCode = '{ "plugin": ["existing-plugin"] }';
+    writeFileSync(
+      target,
+      JSON.stringify({
+        $schema: SCHEMA_URI,
+        agents: {
+          existing: {
+            description: "Existing description",
+            identity: "Existing prompt.",
+            mission: "Do the work.",
+          },
+        },
+      }),
+    );
+    buildProject(dir);
+    const originalManifest = readFileSync(
+      join(dir, ".atlante", "artifacts", "manifest.json"),
+      "utf8",
+    );
+    unlinkSync(target);
+    writeFileSync(alternate, originalAlternate);
+    writeFileSync(opencode, originalOpenCode);
+
+    const originalError = console.error;
+    console.error = () => {
+      throw new Error("throwing diagnostic reporter");
+    };
+    try {
+      await expect(
+        runInitWithDependencies(
+          dir,
+          { force: true },
+          {
+            buildProject: () => ({
+              projectRoot: dir,
+              artifactsPath: join(dir, ".atlante", "artifacts"),
+              diagnostics: [
+                {
+                  severity: "error",
+                  code: "injected-build-failure",
+                  message: "build failed",
+                },
+              ],
+              warnings: [],
+            }),
+          },
+        ),
+      ).rejects.toThrow("throwing diagnostic reporter");
+    } finally {
+      console.error = originalError;
+    }
+
+    expect(existsSync(target)).toBe(false);
+    expect(readFileSync(alternate, "utf8")).toBe(originalAlternate);
+    expect(readFileSync(opencode, "utf8")).toBe(originalOpenCode);
+    expect(
+      readFileSync(join(dir, ".atlante", "artifacts", "manifest.json"), "utf8"),
+    ).toBe(originalManifest);
+    expect(readArtifacts(dir)).toEqual({
+      agents: [expect.objectContaining({ hostAgentId: "existing" })],
+      skills: [],
+    });
+  });
+
+  test("preserves the previous artifacts when automatic publication fails", async () => {
+    const dir = tempDir();
+    const target = join(dir, "atlante.jsonc");
+    const originalConfig = `{ "$schema": "${SCHEMA_URI}" }`;
+    writeFileSync(target, originalConfig);
+    buildProject(dir);
+    const manifestPath = join(dir, ".atlante", "artifacts", "manifest.json");
+    const originalManifest = readFileSync(manifestPath, "utf8");
+
+    const result = await captureErrors(() =>
+      runInitWithDependencies(
+        dir,
+        { force: true },
+        {
+          buildProject: (projectRoot) =>
+            buildProject(
+              projectRoot,
+              {},
+              {
+                fault: (operation) => {
+                  if (operation === "rename-stage") {
+                    throw new Error("injected build publication failure");
+                  }
+                },
+              },
+            ),
+        },
+      ),
+    );
+
+    expect(result.result).toBe(1);
+    expect(result.errors.join("\n")).toContain(
+      "injected build publication failure",
+    );
+    expect(readFileSync(target, "utf8")).toBe(originalConfig);
+    expect(readFileSync(manifestPath, "utf8")).toBe(originalManifest);
+    expect(existsSync(join(dir, "opencode.jsonc"))).toBe(false);
   });
 
   test("the bare config has no workflow slot", async () => {

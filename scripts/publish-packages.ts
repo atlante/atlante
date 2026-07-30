@@ -8,7 +8,7 @@ const PACKAGES = [
   "templates",
   "presets",
   "validator",
-  "resolver",
+  "builder",
   "opencode-plugin",
   "cli",
 ] as const;

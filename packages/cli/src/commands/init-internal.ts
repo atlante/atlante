@@ -1,6 +1,12 @@
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import {
+  assertRealProjectRoot,
+  type BuildResult,
+  buildProject as buildProjectDefault,
+} from "@atlante/builder";
 import { SCHEMA_URI } from "@atlante/schema";
+import { hasErrors } from "@atlante/validator";
 import {
   applyEdits,
   modify,
@@ -8,6 +14,7 @@ import {
   parse,
   printParseErrorCode,
 } from "jsonc-parser";
+import { printDiagnostics } from "../report.js";
 
 export type InitOptions = { preset?: string; force?: boolean };
 
@@ -18,7 +25,11 @@ type InitFileSystem = {
   unlinkSync: (path: string) => void;
 };
 
-export type InitDependencies = Partial<InitFileSystem>;
+type BuildFunction = (target: string) => BuildResult;
+
+export type InitDependencies = Partial<InitFileSystem> & {
+  buildProject?: BuildFunction;
+};
 
 const defaultFileSystem: InitFileSystem = {
   existsSync,
@@ -189,7 +200,7 @@ function commitInitFiles(
   before: { target: Snapshot; alternate: Snapshot },
   plugin: PluginPlan,
   fileSystem: InitFileSystem,
-): string | undefined {
+): { changes: Array<{ path: string; before: Snapshot }>; error?: string } {
   const changes: Array<{ path: string; before: Snapshot }> = [];
   try {
     changes.push({ path: target, before: before.target });
@@ -205,13 +216,70 @@ function commitInitFiles(
       fileSystem.unlinkSync(alternate);
     }
   } catch (cause) {
-    return mutationErrorMessage(
-      "could not complete initialization",
-      cause,
-      rollback(changes, fileSystem),
-    );
+    return {
+      changes: [],
+      error: mutationErrorMessage(
+        "could not complete initialization",
+        cause,
+        rollback(changes, fileSystem),
+      ),
+    };
+  }
+  return { changes };
+}
+
+function initPreflightError(
+  target: string,
+  alternate: string,
+  options: InitOptions,
+  fileSystem: InitFileSystem,
+): string | undefined {
+  const existing = [target, alternate].filter(fileSystem.existsSync);
+  if (existing.length > 0 && !options.force) {
+    const wording = existing.length === 1 ? "already exists" : "already exist";
+    return `error: ${existing.join(" and ")} ${wording}; pass --force to overwrite`;
+  }
+  if (options.preset && options.preset !== "starter") {
+    return `error: unknown preset "${options.preset}"; only "starter" is available`;
   }
   return undefined;
+}
+
+function buildAndReport(
+  directory: string,
+  target: string,
+  changes: Array<{ path: string; before: Snapshot }>,
+  fileSystem: InitFileSystem,
+  buildProject: BuildFunction,
+): number {
+  let built: BuildResult;
+  try {
+    built = buildProject(directory);
+  } catch (cause) {
+    console.error(
+      mutationErrorMessage(
+        "could not complete initialization",
+        cause,
+        rollback(changes, fileSystem),
+      ),
+    );
+    return 1;
+  }
+
+  if (hasErrors(built.diagnostics)) {
+    const rollbackErrors = rollback(changes, fileSystem);
+    printDiagnostics(built.diagnostics);
+    if (rollbackErrors.length > 0) {
+      console.error(`error: rollback failed for ${rollbackErrors.join(", ")}`);
+    }
+    return 1;
+  }
+  printDiagnostics(built.diagnostics);
+  for (const warning of built.warnings)
+    console.error(`warning: ${warning.message}`);
+
+  console.log(`created ${target}`);
+  return 0;
 }
 
 export async function runInitWithDependencies(
@@ -228,20 +296,15 @@ export async function runInitWithDependencies(
   const opencode = join(directory, "opencode.jsonc");
 
   try {
-    const existing = [target, alternate].filter(fileSystem.existsSync);
-    if (existing.length > 0 && !options.force) {
-      const wording =
-        existing.length === 1 ? "already exists" : "already exist";
-      console.error(
-        `error: ${existing.join(" and ")} ${wording}; pass --force to overwrite`,
-      );
-      return 1;
-    }
-
-    if (options.preset && options.preset !== "starter") {
-      console.error(
-        `error: unknown preset "${options.preset}"; only "starter" is available`,
-      );
+    assertRealProjectRoot(directory);
+    const preflightError = initPreflightError(
+      target,
+      alternate,
+      options,
+      fileSystem,
+    );
+    if (preflightError) {
+      console.error(preflightError);
       return 1;
     }
     const contents = bareConfig();
@@ -256,7 +319,7 @@ export async function runInitWithDependencies(
       return 1;
     }
 
-    const error = commitInitFiles(
+    const committed = commitInitFiles(
       target,
       contents,
       alternate,
@@ -265,12 +328,19 @@ export async function runInitWithDependencies(
       plugin,
       fileSystem,
     );
-    if (error) {
-      console.error(error);
+    if (committed.error) {
+      console.error(committed.error);
       return 1;
     }
 
-    console.log(`created ${target}`);
+    const result = buildAndReport(
+      directory,
+      target,
+      committed.changes,
+      fileSystem,
+      dependencies.buildProject ?? buildProjectDefault,
+    );
+    if (result !== 0) return result;
     console.log(
       plugin.registered
         ? `registered @atlante/opencode-plugin in ${opencode}`

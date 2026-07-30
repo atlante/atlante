@@ -14,9 +14,8 @@ jobs:
         with:
           bun-version: "1.2.x"
       - run: bun install --frozen-lockfile
-      - run: bunx biome ci .
-      - run: bun run type:check
-      - run: bun test
+      - run: bun run build
+      - run: bun run full:check
 
       # Every test above calls the command handlers as functions, so a broken
       # shebang, a mis-wired Commander option, or an import that only fails at
@@ -34,18 +33,32 @@ jobs:
           bun "$cli" init "$project"
           test -f "$project/atlante.jsonc"
           grep -q '@atlante/opencode-plugin' "$project/opencode.jsonc"
+          test -f "$project/.atlante/artifacts/manifest.json"
 
           bun "$cli" validate "$project"
-          bun "$cli" resolve "$project" --json > /tmp/resolved.json
-          node -e '
-            const { agents, skills } = require("/tmp/resolved.json");
-            const ids = agents.map(({ hostAgentId }) => hostAgentId).sort();
-            const skillIds = skills.map(({ skillId }) => skillId).sort();
-            if (JSON.stringify(ids) !== JSON.stringify(["architect"])) process.exit(1);
-            if (!agents.some(({ prompt }) => prompt.includes("You are the lead engineer"))) process.exit(1);
-            if (JSON.stringify(skillIds) !== JSON.stringify(["brainstorming", "workflow"])) process.exit(1);
-            if (!skills.some(({ content }) => content.includes("# Workflow"))) process.exit(1);
-          '
+          bun "$cli" build "$project"
+          PROJECT="$project" node <<'NODE'
+          const { createHash } = require("node:crypto");
+          const { readFileSync } = require("node:fs");
+          const { join } = require("node:path");
+
+          const project = process.env.PROJECT;
+          const root = join(project, ".atlante", "artifacts");
+          const manifest = JSON.parse(readFileSync(join(root, "manifest.json"), "utf8"));
+          if (manifest.format !== "atlante-artifacts" || manifest.version !== 1) process.exit(1);
+          const entries = [...manifest.agents, ...manifest.skills];
+          for (const entry of entries) {
+            const payload = readFileSync(join(root, entry.path));
+            const digest = createHash("sha256").update(payload).digest("hex");
+            if (digest !== entry.sha256) process.exit(1);
+          }
+          const ids = manifest.agents.map(({ id }) => id).sort();
+          const skillIds = manifest.skills.map(({ id }) => id).sort();
+          if (JSON.stringify(ids) !== JSON.stringify(["architect"])) process.exit(1);
+          if (JSON.stringify(skillIds) !== JSON.stringify(["brainstorming", "workflow"])) process.exit(1);
+          if (!manifest.agents.some(({ path }) => readFileSync(join(root, path), "utf8").includes("You are the lead engineer"))) process.exit(1);
+          if (!manifest.skills.some(({ path }) => readFileSync(join(root, path), "utf8").includes("# Workflow"))) process.exit(1);
+          NODE
 
           # A broken configuration must fail loudly rather than exit 0.
           printf '{"$schema":"https://atlante.sh/schema/v0.1/schema.json","agents":{"a":{"identity":"x"}}}' \

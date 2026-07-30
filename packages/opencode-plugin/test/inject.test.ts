@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { AgentArtifact } from "@atlante/resolver";
+import type { VerifiedAgentArtifact } from "@atlante/builder/artifacts";
 import type { HostConfig } from "../src/api.js";
 import {
   createSkillTool as apiCreateSkillTool,
@@ -7,10 +7,9 @@ import {
 } from "../src/api.js";
 import { createSkillTool } from "../src/skill-tool.js";
 
-const artifacts: AgentArtifact[] = [
+const artifacts: VerifiedAgentArtifact[] = [
   {
     hostAgentId: "reviewer",
-    templateId: "atlante/agent",
     description: "DESCRIPTION",
     prompt: "PROMPT",
   },
@@ -52,7 +51,6 @@ describe("injectAgents", () => {
     injectAgents(config, [
       {
         hostAgentId: "__proto__",
-        templateId: "atlante/agent",
         description: "D",
         prompt: "P",
       },

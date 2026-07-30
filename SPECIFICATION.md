@@ -12,9 +12,10 @@ first Atlante specification.
 Version 0.1 defines a provider-neutral configuration model for structured agent
 prompts and Markdown skills. It defines a composable template
 system that owns prompt and skill-content semantics, a two-level validation
-model (document structure + template input schemas), deterministic resolution,
-and an OpenCode adapter that materializes resolved prompts into host agent
-definitions and exposes resolved skills through the `atlante_skill` adapter
+   model (document structure + template input schemas), deterministic artifact
+   building,
+and an OpenCode adapter that materializes built prompts into host agent
+definitions and exposes built skills through the `atlante_skill` adapter
 tool.
 
 Version 0.1 includes:
@@ -30,7 +31,7 @@ Version 0.1 includes:
 - skill bindings with descriptions and template-owned input rendered as Markdown;
 - host-agent bindings whose prompt inputs are defined by templates;
 - two-level validation (document structure + template input schema);
-- deterministic prompt resolution;
+- deterministic prompt building;
 - OpenCode prompt materialization and the `atlante_skill` lookup tool;
 - bundled `starter` preset (`atlante init`).
 
@@ -209,7 +210,7 @@ interpreting them. The schema document MUST identify itself with a versioned
 match `[A-Za-z_$][A-Za-z0-9_$-]*` and are referenced directly via
 `{{values.key}}`; value names do not represent nested paths. Values are
 project-wide and are resolved into prompt definitions via these references. An
-agent definition MAY contain a `values` object for local overrides. The resolver
+agent definition MAY contain a `values` object for local overrides. The builder
 MUST merge local values over global values by key; a local value replaces the
 global value with the same key for that agent only.
 
@@ -249,8 +250,8 @@ contract is divided across four layers:
 3. `@atlante/validator` applies structural checks on the document and semantic
    checks on templates, including reference validity and template input schema
    validation;
-4. `@atlante/resolver` normalizes the document into a structured,
-   host-independent model, renders templates with resolved values, and produces
+4. `@atlante/builder` normalizes the document into a structured,
+   host-independent model, renders templates with resolved values, and publishes
    artifact descriptors.
 
 Templates render prompt content; they do not define execution semantics or
@@ -310,7 +311,7 @@ source. Resolution MUST produce deterministic output for the same valid input.
 ### 6.4 Variable resolution
 
 Values are resolved into binding metadata and the prompt definition before
-rendering, not exposed to templates. The resolver MUST merge global and per-agent
+rendering, not exposed to templates. The builder MUST merge global and per-agent
 values, then MUST replace every `{{values.key}}` reference appearing in the
 agent's `description` and prompt definition with the resolved value, before the
 selected template is rendered. Per-agent overrides take precedence over global
@@ -394,7 +395,7 @@ The adapter:
 - SHOULD emit a warning when replacing a non-empty existing host prompt.
 
 The exact warning channel and host-specific file format are adapter concerns.
-The default adapter SHOULD report warnings through resolver, CLI, or plugin
+The default adapter SHOULD report warnings through builder, CLI, or plugin
 diagnostics rather than creating an additional warning file.
 
 ### 7.1 Skill bindings
@@ -473,13 +474,13 @@ configurations against the input schemas of templates selected for resolution.
 Templates required by a configuration MUST be available without network access
 during validation and resolution.
 
-## 9. Resolution and Materialization
+## 9. Build and Materialization
 
-Resolution transforms the canonical document into host-independent artifact
-descriptors. Resolution MUST be deterministic and MUST NOT execute agents,
+Building transforms the canonical document into host-independent artifact
+descriptors. Building MUST be deterministic and MUST NOT execute agents,
 commands, or arbitrary project code.
 
-The resolver MUST:
+The builder MUST:
 
 1. operate only on a document that has already passed structural validation,
    and perform template-level validation itself, refusing to render when either
@@ -493,7 +494,7 @@ The resolver MUST:
 5. produce one agent artifact descriptor per binding;
 6. preserve host-agent IDs and resolved descriptions in every descriptor.
 
-For skills, the resolver MUST:
+For skills, the builder MUST:
 
 1. select the explicit `template` or default to `atlante/skill`;
 2. merge global values with skill-local `values`, resolve system values, and
@@ -503,14 +504,14 @@ For skills, the resolver MUST:
 4. produce one resolved descriptor per binding containing `skillId`,
    `templateId`, `description`, and rendered Markdown `content`.
 
-Resolved output MUST contain `agents`, `skills`, and `diagnostics`. Resolution
-is globally fail-closed: if any agent or skill validation, value interpolation,
+Build preparation MUST contain `agents`, `skills`, and `diagnostics`. Building is
+globally fail-closed: if any agent or skill validation, value interpolation,
 composition, or rendering fails, it MUST return no partial agent or skill
-descriptors, MUST return empty `agents` and `skills` arrays, and MUST report
-diagnostics. An empty `skills` array is a successful result when the document
-contains no skills.
+descriptors and MUST report diagnostics. An empty `skills` collection is a
+successful result when the document contains no skills.
 
-Materialization is performed by an adapter. The OpenCode adapter MUST:
+Materialization is performed by an adapter from the published artifact set. The
+OpenCode adapter MUST:
 
 - locate an existing host agent by its configured ID;
 - create a missing host agent using OpenCode defaults where necessary;
@@ -527,6 +528,51 @@ permitted.
 Repeated materialization from the same valid document SHOULD produce the same
 host artifacts and MUST NOT duplicate agents.
 
+### 9.1 Artifact format and publication
+
+The builder MUST publish a host-independent artifact tree under
+`.atlante/artifacts/`. The artifact contract is separate from the document
+schema contract: the document `$schema` URI identifies the configuration schema,
+while the artifact manifest's `format` and numeric `version` identify the build
+output format. Version 0.1 defines:
+
+```json
+{
+  "format": "atlante-artifacts",
+  "version": 1,
+  "agents": [
+    {
+      "id": "reviewer",
+      "description": "Built description",
+      "path": "agents/<id-sha256>-<content-sha256>.md",
+      "sha256": "<64 lowercase hex characters>"
+    }
+  ],
+  "skills": []
+}
+```
+
+The manifest MUST be UTF-8 JSON and MUST contain only `format`, `version`,
+`agents`, and `skills`. Each entry MUST contain an opaque non-empty `id`, a
+`description`, a relative POSIX `path` in its declared namespace, and the
+lowercase SHA-256 digest of the exact UTF-8 Markdown payload at that path. The
+payload filename MUST be derived from the SHA-256 digest of the UTF-8 ID and
+the payload digest. IDs, paths, manifest entries, and payloads MUST be unique.
+
+An adapter MUST verify the format and version, reject unknown fields, unsafe
+paths, symlinks, non-regular files, invalid UTF-8, missing payloads, duplicate
+entries, and digest mismatches before returning any descriptors. Verification
+provides local integrity checking, not a privilege or trust boundary. Rendered
+values MAY contain sensitive data; implementations SHOULD keep the artifact
+tree local, ignore it in source control, and MUST NOT publish its payloads as a
+package or registry artifact.
+
+Publication MUST prepare the complete tree privately and then replace the live
+artifact directory atomically by directory rename. A reader MUST observe a
+complete previous tree, a complete new tree, or no usable tree, never a partial
+tree. A failed pre-publication replacement MUST preserve the previous complete
+tree when possible.
+
 ## 10. Package Boundaries
 
 The v1 implementation SHOULD preserve these package responsibilities:
@@ -542,13 +588,13 @@ The v1 implementation SHOULD preserve these package responsibilities:
 - `@atlante/validator`: document structural validation (references, required
   fields, types) and template-level validation (input schema compliance and
   composition acyclicity);
-- `@atlante/resolver`: normalization, template composition, value
-  resolution, and host-independent artifact descriptors;
+- `@atlante/builder`: project loading, normalization, template composition,
+  value resolution, rendering, and host-independent artifact publication;
 - `@atlante/presets`: registry-derived preset loading and the bundled preset
   documents themselves;
 - `@atlante/opencode-plugin`: OpenCode prompt materialization and skill lookup;
-- `@atlante/cli`: validation, resolution, materialization, and
-  `atlante init` entry point.
+- `@atlante/cli`: validation, artifact building, and the `atlante init` entry
+  point.
 
 `@atlante/templates` and `@atlante/presets` are the two content packages and
 MUST remain leaves of the dependency graph: neither depends on any other Atlante
@@ -559,22 +605,8 @@ document that uses it. Keeping both content packages dependency-free is what
 allows third parties to distribute templates and presets without depending on
 the core.
 
-An adapter MUST receive resolved descriptors and MUST NOT contain a separate
-execution branch for each renderer.
-
-### 10.1 CLI JSON output
-
-For `atlante resolve --json`, the CLI MUST emit exactly one JSON object to
-standard output with exactly these top-level fields: `agents`, `skills`, and
-`diagnostics`. The `agents` and `skills` fields contain the resolved artifact
-arrays. Each agent artifact includes `hostAgentId`, `templateId`, `description`,
-and `prompt`; each skill artifact includes `skillId`, `templateId`,
-`description`, and `content`. `diagnostics` contains the diagnostic array. The
-`--agent` option filters only `agents`; it MUST NOT filter `skills`.
-
-JSON-mode failures MUST also emit this envelope to standard output, with empty
-`agents` and `skills` arrays and the reported diagnostics. JSON-mode diagnostics
-MUST NOT be duplicated on standard error.
+An adapter MUST consume verified artifact descriptors and MUST NOT contain a
+separate execution branch for each renderer.
 
 ## 11. OpenCode Adapter Profile
 
@@ -582,28 +614,29 @@ The OpenCode adapter is the first host integration. Version 0.1 defines its
 prompt materialization responsibilities and preset support. Runtime
 execution and state management are outside this specification.
 
-The adapter MUST treat the Atlante configuration as the only source of truth for
-prompts. Users SHOULD not maintain a competing prompt in OpenCode agent
-configuration.
+The builder treats the Atlante configuration as the source of truth for prompts;
+the adapter treats the verified artifact tree as its only input. Users SHOULD
+not maintain a competing prompt in OpenCode agent configuration.
 
 ### 11.1 Skill lookup
 
-After successful resolution and materialization, the OpenCode adapter exposes
+After successful artifact verification and materialization, the OpenCode adapter exposes
 an `atlante_skill` tool for skill lookups. The tool input MUST be exactly
 an object with one string field, `{ "name": "<skillId>" }`; the name is looked
 up against the root `skills` map key. A successful known-name lookup returns
 only the resolved Markdown `content`; the skill `description` is not returned
 by the tool.
 
-If overlay expansion, validation, or resolution fails, `atlante_skill` MUST be
-unavailable and the host configuration MUST remain unchanged. Malformed input
-and unknown names MUST return explicit errors without partial skill content.
+If artifact discovery or verification fails, `atlante_skill` MUST be unavailable
+and the host configuration MUST remain unchanged. Malformed input and unknown
+names MUST return explicit errors without partial skill content.
 Skill content is returned as data and is not executed.
 
 ### 11.2 Preset inheritance
 
 `atlante init` scaffolds a project configuration that extends a bundled preset
-via the `extends` field. The generated configuration carries only the document
+via the `extends` field and builds the initial artifact tree before reporting
+success. The generated configuration carries only the document
 `$schema` and the `extends` reference; values are left to the preset's system
 value defaults (e.g. `project` resolves to the basename of `process.cwd()` at
 runtime). Users add per-project overrides as needed.
@@ -657,8 +690,9 @@ taking precedence:
 #### Validation and resolution
 
 Every entry point that accepts a raw configuration overlay, including the CLI
-and host adapters, MUST apply the same shared expansion path before validation
-and resolution:
+and builder, MUST apply the same shared expansion path before validation and
+building. Host adapters consume published artifacts and do not accept or
+expand source configuration:
 
 1. Parse the local document as an overlay that may contain `extends` and
    tombstone `null` values.
@@ -683,6 +717,10 @@ Version 0.1 MUST include the `atlante/starter` preset as the default
 initialization target. The starter preset MUST provide at least an `architect`
 agent and an `implement` agent.
 
+After changing the source configuration, users MUST run `atlante build` before
+the host adapter can observe the change. The adapter consumes the published
+artifact tree and MUST NOT load or render the source configuration itself.
+
 ## 12. Compatibility and Evolution
 
 ### 12.1 Version domains
@@ -699,6 +737,11 @@ Atlante uses separate version domains for separate contracts:
   implementations MUST be selected reproducibly by an exact package version
   recorded in a project lockfile, or by a template ID paired with an immutable
   version or digest.
+- **Artifact format**: the `format` and numeric `version` in
+  `.atlante/artifacts/manifest.json` identify the host-neutral build-output
+  contract. Artifact format versions are independent of document schema
+  versions and package releases; an adapter MUST reject unsupported artifact
+  formats or versions rather than guessing.
 
 Template implementation changes MUST NOT silently change the behavior selected
 by an existing reproducible configuration. A change to a template's input schema
@@ -739,16 +782,17 @@ Version 0.1 is complete when a conforming implementation can:
 7. replace an existing agent prompt and description while preserving host-owned
    fields;
 8. report a warning when a non-empty host prompt is replaced;
-9. scaffold a project from the bundled `starter` preset via `atlante init`;
+9. scaffold a project from the bundled `starter` preset via `atlante init`,
+   automatically build its artifact tree, and rebuild it via `atlante build`;
 10. validate a skill with required description, default `atlante/skill`, and
      template-owned input;
 11. interpolate skill descriptions and input with global and local values;
 12. resolve skill template composition and reject missing references, cycles,
     invalid input, missing values, and other template failures;
 13. apply preset skill inheritance, local precedence, and `null` tombstones;
-14. expose the exact CLI `--json` envelope containing only `agents`, `skills`,
-     and `diagnostics`, with JSON failures on stdout and no duplicate stderr
-     diagnostics, while `--agent` filters only agents;
+14. publish the versioned `atlante-artifacts` manifest with verified payload
+      paths and SHA-256 digests, and reject malformed or mismatched artifacts
+      before host materialization;
 15. expose `atlante_skill` with the `{ "name": "<skillId>" }` lookup returning
     rendered Markdown content only and make it unavailable when preparation
     fails; and

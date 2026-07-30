@@ -1,60 +1,36 @@
-import type { ResolvedHarness } from "@atlante/resolver";
-import { resolve } from "@atlante/resolver";
-import { loadBundledTemplates } from "@atlante/templates";
-import type { Diagnostic } from "@atlante/validator";
 import {
-  createBundledPresetLoader,
-  error,
-  expandDocument,
-  findConfigFile,
-  formatDiagnostic,
-  hasErrors,
-  loadDocument,
-  parseDocumentOverlay,
-  templateLoadDiagnostics,
-} from "@atlante/validator";
+  readArtifacts,
+  type VerifiedArtifacts,
+} from "@atlante/builder/artifacts";
 import type { Plugin } from "@opencode-ai/plugin";
-import type { HostConfig } from "./inject.js";
-import { injectAgents } from "./inject.js";
+import {
+  type HostConfig,
+  type InjectionWarning,
+  injectAgents,
+} from "./inject.js";
 import { createSkillTool, type SkillToolState } from "./skill-tool.js";
 
-function report(diagnostics: Diagnostic[]): void {
-  for (const diagnostic of diagnostics) {
-    console.error(`[atlante] ${formatDiagnostic(diagnostic)}`);
+function report(warnings: readonly InjectionWarning[]): void {
+  for (const warning of warnings) {
+    console.error(
+      `[atlante] ${warning.severity}: [${warning.code}] ${warning.message}`,
+    );
   }
 }
 
 export type AtlantePluginDeps = {
-  loadDocument: typeof loadDocument;
-  loadBundledTemplates: typeof loadBundledTemplates;
-  resolve?: typeof resolve;
-  expandDocument?: typeof expandDocument;
+  readArtifacts?: typeof readArtifacts;
   injectAgents?: typeof injectAgents;
 };
 
 const defaultDeps: AtlantePluginDeps = {
-  loadDocument,
-  loadBundledTemplates,
-  resolve,
-  expandDocument,
+  readArtifacts,
   injectAgents,
 };
 
 type Preparation =
   | { kind: "none" }
-  | { kind: "ready"; resolved: ResolvedHarness }
-  | { kind: "failed"; diagnostics: Diagnostic[] };
-
-function runtimeFailure(cause: unknown): Diagnostic[] {
-  return [
-    error(
-      "plugin-runtime-failed",
-      `plugin runtime failed: ${
-        cause instanceof Error ? cause.message : String(cause)
-      }`,
-    ),
-  ];
-}
+  | { kind: "ready"; artifacts: VerifiedArtifacts };
 
 function restoreConfig(
   config: HostConfig,
@@ -105,9 +81,9 @@ function commitConfig(
   }
 }
 
-function reportFailure(diagnostics: Diagnostic[]): void {
+function reportFailure(warnings: readonly InjectionWarning[]): void {
   try {
-    report(diagnostics);
+    report(warnings);
   } catch {
     // Reporting must not turn a failed host-config transaction into a rejected hook.
   }
@@ -115,65 +91,27 @@ function reportFailure(diagnostics: Diagnostic[]): void {
 
 function prepare(directory: string, deps: AtlantePluginDeps): Preparation {
   try {
-    const file = findConfigFile(directory);
+    const artifacts = (deps.readArtifacts ?? readArtifacts)(directory);
+    if (!artifacts) return { kind: "none" };
 
-    // No configuration at all is not an error: Atlante simply does not apply.
-    if (!file) {
-      const loaded = deps.loadDocument(directory);
-      if (loaded.diagnostics.some((d) => d.code === "config-not-found")) {
-        return { kind: "none" };
-      }
-      return { kind: "failed", diagnostics: loaded.diagnostics };
-    }
-
-    const parsed = parseDocumentOverlay(file.text, file.path);
-    if (!parsed.overlay)
-      return { kind: "failed", diagnostics: parsed.diagnostics };
-
-    const { registry, errors } = deps.loadBundledTemplates();
-    if (errors.length > 0) {
-      return { kind: "failed", diagnostics: templateLoadDiagnostics(errors) };
-    }
-
-    const expanded = (deps.expandDocument ?? expandDocument)(
-      parsed.overlay,
-      createBundledPresetLoader(),
-    );
-    if (!expanded.document) {
-      return { kind: "failed", diagnostics: expanded.diagnostics };
-    }
-
-    const resolved = (deps.resolve ?? resolve)(expanded.document, registry);
-    if (hasErrors(resolved.diagnostics)) {
-      return { kind: "failed", diagnostics: resolved.diagnostics };
-    }
-
-    // Keep initialization output independent from mutable resolver-owned arrays.
+    // Keep initialization output independent from the builder's arrays.
     return {
       kind: "ready",
-      resolved: {
-        agents: resolved.agents.map((artifact) => ({ ...artifact })),
-        skills: resolved.skills.map((artifact) => ({ ...artifact })),
-        diagnostics: resolved.diagnostics.map((diagnostic) => ({
-          ...diagnostic,
-          ...(diagnostic.location
-            ? { location: { ...diagnostic.location } }
-            : {}),
-        })),
+      artifacts: {
+        agents: artifacts.agents.map((artifact) => ({ ...artifact })),
+        skills: artifacts.skills.map((artifact) => ({ ...artifact })),
       },
     };
-  } catch (cause) {
-    return { kind: "failed", diagnostics: runtimeFailure(cause) };
+  } catch {
+    // A missing, corrupt, or unsafe publication must not stop OpenCode.
+    return { kind: "none" };
   }
 }
 
 /**
  * Materialization is runtime injection: the resolved prompts are written into
- * the in-memory OpenCode config and nothing is generated on disk.
- *
- * Failure behavior is fail-closed on the Atlante side and fail-open on the host
- * side. A broken atlante.jsonc must not prevent OpenCode from starting, and a
- * partially injected set of prompts would be worse than none at all.
+ * the in-memory OpenCode config and nothing is generated on disk. Only a
+ * complete, verified builder artifact publication is eligible for injection.
  */
 export function createAtlantePlugin(
   deps: AtlantePluginDeps = defaultDeps,
@@ -183,36 +121,37 @@ export function createAtlantePlugin(
     if (preparation.kind === "none") {
       return { config: async () => {} };
     }
-    if (preparation.kind === "failed") {
-      return {
-        config: async () => reportFailure(preparation.diagnostics),
-      };
-    }
-
-    const { resolved } = preparation;
+    const { artifacts } = preparation;
     const state: SkillToolState = { status: "inactive" };
     const skillTool =
-      resolved.skills.length > 0
-        ? createSkillTool(resolved.skills, state)
+      artifacts.skills.length > 0
+        ? createSkillTool(artifacts.skills, state)
         : undefined;
 
     return {
       config: async (config) => {
-        if (state.status === "failed") return;
         try {
           const staged = structuredClone(config) as unknown as HostConfig;
           const warnings =
-            resolved.agents.length > 0
-              ? (deps.injectAgents ?? injectAgents)(staged, resolved.agents)
+            artifacts.agents.length > 0
+              ? (deps.injectAgents ?? injectAgents)(staged, artifacts.agents)
               : [];
           commitConfig(config as unknown as HostConfig, staged, () => {
-            report([...resolved.diagnostics, ...warnings]);
+            report(warnings);
             state.status = "active";
           });
         } catch (cause) {
           state.status = "failed";
           state.reason = String(cause);
-          reportFailure(runtimeFailure(cause));
+          reportFailure([
+            {
+              severity: "warning",
+              code: "plugin-runtime-failed",
+              message: `plugin runtime failed: ${
+                cause instanceof Error ? cause.message : String(cause)
+              }`,
+            },
+          ]);
         }
       },
       ...(skillTool ? { tool: { atlante_skill: skillTool } } : {}),

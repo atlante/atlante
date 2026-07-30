@@ -1,6 +1,6 @@
 # `@atlante/cli`
 
-Command-line interface for validating, resolving, and initializing
+Command-line interface for validating, building, and initializing
 [Atlante](https://github.com/atlante/atlante) projects. Requires Node.js 22 or
 later.
 
@@ -11,7 +11,7 @@ Run the CLI directly from npm:
 ```bash
 npx @atlante/cli init
 npx @atlante/cli validate
-npx @atlante/cli resolve
+npx @atlante/cli build
 ```
 
 For a global `atlante` command:
@@ -24,43 +24,21 @@ atlante --help
 ## Commands
 
 - `atlante init [path] [--preset starter] [--force]` — scaffold
-  `atlante.jsonc` and register `@atlante/opencode-plugin`
+  `atlante.jsonc`, register `@atlante/opencode-plugin`, and build artifacts
 - `atlante validate [path]` — validate the document and referenced template
   inputs without rendering
-- `atlante resolve [path] [--agent <id>] [--json]` — render resolved agent
-  prompts and skills
+- `atlante build [path]` — validate, render, and atomically publish host-neutral
+  artifacts under `.atlante/artifacts/`
 
 `path` defaults to the current directory and may be a config file or project
 directory. Atlante discovers both `atlante.jsonc` and `atlante.json`.
-Validation and resolution use the same raw-overlay expansion path before
-checking or rendering the canonical document.
+Validation and building use the same raw-overlay expansion path before checking
+or rendering the canonical document. `init` performs a build automatically. Run
+`atlante build` after changing the source configuration.
 
 `init` creates or updates `opencode.jsonc` while preserving existing settings.
 
-Human-readable `resolve` output prints both agent and skill artifacts. The
-`--agent <id>` filter applies only to agents; it never hides or filters skills.
-With `--json`, the CLI emits exactly this envelope to stdout. JSON-mode failures
-also emit the envelope to stdout with diagnostics; diagnostics are not duplicated
-on stderr, and failed results contain empty `agents` and `skills` arrays:
-
-```json
-{
-  "agents": [
-    {
-      "hostAgentId": "implementer",
-      "templateId": "atlante/agent",
-      "description": "Implements requested changes.",
-      "prompt": "..."
-    }
-  ],
-  "skills": [
-    {
-      "skillId": "testing",
-      "templateId": "atlante/skill",
-      "description": "Testing guidance.",
-      "content": "Run the focused test suite."
-    }
-  ],
-  "diagnostics": []
-}
-```
+The artifact format and its verification rules are documented in the repository
+[`ARTIFACTS.md`](../../ARTIFACTS.md). Artifact format/version is distinct from
+the document schema version. Artifacts contain rendered values and may be
+sensitive; keep `.atlante/` local and do not publish it.

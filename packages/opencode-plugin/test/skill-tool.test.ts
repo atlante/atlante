@@ -6,13 +6,11 @@ const skills = [
   {
     skillId: "testing",
     description: "Testing guidance",
-    templateId: "atlante/skill",
     content: "Run tests.",
   },
   {
     skillId: "release",
     description: "Release guidance",
-    templateId: "atlante/skill",
     content: "Cut a release.",
   },
 ] as const;
@@ -37,7 +35,6 @@ test("returns known rendered Markdown", async () => {
       {
         skillId: "testing",
         description: "Testing",
-        templateId: "atlante/skill",
         content: "Run tests.",
       },
     ],
@@ -55,7 +52,6 @@ test("rejects unknown names with the requested name and available IDs", async ()
       {
         skillId: "testing",
         description: "Testing",
-        templateId: "atlante/skill",
         content: "Run tests.",
       },
     ],

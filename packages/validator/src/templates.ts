@@ -418,7 +418,7 @@ function validateAgentBinding(
   }
 
   // Template schemas must see the same values the renderer will see. A
-  // hand-built document with a non-string value is left for the resolver's
+  // hand-built document with a non-string value is left for the builder's
   // defence-in-depth render diagnostic instead of making validation throw.
   let inputForValidation = input;
   try {

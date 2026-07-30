@@ -1,14 +1,36 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { resolve } from "@atlante/resolver";
+import { buildProject } from "@atlante/builder";
 import { SCHEMA_URI } from "@atlante/schema";
-import { loadBundledTemplates } from "@atlante/templates";
-import { expandDocument, loadDocument } from "@atlante/validator";
 import type { Config, PluginInput } from "@opencode-ai/plugin";
 import type { HostConfig } from "../src/api.js";
+import { injectAgents } from "../src/inject.js";
 import { AtlantePlugin, createAtlantePlugin } from "../src/plugin.js";
+
+type ArtifactManifestEntry = {
+  id: string;
+  description: string;
+  path: string;
+  sha256: string;
+};
+
+type ArtifactManifest = {
+  format: "atlante-artifacts";
+  version: 1;
+  agents: ArtifactManifestEntry[];
+  skills: ArtifactManifestEntry[];
+};
 
 const created: string[] = [];
 
@@ -22,6 +44,45 @@ function project(config: string): string {
   const dir = tempDir();
   writeFileSync(join(dir, "atlante.jsonc"), config);
   return dir;
+}
+
+function builtProject(config = validWithSkill): string {
+  const dir = project(config);
+  const result = buildProject(dir);
+  if (result.diagnostics.some((diagnostic) => diagnostic.severity === "error"))
+    throw new Error("test fixture failed to build");
+  return dir;
+}
+
+function digest(value: Uint8Array | string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function manifestAt(directory: string): ArtifactManifest {
+  return JSON.parse(
+    readFileSync(
+      join(directory, ".atlante", "artifacts", "manifest.json"),
+      "utf8",
+    ),
+  ) as ArtifactManifest;
+}
+
+function writeManifest(directory: string, manifest: ArtifactManifest): void {
+  writeFileSync(
+    join(directory, ".atlante", "artifacts", "manifest.json"),
+    JSON.stringify(manifest),
+  );
+}
+
+async function expectPluginFailsOpen(directory: string): Promise<void> {
+  const config: HostConfig = { agent: { existing: { model: "x" } } };
+  const before = structuredClone(config);
+  const hooks = await AtlantePlugin(pluginInput(directory));
+
+  await hooks.config?.(config as unknown as Config);
+
+  expect(hooks.tool?.atlante_skill).toBeUndefined();
+  expect(config).toEqual(before);
 }
 
 afterEach(() => {
@@ -51,24 +112,8 @@ const validWithSkill = `{
   }
 }`;
 
-/**
- * The `config` hook only reads `directory` off its input; the remaining
- * `PluginInput` fields are OpenCode runtime plumbing (SDK client, project
- * metadata, workspace registration) the plugin never touches.
- */
 function pluginInput(directory: string): PluginInput {
   return { directory } as PluginInput;
-}
-
-/** Runs `fn` with `console.error` silenced, always restoring it afterwards. */
-async function silently<T>(fn: () => Promise<T>): Promise<T> {
-  const original = console.error;
-  console.error = () => {};
-  try {
-    return await fn();
-  } finally {
-    console.error = original;
-  }
 }
 
 async function capturedErrors<T>(fn: () => Promise<T>): Promise<string[]> {
@@ -84,30 +129,11 @@ async function capturedErrors<T>(fn: () => Promise<T>): Promise<string[]> {
 }
 
 describe("AtlantePlugin", () => {
-  test("prepares once before returning hooks and activates the skill after config commit", async () => {
-    const dir = project(validWithSkill);
-    const calls = { load: 0, templates: 0, expand: 0, resolve: 0 };
-    const plugin = createAtlantePlugin({
-      loadDocument: (path) => {
-        calls.load += 1;
-        return loadDocument(path);
-      },
-      loadBundledTemplates: () => {
-        calls.templates += 1;
-        return loadBundledTemplates();
-      },
-      expandDocument: (overlay, presets) => {
-        calls.expand += 1;
-        return expandDocument(overlay, presets);
-      },
-      resolve: (document, registry) => {
-        calls.resolve += 1;
-        return resolve(document, registry);
-      },
-    });
+  test("uses verified built artifacts after the source config is removed", async () => {
+    const dir = builtProject();
+    unlinkSync(join(dir, "atlante.jsonc"));
 
-    const hooks = await plugin(pluginInput(dir));
-    expect(calls).toEqual({ load: 0, templates: 1, expand: 1, resolve: 1 });
+    const hooks = await AtlantePlugin(pluginInput(dir));
     const skillTool = hooks.tool?.atlante_skill;
     expect(skillTool).toBeDefined();
     await expect(
@@ -116,18 +142,42 @@ describe("AtlantePlugin", () => {
 
     const config: HostConfig = {};
     await hooks.config?.(config as unknown as Config);
-    expect(calls).toEqual({ load: 0, templates: 1, expand: 1, resolve: 1 });
     expect(config.agent?.reviewer?.prompt).toContain("You review.");
-    await hooks.config?.({} as Config);
-    expect(calls).toEqual({ load: 0, templates: 1, expand: 1, resolve: 1 });
     await expect(
       skillTool?.execute({ name: "testing" }, {} as never),
-    ).resolves.toBe(
-      "# Testing\n\n## Overview\n\nTesting guidance\n\nRun tests.\n",
-    );
+    ).resolves.toContain("Run tests.");
   });
 
-  test("does nothing when no atlante configuration exists", async () => {
+  test.each([
+    ["removal", (dir: string) => unlinkSync(join(dir, "atlante.jsonc"))],
+    [
+      "corruption",
+      (dir: string) => writeFileSync(join(dir, "atlante.jsonc"), "{"),
+    ],
+    [
+      "ambiguity",
+      (dir: string) => writeFileSync(join(dir, "atlante.json"), valid),
+    ],
+    [
+      "change",
+      (dir: string) => writeFileSync(join(dir, "atlante.jsonc"), valid),
+    ],
+  ] as const)(
+    "does not consult source config after a %s",
+    async (_name, alter) => {
+      const dir = builtProject();
+      alter(dir);
+
+      const hooks = await AtlantePlugin(pluginInput(dir));
+      const config: HostConfig = {};
+      await hooks.config?.(config as unknown as Config);
+
+      expect(config.agent?.reviewer?.prompt).toContain("You review.");
+      expect(hooks.tool?.atlante_skill).toBeDefined();
+    },
+  );
+
+  test("fails open for missing artifacts", async () => {
     const dir = tempDir();
     const config: HostConfig = { agent: { existing: { model: "x" } } };
     const before = structuredClone(config);
@@ -135,311 +185,182 @@ describe("AtlantePlugin", () => {
     const hooks = await AtlantePlugin(pluginInput(dir));
     await hooks.config?.(config as unknown as Config);
 
+    expect(hooks.tool?.atlante_skill).toBeUndefined();
     expect(config).toEqual(before);
   });
 
-  test("leaves the host config untouched when the document is invalid", async () => {
-    const dir = project(`{ "$schema": "${SCHEMA_URI}" }`);
+  test("fails open for corrupt artifacts", async () => {
+    const dir = builtProject(validWithSkill);
+    writeFileSync(join(dir, ".atlante", "artifacts", "manifest.json"), "{");
+    unlinkSync(join(dir, "atlante.jsonc"));
     const config: HostConfig = { agent: { existing: { model: "x" } } };
     const before = structuredClone(config);
 
-    await silently(async () => {
-      const hooks = await AtlantePlugin(pluginInput(dir));
-      expect(hooks.tool).toBeUndefined();
-      await hooks.config?.(config as unknown as Config);
-    });
-
-    expect(config).toEqual(before);
-  });
-
-  test("does not reject when preparation diagnostic reporting throws", async () => {
-    const dir = project(`{ "$schema": "${SCHEMA_URI}" }`);
-    const config: HostConfig = { agent: { existing: { model: "x" } } };
-    const before = structuredClone(config);
-    const originalError = console.error;
-    let rejected = false;
-    console.error = () => {
-      throw new Error("report failure");
-    };
-    try {
-      const hooks = await AtlantePlugin(pluginInput(dir));
-      expect(hooks.tool).toBeUndefined();
-      await hooks.config?.(config as unknown as Config);
-    } catch {
-      rejected = true;
-    } finally {
-      console.error = originalError;
-    }
-
-    expect(rejected).toBe(false);
-    expect(config).toEqual(before);
-  });
-
-  test("leaves the host config untouched when the configuration is ambiguous", async () => {
-    const dir = tempDir();
-    writeFileSync(join(dir, "atlante.jsonc"), valid);
-    writeFileSync(join(dir, "atlante.json"), valid);
-    const config: HostConfig = { agent: { existing: { model: "x" } } };
-    const before = structuredClone(config);
-
-    await silently(async () => {
-      const hooks = await AtlantePlugin(pluginInput(dir));
-      await hooks.config?.(config as unknown as Config);
-    });
-
-    expect(config).toEqual(before);
-  });
-
-  test("leaves the host config untouched when template-level validation fails", async () => {
-    // Document-valid (passes the loose zod schema) but missing the "mission"
-    // field the atlante/agent template's inputSchema requires: this fails
-    // inside resolve(), not inside loadDocument().
-    const dir = project(
-      `{ "$schema": "${SCHEMA_URI}", "agents": { "a": { "description": "Agent", "identity": "x" } } }`,
-    );
-    const config: HostConfig = { agent: { existing: { model: "x" } } };
-    const before = structuredClone(config);
-
-    await silently(async () => {
-      const hooks = await AtlantePlugin(pluginInput(dir));
-      await hooks.config?.(config as unknown as Config);
-    });
-
-    expect(config).toEqual(before);
-  });
-
-  test("leaves the host config untouched when template loading fails", async () => {
-    const dir = project(valid);
-    const config: HostConfig = { agent: { existing: { model: "x" } } };
-    const before = structuredClone(config);
-
-    // The real bundled templates directory is always valid, so the
-    // template-load-error path can only be exercised through the deps seam
-    // (see createAtlantePlugin's docstring for why this isn't a module mock).
-    const { loadDocument } = await import("@atlante/validator");
-    const plugin = createAtlantePlugin({
-      loadDocument,
-      loadBundledTemplates: () => ({
-        registry: { get: () => undefined, ids: () => [] },
-        errors: [{ directory: "/bundled", message: "boom" }],
-      }),
-    });
-
-    await silently(async () => {
-      const hooks = await plugin(pluginInput(dir));
-      await hooks.config?.(config as unknown as Config);
-    });
-
-    expect(config).toEqual(before);
-  });
-
-  test("renders diagnostics with the shared code, location, and path format", async () => {
-    const dir = tempDir();
-    const config: HostConfig = { agent: { existing: { model: "x" } } };
-    const plugin = createAtlantePlugin({
-      loadDocument: () => ({
-        diagnostics: [
-          {
-            severity: "error",
-            code: "diagnostic-probe",
-            message: "probe",
-            location: { line: 2, column: 3 },
-            path: "/agents/agent~1id~0one",
-          },
-        ],
-      }),
-      loadBundledTemplates: () => ({
-        registry: { get: () => undefined, ids: () => [] },
-        errors: [],
-      }),
-    });
-
-    const output = await capturedErrors(async () => {
-      const hooks = await plugin(pluginInput(dir));
-      await hooks.config?.(config as unknown as Config);
-    });
-
-    expect(output).toEqual([
-      "[atlante] error:2:3: [diagnostic-probe] probe at /agents/agent~1id~0one",
-    ]);
-    expect(config).toEqual({ agent: { existing: { model: "x" } } });
-  });
-
-  test("reports unexpected dependency failures without mutating host config", async () => {
-    const dir = tempDir();
-    const config: HostConfig = { agent: { existing: { model: "x" } } };
-    const before = structuredClone(config);
-    const plugin = createAtlantePlugin({
-      loadDocument: () => {
-        throw new Error("injected loader failure");
-      },
-      loadBundledTemplates: () => ({
-        registry: { get: () => undefined, ids: () => [] },
-        errors: [],
-      }),
-    });
-
-    const output = await capturedErrors(async () => {
-      const hooks = await plugin(pluginInput(dir));
-      await hooks.config?.(config as unknown as Config);
-    });
-
-    expect(output[0]).toContain(
-      "[atlante] error: [plugin-runtime-failed] plugin runtime failed: injected loader failure",
-    );
-    expect(config).toEqual(before);
-  });
-
-  test("stages injection so an unexpected adapter failure cannot partially mutate config", async () => {
-    const dir = project(valid);
-    const config: HostConfig = { agent: { existing: { model: "x" } } };
-    const before = structuredClone(config);
-    const { loadDocument } = await import("@atlante/validator");
-    const { loadBundledTemplates } = await import("@atlante/templates");
-    const plugin = createAtlantePlugin({
-      loadDocument,
-      loadBundledTemplates,
-      injectAgents: (staged) => {
-        staged.agent = { partial: { prompt: "partial" } };
-        throw new Error("injected adapter failure");
-      },
-    });
-
-    await capturedErrors(async () => {
-      const hooks = await plugin(pluginInput(dir));
-      await hooks.config?.(config as unknown as Config);
-    });
-
-    expect(config).toEqual(before);
-  });
-
-  test("rolls back every top-level change when config assignment fails", async () => {
-    const dir = project(validWithSkill);
-    const plugin = createAtlantePlugin({
-      loadDocument,
-      loadBundledTemplates,
-      injectAgents: (staged) => {
-        staged.first = "new";
-        return [];
-      },
-    });
-    const hooks = await plugin(pluginInput(dir));
-    const config = { first: "old" } as HostConfig;
-    Object.defineProperty(config, "second", {
-      configurable: false,
-      enumerable: true,
-      get: () => "old",
-      set: () => {
-        throw new Error("commit failure");
-      },
-    });
-    const beforeSecond = Object.getOwnPropertyDescriptor(config, "second");
-
-    await capturedErrors(async () => {
-      await hooks.config?.(config as unknown as Config);
-    });
-
-    expect(config.first).toBe("old");
-    expect(Object.hasOwn(config, "agent")).toBe(false);
-    expect(Object.getOwnPropertyDescriptor(config, "second")).toEqual(
-      beforeSecond,
-    );
-    await expect(
-      hooks.tool?.atlante_skill?.execute({ name: "testing" }, {} as never),
-    ).rejects.toThrow("Atlante skills unavailable");
-  });
-
-  test("rolls back the host config when reporting a commit diagnostic fails", async () => {
-    const dir = project(validWithSkill);
-    const plugin = createAtlantePlugin({
-      loadDocument,
-      loadBundledTemplates,
-    });
-    const hooks = await plugin(pluginInput(dir));
-    const config: HostConfig = {
-      agent: { reviewer: { prompt: "old" } },
-    };
-    const before = structuredClone(config);
-    const originalError = console.error;
-    let rejected = false;
-    console.error = () => {
-      throw new Error("report failure");
-    };
-    try {
-      await hooks.config?.(config as unknown as Config);
-    } catch {
-      rejected = true;
-    } finally {
-      console.error = originalError;
-    }
-
-    expect(rejected).toBe(false);
-    expect(config).toEqual(before);
-    await expect(
-      hooks.tool?.atlante_skill?.execute({ name: "testing" }, {} as never),
-    ).rejects.toThrow("Atlante skills unavailable");
-  });
-
-  test("does not recover a failed lifecycle on a later config hook", async () => {
-    const dir = project(validWithSkill);
-    let injectionCalls = 0;
-    const plugin = createAtlantePlugin({
-      loadDocument,
-      loadBundledTemplates,
-      injectAgents: () => {
-        injectionCalls += 1;
-        if (injectionCalls === 1)
-          throw new Error("first materialization failed");
-        return [];
-      },
-    });
-    const hooks = await plugin(pluginInput(dir));
-    const firstConfig: HostConfig = {};
-
-    await capturedErrors(async () => {
-      await hooks.config?.(firstConfig as unknown as Config);
-    });
-    await hooks.config?.({} as Config);
-
-    expect(injectionCalls).toBe(1);
-    await expect(
-      hooks.tool?.atlante_skill?.execute({ name: "testing" }, {} as never),
-    ).rejects.toThrow("Atlante skills unavailable");
-  });
-
-  test("commits an own __proto__ value without changing the config prototype", async () => {
-    const dir = project(validWithSkill);
-    const plugin = createAtlantePlugin({
-      loadDocument,
-      loadBundledTemplates,
-      injectAgents: (staged) => {
-        Object.defineProperty(staged, "__proto__", {
-          configurable: true,
-          enumerable: true,
-          value: { polluted: true },
-          writable: true,
-        });
-        return [];
-      },
-    });
-    const hooks = await plugin(pluginInput(dir));
-    const config: HostConfig = {};
-    const prototype = Object.getPrototypeOf(config);
-
+    const hooks = await AtlantePlugin(pluginInput(dir));
     await hooks.config?.(config as unknown as Config);
 
-    expect(Object.getPrototypeOf(config)).toBe(prototype);
-    expect(Object.hasOwn(config, "__proto__")).toBe(true);
-    expect(Object.getOwnPropertyDescriptor(config, "__proto__")?.value).toEqual(
-      { polluted: true },
-    );
+    expect(hooks.tool?.atlante_skill).toBeUndefined();
+    expect(config).toEqual(before);
   });
 
-  test("fails the skill tool when staged injection throws after mutating its clone", async () => {
-    const dir = project(validWithSkill);
+  test.each(["format", "version"] as const)(
+    "fails open for unsupported manifest %s",
+    async (field) => {
+      const dir = builtProject(validWithSkill);
+      const manifest = manifestAt(dir);
+      writeManifest(dir, {
+        ...manifest,
+        ...(field === "format" ? { format: "unsupported" } : { version: 2 }),
+      } as unknown as ArtifactManifest);
+
+      await expectPluginFailsOpen(dir);
+    },
+  );
+
+  test.each(["id", "path"] as const)(
+    "fails open for duplicate manifest %s",
+    async (field) => {
+      const dir = builtProject(validWithSkill);
+      const manifest = manifestAt(dir);
+      const agent = manifest.agents[0];
+      if (!agent) throw new Error("test fixture has no agent");
+      writeManifest(
+        dir,
+        field === "id"
+          ? { ...manifest, agents: [agent, { ...agent, description: "two" }] }
+          : {
+              ...manifest,
+              agents: [
+                agent,
+                { ...agent, id: "another-agent", description: "two" },
+              ],
+            },
+      );
+
+      await expectPluginFailsOpen(dir);
+    },
+  );
+
+  test.each(["missing", "corrupt"] as const)(
+    "fails open for %s payload",
+    async (kind) => {
+      const dir = builtProject(validWithSkill);
+      const manifest = manifestAt(dir);
+      const agent = manifest.agents[0];
+      if (!agent) throw new Error("test fixture has no agent");
+      const payload = join(
+        dir,
+        ".atlante",
+        "artifacts",
+        ...agent.path.split("/"),
+      );
+      rmSync(payload);
+      if (kind === "corrupt") mkdirSync(payload);
+
+      await expectPluginFailsOpen(dir);
+    },
+  );
+
+  test("fails open for invalid-UTF-8 payload", async () => {
+    const dir = builtProject(validWithSkill);
+    const manifest = manifestAt(dir);
+    const agent = manifest.agents[0];
+    if (!agent) throw new Error("test fixture has no agent");
+    const bytes = new Uint8Array([0xc3, 0x28]);
+    const path = `agents/${digest(agent.id)}-${digest(bytes)}.md`;
+    writeFileSync(
+      join(dir, ".atlante", "artifacts", ...path.split("/")),
+      bytes,
+    );
+    writeManifest(dir, {
+      ...manifest,
+      agents: [{ ...agent, path, sha256: digest(bytes) }],
+    });
+
+    await expectPluginFailsOpen(dir);
+  });
+
+  test("fails open for a digest-mismatched payload", async () => {
+    const dir = builtProject(validWithSkill);
+    const agent = manifestAt(dir).agents[0];
+    if (!agent) throw new Error("test fixture has no agent");
+    writeFileSync(
+      join(dir, ".atlante", "artifacts", ...agent.path.split("/")),
+      "changed payload",
+    );
+
+    await expectPluginFailsOpen(dir);
+  });
+
+  test("fails open for unsafe artifacts", async () => {
+    const dir = builtProject(valid);
+    const manifestPath = join(dir, ".atlante", "artifacts", "manifest.json");
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as {
+      agents: [{ path: string }];
+    };
+    manifest.agents[0].path = "../unsafe.md";
+    writeFileSync(manifestPath, JSON.stringify(manifest));
+    unlinkSync(join(dir, "atlante.jsonc"));
+    const config: HostConfig = { agent: { existing: { model: "x" } } };
+    const before = structuredClone(config);
+
+    const hooks = await AtlantePlugin(pluginInput(dir));
+    await hooks.config?.(config as unknown as Config);
+
+    expect(hooks.tool?.atlante_skill).toBeUndefined();
+    expect(config).toEqual(before);
+  });
+
+  test("fails open for symlinked payloads", async () => {
+    const dir = builtProject(validWithSkill);
+    const agent = manifestAt(dir).agents[0];
+    if (!agent) throw new Error("test fixture has no agent");
+    const payload = join(
+      dir,
+      ".atlante",
+      "artifacts",
+      ...agent.path.split("/"),
+    );
+    rmSync(payload);
+    symlinkSync(join(dir, "outside-payload.md"), payload);
+
+    await expectPluginFailsOpen(dir);
+  });
+
+  test("injects through the plugin with a replacement warning and preserves host fields", async () => {
+    const dir = builtProject(valid);
+    const hooks = await AtlantePlugin(pluginInput(dir));
+    const config: HostConfig = {
+      agent: {
+        reviewer: {
+          prompt: "Host prompt",
+          description: "Host description",
+          model: "host-model",
+          mode: "primary",
+        },
+      },
+      permission: { edit: "allow" },
+    };
+
+    const errors = await capturedErrors(async () => {
+      await hooks.config?.(config as unknown as Config);
+    });
+
+    expect(errors).toEqual([expect.stringContaining("[prompt-replaced]")]);
+    expect(config.agent?.reviewer).toMatchObject({
+      model: "host-model",
+      mode: "primary",
+      prompt: expect.stringContaining("You review."),
+      description: "Reviews changes.",
+    });
+    expect(config.permission).toEqual({ edit: "allow" });
+  });
+
+  test("stages injection so an adapter failure cannot partially mutate config", async () => {
+    const dir = builtProject(validWithSkill);
+    const config: HostConfig = { agent: { existing: { model: "x" } } };
+    const before = structuredClone(config);
     const plugin = createAtlantePlugin({
-      loadDocument,
-      loadBundledTemplates,
       injectAgents: (staged) => {
         staged.agent = { partial: { prompt: "partial" } };
         throw new Error("injected adapter failure");
@@ -447,28 +368,18 @@ describe("AtlantePlugin", () => {
     });
 
     const hooks = await plugin(pluginInput(dir));
-    const skillTool = hooks.tool?.atlante_skill;
-    expect(skillTool).toBeDefined();
-    const config: HostConfig = { agent: { existing: { model: "x" } } };
-    const before = structuredClone(config);
-
     await capturedErrors(async () => {
       await hooks.config?.(config as unknown as Config);
     });
 
     expect(config).toEqual(before);
     await expect(
-      skillTool?.execute({ name: "testing" }, {} as never),
-    ).rejects.toThrow(
-      "Atlante skills unavailable: Error: injected adapter failure",
-    );
+      hooks.tool?.atlante_skill?.execute({ name: "missing" }, {} as never),
+    ).rejects.toThrow("Atlante skills unavailable");
   });
 
-  test("exposes skills without creating an empty host agent map", async () => {
-    const agentHooks = await AtlantePlugin(pluginInput(project(valid)));
-    expect(agentHooks.tool).toBeUndefined();
-
-    const skillOnly = project(`{
+  test("preserves host-owned fields and exposes skill-only projects", async () => {
+    const dir = builtProject(`{
       "$schema": "${SCHEMA_URI}",
       "agents": {},
       "skills": {
@@ -480,95 +391,121 @@ describe("AtlantePlugin", () => {
         }
       }
     }`);
-    const hooks = await AtlantePlugin(pluginInput(skillOnly));
-    expect(Object.keys(hooks.tool ?? {})).toEqual(["atlante_skill"]);
-    expect(hooks.tool?.skill).toBeUndefined();
-
-    const config: HostConfig = { skill: { native: true } };
+    const hooks = await AtlantePlugin(pluginInput(dir));
+    const config: HostConfig = {
+      agent: { existing: { model: "x" } },
+      skill: { native: true },
+    };
     await hooks.config?.(config as unknown as Config);
-    expect(Object.hasOwn(config, "agent")).toBe(false);
+
+    expect(config.agent).toEqual({ existing: { model: "x" } });
     expect(config.skill).toEqual({ native: true });
+    expect(hooks.tool?.atlante_skill).toBeDefined();
+  });
+
+  test("leaves the host config untouched when commit assignment fails", async () => {
+    const dir = builtProject(validWithSkill);
+    const hooks = await AtlantePlugin(pluginInput(dir));
+    const config = { first: "old" } as HostConfig;
+    Object.defineProperty(config, "second", {
+      configurable: false,
+      enumerable: true,
+      get: () => "old",
+      set: () => {
+        throw new Error("commit failure");
+      },
+    });
+
+    await capturedErrors(async () => {
+      await hooks.config?.(config as unknown as Config);
+    });
+
+    expect(config.first).toBe("old");
+    expect(Object.hasOwn(config, "agent")).toBe(false);
     await expect(
       hooks.tool?.atlante_skill?.execute({ name: "testing" }, {} as never),
-    ).resolves.toBe(
-      "# Testing\n\n## Overview\n\nTesting guidance\n\nRun tests.\n",
-    );
+    ).rejects.toThrow("Atlante skills unavailable");
   });
 
-  test("injects the expected prompt on a valid project", async () => {
-    const dir = project(valid);
-    const config: HostConfig = {};
+  test("recovers when a later config hook follows a failed materialization", async () => {
+    const dir = builtProject(validWithSkill);
+    let attempts = 0;
+    const plugin = createAtlantePlugin({
+      injectAgents: (staged, artifacts) => {
+        attempts += 1;
+        if (attempts === 1) {
+          staged.agent = { partial: { prompt: "partial" } };
+          throw new Error("transient adapter failure");
+        }
+        return injectAgents(staged, artifacts);
+      },
+    });
+    const hooks = await plugin(pluginInput(dir));
+    const first: HostConfig = { agent: { existing: { model: "x" } } };
+    const second: HostConfig = { agent: { existing: { model: "x" } } };
 
+    await capturedErrors(async () => {
+      await hooks.config?.(first as unknown as Config);
+    });
+    await hooks.config?.(second as unknown as Config);
+
+    expect(first).toEqual({ agent: { existing: { model: "x" } } });
+    expect(second.agent?.reviewer?.prompt).toContain("You review.");
+    await expect(
+      hooks.tool?.atlante_skill?.execute({ name: "testing" }, {} as never),
+    ).resolves.toContain("Run tests.");
+  });
+
+  test("rolls back host changes when warning reporting throws", async () => {
+    const dir = builtProject(validWithSkill);
     const hooks = await AtlantePlugin(pluginInput(dir));
-    await hooks.config?.(config as unknown as Config);
-
-    expect(config.agent?.reviewer?.prompt).toContain("You review.");
-  });
-
-  test("materializes the starter agent and exposes the workflow skill", async () => {
-    const dir = project(`{
-      "$schema": "${SCHEMA_URI}",
-      "extends": "atlante/starter",
-      "values": {
-        "quick-check": "bun test packages/changed",
-        "full-check": "bun test"
-      }
-    }`);
     const config: HostConfig = {
-      agent: { architect: { model: "provider/model" } },
+      agent: {
+        reviewer: { prompt: "Host prompt", model: "host-model" },
+      },
     };
+    const before = structuredClone(config);
+    const original = console.error;
+    console.error = () => {
+      throw new Error("warning reporter failed");
+    };
+    try {
+      await hooks.config?.(config as unknown as Config);
+    } finally {
+      console.error = original;
+    }
 
-    const hooks = await AtlantePlugin(pluginInput(dir));
-    await hooks.config?.(config as unknown as Config);
-
-    expect(config.agent?.architect?.model).toBe("provider/model");
-    expect(config.agent?.architect?.prompt).toContain("lead engineer");
-    expect(config.agent?.implement).toBeUndefined();
-    const workflow = await hooks.tool?.atlante_skill?.execute(
-      { name: "workflow" },
-      {} as never,
-    );
-    if (typeof workflow !== "string")
-      throw new Error("workflow skill did not return Markdown");
-    expect(workflow).toContain("### 1. plan");
-    expect(workflow.match(/The orchestrator handles this phase\./g)).toBeNull();
-    expect(workflow).toContain(
-      "After each task, run and record a quick check with `bun test packages/changed`, including after any correction round.",
-    );
-    expect(workflow).toContain(
-      "After all tasks and the whole-change review, run and record the full check with `bun test`.",
-    );
-    expect(workflow).toContain("### 3. review");
-    expect(workflow).toContain(
-      "Dispatch a fresh reviewer with only that context; do not rely on the coordinator's session history or substitute a self-review.",
-    );
-    expect(workflow).toContain(
-      "The artifact should be stored at .atlante/review-<issue-number>.md.",
-    );
-    const brainstorming = await hooks.tool?.atlante_skill?.execute(
-      { name: "brainstorming" },
-      {} as never,
-    );
-    if (typeof brainstorming !== "string")
-      throw new Error("brainstorming skill did not return Markdown");
-    expect(brainstorming).toContain(
-      "Do not begin workflow, implementation, or file modifications until the presented design is approved by the developer.",
-    );
-    expect(brainstorming.indexOf("## Constraints")).toBeLessThan(
-      brainstorming.indexOf("## Instructions"),
-    );
+    expect(config).toEqual(before);
+    await expect(
+      hooks.tool?.atlante_skill?.execute({ name: "testing" }, {} as never),
+    ).rejects.toThrow("Atlante skills unavailable");
   });
 
-  test("preserves host-owned fields on an existing agent", async () => {
-    const dir = project(valid);
-    const config: HostConfig = {
-      agent: { reviewer: { model: "anthropic/claude-sonnet-5" } },
-    };
+  test("proves the plugin imports only artifact and host-adapter dependencies", () => {
+    const source = readFileSync(
+      new URL("../src/plugin.ts", import.meta.url),
+      "utf8",
+    );
+    const modules = [...source.matchAll(/from\s+["']([^"']+)["']/g)].map(
+      ([, module]) => module,
+    );
 
-    const hooks = await AtlantePlugin(pluginInput(dir));
-    await hooks.config?.(config as unknown as Config);
-
-    expect(config.agent?.reviewer?.model).toBe("anthropic/claude-sonnet-5");
-    expect(config.agent?.reviewer?.prompt).toContain("You review.");
+    expect(new Set(modules)).toEqual(
+      new Set([
+        "@atlante/builder/artifacts",
+        "@opencode-ai/plugin",
+        "./inject.js",
+        "./skill-tool.js",
+      ]),
+    );
+    expect(modules.filter((module) => module?.startsWith("@atlante/"))).toEqual(
+      ["@atlante/builder/artifacts"],
+    );
+    expect(source).not.toMatch(
+      /@atlante\/(?:loader|presets|templates|validator)/,
+    );
+    expect(source).not.toMatch(
+      /\b(?:load|validate|expand|resolve|render)\w*\s*\(/,
+    );
   });
 });

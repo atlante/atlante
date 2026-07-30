@@ -1,6 +1,10 @@
-import type { AgentArtifact } from "@atlante/resolver";
-import type { Diagnostic } from "@atlante/validator";
-import { warning } from "@atlante/validator";
+import type { VerifiedAgentArtifact } from "@atlante/builder/artifacts";
+
+export type InjectionWarning = {
+  severity: "warning";
+  code: string;
+  message: string;
+};
 
 export type HostAgentConfig = {
   prompt?: string;
@@ -18,9 +22,9 @@ export type HostConfig = {
  */
 export function injectAgents(
   config: HostConfig,
-  artifacts: AgentArtifact[],
-): Diagnostic[] {
-  const diagnostics: Diagnostic[] = [];
+  artifacts: readonly VerifiedAgentArtifact[],
+): InjectionWarning[] {
+  const diagnostics: InjectionWarning[] = [];
   const ownAgent = Object.hasOwn(config, "agent") ? config.agent : undefined;
   const agents =
     ownAgent && typeof ownAgent === "object"
@@ -42,12 +46,11 @@ export function injectAgents(
       : undefined;
 
     if (existing?.prompt) {
-      diagnostics.push(
-        warning(
-          "prompt-replaced",
-          `replaced the existing prompt of host agent "${artifact.hostAgentId}"`,
-        ),
-      );
+      diagnostics.push({
+        severity: "warning",
+        code: "prompt-replaced",
+        message: `replaced the existing prompt of host agent "${artifact.hostAgentId}"`,
+      });
     }
 
     const replacement = {

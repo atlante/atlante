@@ -9,13 +9,13 @@ packages/
   schema/          — document structure contract, JSON Schema, TypeScript types
   templates/       — template engine (loading, composition, Markdown rendering)
   validator/       — two-level validation (document structure + template semantics)
-  resolver/        — normalization, value resolution, artifact descriptors
+  builder/         — project preparation, artifact building, and publication
   presets/         — preset library (load + expose; never validates)
   opencode-plugin/ — OpenCode materialization
-  cli/             — atlante validate, resolve, init
+  cli/             — atlante validate, build, init
 ```
 
-Schema changes require resolving and validating (`atlante validate`, `atlante resolve`). Tests mirror source paths in each package. No generated output is edited directly.
+Schema changes require building and validating (`atlante validate`, `atlante build`). `atlante init` builds artifacts automatically; run `atlante build` after later source configuration changes. Tests mirror source paths in each package. No generated output is edited directly.
 
 ## Common commands
 
