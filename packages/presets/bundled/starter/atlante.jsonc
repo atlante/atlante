@@ -79,7 +79,8 @@
           "constraints": [
             "Do not begin implementation until the developer approves the implementation plan.",
             "For behavior changes, do not make implementation changes before a focused test demonstrates the planned behavior.",
-            "The orchestrator drives all phases but never plans, implements, or reviews directly — it delegates to sub-agents, tracks progress, and integrates results."
+            "The orchestrator drives all phases but never plans, implements, or reviews directly — it delegates to sub-agents, tracks progress, and integrates results.",
+            "The orchestrator may recall a previously dispatched sub-agent when context preservation is valuable, most notably recalling the plan sub-agent to update its own plan. Fresh sub-agents remain the default for execution tasks and the reviewer must always be fresh."
           ]
         },
         {
@@ -93,7 +94,8 @@
                   "Use an existing issue or task defined by the user, as the source of truth.",
                   "The orchestrator dispatches a sub-agent to read applicable project instructions and inspect the relevant code and tests.",
                   "The sub-agent breaks the implementation into the smallest essential tasks and produces the plan.",
-                  "The orchestrator reviews the plan and presents it to the developer for approval before proceeding."
+                  "The orchestrator reviews the plan and presents it to the developer for approval before proceeding.",
+                  "When the plan needs updating during or after execution, the orchestrator recalls the same plan sub-agent rather than dispatching a fresh one, so the update preserves existing context and plan structure."
                 ],
                 "output": {
                   "description": "The approved implementation plan, organized into tasks that run sequentially or in parallel as their dependencies require.",
