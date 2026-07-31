@@ -44,6 +44,15 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_EVENT_NAME: ${{ github.event_name == 'workflow_dispatch' && 'pull_request' || github.event_name }}
           GITHUB_EVENT_PATH: ${{ github.event_name == 'workflow_dispatch' && format('{0}/event.json', runner.temp) || github.event_path }}
+          # Security: the CLI checks out the PR head branch, which is attacker-controlled.
+          # Ignore project opencode.json(c), .opencode/, and AGENTS.md/CLAUDE.md/CONTEXT.md
+          # from the checked-out head so a malicious PR cannot inject config or instructions
+          # into the reviewer agent (see github.handler.ts checkoutLocalBranch).
+          OPENCODE_DISABLE_PROJECT_CONFIG: "true"
+          # Read-only review posture: deny every tool with side effects or exfiltration
+          # potential (shell, network, file writes, subagents, MCP) while keeping
+          # read-only file inspection available for line-level review.
+          OPENCODE_PERMISSION: '{"bash":"deny","webfetch":"deny","edit":"deny","task":"deny","mcp__*":"deny","read":"allow","glob":"allow","grep":"allow"}'
         with:
           model: opencode/deepseek-v4-flash-free
           use_github_token: true
