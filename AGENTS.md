@@ -24,9 +24,8 @@ bun test                        # run all tests
 bun run type:check              # type-check all packages
 bun run lint:check              # lint + format check
 bun run build                   # build all packages
-bun run build:check             # verify build output matches expectations
 bun run quick:check             # type:check + lint:check + test
-bun run full:check              # quick:check + build:check (CI gate)
+bun run full:check              # build + quick:check (CI gate)
 bun run cli                     # run the CLI (packages/cli/bin/atlante.ts)
 ```
 
