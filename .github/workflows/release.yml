@@ -32,7 +32,7 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.2.x"
+          bun-version-file: ".bun-version"
 
       - name: Install dependencies
         shell: bash
