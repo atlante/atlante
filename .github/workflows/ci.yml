@@ -14,55 +14,10 @@ jobs:
         with:
           bun-version: "1.2.x"
       - run: bun install --frozen-lockfile
+
+      # full:check ends with a CLI smoke test. Every other test calls the
+      # command handlers as functions, so a broken shebang, a mis-wired
+      # Commander option, or an import that only fails at process start would
+      # pass the suite and still ship a CLI that does not run. The smoke test
+      # exercises the binary as a user does.
       - run: bun run full:check
-
-      # Every test above calls the command handlers as functions, so a broken
-      # shebang, a mis-wired Commander option, or an import that only fails at
-      # process start would pass the whole suite and still ship a CLI that does
-      # not run. This exercises the binary as a user does.
-      - name: CLI smoke test
-        run: |
-          set -euo pipefail
-          project="$(mktemp -d)"
-          cli="$PWD/packages/cli/bin/atlante.ts"
-          expected_version="$(node -p "require('./packages/cli/package.json').version")"
-
-          test "$(bun "$cli" --version)" = "$expected_version"
-
-          bun "$cli" init "$project"
-          test -f "$project/atlante.jsonc"
-          grep -q '@atlante/opencode-plugin' "$project/opencode.jsonc"
-          test -f "$project/.atlante/artifacts/manifest.json"
-
-          bun "$cli" validate "$project"
-          bun "$cli" build "$project"
-          PROJECT="$project" node <<'NODE'
-          const { createHash } = require("node:crypto");
-          const { readFileSync } = require("node:fs");
-          const { join } = require("node:path");
-
-          const project = process.env.PROJECT;
-          const root = join(project, ".atlante", "artifacts");
-          const manifest = JSON.parse(readFileSync(join(root, "manifest.json"), "utf8"));
-          if (manifest.format !== "atlante-artifacts" || manifest.version !== 1) process.exit(1);
-          const entries = [...manifest.agents, ...manifest.skills];
-          for (const entry of entries) {
-            const payload = readFileSync(join(root, entry.path));
-            const digest = createHash("sha256").update(payload).digest("hex");
-            if (digest !== entry.sha256) process.exit(1);
-          }
-          const ids = manifest.agents.map(({ id }) => id).sort();
-          const skillIds = manifest.skills.map(({ id }) => id).sort();
-          if (JSON.stringify(ids) !== JSON.stringify(["architect"])) process.exit(1);
-          if (JSON.stringify(skillIds) !== JSON.stringify(["brainstorming", "workflow"])) process.exit(1);
-          if (!manifest.agents.some(({ path }) => readFileSync(join(root, path), "utf8").includes("You are the lead engineer"))) process.exit(1);
-          if (!manifest.skills.some(({ path }) => readFileSync(join(root, path), "utf8").includes("# Workflow"))) process.exit(1);
-          NODE
-
-          # A broken configuration must fail loudly rather than exit 0.
-          printf '{"$schema":"https://atlante.sh/schema/v0.1/schema.json","agents":{"a":{"identity":"x"}}}' \
-            > "$project/atlante.jsonc"
-          if bun "$cli" validate "$project"; then
-            echo "validate exited 0 on an invalid configuration" >&2
-            exit 1
-          fi

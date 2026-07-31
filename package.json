@@ -22,10 +22,11 @@
     "type:check": "tsc --build packages/*/tsconfig.json",
     "lint:check": "biome check .",
     "cli": "bun packages/cli/bin/atlante.ts",
+    "smoke:test": "bun scripts/smoke-test.ts",
     "fallow": "fallow",
     "build": "bun scripts/build.ts",
     "quick:check": "bun run type:check && bun run lint:check && bun run test",
-    "full:check": "bun run build && bun run quick:check",
+    "full:check": "bun run build && bun run quick:check && bun run smoke:test",
     "prepack": "bun run build",
     "release": "bun scripts/release.ts"
   },
