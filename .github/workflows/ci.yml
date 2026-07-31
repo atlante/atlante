@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.2.x"
+          bun-version-file: ".bun-version"
       - run: bun install --frozen-lockfile
 
       # full:check ends with a CLI smoke test. Every other test calls the
