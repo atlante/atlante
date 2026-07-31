@@ -26,7 +26,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
-          persist-credentials: false
+          persist-credentials: true
 
       - name: Build pull_request event payload (manual runs)
         if: github.event_name == 'workflow_dispatch'
