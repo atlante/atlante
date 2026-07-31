@@ -14,43 +14,10 @@ jobs:
         with:
           bun-version: "1.2.x"
       - run: bun install --frozen-lockfile
-      - run: bunx biome ci .
-      - run: bun run type:check
-      - run: bun test
 
-      # Every test above calls the command handlers as functions, so a broken
-      # shebang, a mis-wired Commander option, or an import that only fails at
-      # process start would pass the whole suite and still ship a CLI that does
-      # not run. This exercises the binary as a user does.
-      - name: CLI smoke test
-        run: |
-          set -euo pipefail
-          project="$(mktemp -d)"
-          cli="$PWD/packages/cli/bin/atlante.ts"
-          expected_version="$(node -p "require('./packages/cli/package.json').version")"
-
-          test "$(bun "$cli" --version)" = "$expected_version"
-
-          bun "$cli" init "$project"
-          test -f "$project/atlante.jsonc"
-          grep -q '@atlante/opencode-plugin' "$project/opencode.jsonc"
-
-          bun "$cli" validate "$project"
-          bun "$cli" resolve "$project" --json > /tmp/resolved.json
-          node -e '
-            const { agents, skills } = require("/tmp/resolved.json");
-            const ids = agents.map(({ hostAgentId }) => hostAgentId).sort();
-            const skillIds = skills.map(({ skillId }) => skillId).sort();
-            if (JSON.stringify(ids) !== JSON.stringify(["architect"])) process.exit(1);
-            if (!agents.some(({ prompt }) => prompt.includes("You are the lead engineer"))) process.exit(1);
-            if (JSON.stringify(skillIds) !== JSON.stringify(["brainstorming", "workflow"])) process.exit(1);
-            if (!skills.some(({ content }) => content.includes("# Workflow"))) process.exit(1);
-          '
-
-          # A broken configuration must fail loudly rather than exit 0.
-          printf '{"$schema":"https://atlante.sh/schema/v0.1/schema.json","agents":{"a":{"identity":"x"}}}' \
-            > "$project/atlante.jsonc"
-          if bun "$cli" validate "$project"; then
-            echo "validate exited 0 on an invalid configuration" >&2
-            exit 1
-          fi
+      # full:check ends with a CLI smoke test. Every other test calls the
+      # command handlers as functions, so a broken shebang, a mis-wired
+      # Commander option, or an import that only fails at process start would
+      # pass the suite and still ship a CLI that does not run. The smoke test
+      # exercises the binary as a user does.
+      - run: bun run full:check

@@ -143,7 +143,7 @@ describe("bundled templates", () => {
         },
       }),
     ).toBe(
-      "# Testing\n\n## Overview\n\nRun the test suite.\n\n## Instructions\n\nThese are required actions for completing the work. Perform them in order unless a constraint or explicit developer direction requires otherwise.\n\n1. Read the brief.\n1. Run the checks.\n\n## Gotchas\n\nThese are risks and failure modes that require active attention. Account for each one while working; do not dismiss one because the task appears straightforward.\n\n- Do not skip validation.\n",
+      "# Testing\n\n## Overview\n\nRun the test suite.\n\n## Instructions\n\nThese are required actions for completing the work. Perform them in order unless a constraint or explicit developer direction requires otherwise.\n\n1. Read the brief.\n2. Run the checks.\n\n## Gotchas\n\nThese are risks and failure modes that require active attention. Account for each one while working; do not dismiss one because the task appears straightforward.\n\n- Do not skip validation.\n",
     );
   });
 
@@ -252,7 +252,7 @@ describe("bundled templates", () => {
     expect(prompt).toContain("Execute phases sequentially in the order listed");
     expect(prompt).toContain("Inspect the repository.");
     expect(prompt).toContain("1. Inspect the repository.");
-    expect(prompt).toContain("1. Read the project guidance.");
+    expect(prompt).toContain("2. Read the project guidance.");
     expect(prompt).toContain("Phase output: The discovery result.");
     expect(prompt).toContain(
       "Phase validation: Confirm the context is complete. Run `bun test`.",
@@ -290,12 +290,9 @@ describe("bundled templates", () => {
     });
 
     expect(prompt).toContain(
-      "a phase without one is handled by the orchestrator",
-    );
-    expect(prompt).toContain(
       'The subagent "implement" should handle this phase.',
     );
-    expect(prompt).toContain("The orchestrator handles this phase.");
+    expect(prompt).not.toContain("The orchestrator handles this phase.");
     expect(prompt).not.toContain("should be used for this task.");
   });
 

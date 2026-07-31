@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { AtlanteDocument } from "@atlante/schema";
 import { SCHEMA_URI } from "@atlante/schema";
 import { loadBundledTemplates, loadTemplates } from "@atlante/templates";
-import { resolve } from "../src/index.js";
+import { prepareProject as resolve } from "../src/index.js";
 
 const { registry } = loadBundledTemplates();
 
@@ -47,7 +47,7 @@ const document: AtlanteDocument = {
   },
 };
 
-describe("resolve", () => {
+describe("prepareProject", () => {
   test("resolves skill descriptions, local values, and Markdown content", () => {
     const result = resolve(
       {
@@ -447,6 +447,33 @@ describe("resolve", () => {
     expect(result.diagnostics[0]?.path).toBe("/agents/bad~1id~0one/identity");
   });
 
+  test("fails closed for an unknown system value", () => {
+    const unknownSystemValue: AtlanteDocument = {
+      $schema: SCHEMA_URI,
+      values: { project: "{{sys.unknown}}" },
+      agents: {
+        reviewer: {
+          description: "Reviews {{values.project}}.",
+          identity: "You review.",
+          mission: "Find defects.",
+        },
+      },
+    };
+    const result = resolve(unknownSystemValue, registry);
+
+    expect(result.agents).toEqual([]);
+    expect(result.skills).toEqual([]);
+    expect(result.diagnostics).toEqual([
+      {
+        severity: "error",
+        code: "unknown-system-variable",
+        message:
+          'agent "reviewer" template "atlante/agent": unknown system variable "{{sys.unknown}}"',
+        path: "/agents/reviewer",
+      },
+    ]);
+  });
+
   test("keeps integer-like agent keys in ECMAScript enumeration order", () => {
     const integerKeys: AtlanteDocument = {
       $schema: SCHEMA_URI,
@@ -466,7 +493,7 @@ describe("resolve", () => {
   });
 
   // @atlante/schema restricts `values` to strings, so this can only happen for
-  // a document assembled by hand that bypassed that validation — the resolver
+  // a document assembled by hand that bypassed that validation — preparation
   // must still turn it into a diagnostic rather than emit `one,two` or
   // `[object Object]` into a rendered prompt.
   test("returns a diagnostic instead of stringifying a non-string values reference", () => {

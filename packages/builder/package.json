@@ -1,8 +1,8 @@
 {
-  "name": "@atlante/resolver",
+  "name": "@atlante/builder",
   "version": "0.1.5",
   "type": "module",
-  "description": "Atlante value merging and prompt resolution",
+  "description": "Atlante project loading, validation, and preparation",
   "license": "MIT",
   "contributors": [
     {
@@ -19,7 +19,7 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/atlante/atlante.git",
-    "directory": "packages/resolver"
+    "directory": "packages/builder"
   },
   "engines": {
     "node": ">=22"
@@ -32,7 +32,8 @@
     "LICENSE"
   ],
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./artifacts": "./src/artifacts-public.ts"
   },
   "scripts": {
     "build": "tsc --project tsconfig.build.json"

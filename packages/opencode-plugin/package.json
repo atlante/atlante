@@ -39,9 +39,7 @@
     "build": "tsc --project tsconfig.build.json"
   },
   "dependencies": {
-    "@atlante/resolver": "workspace:*",
-    "@atlante/templates": "workspace:*",
-    "@atlante/validator": "workspace:*"
+    "@atlante/builder": "workspace:*"
   },
   "peerDependencies": {
     "@opencode-ai/plugin": "^1.18.4"

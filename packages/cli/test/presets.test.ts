@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { loadProject } from "@atlante/builder";
 import { listPresets, readPreset } from "@atlante/presets";
 import { SCHEMA_URI } from "@atlante/schema";
 import {
@@ -9,7 +10,6 @@ import {
   parseDocumentOverlay,
   validateDocumentText,
 } from "@atlante/validator";
-import { loadCliResources } from "../src/commands/load.js";
 
 const created: string[] = [];
 
@@ -48,7 +48,7 @@ describe("bundled presets as user configurations", () => {
       }`,
     );
 
-    const loaded = loadCliResources(dir);
+    const loaded = loadProject(dir);
 
     expect(loaded.diagnostics).toEqual([]);
     expect(loaded.document?.skills?.testing?.description).toBe(

@@ -1,12 +1,12 @@
 import { Command } from "commander";
 import packageJson from "../package.json" with { type: "json" };
+import { runBuild } from "./commands/build.js";
 import { runInit } from "./commands/init.js";
-import { runResolve } from "./commands/resolve.js";
 import { runValidate } from "./commands/validate.js";
 
 export { listPresets, readPreset } from "@atlante/presets";
+export { runBuild } from "./commands/build.js";
 export { runInit } from "./commands/init.js";
-export { runResolve } from "./commands/resolve.js";
 export { runValidate } from "./commands/validate.js";
 export { formatDiagnostic } from "./report.js";
 
@@ -25,16 +25,12 @@ export function createProgram(): Command {
     });
 
   program
-    .command("resolve")
+    .command("build")
     .argument("[path]", "config file or project directory", process.cwd())
-    .option("--agent <id>", "render only this host agent")
-    .option("--json", "emit artifact descriptors as JSON")
-    .description("render resolved agent prompts and project skills")
-    .action(
-      async (path: string, options: { agent?: string; json?: boolean }) => {
-        process.exitCode = await runResolve(path, options);
-      },
-    );
+    .description("build host-independent Atlante artifacts")
+    .action((path: string) => {
+      process.exitCode = runBuild(path);
+    });
 
   program
     .command("init")

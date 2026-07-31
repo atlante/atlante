@@ -30,15 +30,17 @@ and requires Node.js 22 or later. Run it directly with `npx`:
 ```bash
 npx @atlante/cli init
 npx @atlante/cli validate
-npx @atlante/cli resolve
+npx @atlante/cli build
 ```
 
 For a global `atlante` command, install the package with
 `npm install --global @atlante/cli`.
 
-`init` writes `atlante.jsonc` and registers `@atlante/opencode-plugin` in
-`opencode.jsonc`, preserving anything already there. Without that registration
-nothing activates — prompts are injected by the plugin when OpenCode starts.
+`init` writes `atlante.jsonc`, builds `.atlante/artifacts/`, and registers
+`@atlante/opencode-plugin` in `opencode.jsonc`, preserving anything already
+there. Without that registration nothing activates: verified artifacts are
+injected by the plugin when OpenCode starts. Run `atlante build` after changing
+the source configuration.
 
 ## Example
 
@@ -132,7 +134,7 @@ Values flow through two layers:
 
 Templates never receive the values dictionary: a template's entire input
 contract is its JSON Schema, so it cannot depend on keys that no schema
-defines. The resolver substitutes references into the prompt definition before
+defines. The builder substitutes references into the prompt definition before
 the template renders.
 
 Substitution never evaluates. Only valid `{{values.key}}` references are
@@ -147,26 +149,29 @@ syntax is normal, and doing so must not corrupt them.
    skill bindings and values.
 2. Templates define how prompts render. Each is a Markdown file paired with a
    `template.json` Draft 2020-12 input schema.
-3. The resolver merges values, substitutes references, renders templates, and
-   produces host-independent agent and skill artifact descriptors.
-4. An adapter delivers the rendered prompts to the host.
+3. The builder merges values, substitutes references, renders templates, and
+   publishes host-independent agent and skill artifacts.
+4. An adapter verifies the artifacts and delivers the rendered prompts to the
+   host.
 
 ```
-atlante.jsonc  →  resolve  →  rendered Markdown  →  adapter  →  host agent/tool
+atlante.jsonc  →  build  →  verified artifacts  →  adapter  →  host agent/tool
                   (templates + values)
 ```
 
 For OpenCode, step 4 happens **once in memory during initialization**: the
-plugin's `config` hook stages the rendered prompts in the host's agent
-configuration and makes resolved skills available through `atlante_skill`. No
-agent or skill files are generated, and skill content is not put in a cache or
-registered as a native OpenCode skill. Nothing on disk can drift away from your
-Atlante configuration — it genuinely is the single source of truth for prompt
-and skill content. Only the agent `prompt` and `description` fields are written;
-model, permissions, tools and mode stay owned by the host.
+plugin's `config` hook verifies the published artifacts, stages the rendered
+prompts in the host's agent configuration, and makes verified skills available
+through `atlante_skill`. Only the agent `prompt` and `description` fields are
+written; model, permissions, tools and mode stay owned by the host. The plugin
+does not load or render source configuration.
 
-Because nothing is materialized to disk, `atlante resolve` is how you inspect
-what your configuration actually produces.
+Artifacts are published under `.atlante/artifacts/` using the independent
+`atlante-artifacts` format version 1. The manifest records relative payload
+paths and SHA-256 digests, and adapters reject malformed trees or any digest
+mismatch before materialization. The artifact format version is separate from
+the document `$schema` version. Rendered values may contain sensitive data, so
+keep `.atlante/` local and do not publish artifacts.
 
 ## Templates
 
@@ -207,10 +212,10 @@ Run `atlante init` to scaffold from the `starter` preset.
 | `@atlante/schema` | Document structure and the generated, versioned JSON Schema |
 | `@atlante/templates` | Template schemas, loading, composition, rendering |
 | `@atlante/validator` | Discovery, parsing, and two-level validation |
-| `@atlante/resolver` | Value merging, substitution, and agent/skill artifact descriptors |
+| `@atlante/builder` | Project preparation, value merging, rendering, and artifact publication |
 | `@atlante/presets` | Bundled preset documents and registry loading |
 | `@atlante/opencode-plugin` | In-memory agent injection and `atlante_skill` through OpenCode's `config` hook |
-| `@atlante/cli` | `init`, `validate`, `resolve` |
+| `@atlante/cli` | `init`, `validate`, `build` |
 
 `@atlante/templates` and `@atlante/presets` are the two content packages and
 depend on nothing else in Atlante. That is what will let third parties publish

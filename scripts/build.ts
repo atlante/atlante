@@ -9,21 +9,14 @@ const PACKAGES = [
   "templates",
   "presets",
   "validator",
-  "resolver",
+  "builder",
   "opencode-plugin",
   "cli",
 ] as const;
 
-const checkMode = process.argv.includes("--check");
-
 // Build
 for (const pkg of PACKAGES) {
   const cwd = join(ROOT, "packages", pkg);
-
-  if (checkMode) {
-    console.log(`Checking @atlante/${pkg} build output...`);
-    continue;
-  }
 
   console.log(`Building @atlante/${pkg}...`);
   await rm(join(cwd, "dist"), { force: true, recursive: true });
@@ -43,4 +36,4 @@ for (const pkg of PACKAGES) {
   }
 }
 
-console.log(checkMode ? "Build outputs are valid" : "Build complete");
+console.log("Build complete");
