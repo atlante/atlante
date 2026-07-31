@@ -108,7 +108,7 @@ describe("runBuildWatchWithDependencies", () => {
 
     const callback = watcher.callbacks.get(join(dir, "atlante.jsonc"));
     expect(callback).toBeDefined();
-    callback?.(undefined);
+    callback?.();
 
     await waitFor(() => builds === 2, "rebuild after change");
     expect(builds).toBe(2);
@@ -148,7 +148,7 @@ describe("runBuildWatchWithDependencies", () => {
       mkdirSync(presetDir);
       createdPresets.push(presetDir);
       writeFileSync(createdPresetPath, valid);
-      watcher.callbacks.get(createdPresetPath)?.(undefined);
+      watcher.callbacks.get(createdPresetPath)?.();
 
       await waitFor(() => builds === 2, "rebuild after preset creation");
       await Bun.sleep(40);
@@ -188,7 +188,7 @@ describe("runBuildWatchWithDependencies", () => {
         }`,
       );
 
-      watcher.callbacks.get(join(dir, "atlante.jsonc"))?.(undefined);
+      watcher.callbacks.get(join(dir, "atlante.jsonc"))?.();
 
       await waitFor(() => builds >= 2, "rebuild after invalid change");
       expect(readFileSync(manifestPath, "utf8")).toBe(before);
@@ -236,7 +236,7 @@ describe("runBuildWatchWithDependencies", () => {
     expect(builds).toBe(1);
 
     const callback = watcher.callbacks.get(join(dir, "atlante.jsonc"));
-    for (let i = 0; i < 5; i += 1) callback?.(undefined);
+    for (let i = 0; i < 5; i += 1) callback?.();
 
     await waitFor(() => builds === 2, "single debounced rebuild");
     await Bun.sleep(80);
@@ -264,7 +264,7 @@ describe("runBuildWatchWithDependencies", () => {
     });
 
     const callback = watcher.callbacks.get(join(dir, "atlante.jsonc"));
-    callback?.(undefined);
+    callback?.();
     await waitFor(() => builds === 2, "first rebuild");
     expect(watcher.callbacks.size).toBeGreaterThan(0);
 
@@ -273,7 +273,7 @@ describe("runBuildWatchWithDependencies", () => {
     expect(stopped).toBe(1);
     expect(await handle.exited).toBe(0);
 
-    callback?.(undefined);
+    callback?.();
     await Bun.sleep(100);
     expect(builds).toBe(2);
 
@@ -300,7 +300,7 @@ describe("runBuildWatchWithDependencies", () => {
     expect(watcher.callbacks.size).toBeGreaterThan(0);
 
     const callback = watcher.callbacks.get(join(dir, "atlante.jsonc"));
-    callback?.(undefined);
+    callback?.();
 
     await waitFor(() => builds === 2, "rebuild after first failure");
     await handle.stop();
@@ -327,7 +327,7 @@ describe("runBuildWatchWithDependencies", () => {
     expect(watcher.callbacks.has(alternateCandidate)).toBe(false);
 
     rmSync(configPath);
-    watcher.callbacks.get(configPath)?.(undefined);
+    watcher.callbacks.get(configPath)?.();
 
     await waitFor(() => builds === 2, "rebuild after config deletion");
     expect(watcher.callbacks.has(configPath)).toBe(true);
@@ -356,7 +356,7 @@ describe("runBuildWatchWithDependencies", () => {
     expect(watcher.callbacks.has(staleCandidate)).toBe(true);
 
     writeFileSync(configPath, valid);
-    watcher.callbacks.get(staleCandidate)?.(undefined);
+    watcher.callbacks.get(staleCandidate)?.();
 
     await waitFor(() => builds === 2, "rebuild after config creation");
     expect(watcher.callbacks.has(configPath)).toBe(true);

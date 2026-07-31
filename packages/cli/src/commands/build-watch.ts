@@ -2,7 +2,7 @@ import { unwatchFile, watchFile } from "node:fs";
 import { runBuild } from "./build.js";
 import { resolveWatchFiles, type WatchFiles } from "./build-watch-inputs.js";
 
-export type WatchCallback = (event: unknown, filename?: string) => void;
+export type WatchCallback = () => void;
 
 export type BuildWatchDeps = {
   build?: (target: string) => number;
@@ -23,7 +23,7 @@ const DEFAULT_DEBOUNCE_MS = 150;
 const defaultDeps: Required<BuildWatchDeps> = {
   build: runBuild,
   watch: (path, callback) => {
-    watchFile(path, { interval: POLL_INTERVAL_MS }, () => callback(undefined));
+    watchFile(path, { interval: POLL_INTERVAL_MS }, () => callback());
   },
   unwatch: (path) => {
     unwatchFile(path);
@@ -57,7 +57,7 @@ export function runBuildWatchWithDependencies(
     resolveExited = resolve;
   });
 
-  const onChange = (_event: unknown, _filename?: string): void => {
+  const onChange = (): void => {
     if (stopped) return;
     if (debounceTimer !== undefined) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
@@ -124,6 +124,8 @@ export function runBuildWatchWithDependencies(
   return { exited, stop };
 }
 
+/** Watch mode does not propagate build failures to the exit code: the process
+ * keeps polling, prints failures to stderr, and exits 0 when stopped. */
 export function runBuildWatch(target: string): Promise<number> {
   let handle: BuildWatchHandle;
   process.once("SIGINT", () => {

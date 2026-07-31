@@ -105,11 +105,7 @@ describe("resolveWatchFiles", () => {
     expect(bundledTemplatePaths(join(dir, "missing"))).toEqual([]);
   });
 
-  test("never returns paths under the project .atlante directory", () => {
-    // By-construction contract: the watch list is an explicit file set built
-    // from fixed package dirs plus config paths under projectDir, so no entry
-    // can carry a ".atlante" path segment. This asserts that contract; it
-    // cannot fail today and there is no ignore-list logic to exercise.
+  test("every watch path lies within a known input root", () => {
     const dir = tempDir();
     writeFileSync(
       join(dir, "atlante.jsonc"),
@@ -121,10 +117,13 @@ describe("resolveWatchFiles", () => {
 
     const result = resolveWatchFiles(dir);
 
+    const roots = [dir, PRESETS_DIR, BUNDLED_TEMPLATES_DIR].map(
+      (root) => `${root}${sep}`,
+    );
     const paths = allPaths(result);
     expect(paths.length).toBeGreaterThan(0);
     for (const path of paths) {
-      expect(path.split(sep)).not.toContain(".atlante");
+      expect(roots.some((root) => path.startsWith(root))).toBe(true);
     }
   });
 

@@ -7,6 +7,7 @@ import { runValidate } from "./commands/validate.js";
 
 export { listPresets, readPreset } from "@atlante/presets";
 export { runBuild } from "./commands/build.js";
+export { runBuildWatch } from "./commands/build-watch.js";
 export { runInit } from "./commands/init.js";
 export { runValidate } from "./commands/validate.js";
 export { formatDiagnostic } from "./report.js";
@@ -35,6 +36,7 @@ export function createProgram(): Command {
     .description("build host-independent Atlante artifacts")
     .action((path: string, options: { watch?: boolean }) => {
       if (options.watch) {
+        // Fire-and-forget: watch manages its own lifetime via SIGINT.
         void runBuildWatch(path);
       } else {
         process.exitCode = runBuild(path);
