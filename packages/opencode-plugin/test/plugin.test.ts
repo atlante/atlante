@@ -251,7 +251,10 @@ describe("AtlantePlugin", () => {
     const agent = manifest.agents[0];
     if (!agent) throw new Error("test fixture has no agent");
     const bytes = new Uint8Array([0xc3, 0x28]);
-    const path = `agents/${digest(agent.id)}-${digest(bytes)}.md`;
+    const path = agent.path.replace(
+      /-[0-9a-f]{64}\.md$/,
+      `-${digest(bytes)}.md`,
+    );
     writeFileSync(
       join(dir, ".atlante", "artifacts", ...path.split("/")),
       bytes,

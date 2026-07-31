@@ -10,6 +10,7 @@ import {
 } from "node:fs";
 import { join, resolve } from "node:path";
 import { TextDecoder, TextEncoder } from "node:util";
+import { type ArtifactNamespace, artifactPath } from "./artifact-names.js";
 import type {
   ArtifactInputs,
   ArtifactManifest,
@@ -78,13 +79,6 @@ function sha256(value: Uint8Array): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
-function artifactIdDigest(id: string): string {
-  if (typeof id !== "string" || id.length === 0) {
-    throw new TypeError("artifact IDs must be non-empty strings");
-  }
-  return sha256(utf8(id));
-}
-
 function validateSourceText(
   value: unknown,
   subject: string,
@@ -98,14 +92,14 @@ function validateSourceText(
 }
 
 function sourceEntry(
-  namespace: "agents" | "skills",
+  namespace: ArtifactNamespace,
   id: string,
   description: string,
   content: string,
 ): { entry: ArtifactManifestEntry; payload: ArtifactPayload } {
   const contentBytes = utf8(content);
   const contentDigest = sha256(contentBytes);
-  const path = `${namespace}/${artifactIdDigest(id)}-${contentDigest}.md`;
+  const path = artifactPath(namespace, id, contentDigest);
   return {
     entry: { id, description, path, sha256: contentDigest },
     payload: { path, bytes: contentBytes },
@@ -234,7 +228,7 @@ function parseManifest(text: string): ArtifactManifest {
 
 function manifestEntryValue(
   value: unknown,
-  namespace: "agents" | "skills",
+  namespace: ArtifactNamespace,
   index: number,
 ): Record<string, unknown> {
   if (!isRecord(value)) {
@@ -255,7 +249,7 @@ type ManifestEntryFields = {
 
 function validateManifestEntryFields(
   value: Record<string, unknown>,
-  namespace: "agents" | "skills",
+  namespace: ArtifactNamespace,
   index: number,
 ): asserts value is ManifestEntryFields {
   if (typeof value.id !== "string" || value.id.length === 0) {
@@ -278,7 +272,7 @@ function validateManifestEntryFields(
 
 function validateManifestEntryPath(
   value: ManifestEntryFields,
-  namespace: "agents" | "skills",
+  namespace: ArtifactNamespace,
   index: number,
   ids: Set<string>,
   paths: Set<string>,
@@ -297,7 +291,7 @@ function validateManifestEntryPath(
     );
   }
 
-  const expectedPath = `${namespace}/${artifactIdDigest(value.id)}-${value.sha256}.md`;
+  const expectedPath = artifactPath(namespace, value.id, value.sha256);
   if (value.path !== expectedPath) {
     throw new ArtifactReadError(
       `${namespace}[${index}].path does not match its ID, namespace, and digest`,
@@ -309,7 +303,7 @@ function validateManifestEntryPath(
 
 function parseEntry(
   value: unknown,
-  namespace: "agents" | "skills",
+  namespace: ArtifactNamespace,
   index: number,
   ids: Set<string>,
   paths: Set<string>,
@@ -330,7 +324,7 @@ function parseEntry(
 
 function parseEntries(
   values: unknown[],
-  namespace: "agents" | "skills",
+  namespace: ArtifactNamespace,
 ): ArtifactManifestEntry[] {
   const ids = new Set<string>();
   const paths = new Set<string>();

@@ -544,7 +544,7 @@ output format. Version 0.1 defines:
     {
       "id": "reviewer",
       "description": "Built description",
-      "path": "agents/<id-sha256>-<content-sha256>.md",
+      "path": "agents/<ascii-slug>-<id-sha256>-<content-sha256>.md",
       "sha256": "<64 lowercase hex characters>"
     }
   ],
@@ -553,11 +553,21 @@ output format. Version 0.1 defines:
 ```
 
 The manifest MUST be UTF-8 JSON and MUST contain only `format`, `version`,
-`agents`, and `skills`. Each entry MUST contain an opaque non-empty `id`, a
+`agents`, and `skills`. Each entry MUST contain a non-empty `id`, a
 `description`, a relative POSIX `path` in its declared namespace, and the
 lowercase SHA-256 digest of the exact UTF-8 Markdown payload at that path. The
-payload filename MUST be derived from the SHA-256 digest of the UTF-8 ID and
-the payload digest. IDs, paths, manifest entries, and payloads MUST be unique.
+payload filename MUST have the form
+`<ascii-slug>-<id-sha256>-<content-sha256>.md`. To form `<ascii-slug>`, an
+implementation MUST fold only ASCII `A` through `Z` to lowercase, replace each
+maximal run outside ASCII `[a-z0-9]` with one hyphen, trim outer hyphens, keep
+at most the first 48 characters, and trim a trailing hyphen again. If no
+characters remain, it MUST use `artifact`. The algorithm MUST NOT apply Unicode
+normalization, transliteration, or Unicode case folding. The ID digest MUST be
+the lowercase SHA-256 digest of the original ID's UTF-8 bytes, and the content
+digest MUST be the lowercase SHA-256 digest of the exact payload bytes. The
+filename component MUST be at most 181 ASCII bytes. The slug is a display hint;
+the ID digest distinguishes IDs with the same slug. IDs, paths, manifest
+entries, and payloads MUST be unique.
 
 An adapter MUST verify the format and version, reject unknown fields, unsafe
 paths, symlinks, non-regular files, invalid UTF-8, missing payloads, duplicate

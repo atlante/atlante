@@ -10,9 +10,9 @@ root:
   artifacts/
     manifest.json
     agents/
-      <id-sha256>-<content-sha256>.md
+      <ascii-slug>-<id-sha256>-<content-sha256>.md
     skills/
-      <id-sha256>-<content-sha256>.md
+      <ascii-slug>-<id-sha256>-<content-sha256>.md
 ```
 
 ## Manifest
@@ -27,7 +27,7 @@ root:
     {
       "id": "reviewer",
       "description": "Resolved description",
-      "path": "agents/<id-sha256>-<content-sha256>.md",
+      "path": "agents/<ascii-slug>-<id-sha256>-<content-sha256>.md",
       "sha256": "<64 lowercase hex characters>"
     }
   ],
@@ -35,7 +35,7 @@ root:
     {
       "id": "workflow",
       "description": "Resolved description",
-      "path": "skills/<id-sha256>-<content-sha256>.md",
+      "path": "skills/<ascii-slug>-<id-sha256>-<content-sha256>.md",
       "sha256": "<64 lowercase hex characters>"
     }
   ]
@@ -50,11 +50,15 @@ The builder stages a complete replacement privately and publishes it by
 directory rename, so adapters observe a complete old tree, a complete new tree,
 or no usable tree, never a partial tree.
 
-IDs are opaque non-empty strings. The first filename component is the lowercase
-SHA-256 digest of the ID's UTF-8 bytes, so whitespace, Unicode, slashes,
-traversal-looking strings, and long IDs produce safe deterministic names. The
-second component and the manifest `sha256` are the lowercase SHA-256 digest of
-the exact UTF-8 Markdown payload bytes.
+IDs are non-empty strings. The filename is formed from a display slug followed
+by the lowercase SHA-256 digest of the ID's UTF-8 bytes and the lowercase
+SHA-256 digest of the exact UTF-8 Markdown payload bytes. The slug is produced
+without Unicode normalization or transliteration: fold only ASCII `A` through
+`Z` to lowercase, replace each maximal run outside ASCII `[a-z0-9]` with one
+hyphen, trim outer hyphens, keep at most the first 48 characters, and trim a
+trailing hyphen again. If no characters remain, use `artifact`. The slug is
+only a display hint; the ID digest distinguishes IDs with the same slug. The
+filename component is at most 181 ASCII bytes.
 
 ## Verification
 
@@ -75,7 +79,8 @@ no artifact creation, digest, or publication helpers.
   blocking. Node and Bun do not expose descriptor-relative `openat` traversal
   here, so the checks are not an atomic race-free trust boundary.
 - Paths must be relative POSIX paths in their declared namespace and must match
-  the deterministic filename derived from the ID and digest.
+  the complete canonical filename derived from the ID and payload digest,
+  including the slug and both digest segments.
 - No descriptors are returned until every manifest entry and payload has been
   verified. The adapter-visible result contains only `{ hostAgentId,
   description, prompt }` for agents and `{ skillId, description, content }` for

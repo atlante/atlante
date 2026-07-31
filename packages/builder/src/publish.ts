@@ -11,6 +11,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
+import { isArtifactPayloadPath } from "./artifact-names.js";
 import type {
   ArtifactManifest,
   ArtifactPayload,
@@ -185,11 +186,7 @@ function ensureMetadataDirectory(
 
 function safeRelativePayloadPath(path: string): string[] {
   const parts = path.split("/");
-  if (
-    parts.length !== 2 ||
-    (parts[0] !== "agents" && parts[0] !== "skills") ||
-    !/^[0-9a-f]{64}-[0-9a-f]{64}\.md$/.test(parts[1] ?? "")
-  ) {
+  if (!isArtifactPayloadPath(path)) {
     throw new Error(`unsafe artifact payload path: ${path}`);
   }
   return parts;

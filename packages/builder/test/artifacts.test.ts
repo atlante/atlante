@@ -124,7 +124,7 @@ describe("createArtifacts", () => {
         {
           id: "réviewer/../ \ud83d\udca1",
           description: "Resolved description",
-          path: `agents/${digest("réviewer/../ \ud83d\udca1")}-${digest("Café\n💡\n")}.md`,
+          path: `agents/r-viewer-${digest("réviewer/../ \ud83d\udca1")}-${digest("Café\n💡\n")}.md`,
           sha256: digest("Café\n💡\n"),
         },
       ],
@@ -142,6 +142,9 @@ describe("createArtifacts", () => {
       " whitespace id ",
       "日本語/\u0000/../../name",
       "__proto__",
+      "日本語",
+      "💡",
+      "ÄBC id",
       "a".repeat(4096),
     ];
     const first = createArtifacts({
@@ -163,10 +166,47 @@ describe("createArtifacts", () => {
 
     expect(first).toEqual(second);
     for (const entry of first.manifest.agents) {
-      expect(entry.path).toMatch(/^agents\/[0-9a-f]{64}-[0-9a-f]{64}\.md$/);
+      expect(entry.path).toMatch(
+        /^agents\/(?:[a-z0-9]+(?:-[a-z0-9]+)*|artifact)-[0-9a-f]{64}-[0-9a-f]{64}\.md$/,
+      );
+      expect(entry.path.split("/")[1]?.length).toBeLessThanOrEqual(181);
       expect(entry.path.includes("..")).toBe(false);
       expect(entry.path.includes("__proto__")).toBe(false);
     }
+    expect(first.manifest.agents.map(({ path }) => path)).toContainEqual(
+      expect.stringContaining("/artifact-"),
+    );
+  });
+
+  test("keeps colliding slugs distinct with the ID digest", () => {
+    const ids = [
+      "Alpha ID",
+      "alpha-id",
+      "日本語",
+      "💡",
+      `${"a".repeat(48)}-one`,
+      `${"a".repeat(48)}-two`,
+    ];
+    const artifacts = createArtifacts({
+      agents: ids.map((hostAgentId) => ({
+        hostAgentId,
+        description: "description",
+        prompt: "same content",
+      })),
+      skills: [],
+    });
+    const paths = artifacts.manifest.agents.map(({ path }) => path);
+
+    expect(paths).toHaveLength(new Set(paths).size);
+    expect(paths[0]).toContain("alpha-id-");
+    expect(paths[1]).toContain("alpha-id-");
+    expect(paths[2]).toContain("artifact-");
+    expect(paths[3]).toContain("artifact-");
+    expect(paths[4]).toContain(`${"a".repeat(48)}-`);
+    expect(paths[5]).toContain(`${"a".repeat(48)}-`);
+    expect(paths[0]).not.toBe(paths[1]);
+    expect(paths[2]).not.toBe(paths[3]);
+    expect(paths[4]).not.toBe(paths[5]);
   });
 
   test("rejects duplicate source IDs before returning a bundle", () => {
@@ -361,10 +401,19 @@ describe("readArtifacts", () => {
     ["absolute path", "/tmp/outside.md"],
     ["backslash path", "agents\\outside.md"],
     ["wrong deterministic name", "agents/not-the-digest.md"],
-  ] as const)("rejects %s", (_name, path) => {
+    [
+      "altered slug",
+      (manifest: ArtifactManifest) =>
+        `agents/wrong-${digest(manifest.agents[0]?.id ?? "")}-${manifest.agents[0]?.sha256}.md`,
+    ],
+  ] as const)("rejects %s", (_name, pathOrFactory) => {
     const { root, manifest, payloads } = validTree();
     const agent = manifest.agents[0];
     if (!agent) throw new Error("test fixture has no agent");
+    const path =
+      typeof pathOrFactory === "function"
+        ? pathOrFactory(manifest)
+        : pathOrFactory;
     writeTree(root, { ...manifest, agents: [{ ...agent, path }] }, payloads);
 
     expectReadError(() => publicArtifacts.readArtifacts(root));
@@ -427,7 +476,10 @@ describe("readArtifacts", () => {
     const agent = manifest.agents[0];
     if (!agent) throw new Error("test fixture has no agent");
     const bytes = new Uint8Array([0xc3, 0x28]);
-    const path = `agents/${digest(agent.id)}-${digest(bytes)}.md`;
+    const path = agent.path.replace(
+      /-[0-9a-f]{64}\.md$/,
+      `-${digest(bytes)}.md`,
+    );
     writeTree(
       root,
       { ...manifest, agents: [{ ...agent, path, sha256: digest(bytes) }] },
