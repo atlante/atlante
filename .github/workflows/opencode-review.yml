@@ -23,7 +23,6 @@ jobs:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
         with:
           model: opencode/deepseek-v4-flash-free
-          use_github_token: true
           prompt: |
             Act as a senior engineer doing final PR review. Focus on:
 
