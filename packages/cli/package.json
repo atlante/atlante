@@ -41,9 +41,10 @@
     "build": "tsc --project tsconfig.build.json && tsc --project tsconfig.build.bin.json"
   },
   "dependencies": {
+    "@atlante/builder": "workspace:*",
     "@atlante/presets": "workspace:*",
     "@atlante/schema": "workspace:*",
-    "@atlante/builder": "workspace:*",
+    "@atlante/templates": "workspace:*",
     "@atlante/validator": "workspace:*",
     "commander": "^12.1.0",
     "jsonc-parser": "^3.3.1"

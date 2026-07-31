@@ -1,11 +1,13 @@
 import { Command } from "commander";
 import packageJson from "../package.json" with { type: "json" };
 import { runBuild } from "./commands/build.js";
+import { runBuildWatch } from "./commands/build-watch.js";
 import { runInit } from "./commands/init.js";
 import { runValidate } from "./commands/validate.js";
 
 export { listPresets, readPreset } from "@atlante/presets";
 export { runBuild } from "./commands/build.js";
+export { runBuildWatch } from "./commands/build-watch.js";
 export { runInit } from "./commands/init.js";
 export { runValidate } from "./commands/validate.js";
 export { formatDiagnostic } from "./report.js";
@@ -27,9 +29,18 @@ export function createProgram(): Command {
   program
     .command("build")
     .argument("[path]", "config file or project directory", process.cwd())
+    .option(
+      "--watch",
+      "rebuild on changes to config, presets, and bundled templates",
+    )
     .description("build host-independent Atlante artifacts")
-    .action((path: string) => {
-      process.exitCode = runBuild(path);
+    .action((path: string, options: { watch?: boolean }) => {
+      if (options.watch) {
+        // Fire-and-forget: watch manages its own lifetime via SIGINT.
+        void runBuildWatch(path);
+      } else {
+        process.exitCode = runBuild(path);
+      }
     });
 
   program
