@@ -3,14 +3,20 @@ name: opencode-review
 on:
   pull_request:
     types: [ready_for_review, synchronize]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "Pull request number to review"
+        required: true
+        type: number
 
 concurrency:
-  group: opencode-review-${{ github.event.pull_request.number }}
+  group: opencode-review-${{ github.event.pull_request.number || inputs.pr_number || github.run_id }}
   cancel-in-progress: true
 
 jobs:
   review:
-    if: github.event.pull_request.draft == false
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -21,11 +27,23 @@ jobs:
         uses: actions/checkout@v6
         with:
           persist-credentials: false
+
+      - name: Build pull_request event payload (manual runs)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          gh api repos/${{ github.repository }}/pulls/${{ inputs.pr_number }} \
+            --jq '{ action: "synchronize", number: .number, pull_request: ., repository: { owner: { login: .base.repo.owner.login }, name: .base.repo.name } }' \
+            > "$RUNNER_TEMP/event.json"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Run opencode
         uses: anomalyco/opencode/github@latest
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_EVENT_NAME: ${{ github.event_name == 'workflow_dispatch' && 'pull_request' || github.event_name }}
+          GITHUB_EVENT_PATH: ${{ github.event_name == 'workflow_dispatch' && format('{0}/event.json', runner.temp) || github.event_path }}
         with:
           model: opencode/deepseek-v4-flash-free
           use_github_token: true
