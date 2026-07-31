@@ -36,3 +36,34 @@ digests before returning anything to an adapter. Artifact format/version is
 separate from the document `$schema` version. Artifacts are host-neutral build
 outputs, not source configuration, and may contain sensitive rendered values;
 keep them local and do not publish them.
+
+## Reading artifacts
+
+Adapters must import `readArtifacts` and the verified types from
+`@atlante/builder/artifacts`. The reader is fail-closed. The subpath exposes
+no artifact creation, digest, or publication helpers.
+
+- An absent `.atlante/artifacts/` directory returns `undefined`, meaning the
+  project has not been built.
+- An existing tree with malformed JSON, unknown fields, an unsupported format or
+  version, duplicate IDs or paths, invalid hashes, unsafe paths, symlinks,
+  non-regular files, invalid UTF-8, missing payloads, or digest mismatches throws
+  `ArtifactReadError`.
+- Manifest and payload paths are checked component-by-component, opened with
+  the available no-follow and non-blocking flags, and rechecked after opening
+  by comparing descriptor and path identities. This rejects concurrent
+  regular-file replacement, ancestor symlink swaps, and FIFOs without
+  blocking. Node and Bun do not expose descriptor-relative `openat` traversal
+  here, so the checks are not an atomic race-free trust boundary.
+- Paths must be relative POSIX paths in their declared namespace and must match
+  the complete canonical filename derived from the ID and payload digest,
+  including the slug and both digest segments.
+- No descriptors are returned until every manifest entry and payload has been
+  verified. The adapter-visible result contains only `{ hostAgentId,
+  description, prompt }` for agents and `{ skillId, description, content }` for
+  skills.
+
+Artifact verification provides local integrity checking, not a privilege or
+trust boundary. Rendered values may contain secrets. Keep `.atlante/` ignored
+and local; do not publish artifact payloads or treat their digests as proof that
+the source or build environment is trusted.

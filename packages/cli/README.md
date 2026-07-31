@@ -38,7 +38,10 @@ or rendering the canonical document. `init` performs a build automatically. Run
 
 `init` creates or updates `opencode.jsonc` while preserving existing settings.
 
-The artifact format and its verification rules are documented in the repository
-[`ARTIFACTS.md`](../../ARTIFACTS.md). Artifact format/version is distinct from
-the document schema version. Artifacts contain rendered values and may be
-sensitive; keep `.atlante/` local and do not publish it.
+The artifact format and its verification rules are documented in
+[`SPECIFICATION.md`](../../SPECIFICATION.md) §9.1; the builder's fail-closed
+`readArtifacts` reader contract is in
+[`@atlante/builder`'s README](../builder/README.md#reading-artifacts). Artifact
+format/version is distinct from the document schema version. Artifacts contain
+rendered values and may be sensitive; keep `.atlante/` local and do not publish
+it.
