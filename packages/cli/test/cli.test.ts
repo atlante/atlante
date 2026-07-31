@@ -155,3 +155,10 @@ test("registers build, validate, and init, but not resolve", () => {
     "init",
   ]);
 });
+
+test("the build command exposes a --watch option", () => {
+  const build = createProgram().commands.find(
+    (command) => command.name() === "build",
+  );
+  expect(build?.options.map((option) => option.long)).toContain("--watch");
+});

@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import packageJson from "../package.json" with { type: "json" };
 import { runBuild } from "./commands/build.js";
+import { runBuildWatch } from "./commands/build-watch.js";
 import { runInit } from "./commands/init.js";
 import { runValidate } from "./commands/validate.js";
 
@@ -27,9 +28,17 @@ export function createProgram(): Command {
   program
     .command("build")
     .argument("[path]", "config file or project directory", process.cwd())
+    .option(
+      "--watch",
+      "rebuild on changes to config, presets, and bundled templates",
+    )
     .description("build host-independent Atlante artifacts")
-    .action((path: string) => {
-      process.exitCode = runBuild(path);
+    .action((path: string, options: { watch?: boolean }) => {
+      if (options.watch) {
+        void runBuildWatch(path);
+      } else {
+        process.exitCode = runBuild(path);
+      }
     });
 
   program
