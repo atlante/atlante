@@ -10,20 +10,27 @@
     }
   },
 
-  // Disable some OpenCode's user-facing default agents so the roster is Atlante's own.
+  // Disable OpenCode's user-facing default agents so the roster is Atlante's own.
   // The internal system agents (compaction, summary, title) are intentionally left enabled
   // because OpenCode relies on them for context compaction, session summaries,
   // and title generation.
   "agent": {
     "architect": {
       "mode": "primary",
-      "model": "openai/gpt-5.6-terra",
-      "reasoningEffort": "high",
+      "model": "openai/gpt-5.6-sol",
+      "reasoningEffort": "medium",
       "permission": {
         "*": "allow",
-        "edit": "deny",
-        "external_directory": "deny"
+        "edit": "deny"
       }
+    },
+    "general": {
+      "model": "opencode/deepseek-v4-flash-free",
+      "reasoningEffort": "max"
+    },
+    "explore": {
+      "model": "opencode/deepseek-v4-flash-free",
+      "reasoningEffort": "max"
     },
     "build": { "disable": true },
     "plan": { "disable": true }

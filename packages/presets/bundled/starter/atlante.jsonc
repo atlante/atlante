@@ -33,10 +33,9 @@
         },
         {
           "instructions": [
-            "Check whether an approved issue or task was provided with the request.",
-            "If none was provided, ask the developer whether they want to brainstorm a new design or already have an issue or task to work from.",
-            "If brainstorming was chosen, load and follow the brainstorming skill.",
-            "When an approved issue or task is available, load and follow the workflow skill."
+            "Ask the developer to choose whether to start brainstorming or workflow, regardless of whether an approved issue or task already exists.",
+            "After the developer chooses a mode, request explicit approval before loading and following its skill.",
+            "Once approved, load and follow the chosen skill. Workflow requires an approved issue or task as its source of truth; if none exists, clarify the task before loading workflow."
           ]
         }
       ]
@@ -73,65 +72,86 @@
     "workflow": {
       "description": "Use when an approved issue is ready for implementation: deliver a focused, verified change that satisfies its acceptance criteria.",
       "title": "Workflow",
-      "overview": "Provide a disciplined delivery framework that keeps approved work scoped, maintainable, and accountable from handoff through completion, with decisions and outcomes grounded in the issue's acceptance criteria. This workflow is driven by an orchestrator that delegates each task to a focused sub-agent, coordinates their outputs, and never implements or reviews directly.",
+      "overview": "Provide a disciplined delivery framework that keeps approved work scoped, maintainable, and accountable from handoff through completion, with decisions and outcomes grounded in the issue's acceptance criteria. This workflow is driven by an orchestrator that delegates each task to a focused sub-agent, coordinates their outputs, and enforces the workflow's quality gates.",
       "sections": [
         {
           "constraints": [
-            "Do not begin implementation until the developer approves the implementation plan.",
+            "Do not begin implementation until the developer approves the implementation plan when a full plan is warranted.",
             "For behavior changes, do not make implementation changes before a focused test demonstrates the planned behavior.",
-            "The orchestrator drives all phases but never plans, implements, or reviews directly — it delegates to sub-agents, tracks progress, and integrates results.",
+            "The orchestrator drives all phases but never edits files directly; it delegates every write, including corrections, to sub-agents, tracks progress, and integrates results.",
             "The orchestrator may recall a previously dispatched sub-agent when context preservation is valuable, most notably recalling the plan sub-agent to update its own plan. Fresh sub-agents remain the default for execution tasks and the reviewer must always be fresh."
           ]
         },
         {
           "workflow": {
             "title": "Phases",
+            "policies": {
+              "orchestratorReadOnly": true
+            },
             "phases": [
               {
+                "kind": "plan",
                 "name": "plan",
                 "description": "Turn the issue into the smallest DRY-KISS implementation plan.",
                 "instructions": [
                   "Use an existing issue or task defined by the user, as the source of truth.",
+                  "Assess the issue's type, size, and risk; decide and record whether to use the full plan or execute inline, defaulting to a full plan for non-trivial work.",
                   "The orchestrator dispatches a sub-agent to read applicable project instructions and inspect the relevant code and tests.",
-                  "The sub-agent breaks the implementation into the smallest essential tasks and writes the plan.",
-                  "The orchestrator reviews the plan and presents it to the developer for approval before proceeding.",
-                  "When the plan needs updating during or after execution, the orchestrator recalls the same plan sub-agent rather than dispatching a fresh one, so the update preserves existing context and plan structure."
+                  "For a full plan, the sub-agent breaks the implementation into the smallest essential tasks and writes the plan.",
+                  "For inline execution, record the judgment and focused steps in task context, skip the plan artifact and its approval and validation, and proceed directly to execute.",
+                  "The orchestrator reviews a full plan and presents it to the developer for approval before proceeding.",
+                  "When produced, keep this output as the single living plan; recall the same planner when execution or whole-change review findings change decomposition, sequencing, or scope.",
+                  "Judge case by case whether a living-plan update during execution requires renewed developer approval."
                 ],
                 "output": {
-                  "description": "The approved implementation plan, organized into tasks that run sequentially or in parallel as their dependencies require.",
-                  "filePath": ".atlante/plans/plan-<issue-number>.md"
+                  "description": "For full planning, the approved implementation plan, organized into tasks that run sequentially or in parallel as their dependencies require.",
+                  "filePath": ".atlante/plans/plan-<issue-number>.md",
+                  "updateable": true
                 },
-                "validation": "Review the output plan before presenting it."
+                "validation": "For full planning, review the output plan before presenting it."
               },
               {
+                "kind": "build",
                 "name": "execute",
-                "description": "Execute the approved tasks with focused implementation, verification, review, and bounded correction loops, then complete a whole-change review.",
+                "description": "Execute the approved tasks with focused implementation, verification, risk-scaled review, commits, and bounded correction loops.",
+                "policies": {
+                  "commit": true,
+                  "review": true,
+                  "maxLoops": 5
+                },
                 "instructions": [
-                  "Treat the approved plan and acceptance criteria as the source of truth; track task progress and do not repeat completed tasks.",
+                  "Treat the approved issue or task and its acceptance criteria as the source of truth; when a full plan exists, also use it, otherwise use the recorded inline judgment and steps.",
                   "The orchestrator executes tasks according to their dependencies, delegating each one to a fresh sub-agent with only its necessary context. Parallelize only independent tasks that cannot conflict.",
                   "For behavior changes, write a focused failing test before implementation; then make the smallest change needed, run covering tests, and report the evidence.",
-                  "After each task, the orchestrator dispatches a separate review for specification compliance and code quality. Return findings for correction and re-review; do not proceed with unresolved critical or important findings.",
-                  "Limit correction to five rounds per task. At the limit, the orchestrator records explicit rulings for deferred findings and stops with a blocker if a load-bearing issue remains.",
-                  "After all tasks, the orchestrator performs one whole-change review against the acceptance criteria, including deferred findings, before declaring the work complete.",
+                  "After the focused tests and task quick check pass, the orchestrator creates the initial focused task commit before any required per-task review and owns all commit authorship and pushing.",
+                  "Require per-task review for runtime behavior, public API, security, or otherwise risky or complex work; mechanical tasks may skip review but still require test-first behavior and a quick check.",
+                  "For a required per-task review, dispatch a separate reviewer for specification compliance and code quality. Route findings through delegated corrections and fresh re-review, and do not proceed with unresolved critical or important findings.",
+                  "After each correction's focused tests and quick check pass, create a separate correction commit; never amend or force-push.",
+                  "At the configured correction-loop limit, record explicit rulings for deferred findings and stop with a blocker if a load-bearing issue remains.",
+                  "When execution reveals facts that change decomposition, sequencing, or scope, recall the same planner to update the existing living plan for full-plan work, or update the recorded inline steps for inline work, before continuing.",
+                  "Escalate doubt in order: decide and document within scope; ask the orchestrator only for context or scope; recall a dedicated advisor for substantial doubt; then ask the developer one question at a time as a last resort.",
                   "Preserve unrelated changes and keep implementation within the approved scope."
                 ],
-                "validation": "After each task, run and record a quick check with {{values.quick-check}}, including after any correction round. After all tasks and the whole-change review, run and record the full check with {{values.full-check}}. Report commands, results, and any checks that could not run; do not claim completion while acceptance criteria or required review findings remain unresolved."
+                "validation": "After each task, run and record a quick check with {{values.quick-check}}, including after any correction loop. After all tasks and any required whole-change review, run and record the full check with {{values.full-check}}. Report commands, results, and any checks that could not run; do not claim completion while acceptance criteria or required review findings remain unresolved."
               },
               {
+                "kind": "review",
                 "name": "review",
-                "description": "Obtain an independent review of the completed change before declaring it complete.",
+                "description": "Obtain a fresh, read-only whole-change review, distinct from per-task review, before declaring eligible plans complete.",
 
                 "instructions": [
-                  "Prepare precise review context: the change summary, approved plan and acceptance criteria, applicable project instructions, relevant validation results, and the appropriate base and head revisions or current diff.",
+                  "Normally run this whole-change review only when a full plan has more than two tasks; skip it for inline execution unless an edge case warrants it.",
+                  "Prepare precise review context with the approved plan when present, otherwise the recorded inline judgment and steps. Include the change summary, acceptance criteria, applicable project instructions, relevant validation results, and the appropriate base and head revisions or current diff.",
                   "Dispatch a fresh reviewer with only that context; do not rely on the coordinator's session history or substitute a self-review.",
-                  "The reviewer must not modify any source file. Their sole job is to inspect, report, and write the review report.",
-                  "Ask the reviewer to assess specification compliance, correctness, maintainability, regressions, compatibility, security, and test coverage, and to classify findings as critical, important, or minor.",
-                  "The review report is the output. Do not fix, re-review, or loop — return the report as-is.",
-                  "If the report contains findings that require changes, the orchestrator goes back to the execute phase with the review report as its plan.",
+                  "The reviewer must not modify any source file. Its sole job is to inspect, report, and write the review report.",
+                  "Assess the entire diff against the acceptance criteria, including deferred findings, cross-task integration, regressions, compatibility, security, and test coverage. Classify findings as critical, important, or minor.",
+                  "Each fresh reviewer produces one immutable report and returns it as-is without fixing, re-reviewing, or looping.",
+                  "For full-plan work, integrate required findings into the existing living plan; for inline work, update the recorded inline steps. Immediately relaunch execute, then dispatch another fresh whole-change reviewer; repeat until clean or explicitly stopped with rulings or a blocker.",
+                  "Do not create a replacement plan or rerun the plan phase, and do not seek developer re-approval for full-plan whole-change review corrections.",
                   "Only declare the change complete when the review report has no unresolved critical or important findings."
                 ],
                 "output": {
-                  "description": "A review report listing all findings, classified by severity. Serves as the execution plan for the orchestrator if changes are needed.",
+                  "description": "An immutable whole-change review report listing all findings, classified by severity.",
                   "filePath": ".atlante/reviews/review-<issue-number>.md"
                 }
               }

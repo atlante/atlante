@@ -26,12 +26,15 @@ arrays. Agent sections may compose responsibilities, constraints, Markdown,
 instructions, and gotchas; skill sections may compose Markdown, constraints,
 instructions, gotchas, and multi-phase workflows.
 
-`atlante/workflow` executes phases and their required, non-empty inline
-`instructions` sequentially. Each phase may also have an aggregate `output` and
-final inline `validation` with a description, a command, or both. An optional
-`subagent` on a phase names the configured agent delegated that phase; when
-omitted, the orchestrator handles it. Delegation is supported at the phase
-level only.
+`atlante/workflow` renders phases and their required, non-empty inline
+`instructions` sequentially. A phase may declare a `plan`, `build`, or `review`
+`kind`, phase-level commit, review, and positive correction-loop policies, an
+aggregate `output`, and final inline string `validation`. Workflow-level policy
+can make the orchestrator read-only. An output marked `updateable` renders as a
+living artifact that later phases may revisit. An optional `subagent` names the
+configured agent delegated that phase; delegation is supported at the phase
+level only. All semantic and policy fields are optional, preserving generic
+workflows.
 
 Templates may declare nested slots with a `{ "template": "namespace/name" }`
 marker inside an object property, array `items`, or `oneOf` branch. A slot's

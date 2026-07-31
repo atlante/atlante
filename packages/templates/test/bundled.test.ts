@@ -269,6 +269,74 @@ describe("bundled templates", () => {
     expect(prompt).not.toContain("task 'Plan'");
   });
 
+  test("renders enabled workflow and phase policies", () => {
+    const { registry } = loadBundledTemplates();
+    const prompt = renderTemplate({
+      registry,
+      templateId: "atlante/workflow",
+      input: {
+        policies: { orchestratorReadOnly: true },
+        phases: [
+          {
+            kind: "build",
+            name: "Execute",
+            policies: { commit: true, review: true, maxLoops: 5 },
+            output: {
+              description: "The implementation result.",
+              updateable: true,
+            },
+            instructions: ["Make the change."],
+          },
+        ],
+      },
+    });
+
+    expect(prompt).toContain(
+      "Workflow policy: the orchestrator is read-only and delegates every file edit.",
+    );
+    expect(prompt).toContain(
+      "Phase policy: commit task implementation and corrections separately.",
+    );
+    expect(prompt).toContain(
+      "Phase policy: apply task review according to this phase's review criteria.",
+    );
+    expect(prompt).not.toContain("review after each task");
+    expect(prompt).toContain(
+      "Phase policy: limit correction to 5 loops per task.",
+    );
+    expect(prompt).toContain(
+      "This output is a living artifact that later phases may revisit and update, looping back when needed.",
+    );
+  });
+
+  test("omits disabled and absent workflow policies", () => {
+    const { registry } = loadBundledTemplates();
+    const prompt = renderTemplate({
+      registry,
+      templateId: "atlante/workflow",
+      input: {
+        policies: { orchestratorReadOnly: false },
+        phases: [
+          {
+            name: "Execute",
+            policies: { commit: false, review: false },
+            output: { description: "The implementation result." },
+            instructions: ["Make the change."],
+          },
+          { name: "Deliver", instructions: ["Deliver the result."] },
+        ],
+      },
+    });
+
+    expect(prompt).not.toContain("Workflow policy:");
+    expect(prompt).not.toContain("Phase policy:");
+    expect(prompt).not.toContain("living artifact");
+    expect(prompt).toContain("Execute phases sequentially in the order listed");
+    expect(prompt.indexOf("### 1. Execute")).toBeLessThan(
+      prompt.indexOf("### 2. Deliver"),
+    );
+  });
+
   test("renders phase-level subagent delegation without task-level routing", () => {
     const { registry } = loadBundledTemplates();
     const prompt = renderTemplate({

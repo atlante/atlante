@@ -462,6 +462,17 @@ describe("validateTemplates", () => {
   const { registry } = loadBundledTemplates();
   const check = (agent: Record<string, unknown>) =>
     validateTemplates(documentWith(agent), registry, "atlante/agent");
+  const checkWorkflow = (workflow: Record<string, unknown>) =>
+    validateSkillInput(
+      registry,
+      "atlante/skill",
+      {
+        title: "Workflow",
+        overview: "Coordinate the change.",
+        sections: [{ workflow }],
+      },
+      "workflow",
+    );
 
   test("accepts a valid agent binding", () => {
     expect(
@@ -548,6 +559,106 @@ describe("validateTemplates", () => {
         "workflow",
       ),
     ).toEqual([]);
+  });
+
+  test.each(["plan", "build", "review"])(
+    "accepts workflow policies, %s phases, and updateable outputs",
+    (kind) => {
+      expect(
+        checkWorkflow({
+          policies: { orchestratorReadOnly: true },
+          phases: [
+            {
+              kind,
+              name: "Execute",
+              policies: { commit: true, review: true, maxLoops: 5 },
+              output: {
+                description: "The phase result.",
+                updateable: true,
+              },
+              instructions: ["Make the change."],
+            },
+          ],
+        }),
+      ).toEqual([]);
+    },
+  );
+
+  test("keeps generic workflows valid when optional semantics are absent", () => {
+    expect(
+      checkWorkflow({
+        phases: [{ name: "Execute", instructions: ["Make the change."] }],
+      }),
+    ).toEqual([]);
+  });
+
+  test.each([0, -1, 1.5])("rejects maxLoops value %j", (maxLoops) => {
+    expect(
+      checkWorkflow({
+        phases: [
+          {
+            name: "Execute",
+            policies: { maxLoops },
+            instructions: ["Make the change."],
+          },
+        ],
+      }),
+    ).not.toEqual([]);
+  });
+
+  test.each([
+    {
+      label: "an unknown phase kind",
+      workflow: {
+        phases: [
+          {
+            kind: "deploy",
+            name: "Execute",
+            instructions: ["Make the change."],
+          },
+        ],
+      },
+    },
+    {
+      label: "an unknown workflow policy",
+      workflow: {
+        policies: { orchestratorWrites: true },
+        phases: [{ name: "Execute", instructions: ["Make the change."] }],
+      },
+    },
+    {
+      label: "an unknown phase policy",
+      workflow: {
+        phases: [
+          {
+            name: "Execute",
+            policies: { retries: 3 },
+            instructions: ["Make the change."],
+          },
+        ],
+      },
+    },
+    {
+      label: "an unrelated workflow field",
+      workflow: {
+        strategy: "parallel",
+        phases: [{ name: "Execute", instructions: ["Make the change."] }],
+      },
+    },
+    {
+      label: "an unrelated artifact field",
+      workflow: {
+        phases: [
+          {
+            name: "Execute",
+            output: { description: "The result.", format: "json" },
+            instructions: ["Make the change."],
+          },
+        ],
+      },
+    },
+  ])("rejects $label", ({ workflow }) => {
+    expect(checkWorkflow(workflow)).not.toEqual([]);
   });
 
   test.each(["Confirm the phase result.", "Run `bun test`."])(
