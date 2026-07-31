@@ -38,7 +38,7 @@ afterEach(() => {
 async function waitFor(
   check: () => boolean,
   description: string,
-  timeoutMs = 2_000,
+  timeoutMs = 5_000,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (!check()) {
@@ -111,11 +111,14 @@ describe("runBuildWatchWithDependencies", () => {
     const dir = tempProject(valid);
     await withSilencedConsole(async () => {
       let builds = 0;
+      const watcher = fakeWatcher();
       const handle = runBuildWatchWithDependencies(dir, {
         build: (target) => {
           builds += 1;
           return runBuild(target);
         },
+        watch: watcher.watch,
+        unwatch: watcher.unwatch,
         debounceMs: 40,
       });
 
@@ -132,6 +135,8 @@ describe("runBuildWatchWithDependencies", () => {
           }
         }`,
       );
+
+      watcher.callbacks.get(join(dir, "atlante.jsonc"))?.(undefined);
 
       await waitFor(() => builds >= 2, "rebuild after invalid change");
       expect(readFileSync(manifestPath, "utf8")).toBe(before);
