@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, sep } from "node:path";
+import { basename, join, sep } from "node:path";
 import { PRESETS_DIR } from "@atlante/presets";
 import { SCHEMA_URI } from "@atlante/schema";
 import { BUNDLED_TEMPLATES_DIR } from "@atlante/templates";
+import { MAX_PRESET_DEPTH } from "@atlante/validator";
 import {
   bundledTemplatePaths,
   resolveWatchFiles,
@@ -12,10 +13,19 @@ import {
 } from "../src/commands/build-watch-inputs.js";
 
 const created: string[] = [];
+const createdPresets: string[] = [];
 
 function tempDir(): string {
   const dir = mkdtempSync(join(tmpdir(), "atlante-watch-inputs-"));
   created.push(dir);
+  return dir;
+}
+
+function createPresetDirectory(prefix: string): string {
+  const name = `${prefix}-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const dir = join(PRESETS_DIR, name);
+  mkdirSync(dir);
+  createdPresets.push(dir);
   return dir;
 }
 
@@ -35,6 +45,8 @@ const valid = `{
 
 afterEach(() => {
   for (const dir of created.splice(0))
+    rmSync(dir, { recursive: true, force: true });
+  for (const dir of createdPresets.splice(0))
     rmSync(dir, { recursive: true, force: true });
 });
 
@@ -178,7 +190,59 @@ describe("resolveWatchFiles", () => {
     const result = resolveWatchFiles(dir);
 
     expect(result.configPath).toBe(join(dir, "atlante.jsonc"));
-    expect(result.presetPaths).toEqual([]);
+    expect(result.presetPaths).toEqual([
+      join(PRESETS_DIR, "missing", "atlante.jsonc"),
+      join(PRESETS_DIR, "missing", "atlante.json"),
+    ]);
+  });
+
+  test("stops bundled preset traversal at MAX_PRESET_DEPTH", () => {
+    const dir = tempDir();
+    const firstPresetDir = createPresetDirectory("watch-depth");
+    const firstName = basename(firstPresetDir);
+    const presetNames = Array.from(
+      { length: MAX_PRESET_DEPTH + 1 },
+      (_, index) => (index === 0 ? firstName : `${firstName}-${index}`),
+    );
+
+    for (const [index, name] of presetNames.entries()) {
+      const presetDir = index === 0 ? firstPresetDir : join(PRESETS_DIR, name);
+      if (index > 0) {
+        mkdirSync(presetDir);
+        createdPresets.push(presetDir);
+      }
+      const extendsField =
+        index < MAX_PRESET_DEPTH
+          ? `,\n          "extends": "atlante/${presetNames[index + 1]}"`
+          : "";
+      writeFileSync(
+        join(presetDir, "atlante.jsonc"),
+        `{
+          "$schema": "${SCHEMA_URI}",
+          "values": { "project": "demo" }${extendsField}
+        }`,
+      );
+    }
+    writeFileSync(
+      join(dir, "atlante.jsonc"),
+      `{
+        "$schema": "${SCHEMA_URI}",
+        "extends": "atlante/${presetNames[0]}"
+      }`,
+    );
+
+    const result = resolveWatchFiles(dir);
+
+    expect(result.presetPaths).toEqual(
+      presetNames
+        .slice(0, MAX_PRESET_DEPTH)
+        .map((name) => join(PRESETS_DIR, name, "atlante.jsonc")),
+    );
+    const excludedPreset = presetNames[MAX_PRESET_DEPTH];
+    if (!excludedPreset) throw new Error("missing depth-limit fixture");
+    expect(result.presetPaths).not.toContain(
+      join(PRESETS_DIR, excludedPreset, "atlante.jsonc"),
+    );
   });
 
   test("skips a preset id that fails the name pattern", () => {

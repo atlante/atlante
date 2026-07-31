@@ -17,7 +17,7 @@ export {
   validateDocumentText,
 } from "./document.js";
 export type { PresetLoader } from "./expand.js";
-export { expandDocument } from "./expand.js";
+export { expandDocument, MAX_PRESET_DEPTH } from "./expand.js";
 export { templateLoadDiagnostics } from "./loader-diagnostics.js";
 export {
   createBundledPresetLoader,

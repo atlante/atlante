@@ -9,6 +9,7 @@ import { BUNDLED_TEMPLATES_DIR } from "@atlante/templates";
 import {
   CONFIG_FILENAMES,
   findConfigFile,
+  MAX_PRESET_DEPTH,
   parseDocumentOverlay,
 } from "@atlante/validator";
 
@@ -44,34 +45,40 @@ function projectDirOf(target: string): string {
   return target;
 }
 
-function bundledPresetPath(id: string): string | undefined {
+function bundledPresetPaths(id: string): string[] | undefined {
   if (!id.startsWith(`${PRESET_NAMESPACE}/`)) return undefined;
   const name = id.slice(PRESET_NAMESPACE.length + 1);
   if (!PRESET_NAME_PATTERN.test(name)) return undefined;
   const directory = join(PRESETS_DIR, name);
-  for (const filename of CONFIG_FILENAMES) {
-    const candidate = join(directory, filename);
-    if (existsSync(candidate)) return candidate;
-  }
-  return undefined;
+  const candidates = CONFIG_FILENAMES.map((filename) =>
+    join(directory, filename),
+  );
+  const existing = candidates.find(existsSync);
+  return existing ? [existing] : candidates;
 }
 
 function walkExtendsChain(
   overlay: { extends?: string },
   visited: Set<string>,
   paths: string[],
+  depth: number,
 ): void {
+  if (depth >= MAX_PRESET_DEPTH) return;
   const presetId = overlay.extends;
   if (typeof presetId !== "string" || presetId.length === 0) return;
   if (visited.has(presetId)) return;
   visited.add(presetId);
 
-  const presetPath = bundledPresetPath(presetId);
-  if (!presetPath) return;
+  const presetPaths = bundledPresetPaths(presetId);
+  if (!presetPaths) return;
 
-  paths.push(presetPath);
-  const presetOverlay = readPresetOverlay(presetPath);
-  if (presetOverlay) walkExtendsChain(presetOverlay, visited, paths);
+  paths.push(...presetPaths);
+  const [presetPath] = presetPaths;
+  const presetOverlay =
+    presetPaths.length === 1 && presetPath
+      ? readPresetOverlay(presetPath)
+      : undefined;
+  if (presetOverlay) walkExtendsChain(presetOverlay, visited, paths, depth + 1);
 }
 
 function readPresetOverlay(path: string): { extends?: string } | undefined {
@@ -86,7 +93,7 @@ function presetPathsOf(configText: string, configPath: string): string[] {
   const parsed = parseDocumentOverlay(configText, configPath);
   if (!parsed.overlay) return [];
   const paths: string[] = [];
-  walkExtendsChain(parsed.overlay, new Set(), paths);
+  walkExtendsChain(parsed.overlay, new Set(), paths, 0);
   return paths;
 }
 

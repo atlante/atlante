@@ -9,6 +9,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { PRESETS_DIR } from "@atlante/presets";
 import { SCHEMA_URI } from "@atlante/schema";
 import { runBuild } from "../src/commands/build.js";
 import {
@@ -17,12 +18,17 @@ import {
 } from "../src/commands/build-watch.js";
 
 const created: string[] = [];
+const createdPresets: string[] = [];
 
 function tempProject(config?: string): string {
   const dir = mkdtempSync(join(tmpdir(), "atlante-build-watch-"));
   created.push(dir);
   if (config !== undefined) writeFileSync(join(dir, "atlante.jsonc"), config);
   return dir;
+}
+
+function uniquePresetName(): string {
+  return `watch-missing-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 const valid = `{
@@ -32,6 +38,8 @@ const valid = `{
 
 afterEach(() => {
   for (const dir of created.splice(0))
+    rmSync(dir, { recursive: true, force: true });
+  for (const dir of createdPresets.splice(0))
     rmSync(dir, { recursive: true, force: true });
 });
 
@@ -106,6 +114,50 @@ describe("runBuildWatchWithDependencies", () => {
     expect(builds).toBe(2);
     await handle.stop();
   });
+
+  for (const presetFilename of ["atlante.jsonc", "atlante.json"]) {
+    test(`creating missing bundled preset ${presetFilename} triggers one rebuild`, async () => {
+      const presetName = uniquePresetName();
+      const presetDir = join(PRESETS_DIR, presetName);
+      const presetJsonc = join(presetDir, "atlante.jsonc");
+      const presetJson = join(presetDir, "atlante.json");
+      const createdPresetPath = join(presetDir, presetFilename);
+      const alternatePresetPath =
+        presetFilename === "atlante.jsonc" ? presetJson : presetJsonc;
+      const dir = tempProject(`{
+        "$schema": "${SCHEMA_URI}",
+        "extends": "atlante/${presetName}"
+      }`);
+      const watcher = fakeWatcher();
+      let builds = 0;
+
+      const handle = runBuildWatchWithDependencies(dir, {
+        build: () => {
+          builds += 1;
+          return 0;
+        },
+        watch: watcher.watch,
+        unwatch: watcher.unwatch,
+        debounceMs: 20,
+      });
+
+      expect(builds).toBe(1);
+      expect(watcher.callbacks.has(presetJsonc)).toBe(true);
+      expect(watcher.callbacks.has(presetJson)).toBe(true);
+
+      mkdirSync(presetDir);
+      createdPresets.push(presetDir);
+      writeFileSync(createdPresetPath, valid);
+      watcher.callbacks.get(createdPresetPath)?.(undefined);
+
+      await waitFor(() => builds === 2, "rebuild after preset creation");
+      await Bun.sleep(40);
+      expect(builds).toBe(2);
+      expect(watcher.callbacks.has(createdPresetPath)).toBe(true);
+      expect(watcher.callbacks.has(alternatePresetPath)).toBe(false);
+      await handle.stop();
+    });
+  }
 
   test("an invalid change does not publish", async () => {
     const dir = tempProject(valid);

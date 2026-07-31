@@ -3,7 +3,7 @@ import { atlanteDocumentSchema, VALUE_KEY_PATTERN } from "@atlante/schema";
 import type { Diagnostic } from "./diagnostic.js";
 import { error, escapeJsonPointerSegment } from "./diagnostic.js";
 
-const MAX_PRESET_DEPTH = 32;
+export const MAX_PRESET_DEPTH = 32;
 
 /** @atlante/validator does not depend on @atlante/presets. */
 export interface PresetLoader {

@@ -1,7 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import type { SkillsOverlay } from "@atlante/schema";
 import { SCHEMA_URI } from "@atlante/schema";
-import { expandDocument, type PresetLoader } from "../src/index.js";
+import {
+  expandDocument,
+  MAX_PRESET_DEPTH,
+  type PresetLoader,
+} from "../src/index.js";
 
 describe("expandDocument", () => {
   test("merges, overrides, and tombstones inherited skills", () => {
@@ -211,7 +215,7 @@ describe("expandDocument", () => {
 
     expect(result.diagnostics[0]?.code).toBe("preset-depth-exceeded");
     expect(result.diagnostics[0]?.path).toBe("/extends");
-    expect(result.diagnostics[0]?.message).toContain("32");
+    expect(result.diagnostics[0]?.message).toContain(String(MAX_PRESET_DEPTH));
     expect(result.diagnostics[0]?.message).toContain(
       "test/0 -> test/1 -> test/2",
     );
