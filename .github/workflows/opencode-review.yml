@@ -2,21 +2,25 @@ name: opencode-review
 
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review, synchronize]
-  workflow_dispatch:
-    inputs:
-      pr_number:
-        description: "Pull request number to review"
-        required: true
-        type: number
+    types: [ready_for_review]
+  issue_comment:
+    types: [created]
 
 concurrency:
-  group: opencode-review-${{ github.event.pull_request.number || inputs.pr_number || github.run_id }}
+  group: opencode-review-${{ github.event.pull_request.number || github.event.issue.number || github.run_id }}
   cancel-in-progress: true
 
 jobs:
   review:
-    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.draft == false && github.event.pull_request.head.repo.fork == false)
+    if: >-
+      (github.event_name == 'pull_request' &&
+       github.event.pull_request.draft == false &&
+       github.event.pull_request.head.repo.fork == false) ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request != null &&
+       (contains(github.event.comment.body, '/opencode review') ||
+        contains(github.event.comment.body, '/oc review')) &&
+       contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -28,22 +32,11 @@ jobs:
         with:
           persist-credentials: true
 
-      - name: Build pull_request event payload (manual runs)
-        if: github.event_name == 'workflow_dispatch'
-        run: |
-          gh api repos/${{ github.repository }}/pulls/${{ inputs.pr_number }} \
-            --jq '{ action: "synchronize", number: .number, pull_request: ., repository: { owner: { login: .base.repo.owner.login }, name: .base.repo.name } }' \
-            > "$RUNNER_TEMP/event.json"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Run opencode
         uses: anomalyco/opencode/github@latest
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_EVENT_NAME: ${{ github.event_name == 'workflow_dispatch' && 'pull_request' || github.event_name }}
-          GITHUB_EVENT_PATH: ${{ github.event_name == 'workflow_dispatch' && format('{0}/event.json', runner.temp) || github.event_path }}
           # Security: the CLI checks out the PR head branch, which is attacker-controlled.
           # Ignore project opencode.json(c), .opencode/, and AGENTS.md/CLAUDE.md/CONTEXT.md
           # from the checked-out head so a malicious PR cannot inject config or instructions
@@ -56,6 +49,7 @@ jobs:
         with:
           model: opencode/deepseek-v4-flash-free
           use_github_token: true
+          share: false
           prompt: |
             Act as a senior engineer doing final PR review. Focus on:
 
@@ -71,3 +65,30 @@ jobs:
             - Observations (nice to have)
 
             Be specific with line references. Don't repeat what pre-review likely caught.
+
+      - name: Remove run link from review comment
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          PR="${{ github.event.pull_request.number || github.event.issue.number }}"
+          RUN_ID="${{ github.run_id }}"
+          COMMENT_ID=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" \
+            --jq "[.[] | select(.body | contains(\"/actions/runs/$RUN_ID\"))][-1].id")
+          if [ -z "$COMMENT_ID" ] || [ "$COMMENT_ID" = "null" ]; then
+            echo "No comment found for run $RUN_ID; nothing to strip"
+            exit 0
+          fi
+          gh api "repos/${{ github.repository }}/issues/comments/$COMMENT_ID" \
+            --jq '.body' > /tmp/comment_body.txt
+          python3 - <<'PY'
+          import re
+          body = open('/tmp/comment_body.txt').read()
+          cleaned = re.sub(r'(?:&nbsp;&nbsp;\|\s*)?\[github run\]\([^)]*\)\s*$', '', body)
+          open('/tmp/comment_body.txt', 'w').write(cleaned)
+          PY
+          python3 -c 'import json; print(json.dumps({"body": open("/tmp/comment_body.txt").read()}))' > /tmp/payload.json
+          gh api -X PATCH "repos/${{ github.repository }}/issues/comments/$COMMENT_ID" \
+            --input /tmp/payload.json --jq '.id'
