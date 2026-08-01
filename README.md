@@ -251,6 +251,16 @@ bun run type:check   # tsc --build packages/*/tsconfig.json
 bun test
 ```
 
+### Local `atlante` command
+
+Run the CLI directly with `bun run cli <command>`. To use the bare
+`atlante <command>` instead, link the CLI package globally (per machine;
+re-run after a fresh clone):
+
+```bash
+bun link --cwd packages/cli
+```
+
 ## Status
 
 v0.1, prompt-first profile. See [`SPECIFICATION.md`](SPECIFICATION.md) for the
