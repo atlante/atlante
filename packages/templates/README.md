@@ -3,10 +3,6 @@
 Template loading, composition, value interpolation, and Markdown rendering for
 [Atlante](https://github.com/atlante/atlante). Requires Node.js 22 or later.
 
-> Internal workspace package — not published to npm. This package exists only
-> inside the Atlante repository, where the published `@atlante/cli` and
-> `@atlante/opencode-plugin` packages consume its source at build time.
-
 The package exports registry loaders, composition validation, bundled Draft
 2020-12 template schemas, system-value resolution, and rendering helpers.
 

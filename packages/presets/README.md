@@ -3,10 +3,6 @@
 Bundled configuration presets for
 [Atlante](https://github.com/atlante/atlante). Requires Node.js 22 or later.
 
-> Internal workspace package — not published to npm. This package exists only
-> inside the Atlante repository, where the published `@atlante/cli` and
-> `@atlante/opencode-plugin` packages consume its source at build time.
-
 Use `listPresets` to inspect registry-derived preset IDs and `readPreset` to read
 a preset document. The package includes the `atlante/starter` preset used by
 `atlante init`; each preset is an ordinary `atlante.jsonc` or `atlante.json`.

@@ -3,10 +3,6 @@
 Document and template-input validation for
 [Atlante](https://github.com/atlante/atlante). Requires Node.js 22 or later.
 
-> Internal workspace package — not published to npm. This package exists only
-> inside the Atlante repository, where the published `@atlante/cli` and
-> `@atlante/opencode-plugin` packages consume its source at build time.
-
 The validator discovers and parses `atlante.jsonc` or `atlante.json`, expands
 raw overlays through the uniform preset path, validates the resulting canonical
 document structure, and validates each agent and skill through the shared
