@@ -2,9 +2,16 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const PRESETS_DIR = fileURLToPath(
-  new URL("../bundled", import.meta.url),
-);
+function resolveBundledDir(): URL {
+  // Standalone package (source or built dist): <pkg>/bundled.
+  const standalone = new URL("../bundled", import.meta.url);
+  if (existsSync(fileURLToPath(standalone))) return standalone;
+  // Inlined into the CLI bundle at <cli>/dist/bin/atlante.js:
+  // <cli>/bundled/presets (copied by scripts/build.ts).
+  return new URL("../../bundled/presets", import.meta.url);
+}
+
+export const PRESETS_DIR = fileURLToPath(resolveBundledDir());
 export const PRESET_NAMESPACE = "atlante";
 export const PRESET_NAME_PATTERN = /^[a-z0-9-]+$/;
 

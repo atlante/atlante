@@ -23,7 +23,7 @@ Schema changes require building and validating (`atlante validate`, `atlante bui
 bun test                        # run all tests
 bun run type:check              # type-check all packages
 bun run lint:check              # lint + format check
-bun run build                   # build all packages
+bun run build                   # build publishable artifacts (CLI + plugin bundles)
 bun run quick:check             # type:check + lint:check + test
 bun run full:check              # build + quick:check (CI gate)
 bun run cli                     # run the CLI (packages/cli/bin/atlante.ts)

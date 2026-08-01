@@ -1,5 +1,5 @@
-import type { VerifiedSkillArtifact } from "@atlante/builder/artifacts";
 import { type ToolDefinition, tool } from "@opencode-ai/plugin";
+import type { PluginSkillArtifact } from "./artifacts.js";
 
 export type SkillToolState = {
   status: "inactive" | "active" | "failed";
@@ -7,7 +7,7 @@ export type SkillToolState = {
 };
 
 export function createSkillTool(
-  skills: readonly VerifiedSkillArtifact[],
+  skills: readonly PluginSkillArtifact[],
   state: SkillToolState,
 ): ToolDefinition {
   const artifacts = skills.map((skill) => ({ ...skill }));

@@ -32,19 +32,20 @@
     "LICENSE"
   ],
   "exports": {
-    ".": "./src/index.ts",
-    "./api": "./src/api.ts"
-  },
-  "scripts": {
-    "build": "tsc --project tsconfig.build.json"
-  },
-  "dependencies": {
-    "@atlante/builder": "workspace:*"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./api": {
+      "types": "./dist/api.d.ts",
+      "default": "./dist/api.js"
+    }
   },
   "peerDependencies": {
     "@opencode-ai/plugin": "^1.18.4"
   },
   "devDependencies": {
+    "@atlante/builder": "workspace:*",
     "@opencode-ai/plugin": "^1.18.4"
   }
 }

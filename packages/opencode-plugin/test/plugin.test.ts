@@ -473,6 +473,7 @@ describe("AtlantePlugin", () => {
       new Set([
         "@atlante/builder/artifacts",
         "@opencode-ai/plugin",
+        "./artifacts.js",
         "./inject.js",
         "./skill-tool.js",
       ]),

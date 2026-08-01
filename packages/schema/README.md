@@ -4,10 +4,6 @@ Document contract for [Atlante](https://github.com/atlante/atlante), including
 TypeScript types, Zod schemas, and the versioned JSON Schema. Requires Node.js
 22 or later.
 
-```bash
-npm install @atlante/schema
-```
-
 The package exports `atlanteDocumentSchema`, `agentBindingSchema`,
 `skillBindingSchema`, the shared `bindingDescriptionSchema`, value schemas, their
 TypeScript types, `SCHEMA_URI`, and `documentJsonSchema`. Every agent and skill

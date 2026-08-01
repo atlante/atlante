@@ -29,24 +29,16 @@
   },
   "files": [
     "dist",
+    "bundled",
     "LICENSE"
   ],
   "bin": {
-    "atlante": "./bin/atlante.ts"
-  },
-  "exports": {
-    ".": "./src/main.ts"
-  },
-  "scripts": {
-    "build": "tsc --project tsconfig.build.json && tsc --project tsconfig.build.bin.json"
+    "atlante": "./dist/bin/atlante.js"
   },
   "dependencies": {
-    "@atlante/builder": "workspace:*",
-    "@atlante/presets": "workspace:*",
-    "@atlante/schema": "workspace:*",
-    "@atlante/templates": "workspace:*",
-    "@atlante/validator": "workspace:*",
-    "commander": "^12.1.0",
     "jsonc-parser": "^3.3.1"
+  },
+  "devDependencies": {
+    "commander": "^12.1.0"
   }
 }

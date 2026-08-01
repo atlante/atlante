@@ -3,10 +3,6 @@
 Template loading, composition, value interpolation, and Markdown rendering for
 [Atlante](https://github.com/atlante/atlante). Requires Node.js 22 or later.
 
-```bash
-npm install @atlante/templates
-```
-
 The package exports registry loaders, composition validation, bundled Draft
 2020-12 template schemas, system-value resolution, and rendering helpers.
 

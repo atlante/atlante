@@ -24,19 +24,10 @@
   "engines": {
     "node": ">=22"
   },
-  "publishConfig": {
-    "access": "public"
-  },
-  "files": [
-    "dist",
-    "LICENSE"
-  ],
+  "private": true,
   "exports": {
     ".": "./src/index.ts",
     "./artifacts": "./src/artifacts-public.ts"
-  },
-  "scripts": {
-    "build": "tsc --project tsconfig.build.json"
   },
   "dependencies": {
     "@atlante/schema": "workspace:*",

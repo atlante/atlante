@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const ROOT = join(import.meta.dir, "..");
-const CLI = join(ROOT, "packages", "cli", "bin", "atlante.ts");
+const CLI = join(ROOT, "packages", "cli", "dist", "bin", "atlante.js");
 
 function assert(condition: boolean, message: string) {
   if (!condition) throw new Error(message);
@@ -14,13 +14,13 @@ function assert(condition: boolean, message: string) {
 const project = await mkdtemp(join(tmpdir(), "atlante-smoke-"));
 
 try {
-  const version = (await Bun.$`bun ${CLI} --version`.cwd(ROOT).text()).trim();
+  const version = (await Bun.$`node ${CLI} --version`.cwd(ROOT).text()).trim();
   const pkg = await Bun.file(
     join(ROOT, "packages", "cli", "package.json"),
   ).json();
   assert(version === pkg.version, `unexpected CLI version: ${version}`);
 
-  await Bun.$`bun ${CLI} init ${project}`.cwd(ROOT);
+  await Bun.$`node ${CLI} init ${project}`.cwd(ROOT);
   assert(
     await Bun.file(join(project, "atlante.jsonc")).exists(),
     "init did not write atlante.jsonc",
@@ -31,8 +31,8 @@ try {
     "missing @atlante/opencode-plugin in opencode.jsonc",
   );
 
-  await Bun.$`bun ${CLI} validate ${project}`.cwd(ROOT);
-  await Bun.$`bun ${CLI} build ${project}`.cwd(ROOT);
+  await Bun.$`node ${CLI} validate ${project}`.cwd(ROOT);
+  await Bun.$`node ${CLI} build ${project}`.cwd(ROOT);
 
   const artifacts = join(project, ".atlante", "artifacts");
   const manifest = (await Bun.file(
@@ -85,7 +85,7 @@ try {
     join(project, "atlante.jsonc"),
     '{"$schema":"https://atlante.sh/schema/v0.1/schema.json","agents":{"a":{"identity":"x"}}}',
   );
-  const invalid = await Bun.$`bun ${CLI} validate ${project}`
+  const invalid = await Bun.$`node ${CLI} validate ${project}`
     .cwd(ROOT)
     .quiet()
     .nothrow();

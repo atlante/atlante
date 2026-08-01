@@ -6,6 +6,27 @@ stages the resulting agent prompts and descriptions in the in-memory host
 config, and exposes skills through the `atlante_skill` tool. Requires Node.js 22
 or later.
 
+## Published package
+
+The plugin is published to npm as `@atlante/opencode-plugin`. It ships as a
+Bun-bundled artifact (the `dist/` output of `bun run build` at the repository
+root) that inlines the internal Atlante workspaces it uses. `@opencode-ai/plugin`
+is a peer dependency: the host OpenCode installation provides it, so the plugin
+has no runtime dependency on it.
+
+The package exposes two entries:
+
+- `@atlante/opencode-plugin` — the default export (`AtlantePlugin`) registered
+  in `opencode.jsonc`
+- `@atlante/opencode-plugin/api` — the explicit programmatic entry, exporting
+  `injectAgents`, `createAtlantePlugin`, `AtlantePlugin`, `createSkillTool`,
+  and the plugin's artifact and host-config types
+
+Import from the `./api` entry with
+`import { injectAgents } from "@atlante/opencode-plugin/api"`.
+
+## Usage
+
 Register the plugin in `opencode.jsonc`:
 
 ```jsonc

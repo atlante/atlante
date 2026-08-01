@@ -1,8 +1,6 @@
-import {
-  readArtifacts,
-  type VerifiedArtifacts,
-} from "@atlante/builder/artifacts";
+import { readArtifacts } from "@atlante/builder/artifacts";
 import type { Plugin } from "@opencode-ai/plugin";
+import type { PluginArtifacts, PluginArtifactsReader } from "./artifacts.js";
 import {
   type HostConfig,
   type InjectionWarning,
@@ -19,7 +17,7 @@ function report(warnings: readonly InjectionWarning[]): void {
 }
 
 export type AtlantePluginDeps = {
-  readArtifacts?: typeof readArtifacts;
+  readArtifacts?: PluginArtifactsReader;
   injectAgents?: typeof injectAgents;
 };
 
@@ -88,7 +86,7 @@ function reportFailure(warnings: readonly InjectionWarning[]): void {
 function prepare(
   directory: string,
   deps: AtlantePluginDeps,
-): VerifiedArtifacts | undefined {
+): PluginArtifacts | undefined {
   try {
     const artifacts = (deps.readArtifacts ?? readArtifacts)(directory);
     if (!artifacts) return undefined;

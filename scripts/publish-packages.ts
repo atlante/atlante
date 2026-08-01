@@ -1,17 +1,13 @@
 #!/usr/bin/env bun
-import { readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { existsSync } from "node:fs";
+import { readdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, join, relative, resolve, sep } from "node:path";
 
 const ROOT = join(import.meta.dir, "..");
-const PACKAGES = [
-  "schema",
-  "templates",
-  "presets",
-  "validator",
-  "builder",
-  "opencode-plugin",
-  "cli",
-] as const;
+// Only the two public packages are published. The other five (schema,
+// templates, presets, validator, builder) are private workspaces: they are
+// versioned and synchronized by scripts/release.ts, but never published.
+const PACKAGES = ["cli", "opencode-plugin"] as const;
 
 function parseArgs() {
   let version: string | undefined;
@@ -39,19 +35,101 @@ function parseArgs() {
   return { version, otp };
 }
 
-function transformExports(
-  exports: Record<string, unknown>,
-): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(exports)) {
-    if (typeof value === "string" && value.endsWith(".ts")) {
-      const stem = value.replace("./src/", "./dist/").slice(0, -3);
-      result[key] = { import: `${stem}.js`, types: `${stem}.d.ts` };
-    } else {
-      result[key] = value;
+// Files that must exist verbatim in each public package (relative to the
+// package dir) before anything else happens.
+const REQUIRED_FILES: Record<string, string[]> = {
+  cli: ["dist/bin/atlante.js"],
+  "opencode-plugin": [
+    "dist/index.js",
+    "dist/api.js",
+    "dist/index.d.ts",
+    "dist/api.d.ts",
+  ],
+};
+
+// Static, offline bundle inspection: follow every relative runtime import
+// reachable from the plugin entry JS files and require each target to exist
+// under dist. Bare specifiers (node builtins, the external @opencode-ai/plugin
+// peer) are skipped; only files inside dist are followed, so nothing outside
+// dist is read and no plugin behavior is invoked.
+const RELATIVE_IMPORT_RE =
+  /(?:from\s+|import\s*\(\s*|require\s*\()\s*["'](\.[^"']+)["']/g;
+
+async function relativeImports(file: string): Promise<string[]> {
+  const text = await readFile(file, "utf8");
+  const specs: string[] = [];
+  for (const match of text.matchAll(RELATIVE_IMPORT_RE)) {
+    specs.push(match[1]);
+  }
+  return specs;
+}
+
+async function pluginImportIssues(
+  dir: string,
+  name: string,
+): Promise<string[]> {
+  const issues: string[] = [];
+  const distDir = join(dir, "dist");
+  const seen = new Set<string>();
+  const queue = ["dist/index.js", "dist/api.js"]
+    .map((entry) => join(dir, entry))
+    .filter((path) => existsSync(path));
+
+  while (queue.length > 0) {
+    const file = queue.shift();
+    if (file === undefined) break;
+    if (seen.has(file)) continue;
+    seen.add(file);
+
+    for (const spec of await relativeImports(file)) {
+      const target = resolve(dirname(file), spec);
+      if (!target.startsWith(distDir + sep)) {
+        issues.push(
+          `${name}: import "${spec}" in ${relative(dir, file)} escapes dist`,
+        );
+        continue;
+      }
+      if (!existsSync(target)) {
+        issues.push(
+          `${name}: missing dist/${relative(distDir, target)} (imported by ${relative(dir, file)})`,
+        );
+        continue;
+      }
+      if (target.endsWith(".js") && !seen.has(target)) queue.push(target);
     }
   }
-  return result;
+  return issues;
+}
+
+async function preflightArtifacts(): Promise<string[]> {
+  const missing: string[] = [];
+
+  for (const pkg of PACKAGES) {
+    const dir = join(ROOT, "packages", pkg);
+    const name = `@atlante/${pkg}`;
+
+    for (const rel of REQUIRED_FILES[pkg]) {
+      if (!existsSync(join(dir, rel))) missing.push(`${name}: missing ${rel}`);
+    }
+
+    if (pkg === "cli") {
+      const launcher = join(dir, "dist", "bin", "atlante.js");
+      if (existsSync(launcher)) {
+        const head = await readFile(launcher, "utf8");
+        if (!head.startsWith("#!/usr/bin/env node"))
+          missing.push(`${name}: dist/bin/atlante.js shebang is not node`);
+      }
+      for (const asset of ["bundled/templates", "bundled/presets"]) {
+        const assetDir = join(dir, asset);
+        if (!existsSync(assetDir) || (await readdir(assetDir)).length === 0)
+          missing.push(`${name}: ${asset} is missing or empty`);
+      }
+    } else if (pkg === "opencode-plugin") {
+      missing.push(...(await pluginImportIssues(dir, name)));
+    }
+  }
+
+  return missing;
 }
 
 async function publishPackage(pkg: string, version: string, otp?: string) {
@@ -60,41 +138,15 @@ async function publishPackage(pkg: string, version: string, otp?: string) {
   const original = await readFile(manifestPath, "utf8");
   const manifest = JSON.parse(original);
 
-  manifest.exports = transformExports(manifest.exports);
-
-  if (manifest.bin?.atlante) {
-    manifest.bin.atlante = manifest.bin.atlante
-      .replace("./bin/", "./dist/bin/")
-      .replace(".ts", ".js");
-  }
-
-  for (const field of ["dependencies", "peerDependencies", "devDependencies"]) {
-    for (const [name, range] of Object.entries(manifest[field] ?? {})) {
-      if (range === "workspace:*") manifest[field][name] = `^${version}`;
-    }
-  }
+  // npm does not strip devDependencies from the packed/published manifest, so
+  // repo-only dev tooling (e.g. the plugin's `@atlante/builder:
+  // workspace:*`) would ship verbatim. Drop the field for the pack/publish
+  // cycle and restore the byte-exact original in `finally` below.
+  delete manifest.devDependencies;
 
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
   const name = `@atlante/${pkg}`;
-
-  // The source bin runs under Bun (`#!/usr/bin/env bun`) so that `bun link`
-  // and the local harness work from source. The published launcher targets
-  // Node.js consumers (the documented engine contract), so rewrite its
-  // shebang to node before publishing. `dist/` is gitignored and regenerated
-  // by the build, so no cleanup is needed afterwards.
-  if (manifest.bin?.atlante) {
-    const launcher = join(dir, "dist", "bin", "atlante.js");
-    const content = await readFile(launcher, "utf8");
-    if (!content.startsWith("#!/usr/bin/env bun"))
-      throw new Error(
-        `${name}: expected a bun shebang in ${launcher}; build the CLI before publishing`,
-      );
-    await writeFile(
-      launcher,
-      content.replace("#!/usr/bin/env bun", "#!/usr/bin/env node"),
-    );
-  }
 
   try {
     // Validate
@@ -126,6 +178,16 @@ async function publishPackage(pkg: string, version: string, otp?: string) {
 
 async function main() {
   const { version, otp } = parseArgs();
+
+  // Two-phase, all-or-nothing preflight: every required artifact of BOTH
+  // public packages must exist before any manifest mutation, npm pack, or
+  // npm publish, so a missing artifact can never leave a partial release
+  // (dist/ and cli bundled/ are gitignored generated output; a fresh
+  // checkout must build first).
+  const missing = await preflightArtifacts();
+  if (missing.length > 0) {
+    throw new Error(`${missing.join("\n")}\nrun \`bun run build\` first`);
+  }
 
   for (const pkg of PACKAGES) {
     console.log(`\n--- @atlante/${pkg} ---`);
