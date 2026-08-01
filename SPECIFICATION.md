@@ -346,14 +346,16 @@ template and its inputs, not by a reserved host-agent ID or schema field. The
 specification does not require every configuration to define an orchestrator.
 
 The bundled `atlante/workflow` template defines a sequential workflow. It has a
-`phases` array; each phase requires a non-empty `name` and a non-empty
-`instructions` array of non-empty strings, and may include a non-empty
-`description`, a `plan`, `build`, or `review` `kind`, `subagent`, phase
-`policies`, `output`, or inline string `validation`. Workflow-level `policies`
+`phases` array; each phase requires a non-empty `instructions` array of
+non-empty strings and a non-empty `name` unless it declares a `plan`, `build`,
+or `review` `kind`, which then serves as the phase name. A phase may include a
+non-empty `description`, `subagent`, phase `policies`, `output`, or inline
+string `validation`. Workflow-level `policies`
 may mark the orchestrator read-only. Phase policies may enable per-task commits
 or reviews and may set `maxLoops` to a positive integer correction-loop limit.
-All kinds and policies are optional; omission preserves a generic workflow, and
-policy objects reject unknown fields.
+All kinds and policies are optional; omission preserves a generic workflow,
+policy objects reject unknown fields, and active policies render as a
+consolidated `Policies` section.
 
 A phase that includes `subagent` delegates the entire phase to the named
 configured or delegable agent. When `subagent` is omitted, the orchestrator

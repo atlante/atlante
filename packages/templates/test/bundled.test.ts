@@ -269,7 +269,7 @@ describe("bundled templates", () => {
     expect(prompt).not.toContain("task 'Plan'");
   });
 
-  test("renders enabled workflow and phase policies", () => {
+  test("renders enabled workflow and phase policies in a consolidated section", () => {
     const { registry } = loadBundledTemplates();
     const prompt = renderTemplate({
       registry,
@@ -291,21 +291,47 @@ describe("bundled templates", () => {
       },
     });
 
+    expect(prompt).toContain("## Policies");
     expect(prompt).toContain(
-      "Workflow policy: the orchestrator is read-only and delegates every file edit.",
+      "Policies are binding; follow them in every phase.",
     );
     expect(prompt).toContain(
-      "Phase policy: commit task implementation and corrections separately.",
+      "- Workflow: the orchestrator is read-only and delegates every file edit.",
     );
     expect(prompt).toContain(
-      "Phase policy: apply task review according to this phase's review criteria.",
+      "- Execute: commit task implementation and corrections in separate commits, after the task's focused tests and checks pass; the orchestrator owns all commit authorship and pushing, and never amends or force-pushes.",
+    );
+    expect(prompt).toContain(
+      "- Execute: apply task review according to this phase's review criteria.",
     );
     expect(prompt).not.toContain("review after each task");
     expect(prompt).toContain(
-      "Phase policy: limit correction to 5 loops per task.",
+      "- Execute: limit correction to 5 loops per task.",
     );
     expect(prompt).toContain(
       "This output is a living artifact that later phases may revisit and update, looping back when needed.",
+    );
+  });
+
+  test("renders the phase kind as the phase name when name is absent", () => {
+    const { registry } = loadBundledTemplates();
+    const prompt = renderTemplate({
+      registry,
+      templateId: "atlante/workflow",
+      input: {
+        phases: [
+          {
+            kind: "build",
+            policies: { commit: true },
+            instructions: ["Make the change."],
+          },
+        ],
+      },
+    });
+
+    expect(prompt).toContain("### 1. build");
+    expect(prompt).toContain(
+      "- build: commit task implementation and corrections in separate commits",
     );
   });
 
@@ -328,8 +354,8 @@ describe("bundled templates", () => {
       },
     });
 
-    expect(prompt).not.toContain("Workflow policy:");
-    expect(prompt).not.toContain("Phase policy:");
+    expect(prompt).not.toContain("## Policies");
+    expect(prompt).not.toContain("Policies are binding");
     expect(prompt).not.toContain("living artifact");
     expect(prompt).toContain("Execute phases sequentially in the order listed");
     expect(prompt.indexOf("### 1. Execute")).toBeLessThan(

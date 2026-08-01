@@ -131,6 +131,30 @@ export function renderTemplate(
   const handlebars = Handlebars.create();
   handlebars.registerHelper("increment", (value: unknown) => Number(value) + 1);
   handlebars.registerHelper("input", () => input);
+  // True when any workflow-level or phase-level policy is active (a policy
+  // with a truthy value), so a template can gate a consolidated policies
+  // section on a single condition.
+  handlebars.registerHelper(
+    "anyPolicy",
+    (policies: unknown, phases: unknown) => {
+      const hasWorkflowPolicy =
+        typeof policies === "object" &&
+        policies !== null &&
+        Object.values(policies).some(Boolean);
+      const hasPhasePolicy =
+        Array.isArray(phases) &&
+        phases.some((phase) => {
+          if (typeof phase !== "object" || phase === null) return false;
+          const phasePolicies = (phase as Record<string, unknown>).policies;
+          return (
+            typeof phasePolicies === "object" &&
+            phasePolicies !== null &&
+            Object.values(phasePolicies).some(Boolean)
+          );
+        });
+      return hasWorkflowPolicy || hasPhasePolicy;
+    },
+  );
   const nextStack = [...stack, templateId];
 
   const slots = slotsOf(template.inputSchema);

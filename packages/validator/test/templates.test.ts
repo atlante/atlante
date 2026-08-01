@@ -592,6 +592,22 @@ describe("validateTemplates", () => {
     ).toEqual([]);
   });
 
+  test("accepts a phase with a kind and no name", () => {
+    expect(
+      checkWorkflow({
+        phases: [{ kind: "build", instructions: ["Make the change."] }],
+      }),
+    ).toEqual([]);
+  });
+
+  test("rejects a phase with neither a name nor a kind", () => {
+    expect(
+      checkWorkflow({
+        phases: [{ instructions: ["Make the change."] }],
+      }),
+    ).not.toEqual([]);
+  });
+
   test.each([0, -1, 1.5])("rejects maxLoops value %j", (maxLoops) => {
     expect(
       checkWorkflow({

@@ -22,7 +22,11 @@
         "type": "object",
         "properties": {
           "kind": { "enum": ["plan", "build", "review"] },
-          "name": { "type": "string", "minLength": 1 },
+          "name": {
+            "description": "Phase name; defaults to the phase kind when absent.",
+            "type": "string",
+            "minLength": 1
+          },
           "description": { "type": "string", "minLength": 1 },
           "subagent": {
             "description": "Configured agent responsible for this phase; omit to keep the phase with the orchestrator.",
@@ -58,7 +62,8 @@
           },
           "validation": { "type": "string" }
         },
-        "required": ["name", "instructions"],
+        "required": ["instructions"],
+        "anyOf": [{ "required": ["name"] }, { "required": ["kind"] }],
         "additionalProperties": false
       },
       "minItems": 1
