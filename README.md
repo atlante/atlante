@@ -180,8 +180,9 @@ Bundled templates live in the `atlante/` namespace:
 - **`atlante/agent`** — the root prompt renderer: identity, mission,
   responsibilities, constraints, and ordered, reusable sections
 - **`atlante/workflow`** — a sequential multi-phase workflow with inline
-  instructions and final validation, optional phase-level `subagent` delegation,
-  and phase-level aggregate output, composed into agent or skill sections
+  instructions, optional `plan`/`build`/`review` semantics, workflow and phase
+  policies, phase-level `subagent` delegation, and living aggregate outputs,
+  composed into agent or skill sections
 - **`atlante/skill`** — structured skill input rendered as Markdown with
   ordered, reusable sections
 
