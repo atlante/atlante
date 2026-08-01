@@ -2,10 +2,10 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import {
   chmodSync,
-  copyFileSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -51,9 +51,16 @@ test("the published launcher runs with Node when Bun is unavailable", () => {
   mkdirSync(executableDir);
   mkdirSync(binDir, { recursive: true });
   symlinkSync(process.execPath, join(executableDir, "node"));
-  copyFileSync(
+  // Mirror scripts/publish-packages.ts: the published launcher ships with a
+  // node shebang even though the source bin runs under bun, so that Node-only
+  // consumers (the documented engine contract) can run it.
+  const source = readFileSync(
     new URL("../bin/atlante.ts", import.meta.url),
+    "utf8",
+  );
+  writeFileSync(
     join(binDir, "atlante.js"),
+    source.replace("#!/usr/bin/env bun", "#!/usr/bin/env node"),
   );
   chmodSync(join(binDir, "atlante.js"), 0o755);
   writeFileSync(join(dir, "package.json"), '{ "type": "module" }');

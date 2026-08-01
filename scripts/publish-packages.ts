@@ -77,6 +77,25 @@ async function publishPackage(pkg: string, version: string, otp?: string) {
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
   const name = `@atlante/${pkg}`;
+
+  // The source bin runs under Bun (`#!/usr/bin/env bun`) so that `bun link`
+  // and the local harness work from source. The published launcher targets
+  // Node.js consumers (the documented engine contract), so rewrite its
+  // shebang to node before publishing. `dist/` is gitignored and regenerated
+  // by the build, so no cleanup is needed afterwards.
+  if (manifest.bin?.atlante) {
+    const launcher = join(dir, "dist", "bin", "atlante.js");
+    const content = await readFile(launcher, "utf8");
+    if (!content.startsWith("#!/usr/bin/env bun"))
+      throw new Error(
+        `${name}: expected a bun shebang in ${launcher}; build the CLI before publishing`,
+      );
+    await writeFile(
+      launcher,
+      content.replace("#!/usr/bin/env bun", "#!/usr/bin/env node"),
+    );
+  }
+
   try {
     // Validate
     const pack = await Bun.$`npm pack --dry-run`.cwd(dir).quiet().nothrow();
