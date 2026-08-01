@@ -3,6 +3,10 @@
 Project loading, validation, host-neutral preparation, and artifact publication for
 [Atlante](https://github.com/atlante/atlante). Requires Node.js 22 or later.
 
+> Internal workspace package — not published to npm. This package exists only
+> inside the Atlante repository, where the published `@atlante/cli` and
+> `@atlante/opencode-plugin` packages consume its source at build time.
+
 The package loads a project configuration, expands bundled presets, validates
 template inputs, renders agent and skill descriptors, and publishes verified
 host-independent artifacts. The preparation pipeline is deterministic and

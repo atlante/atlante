@@ -24,21 +24,13 @@
   "engines": {
     "node": ">=22"
   },
-  "publishConfig": {
-    "access": "public"
-  },
-  "files": [
-    "dist",
-    "LICENSE",
-    "schema"
-  ],
+  "private": true,
   "exports": {
     ".": "./src/index.ts",
     "./schema.json": "./schema/v0.1/schema.json"
   },
   "scripts": {
-    "generate": "bun scripts/generate.ts",
-    "build": "tsc --project tsconfig.build.json"
+    "generate": "bun scripts/generate.ts"
   },
   "dependencies": {
     "zod": "^4.0.0"

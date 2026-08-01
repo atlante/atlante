@@ -24,25 +24,20 @@
       "name": "@atlante/cli",
       "version": "0.1.5",
       "bin": {
-        "atlante": "./bin/atlante.ts",
+        "atlante": "./dist/bin/atlante.js",
       },
       "dependencies": {
-        "@atlante/builder": "workspace:*",
-        "@atlante/presets": "workspace:*",
-        "@atlante/schema": "workspace:*",
-        "@atlante/templates": "workspace:*",
-        "@atlante/validator": "workspace:*",
-        "commander": "^12.1.0",
         "jsonc-parser": "^3.3.1",
+      },
+      "devDependencies": {
+        "commander": "^12.1.0",
       },
     },
     "packages/opencode-plugin": {
       "name": "@atlante/opencode-plugin",
       "version": "0.1.5",
-      "dependencies": {
-        "@atlante/builder": "workspace:*",
-      },
       "devDependencies": {
+        "@atlante/builder": "workspace:*",
         "@opencode-ai/plugin": "^1.18.4",
       },
       "peerDependencies": {

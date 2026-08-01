@@ -1,17 +1,16 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import {
-  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
-  readFileSync,
   rmSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { SCHEMA_URI } from "@atlante/schema";
 import packageJson from "../package.json" with { type: "json" };
 import { createProgram, runBuild, runValidate } from "../src/main.js";
@@ -42,41 +41,54 @@ test("reports the package manifest version", () => {
   expect(createProgram().version()).toBe(packageJson.version);
 });
 
-test("the published launcher runs with Node when Bun is unavailable", () => {
-  const dir = mkdtempSync(join(tmpdir(), "atlante-node-launcher-"));
-  created.push(dir);
-  const executableDir = join(dir, "path");
-  const distDir = join(dir, "dist");
-  const binDir = join(distDir, "bin");
-  mkdirSync(executableDir);
-  mkdirSync(binDir, { recursive: true });
-  symlinkSync(process.execPath, join(executableDir, "node"));
-  // Mirror scripts/publish-packages.ts: the published launcher ships with a
-  // node shebang even though the source bin runs under bun, so that Node-only
-  // consumers (the documented engine contract) can run it.
-  const source = readFileSync(
-    new URL("../bin/atlante.ts", import.meta.url),
-    "utf8",
-  );
-  writeFileSync(
-    join(binDir, "atlante.js"),
-    source.replace("#!/usr/bin/env bun", "#!/usr/bin/env node"),
-  );
-  chmodSync(join(binDir, "atlante.js"), 0o755);
-  writeFileSync(join(dir, "package.json"), '{ "type": "module" }');
-  writeFileSync(
-    join(distDir, "main.js"),
-    'export function createProgram() { return { async parseAsync() { console.log("launched"); } }; }',
-  );
+// These tests execute the real built artifact under real node (run `bun run
+// build` first so dist/bin/atlante.js exists; CI runs full:check which builds
+// before testing). They replace the old launcher simulation, which symlinked
+// bun itself as `node` and never exercised the published bundle.
+const LAUNCHER = fileURLToPath(
+  new URL("../dist/bin/atlante.js", import.meta.url),
+);
+const REAL_NODE = Bun.which("node");
+const launcherIsBuilt = existsSync(LAUNCHER) && REAL_NODE !== null;
 
-  const result = spawnSync(join(binDir, "atlante.js"), [], {
-    encoding: "utf8",
-    env: { ...process.env, PATH: executableDir },
-  });
+test.skipIf(!launcherIsBuilt)(
+  "the built launcher runs with Node when Bun is unavailable",
+  () => {
+    const dir = mkdtempSync(join(tmpdir(), "atlante-node-launcher-"));
+    created.push(dir);
+    const executableDir = join(dir, "path");
+    mkdirSync(executableDir);
+    if (!REAL_NODE) throw new Error("real node not found via Bun.which");
+    symlinkSync(REAL_NODE, join(executableDir, "node"));
 
-  expect(result.status).toBe(0);
-  expect(result.stdout.trim()).toBe("launched");
-});
+    const result = spawnSync(LAUNCHER, ["--version"], {
+      encoding: "utf8",
+      env: { ...process.env, PATH: executableDir },
+    });
+
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim()).toBe(packageJson.version);
+  },
+);
+
+test.skipIf(!launcherIsBuilt)(
+  "the built launcher builds a project under Node",
+  () => {
+    const dir = project(valid);
+    const executableDir = join(dir, "path");
+    mkdirSync(executableDir);
+    if (!REAL_NODE) throw new Error("real node not found via Bun.which");
+    symlinkSync(REAL_NODE, join(executableDir, "node"));
+
+    const result = spawnSync(LAUNCHER, ["build", dir], {
+      encoding: "utf8",
+      env: { ...process.env, PATH: executableDir },
+    });
+
+    expect(result.status).toBe(0);
+    expect(existsSync(join(dir, ".atlante", "artifacts"))).toBe(true);
+  },
+);
 
 describe("runValidate", () => {
   test("exits 0 on a valid project", async () => {

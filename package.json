@@ -26,7 +26,7 @@
     "fallow": "fallow",
     "build": "bun scripts/build.ts",
     "quick:check": "bun scripts/parallel.ts type:check lint:check test",
-    "full:check": "bun scripts/parallel.ts build quick:check smoke:test",
+    "full:check": "bun run build && bun scripts/parallel.ts quick:check smoke:test",
     "prepack": "bun run build",
     "release": "bun scripts/release.ts"
   },

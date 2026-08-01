@@ -1,4 +1,4 @@
-import type { VerifiedAgentArtifact } from "@atlante/builder/artifacts";
+import type { PluginAgentArtifact } from "./artifacts.js";
 
 export type InjectionWarning = {
   severity: "warning";
@@ -22,7 +22,7 @@ export type HostConfig = {
  */
 export function injectAgents(
   config: HostConfig,
-  artifacts: readonly VerifiedAgentArtifact[],
+  artifacts: readonly PluginAgentArtifact[],
 ): InjectionWarning[] {
   const diagnostics: InjectionWarning[] = [];
   const ownAgent = Object.hasOwn(config, "agent") ? config.agent : undefined;

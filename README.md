@@ -208,6 +208,17 @@ Run `atlante init` to scaffold from the `starter` preset.
 
 ## Packages
 
+Two packages are published to npm:
+
+| Package | Responsibility |
+| --- | --- |
+| `@atlante/cli` | `init`, `validate`, `build` |
+| `@atlante/opencode-plugin` | In-memory agent injection and `atlante_skill` through OpenCode's `config` hook |
+
+The remaining five packages are private internal workspaces. They are not
+published to npm and exist only inside this repository, where their source is
+bundled into the published artifacts at build time:
+
 | Package | Responsibility |
 | --- | --- |
 | `@atlante/schema` | Document structure and the generated, versioned JSON Schema |
@@ -215,12 +226,6 @@ Run `atlante init` to scaffold from the `starter` preset.
 | `@atlante/validator` | Discovery, parsing, and two-level validation |
 | `@atlante/builder` | Project preparation, value merging, rendering, and artifact publication |
 | `@atlante/presets` | Bundled preset documents and registry loading |
-| `@atlante/opencode-plugin` | In-memory agent injection and `atlante_skill` through OpenCode's `config` hook |
-| `@atlante/cli` | `init`, `validate`, `build` |
-
-`@atlante/templates` and `@atlante/presets` are the two content packages and
-depend on nothing else in Atlante. That is what will let third parties publish
-templates and presets without pulling in the core.
 
 ## Current scope (v0.1)
 
@@ -253,13 +258,20 @@ bun test
 
 ### Local `atlante` command
 
-Run the CLI directly with `bun run cli <command>`. To use the bare
-`atlante <command>` instead, link the CLI package globally (per machine;
-re-run after a fresh clone):
+Run the CLI directly from source with `bun run cli <command>` (no build
+needed). To use the bare `atlante <command>` instead, link the CLI package
+globally (per machine; re-run after a fresh clone):
 
 ```bash
+bun run build   # required: the linked command runs the built artifact
 bun link --cwd packages/cli
 ```
+
+The linked `atlante` runs `packages/cli/dist/bin/atlante.js`, which is
+gitignored build output. A fresh checkout has neither `packages/cli/dist/`
+nor the generated `packages/cli/bundled/` (bundled templates and presets
+copied at build time); `bun run build` produces both, so re-run it after any
+CLI source changes.
 
 ## Status
 
