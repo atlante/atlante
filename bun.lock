@@ -13,7 +13,7 @@
     },
     "packages/builder": {
       "name": "@atlante/builder",
-      "version": "0.1.5",
+      "version": "0.1.6",
       "dependencies": {
         "@atlante/schema": "workspace:*",
         "@atlante/templates": "workspace:*",
@@ -22,7 +22,7 @@
     },
     "packages/cli": {
       "name": "@atlante/cli",
-      "version": "0.1.5",
+      "version": "0.1.6",
       "bin": {
         "atlante": "./dist/bin/atlante.js",
       },
@@ -35,7 +35,7 @@
     },
     "packages/opencode-plugin": {
       "name": "@atlante/opencode-plugin",
-      "version": "0.1.5",
+      "version": "0.1.6",
       "devDependencies": {
         "@atlante/builder": "workspace:*",
         "@opencode-ai/plugin": "^1.18.4",
@@ -46,25 +46,33 @@
     },
     "packages/presets": {
       "name": "@atlante/presets",
-      "version": "0.1.5",
+      "version": "0.1.6",
+    },
+    "packages/resources": {
+      "name": "@atlante/resources",
+      "version": "0.1.6",
+      "dependencies": {
+        "handlebars": "^4.7.8",
+        "jsonc-parser": "^3.3.1",
+      },
     },
     "packages/schema": {
       "name": "@atlante/schema",
-      "version": "0.1.5",
+      "version": "0.1.6",
       "dependencies": {
         "zod": "^4.0.0",
       },
     },
     "packages/templates": {
       "name": "@atlante/templates",
-      "version": "0.1.5",
+      "version": "0.1.6",
       "dependencies": {
         "handlebars": "^4.7.8",
       },
     },
     "packages/validator": {
       "name": "@atlante/validator",
-      "version": "0.1.5",
+      "version": "0.1.6",
       "dependencies": {
         "@atlante/presets": "workspace:*",
         "@atlante/schema": "workspace:*",
@@ -84,6 +92,8 @@
     "@atlante/opencode-plugin": ["@atlante/opencode-plugin@workspace:packages/opencode-plugin"],
 
     "@atlante/presets": ["@atlante/presets@workspace:packages/presets"],
+
+    "@atlante/resources": ["@atlante/resources@workspace:packages/resources"],
 
     "@atlante/schema": ["@atlante/schema@workspace:packages/schema"],
 
