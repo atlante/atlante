@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Root agent prompt renderer with identity, mission, and ordered sections.",
+  "type": "object",
+  "properties": {
+    "identity": { "type": "string", "minLength": 1 },
+    "mission": { "type": "string", "minLength": 1 },
+    "sections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "oneOf": [
+          {
+            "properties": { "markdown": { "template": "atlante/markdown" } },
+            "required": ["markdown"],
+            "additionalProperties": false
+          },
+          {
+            "properties": {
+              "instructions": { "template": "atlante/instructions" }
+            },
+            "required": ["instructions"],
+            "additionalProperties": false
+          },
+          {
+            "properties": {
+              "responsibilities": {
+                "description": "Positive, ongoing outcomes the agent owns throughout its work. Use responsibilities for what the agent must accomplish, not for behavioral limits.",
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 },
+                "minItems": 1
+              }
+            },
+            "required": ["responsibilities"],
+            "additionalProperties": false
+          },
+          {
+            "properties": { "gotchas": { "template": "atlante/gotchas" } },
+            "required": ["gotchas"],
+            "additionalProperties": false
+          },
+          {
+            "properties": {
+              "constraints": { "template": "atlante/constraints" }
+            },
+            "required": ["constraints"],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "minItems": 1
+    }
+  },
+  "required": ["identity", "mission"],
+  "additionalProperties": false
+}

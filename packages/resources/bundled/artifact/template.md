@@ -1,0 +1,1 @@
+{{description}}{{#if filePath}} The artifact should be stored at {{filePath}}.{{/if}}{{#if updateable}} This output is a living artifact that later phases may revisit and update, looping back when needed.{{/if}}

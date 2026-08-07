@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A workflow artifact with a description, optional file path, and optional updateability marker.",
+  "type": "object",
+  "properties": {
+    "description": { "type": "string", "minLength": 1 },
+    "filePath": { "type": "string", "minLength": 1 },
+    "updateable": {
+      "description": "Whether later workflow phases may revisit and update this artifact.",
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "required": ["description"],
+  "additionalProperties": false
+}
