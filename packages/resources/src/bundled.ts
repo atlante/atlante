@@ -1,6 +1,8 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createResourcePack, type ResourcePack } from "./content-root.js";
+import { isSafeJsonObject } from "./jsonc.js";
 import {
   loadTemplateMigrationRegistry,
   parseJsonc,
@@ -20,6 +22,18 @@ function resolveBundledDir(): URL {
 
 export const BUNDLED_RESOURCES_DIR = fileURLToPath(resolveBundledDir());
 
+/** The bundled root is canonicalized once, before any child is selected. */
+export const BUNDLED_RESOURCE_PACK = createResourcePack(
+  BUNDLED_RESOURCES_DIR,
+  "bundled",
+);
+
+export function createBundledResourcePack(
+  rootDirectory: string = BUNDLED_RESOURCES_DIR,
+): ResourcePack {
+  return createResourcePack(rootDirectory, "bundled");
+}
+
 /** Transitional T2 instance record produced by the eager bundled scan. */
 export type BundledInstanceMigrationRecord = {
   readonly id: string;
@@ -29,10 +43,6 @@ export type BundledInstanceMigrationRecord = {
   readonly kind: "instance";
   readonly input: JsonObject;
 };
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 function bundledOrigin(path: string): RawBundledResourceOrigin {
   return { kind: "bundled", path };
@@ -83,7 +93,7 @@ export function loadBundledInstanceMigrationRecords(): {
       });
       continue;
     }
-    if (!isObject(input)) {
+    if (!isSafeJsonObject(input)) {
       errors.push({
         directory,
         message: "invalid instance.jsonc: expected object",
@@ -124,7 +134,7 @@ export function loadBundledStarterMigrationRecord(): {
       ],
     };
   }
-  if (!isObject(document)) {
+  if (!isSafeJsonObject(document)) {
     return {
       errors: [
         {

@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { type ParseError, parse } from "jsonc-parser";
+import { isSafeJsonObject, parseJsonc } from "./jsonc.js";
 import {
   JSON_SCHEMA_DRAFT_2020_12_URI,
   TEMPLATE_NAME_PATTERN,
@@ -39,22 +39,7 @@ export type TemplateLoaderDeps = {
 
 export type FacetOriginKind = "project" | "bundled";
 
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-/** Parses only the selected JSONC facet; unrelated files are never inspected. */
-export function parseJsonc(source: string): unknown {
-  const errors: ParseError[] = [];
-  const parsed = parse(source, errors, {
-    allowTrailingComma: true,
-    disallowComments: false,
-  });
-  if (errors.length > 0) {
-    throw new Error(`JSONC parse error at offset ${errors[0]?.offset ?? 0}`);
-  }
-  return parsed;
-}
+export { parseJsonc } from "./jsonc.js";
 
 function originFor(
   namespace: string,
@@ -99,7 +84,11 @@ function loadOne(
     };
   }
 
-  if (!isObject(parsed) || parsed.$schema !== JSON_SCHEMA_DRAFT_2020_12_URI) {
+  if (
+    !isSafeJsonObject(parsed) ||
+    !Object.hasOwn(parsed, "$schema") ||
+    parsed.$schema !== JSON_SCHEMA_DRAFT_2020_12_URI
+  ) {
     return {
       directory,
       message: `invalid template.jsonc at "$schema": expected JSON Schema Draft 2020-12 (${JSON_SCHEMA_DRAFT_2020_12_URI})`,
