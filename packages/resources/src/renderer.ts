@@ -1,6 +1,11 @@
+// fallow-ignore-file code-duplication -- resource rendering intentionally mirrors templates without a package dependency
 import Handlebars from "handlebars";
 import { slotsOf, walkComposition } from "./composition.js";
 import type { TemplateRegistry } from "./loader.js";
+import {
+  copyResourceTemplateSelection,
+  resourceTemplateSelection,
+} from "./resolution.js";
 import { analyzeValueReferences, isValidValueKey } from "./values.js";
 
 export type RenderArgs = {
@@ -94,6 +99,39 @@ function isArrayInputSchema(inputSchema: unknown): boolean {
   );
 }
 
+type RenderSlot = ReturnType<typeof slotsOf>[number];
+
+type SlotGroup = Readonly<{
+  readonly path: string[];
+  readonly slots: readonly RenderSlot[];
+}>;
+
+function groupSlots(slots: readonly RenderSlot[]): SlotGroup[] {
+  const groups = new Map<string, { path: string[]; slots: RenderSlot[] }>();
+  for (const slot of slots) {
+    const path = slot.dataPath ?? [slot.property];
+    const key = JSON.stringify(path);
+    const group = groups.get(key);
+    if (group) group.slots.push(slot);
+    else groups.set(key, { path: [...path], slots: [slot] });
+  }
+  return [...groups.values()];
+}
+
+function selectedSlot(
+  slots: readonly RenderSlot[],
+  input: unknown,
+): RenderSlot {
+  const selected = resourceTemplateSelection(input)?.templateId;
+  const matched = selected
+    ? slots.find((slot) => slot.templateId === selected)
+    : undefined;
+  return (matched ??
+    [...slots].sort((left, right) =>
+      left.templateId.localeCompare(right.templateId),
+    )[0]) as RenderSlot;
+}
+
 /**
  * Renders each child before registering its Markdown as an opaque partial.
  * Prompt text is not HTML-escaped and child output is never parsed again.
@@ -144,29 +182,36 @@ export function renderTemplate(
   const nextStack = [...stack, templateId];
 
   const slots = slotsOf(template.inputSchema);
-  const renderedSlots = slots.map((slot) => {
-    const path = slot.dataPath ?? [slot.property];
-    const childTemplate = registry.get(slot.templateId);
+  for (const group of groupSlots(slots)) {
     const renderSlot = (context: unknown): string => {
+      const contextSlot = selectedSlot(group.slots, context);
+      const contextTemplate = registry.get(contextSlot.templateId);
       if (
-        isArrayInputSchema(childTemplate?.inputSchema) &&
+        isArrayInputSchema(contextTemplate?.inputSchema) &&
         Array.isArray(context)
       ) {
         return renderTemplate(
-          { registry, templateId: slot.templateId, input: context },
+          {
+            registry,
+            templateId: contextSlot.templateId,
+            input: context,
+          },
           nextStack,
         );
       }
+
       const contextPath =
-        slot.arrayItems && context !== input
-          ? arrayItemPath(input, path)
+        contextSlot.arrayItems && context !== input
+          ? arrayItemPath(input, group.path)
           : undefined;
       const slotInputsForRender = contextPath
         ? slotInputs(context, contextPath, false)
-        : slotInputs(input, path, slot.arrayItems ?? false);
+        : slotInputs(input, group.path, contextSlot.arrayItems ?? false);
       return slotInputsForRender
-        .map((slotInput) =>
-          renderTemplate(
+        .map((slotInput) => {
+          const slot = selectedSlot(group.slots, slotInput);
+          const childTemplate = registry.get(slot.templateId);
+          return renderTemplate(
             {
               registry,
               templateId: slot.templateId,
@@ -177,16 +222,16 @@ export function renderTemplate(
               ),
             },
             nextStack,
-          ),
-        )
+          );
+        })
         .join("");
     };
-    return { renderSlot, slot };
-  });
-
-  for (const { renderSlot, slot } of renderedSlots) {
-    const path = (slot.dataPath ?? [slot.property]).join("/");
-    handlebars.registerPartial(slotPartialName(path), renderSlot);
+    handlebars.registerPartial(
+      slotPartialName(
+        (group.path.length ? group.path : [group.slots[0]?.property]).join("/"),
+      ),
+      renderSlot,
+    );
   }
 
   const compiled = handlebars.compile(template.source, {
@@ -272,9 +317,10 @@ export function interpolateValues<T>(
   if (typeof input === "string") return renderString(input, values) as T;
 
   if (Array.isArray(input)) {
-    return input.map((item, index) =>
+    const output = input.map((item, index) =>
       interpolateValues(item, values, [...path, index]),
     ) as T;
+    return copyResourceTemplateSelection(input, output);
   }
 
   if (typeof input === "object" && input !== null) {
@@ -290,7 +336,7 @@ export function interpolateValues<T>(
         writable: true,
       });
     }
-    return output as T;
+    return copyResourceTemplateSelection(input, output as T);
   }
 
   return input;

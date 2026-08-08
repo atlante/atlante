@@ -45,6 +45,21 @@ export {
   resolveResourceLocator,
 } from "./filesystem.js";
 export type {
+  ResourceGraph,
+  ResourceGraphEdge,
+  ResourceGraphState,
+} from "./graph.js";
+export {
+  addResourceGraphEdge,
+  addResourceGraphNode,
+  assertResourceGraphStep,
+  canonicalGraphKey,
+  createResourceGraphState,
+  graphNodeLabel,
+  MAX_REFERENCE_HOPS,
+  snapshotResourceGraph,
+} from "./graph.js";
+export type {
   FacetOriginKind,
   TemplateLoadError,
   TemplateLoaderDeps,
@@ -54,6 +69,20 @@ export type {
 export { loadTemplateMigrationRegistry, parseJsonc } from "./loader.js";
 export type { ParsedResourceLocator } from "./locator.js";
 export { parseResourceLocator, validateResourceLocator } from "./locator.js";
+export type { ResourceMergeOptions, ResourceMergeResult } from "./merge.js";
+export {
+  mergeResource,
+  mergeResourceValues,
+  provenanceOfResourceValue,
+} from "./merge.js";
+export type { ResourceProvenance } from "./provenance.js";
+export {
+  childPointer,
+  cloneResourceProvenance,
+  originAt,
+  prefixProvenance,
+  provenanceForValue,
+} from "./provenance.js";
 export type { RenderArgs } from "./renderer.js";
 export {
   InvalidValueReferenceError,
@@ -66,6 +95,29 @@ export {
   slotPartialName,
   ValueReferenceCollisionError,
 } from "./renderer.js";
+export type { ResourceTemplateSelection } from "./resolution.js";
+export { resourceTemplateSelection } from "./resolution.js";
+export type {
+  NormalizedResourceDocument,
+  ResolveDocumentRequest,
+  ResolvedResourceBinding,
+  ResolvedResourceDocument,
+  ResolvedResourceInstance,
+  ResolvedTemplate,
+  ResolvedTemplateSlot,
+  ResolveInstanceRequest,
+  ResolveTemplateRequest,
+  ResourceResolveOptions,
+} from "./resolve.js";
+export {
+  resolveDocument,
+  resolveInstance,
+  resolveResource,
+  resolveResourceDocument,
+  resolveResourceInstance,
+  resolveResourceTemplate,
+  resolveTemplate,
+} from "./resolve.js";
 export {
   JSON_SCHEMA_DRAFT_2020_12_URI,
   TEMPLATE_ID_PATTERN,

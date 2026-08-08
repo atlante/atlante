@@ -1,3 +1,4 @@
+// fallow-ignore-file code-duplication -- resource composition intentionally mirrors templates without a package dependency
 import type { TemplateRegistry } from "./loader.js";
 import { TEMPLATE_ID_PATTERN } from "./schema.js";
 
@@ -40,7 +41,12 @@ function isObject(node: unknown): node is Record<string, unknown> {
 }
 
 function isValidTemplateId(value: unknown): value is string {
-  return typeof value === "string" && TEMPLATE_ID_PATTERN.test(value);
+  return (
+    typeof value === "string" &&
+    (TEMPLATE_ID_PATTERN.test(value) ||
+      (value.length >= 2 &&
+        (value.startsWith("./") || value.startsWith("../"))))
+  );
 }
 
 function isValidMarker(
@@ -186,9 +192,9 @@ function markersOf(inputSchema: Record<string, unknown>): SlotMarker[] {
   const otherMarkers = Object.entries(inputSchema)
     .filter(([key]) => key !== "properties")
     .flatMap(([key, value]) =>
-      visitSchemaNode(value, {
-        path: [key],
-        dataPath: [key],
+      visitSchemaEntry(key, value, {
+        path: [],
+        dataPath: [],
         property: key,
         topLevel: false,
         arrayItems: false,

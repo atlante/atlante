@@ -5,13 +5,16 @@ import {
   type JsonObject,
   loadTemplateMigrationRegistry,
   MissingValueError,
+  mergeResourceValues,
   NonStringValueError,
   renderTemplate,
+  resourceTemplateSelection,
   slotPartialName,
   type TemplateMigrationRecord,
   type TemplateRegistry,
   ValueReferenceCollisionError,
 } from "../src/index.js";
+import { resolvedSelectionFixture } from "./selection-fixture.js";
 
 function templateRegistryOf(
   definitions: Record<string, { inputSchema: JsonObject; source: string }>,
@@ -120,6 +123,80 @@ function slotRegistry(properties: string[], source: string): TemplateRegistry {
   };
 }
 
+function selectedBranchDefinitions(
+  composition: "oneOf" | "anyOf" | "allOf",
+  order: readonly string[],
+): Record<string, { inputSchema: JsonObject; source: string }> {
+  const rootBranches = order.map((branch) => ({
+    type: "object",
+    properties: {
+      payload: { template: `../branch-${branch}` },
+    },
+  }));
+  const nestedBranches = order.map((branch) => ({
+    type: "object",
+    properties: {
+      value: { template: `../leaf-${branch}` },
+    },
+  }));
+  const branchSchema = {
+    type: "object",
+    properties: { nested: { [composition]: nestedBranches } },
+  };
+  return {
+    "test/root": {
+      inputSchema: {
+        type: "object",
+        properties: { choice: { [composition]: rootBranches } },
+      } as JsonObject,
+      source: slotPartial("choice/payload"),
+    },
+    "../branch-first": {
+      inputSchema: branchSchema as JsonObject,
+      source: `branch-first: ${slotPartial("nested/value")}`,
+    },
+    "../branch-second": {
+      inputSchema: branchSchema as JsonObject,
+      source: `branch-second: ${slotPartial("nested/value")}`,
+    },
+    "../leaf-first": {
+      inputSchema: childSchema(),
+      source: "leaf-first: {{value}}",
+    },
+    "../leaf-second": {
+      inputSchema: childSchema(),
+      source: "leaf-second: {{value}}",
+    },
+  };
+}
+
+function selectionMarker(value: object): symbol {
+  const marker = Object.getOwnPropertySymbols(value)[0];
+  if (!marker) throw new Error("selection marker missing");
+  return marker;
+}
+
+function prototypeOnlySelection<T extends object>(
+  value: T,
+  markerSource: object = value,
+): T {
+  const marker = selectionMarker(markerSource);
+  const descriptor = Object.getOwnPropertyDescriptor(markerSource, marker);
+  if (!descriptor || !("value" in descriptor))
+    throw new Error("selection marker descriptor missing");
+
+  const output = Object.create({ [marker]: descriptor.value }) as T;
+  for (const key of Object.keys(value)) {
+    const ownDescriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (ownDescriptor) Object.defineProperty(output, key, ownDescriptor);
+  }
+  return output;
+}
+
+function plainSelection<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
 describe("resource renderer", () => {
   test("renders nested slots from a JSONC template facet", () => {
     const output = renderTemplate({
@@ -187,6 +264,28 @@ describe("resource renderer", () => {
     });
 
     expect(output).toBe("[first][second][third]");
+  });
+
+  test("renders root array item composition in input order", () => {
+    const output = renderTemplate({
+      registry: templateRegistryOf({
+        "test/root-array": {
+          inputSchema: {
+            type: "array",
+            items: { template: "test/section" },
+          },
+          source: slotPartial("items"),
+        },
+        "test/section": {
+          inputSchema: childSchema(),
+          source: "[{{value}}]",
+        },
+      }),
+      templateId: "test/root-array",
+      input: [{ value: "first" }, { value: "second" }],
+    });
+
+    expect(output).toBe("[first][second]");
   });
 
   test("keeps child Markdown opaque", () => {
@@ -319,6 +418,271 @@ describe("resource renderer", () => {
     });
 
     expect(output).toBe("Instructions: selected");
+  });
+
+  for (const composition of ["oneOf", "anyOf", "allOf"] as const) {
+    test(`renders resolver-selected nested ${composition} branches regardless of registration order`, () => {
+      const branchOrder = ["first", "second"] as const;
+      for (const order of [branchOrder, [...branchOrder].reverse()] as const) {
+        const registry = templateRegistryOf(
+          selectedBranchDefinitions(composition, order),
+        );
+        const fixture = resolvedSelectionFixture(composition, "first");
+        try {
+          const payload = fixture.payload;
+          const output = renderTemplate({
+            registry,
+            templateId: "test/root",
+            input: { choice: { payload } },
+          });
+
+          expect(output).toBe("branch-first: leaf-first: selected");
+          expect(Object.keys(payload)).toEqual(["nested"]);
+          expect(JSON.stringify(payload)).toBe(
+            '{"nested":{"value":{"value":"selected"}}}',
+          );
+        } finally {
+          fixture.cleanup();
+        }
+      }
+    });
+  }
+
+  test("renders selected second instead of fallback first after a recursive merge in either branch order", () => {
+    const definitions = (order: readonly ("first" | "second")[]) =>
+      templateRegistryOf({
+        "test/root": {
+          inputSchema: {
+            type: "object",
+            properties: {
+              choice: {
+                oneOf: order.map((branch) => ({
+                  type: "object",
+                  properties: {
+                    payload: { template: `../branch-${branch}` },
+                  },
+                })),
+              },
+            },
+          },
+          source: slotPartial("choice/payload"),
+        },
+        "../branch-first": {
+          inputSchema: {
+            type: "object",
+            properties: {
+              nested: {
+                oneOf: [
+                  {
+                    type: "object",
+                    properties: { value: { template: "../leaf-first" } },
+                  },
+                  {
+                    type: "object",
+                    properties: { value: { template: "../leaf-second" } },
+                  },
+                ],
+              },
+            },
+          },
+          source: `fallback first: ${slotPartial("nested/value")}`,
+        },
+        "../branch-second": {
+          inputSchema: {
+            type: "object",
+            properties: {
+              nested: {
+                oneOf: [
+                  {
+                    type: "object",
+                    properties: { value: { template: "../leaf-first" } },
+                  },
+                  {
+                    type: "object",
+                    properties: { value: { template: "../leaf-second" } },
+                  },
+                ],
+              },
+            },
+          },
+          source: `selected second: ${slotPartial("nested/value")}`,
+        },
+        "../leaf-first": {
+          inputSchema: childSchema(),
+          source: "leaf first: {{value}}",
+        },
+        "../leaf-second": {
+          inputSchema: childSchema(),
+          source: "leaf second: {{value}}",
+        },
+      });
+
+    for (const order of [
+      ["first", "second"],
+      ["second", "first"],
+    ] as const) {
+      const fixture = resolvedSelectionFixture("oneOf", "second");
+      try {
+        const merged = mergeResourceValues(
+          { choice: { payload: fixture.payload } },
+          { choice: { overlay: true } },
+        ).value;
+
+        expect(
+          renderTemplate({
+            registry: definitions(order),
+            templateId: "test/root",
+            input: merged,
+          }),
+        ).toBe("selected second: leaf second: selected");
+      } finally {
+        fixture.cleanup();
+      }
+    }
+  });
+
+  test("ignores inherited, accessor, and polluted selections while rendering, cloning, and merging", () => {
+    const registry = templateRegistryOf(
+      selectedBranchDefinitions("oneOf", ["first", "second"]),
+    );
+    const fixture = resolvedSelectionFixture("oneOf", "second");
+    try {
+      const selectedPayload = fixture.payload;
+      const marker = selectionMarker(selectedPayload);
+      const markerDescriptor = Object.getOwnPropertyDescriptor(
+        selectedPayload,
+        marker,
+      );
+      if (!markerDescriptor || !("value" in markerDescriptor))
+        throw new Error("selection marker descriptor missing");
+      const render = (payload: unknown): string =>
+        renderTemplate({
+          registry,
+          templateId: "test/root",
+          input: { choice: { payload } },
+        });
+      const expectedFallback = "branch-first: leaf-first: selected";
+
+      const inherited = prototypeOnlySelection(
+        plainSelection(selectedPayload),
+        selectedPayload,
+      );
+      expect(render(inherited)).toBe(expectedFallback);
+      expect(render(interpolateValues(inherited, {}))).toBe(expectedFallback);
+      expect(
+        render(
+          (
+            mergeResourceValues(
+              { choice: { payload: inherited } },
+              { choice: { overlay: true } },
+            ).value as { choice: { payload: unknown } }
+          ).choice.payload,
+        ),
+      ).toBe(expectedFallback);
+
+      const accessor = plainSelection(selectedPayload) as Record<
+        string,
+        unknown
+      >;
+      Object.defineProperty(accessor, marker, {
+        configurable: true,
+        enumerable: false,
+        get: () => markerDescriptor.value,
+      });
+      expect(render(accessor)).toBe(expectedFallback);
+
+      const forged = plainSelection(selectedPayload) as Record<string, unknown>;
+      Object.defineProperty(forged, marker, {
+        configurable: true,
+        enumerable: false,
+        value: markerDescriptor.value,
+        writable: false,
+      });
+      expect(render(forged)).toBe(expectedFallback);
+
+      const polluted = plainSelection(selectedPayload);
+      const previous = Object.getOwnPropertyDescriptor(
+        Object.prototype,
+        marker,
+      );
+      try {
+        Object.defineProperty(Object.prototype, marker, {
+          configurable: true,
+          enumerable: false,
+          value: markerDescriptor.value,
+          writable: false,
+        });
+        expect(render(polluted)).toBe(expectedFallback);
+        expect(render(interpolateValues(polluted, {}))).toBe(expectedFallback);
+        expect(
+          render(
+            (
+              mergeResourceValues(
+                { choice: { payload: polluted } },
+                { choice: { overlay: true } },
+              ).value as { choice: { payload: unknown } }
+            ).choice.payload,
+          ),
+        ).toBe(expectedFallback);
+      } finally {
+        if (previous) Object.defineProperty(Object.prototype, marker, previous);
+        else Reflect.deleteProperty(Object.prototype, marker);
+      }
+    } finally {
+      fixture.cleanup();
+    }
+  });
+
+  test("keeps selection metadata out of schema enumeration, interpolation, and Markdown", () => {
+    const fixture = resolvedSelectionFixture("oneOf", "second");
+    try {
+      const input = fixture.payload as Record<string, unknown>;
+      const nested = input.nested as Record<string, unknown>;
+      nested.value = "{{values.project}}";
+      const marker = selectionMarker(input);
+      const descriptor = Object.getOwnPropertyDescriptor(input, marker);
+      expect(descriptor?.enumerable).toBe(false);
+      expect(Object.keys(input)).toEqual(["nested"]);
+      expect(JSON.stringify(input)).toBe(
+        '{"nested":{"value":"{{values.project}}"}}',
+      );
+
+      const schema: JsonObject = {
+        type: "object",
+        properties: {
+          nested: {
+            type: "object",
+            properties: { value: { type: "string" } },
+          },
+        },
+      };
+      expect(Object.keys(schema)).toEqual(["type", "properties"]);
+      expect(JSON.stringify(schema)).not.toContain("template-selection");
+
+      const interpolated = interpolateValues(input, { project: "atlante" });
+      expect(interpolated).toEqual({ nested: { value: "atlante" } });
+      expect(resourceTemplateSelection(interpolated)).toEqual({
+        templateId: "../branch-second",
+      });
+      expect(JSON.stringify(interpolated)).toBe(
+        '{"nested":{"value":"atlante"}}',
+      );
+
+      const output = renderTemplate({
+        registry: templateRegistryOf({
+          "test/selected": {
+            inputSchema: schema,
+            source: "{{nested.value}}",
+          },
+        }),
+        templateId: "test/selected",
+        input: interpolated,
+      });
+      expect(output).toBe("atlante");
+      expect(output).not.toContain("template-selection");
+    } finally {
+      fixture.cleanup();
+    }
   });
 
   test("omits absent optional slot inputs", () => {

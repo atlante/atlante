@@ -102,13 +102,18 @@ export function loadBundledInstanceMigrationRecords(): {
     }
 
     const id = `atlante/${entry}`;
+    const migrationInput = Object.fromEntries(
+      Object.entries(input).filter(
+        ([key]) => key !== "$template" && key !== "$instance",
+      ),
+    ) as JsonObject;
     instances.push({
       id,
       directory,
       locator: id,
       origin: bundledOrigin(`${id}/instance.jsonc`),
       kind: "instance",
-      input: input as JsonObject,
+      input: migrationInput,
     });
   }
 

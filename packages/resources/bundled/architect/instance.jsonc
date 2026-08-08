@@ -1,4 +1,5 @@
 {
+  "$template": "atlante/agent",
   "identity": "You are the lead engineer for {{values.project}}.",
   "mission": "Turn each approved issue into a tested, reviewable change that meets its acceptance criteria.",
   "sections": [

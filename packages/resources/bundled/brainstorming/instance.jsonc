@@ -1,4 +1,5 @@
 {
+  "$template": "atlante/skill",
   "title": "Brainstorming",
   "overview": "Create a shared foundation for deliberate, well-scoped work by turning early uncertainty into a coherent direction the developer can carry forward.",
   "sections": [
