@@ -1,12 +1,11 @@
-import type { AtlanteDocument, ValuesMap } from "@atlante/schema";
 import {
   interpolateValues,
-  loadBundledTemplates,
+  loadBundledTemplateMigrationRegistry,
   MissingValueError,
   renderTemplate,
   resolveSystemValues,
-  type TemplateRegistry,
-} from "@atlante/templates";
+} from "@atlante/resources";
+import type { AtlanteDocument, ValuesMap } from "@atlante/schema";
 import type { Diagnostic } from "@atlante/validator";
 import {
   error,
@@ -17,9 +16,14 @@ import {
   validateTemplates,
 } from "@atlante/validator";
 import { loadProject, type ProjectContext } from "./project.js";
+import { prepareResolvedDocument } from "./resource-prepare.js";
+import {
+  type DirectTemplateRegistry,
+  toResourceTemplateRegistry,
+} from "./template-compat.js";
 import { mergeValues } from "./values.js";
 
-export const DEFAULT_TEMPLATE_ID = "atlante/agent";
+const DEFAULT_TEMPLATE_ID = "atlante/agent";
 const DEFAULT_SKILL_TEMPLATE_ID = "atlante/skill";
 
 export type AgentArtifact = {
@@ -42,12 +46,12 @@ export type PreparedProject = {
   diagnostics: Diagnostic[];
 };
 
-function isTemplateRegistry(value: unknown): value is TemplateRegistry {
+function isTemplateRegistry(value: unknown): value is DirectTemplateRegistry {
   return (
     typeof value === "object" &&
     value !== null &&
-    typeof (value as TemplateRegistry).get === "function" &&
-    typeof (value as TemplateRegistry).ids === "function"
+    typeof (value as DirectTemplateRegistry).get === "function" &&
+    typeof (value as DirectTemplateRegistry).ids === "function"
   );
 }
 
@@ -72,7 +76,7 @@ function interpolateBindingDescription(
 }
 
 function renderBinding(
-  registry: TemplateRegistry,
+  registry: DirectTemplateRegistry,
   documentValues: ValuesMap | undefined,
   binding: Record<string, unknown>,
   templateId: string,
@@ -84,7 +88,11 @@ function renderBinding(
   const prepared = prepare(values);
   return {
     ...prepared,
-    content: renderTemplate({ registry, templateId, input: prepared.input }),
+    content: renderTemplate({
+      registry: toResourceTemplateRegistry(registry),
+      templateId,
+      input: prepared.input,
+    }),
   };
 }
 
@@ -111,9 +119,9 @@ function renderDiagnostic(
  * Validate, resolve, and render one canonical document. Preparation is
  * globally fail-closed: a failure in any binding discards every descriptor.
  */
-export function prepareDocument(
+function prepareDocument(
   document: AtlanteDocument,
-  registry: TemplateRegistry,
+  registry: DirectTemplateRegistry,
   initialDiagnostics: Diagnostic[] = [],
 ): PreparedProject {
   const diagnostics = [
@@ -125,7 +133,8 @@ export function prepareDocument(
   const agents: AgentArtifact[] = [];
 
   for (const [hostAgentId, binding] of Object.entries(document.agents ?? {})) {
-    const templateId = binding.template ?? DEFAULT_TEMPLATE_ID;
+    // Direct preparation keeps value interpolation before template rendering.
+    const templateId = DEFAULT_TEMPLATE_ID;
     try {
       const rendered = renderBinding(
         registry,
@@ -166,7 +175,8 @@ export function prepareDocument(
   const skills: SkillArtifact[] = [];
 
   for (const [skillId, binding] of Object.entries(document.skills ?? {})) {
-    const templateId = binding.template ?? DEFAULT_SKILL_TEMPLATE_ID;
+    // Direct preparation keeps value interpolation before template rendering.
+    const templateId = DEFAULT_SKILL_TEMPLATE_ID;
     try {
       const rendered = renderBinding(
         registry,
@@ -215,12 +225,12 @@ export function prepareDocument(
 
 export function prepareProject(
   target: string | AtlanteDocument,
-  context?: ProjectContext | TemplateRegistry,
+  context?: ProjectContext | DirectTemplateRegistry,
 ): PreparedProject {
   if (typeof target !== "string") {
     const loaded = isTemplateRegistry(context)
       ? { registry: context, errors: [] }
-      : (context?.loadTemplates ?? loadBundledTemplates)();
+      : loadBundledTemplateMigrationRegistry();
     if (loaded.errors.length > 0) {
       return failedPreparation(templateLoadDiagnostics(loaded.errors));
     }
@@ -228,11 +238,11 @@ export function prepareProject(
   }
 
   const projectContext: ProjectContext | undefined = isTemplateRegistry(context)
-    ? { loadTemplates: () => ({ registry: context, errors: [] }) }
+    ? undefined
     : (context as ProjectContext | undefined);
   const loaded = loadProject(target, projectContext);
-  if (!loaded.document || !loaded.registry || hasErrors(loaded.diagnostics)) {
+  if (!loaded.resources || hasErrors(loaded.diagnostics)) {
     return failedPreparation(loaded.diagnostics);
   }
-  return prepareDocument(loaded.document, loaded.registry, loaded.diagnostics);
+  return prepareResolvedDocument(loaded.resources, loaded.diagnostics);
 }

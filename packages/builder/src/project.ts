@@ -1,36 +1,23 @@
 import { dirname } from "node:path";
+import type {
+  ResolvedResourceDocument,
+  ResourcePack,
+} from "@atlante/resources";
 import type { AtlanteDocument } from "@atlante/schema";
-import {
-  loadBundledTemplates,
-  type TemplateLoadError,
-  type TemplateRegistry,
-} from "@atlante/templates";
-import {
-  createBundledPresetLoader,
-  type Diagnostic,
-  expandDocument,
-  findConfigFile,
-  loadDocument,
-  type PresetLoader,
-  parseDocumentOverlay,
-  templateLoadDiagnostics,
-} from "@atlante/validator";
-
-export type TemplateLoader = () => {
-  registry: TemplateRegistry;
-  errors: TemplateLoadError[];
-};
+import { type Diagnostic, loadDocument } from "@atlante/validator";
+import { resourceTemplateRegistry } from "./resource-registry.js";
+import type { DirectTemplateRegistry } from "./template-compat.js";
 
 export type ProjectContext = {
-  loadTemplates?: TemplateLoader;
-  presetLoader?: PresetLoader;
+  bundledPack?: ResourcePack;
 };
 
 export type LoadedProject = {
   document?: AtlanteDocument;
   configPath?: string;
   projectRoot?: string;
-  registry?: TemplateRegistry;
+  registry?: DirectTemplateRegistry;
+  resources?: ResolvedResourceDocument;
   diagnostics: Diagnostic[];
 };
 
@@ -41,48 +28,32 @@ function loadedLocation(
 }
 
 /**
- * Loads a project overlay, bundled templates, and bundled preset inheritance
- * into one canonical document. No template rendering occurs here.
+ * Loads one validated resource context. No second template or preset registry
+ * is selected for resource-backed projects.
  */
 export function loadProject(
   target: string,
   context: ProjectContext = {},
 ): LoadedProject {
-  const config = findConfigFile(target);
-  if (!config) {
-    const loaded = loadDocument(target);
-    if (!loaded.path) return { diagnostics: loaded.diagnostics };
+  const loaded = loadDocument(
+    target,
+    context.bundledPack ? { bundledPack: context.bundledPack } : {},
+  );
+  if (!loaded.path) return { diagnostics: loaded.diagnostics };
+
+  if (!loaded.document)
     return {
       ...loadedLocation(loaded.path),
-      document: loaded.document,
       diagnostics: loaded.diagnostics,
     };
-  }
 
-  const location = loadedLocation(config.path);
-  const parsed = parseDocumentOverlay(config.text, config.path);
-  if (!parsed.overlay) {
-    return { ...location, diagnostics: parsed.diagnostics };
-  }
-
-  const { registry, errors } = (
-    context.loadTemplates ?? loadBundledTemplates
-  )();
-  if (errors.length > 0) {
-    return {
-      ...location,
-      diagnostics: [...parsed.diagnostics, ...templateLoadDiagnostics(errors)],
-    };
-  }
-
-  const expanded = expandDocument(
-    parsed.overlay,
-    context.presetLoader ?? createBundledPresetLoader(),
-  );
   return {
-    ...location,
-    document: expanded.document,
-    registry,
-    diagnostics: [...parsed.diagnostics, ...expanded.diagnostics],
+    ...loadedLocation(loaded.path),
+    document: loaded.document,
+    resources: loaded.resources,
+    registry: loaded.resources
+      ? resourceTemplateRegistry(loaded.resources)
+      : undefined,
+    diagnostics: loaded.diagnostics,
   };
 }

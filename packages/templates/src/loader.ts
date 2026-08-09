@@ -33,20 +33,27 @@ function loadOne(directory: string, id: string): Template | TemplateLoadError {
   try {
     schemaText = readFileSync(join(directory, "template.json"), "utf8");
     source = readFileSync(join(directory, "template.md"), "utf8");
-  } catch (error) {
-    return { directory, message: `unreadable template: ${String(error)}` };
+  } catch {
+    return {
+      directory: id,
+      message: "unreadable template facets: template.json or template.md",
+    };
   }
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(schemaText);
-  } catch (error) {
-    return { directory, message: `malformed template.json: ${String(error)}` };
+  } catch {
+    return { directory: id, message: "malformed template.json" };
   }
 
-  if (!isObject(parsed) || parsed.$schema !== JSON_SCHEMA_DRAFT_2020_12_URI) {
+  if (
+    !isObject(parsed) ||
+    !Object.hasOwn(parsed, "$schema") ||
+    parsed.$schema !== JSON_SCHEMA_DRAFT_2020_12_URI
+  ) {
     return {
-      directory,
+      directory: id,
       message: `invalid template.json at "$schema": expected JSON Schema Draft 2020-12 (${JSON_SCHEMA_DRAFT_2020_12_URI})`,
     };
   }
@@ -67,7 +74,7 @@ export function loadTemplates(
       registry: { get: () => undefined, ids: () => [] },
       errors: [
         {
-          directory: rootDirectory,
+          directory: namespace,
           message: `invalid template namespace "${namespace}"`,
         },
       ],
@@ -77,10 +84,12 @@ export function loadTemplates(
   let entries: string[];
   try {
     entries = readdirSync(rootDirectory).sort();
-  } catch (error) {
+  } catch {
     return {
       registry: { get: () => undefined, ids: () => [] },
-      errors: [{ directory: rootDirectory, message: String(error) }],
+      errors: [
+        { directory: namespace, message: "template root is unreadable" },
+      ],
     };
   }
 
@@ -89,17 +98,20 @@ export function loadTemplates(
     let isDirectory: boolean;
     try {
       isDirectory = (deps.statSync ?? statSync)(directory).isDirectory();
-    } catch (error) {
+    } catch {
       errors.push({
-        directory,
-        message: `unreadable template entry: ${String(error)}`,
+        directory: `${namespace}/${entry}`,
+        message: "unreadable template entry",
       });
       continue;
     }
     if (!isDirectory) continue;
 
     if (!TEMPLATE_NAME_PATTERN.test(entry)) {
-      errors.push({ directory, message: `invalid template name "${entry}"` });
+      errors.push({
+        directory: `${namespace}/${entry}`,
+        message: `invalid template name "${entry}"`,
+      });
       continue;
     }
 

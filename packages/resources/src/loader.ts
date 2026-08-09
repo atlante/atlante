@@ -1,3 +1,5 @@
+// fallow-ignore-file code-duplication -- migration loader mirrors retained old-package behavior until Cleanup
+
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { isSafeJsonObject, parseJsonc } from "./jsonc.js";
@@ -67,20 +69,20 @@ function loadOne(
   try {
     schemaText = readFileSync(join(directory, "template.jsonc"), "utf8");
     source = readFileSync(join(directory, "template.md"), "utf8");
-  } catch (error) {
+  } catch {
     return {
-      directory,
-      message: `unreadable template facets: ${String(error)}`,
+      directory: id,
+      message: "unreadable template facets: template.jsonc or template.md",
     };
   }
 
   let parsed: unknown;
   try {
     parsed = parseJsonc(schemaText);
-  } catch (error) {
+  } catch {
     return {
-      directory,
-      message: `malformed template.jsonc: ${String(error)}`,
+      directory: id,
+      message: "malformed template.jsonc",
     };
   }
 
@@ -90,7 +92,7 @@ function loadOne(
     parsed.$schema !== JSON_SCHEMA_DRAFT_2020_12_URI
   ) {
     return {
-      directory,
+      directory: id,
       message: `invalid template.jsonc at "$schema": expected JSON Schema Draft 2020-12 (${JSON_SCHEMA_DRAFT_2020_12_URI})`,
     };
   }
@@ -125,7 +127,7 @@ export function loadTemplateMigrationRegistry(
       registry: { get: () => undefined, ids: () => [] },
       errors: [
         {
-          directory: rootDirectory,
+          directory: namespace,
           message: `invalid template namespace "${namespace}"`,
         },
       ],
@@ -135,10 +137,12 @@ export function loadTemplateMigrationRegistry(
   let entries: string[];
   try {
     entries = readdirSync(rootDirectory).sort();
-  } catch (error) {
+  } catch {
     return {
       registry: { get: () => undefined, ids: () => [] },
-      errors: [{ directory: rootDirectory, message: String(error) }],
+      errors: [
+        { directory: namespace, message: "template root is unreadable" },
+      ],
     };
   }
 
@@ -147,10 +151,10 @@ export function loadTemplateMigrationRegistry(
     let isDirectory: boolean;
     try {
       isDirectory = (deps.statSync ?? statSync)(directory).isDirectory();
-    } catch (error) {
+    } catch {
       errors.push({
-        directory,
-        message: `unreadable template entry: ${String(error)}`,
+        directory: `${namespace}/${entry}`,
+        message: "unreadable template entry",
       });
       continue;
     }
@@ -166,7 +170,10 @@ export function loadTemplateMigrationRegistry(
       continue;
 
     if (!TEMPLATE_NAME_PATTERN.test(entry)) {
-      errors.push({ directory, message: `invalid template name "${entry}"` });
+      errors.push({
+        directory: `${namespace}/${entry}`,
+        message: `invalid template name "${entry}"`,
+      });
       continue;
     }
 

@@ -39,8 +39,24 @@ function isObject(node: unknown): node is Record<string, unknown> {
   return typeof node === "object" && node !== null && !Array.isArray(node);
 }
 
+/** A slot marker candidate is exactly `{ template: ... }`. */
+function isCompositionMarker(
+  node: unknown,
+): node is Record<string, unknown> & { template: unknown } {
+  return (
+    isObject(node) &&
+    Object.keys(node).length === 1 &&
+    Object.hasOwn(node, "template")
+  );
+}
+
 function isValidTemplateId(value: unknown): value is string {
-  return typeof value === "string" && TEMPLATE_ID_PATTERN.test(value);
+  return (
+    typeof value === "string" &&
+    (TEMPLATE_ID_PATTERN.test(value) ||
+      (value.length >= 2 &&
+        (value.startsWith("./") || value.startsWith("../"))))
+  );
 }
 
 function isValidMarker(
@@ -61,7 +77,7 @@ function childContext(
 
 function visitSchemaNode(node: unknown, context: MarkerContext): SlotMarker[] {
   if (!isObject(node)) return [];
-  if (Object.hasOwn(node, "template")) {
+  if (isCompositionMarker(node)) {
     return [
       {
         path: context.path,
@@ -215,13 +231,9 @@ function invalidMarkerIssue(
   slotPath: string[],
   marker: SlotMarker,
 ): CompositionIssue {
-  const actual =
-    typeof marker.template === "string"
-      ? JSON.stringify(marker.template)
-      : `${typeof marker.template} ${JSON.stringify(marker.template)}`;
   return {
     code: "invalid-input-schema",
-    message: `template "${rootId}": slot "${marker.property}" has invalid template marker ${actual}; expected a non-empty namespaced id matching namespace/name`,
+    message: `template "${rootId}": slot "${marker.property}" has an invalid template marker; expected a non-empty namespaced id matching namespace/name`,
     templateId: rootId,
     property: [...slotPath, ...marker.dataPath].at(-1),
     slotPath: [...slotPath, ...marker.path],

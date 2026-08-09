@@ -1,4 +1,5 @@
-import { basename, join } from "node:path";
+import { basename, join, relative } from "node:path";
+import { authoredValueLayerIssues } from "./authored-values.js";
 import { BUNDLED_RESOURCE_PACK } from "./bundled.js";
 import { type Slot, slotsOf } from "./composition.js";
 import type { ResourcePack } from "./content-root.js";
@@ -28,6 +29,7 @@ import {
   type ResourceGraphState,
   snapshotResourceGraph,
 } from "./graph.js";
+import type { JsoncLocation } from "./jsonc.js";
 import { isSafeJsonObject } from "./jsonc.js";
 import { parseResourceLocator } from "./locator.js";
 import { mergeResourceValues } from "./merge.js";
@@ -42,8 +44,11 @@ import {
 } from "./provenance.js";
 import {
   copyResourceTemplateSelection,
+  copyResourceValueTombstones,
   resourceTemplateSelection,
+  resourceValueTombstones,
   withResourceTemplateSelection,
+  withResourceValueTombstones,
 } from "./resolution.js";
 import type {
   InstanceFacet,
@@ -79,6 +84,8 @@ export type ResolveTemplateRequest = ResourceResolveOptions & {
 export type ResolveDocumentRequest = ResourceResolveOptions & {
   readonly pack: ResourcePack;
   readonly rootFile: string;
+  /** Optional in-memory authored root used by text-validation callers. */
+  readonly rootDocument?: JsonObject;
 };
 
 export type ResolvedTemplateSlot = Readonly<{
@@ -92,6 +99,7 @@ export type ResolvedTemplate = Readonly<{
   readonly locator: ResourceLocator;
   readonly origin: ResourceOrigin;
   readonly facet: TemplateFacet;
+  readonly locations?: Readonly<Record<string, JsoncLocation>>;
   readonly slots: readonly ResolvedTemplateSlot[];
   readonly dependencies: readonly string[];
   readonly unresolvedParents: readonly string[];
@@ -160,6 +168,7 @@ type AuthoringContext = Readonly<{
   readonly pack: ResourcePack;
   /** Lexical path used to resolve relative selectors. */
   readonly file: string;
+  readonly locations?: Readonly<Record<string, JsoncLocation>>;
 }>;
 
 type AuthoringProvenance = Readonly<Record<string, AuthoringContext>>;
@@ -226,6 +235,7 @@ type SourceSelectorContext = Readonly<{
   readonly selector?: string;
   readonly origin: ResourceOrigin;
   readonly pointer?: string;
+  readonly location?: JsoncLocation;
   readonly authoring: AuthoringContext;
 }>;
 
@@ -264,6 +274,48 @@ type BindingCollection = Readonly<{
   readonly provenance: Readonly<Record<string, ResourceOrigin>>;
 }>;
 
+function composeFailurePointer(
+  parent: string | undefined,
+  child: string | undefined,
+  scope: string | undefined,
+): string | undefined {
+  if (!parent) return child;
+  if (!child) return parent;
+  if (child === parent || child.startsWith(`${parent}/`)) return child;
+  if (scope && (child === scope || child.startsWith(`${scope}/`))) return child;
+  return `${parent}${child.startsWith("/") ? child : `/${child}`}`;
+}
+
+function pointerForSegments(segments: readonly string[]): string {
+  return segments.reduce(childPointer, "");
+}
+
+function schemaPointerForPath(
+  schema: Record<string, unknown>,
+  path: readonly string[],
+): string {
+  let current: unknown = schema;
+  let pointer = "";
+  for (const segment of path) {
+    if (Array.isArray(current) && /^\d+$/.test(segment)) {
+      pointer = childPointer(pointer, segment);
+      current = current[Number(segment)];
+      continue;
+    }
+    if (!isObject(current)) break;
+    const properties = current.properties;
+    if (isObject(properties) && Object.hasOwn(properties, segment)) {
+      pointer = `${pointer}/properties${childPointer("", segment)}`;
+      current = properties[segment];
+      continue;
+    }
+    if (!Object.hasOwn(current, segment)) break;
+    pointer = childPointer(pointer, segment);
+    current = current[segment];
+  }
+  return pointer;
+}
+
 type NormalizedValue = Readonly<{
   readonly value: JsonValue;
   readonly provenance: ResourceProvenance;
@@ -274,6 +326,7 @@ type TraversalFailureDetails = Readonly<{
   readonly locator?: RawResourceLocator;
   readonly source?: ResourceOrigin;
   readonly pointer?: string;
+  readonly location?: JsoncLocation;
 }>;
 
 type LocatedValue = Readonly<{
@@ -312,15 +365,21 @@ function isObject(value: unknown): value is Record<string, JsonValue> {
 function cloneValue(value: JsonValue): JsonValue {
   if (Array.isArray(value)) {
     const output = value.map(cloneValue);
-    return copyResourceTemplateSelection(value, output);
+    return copyResourceValueTombstones(
+      value,
+      copyResourceTemplateSelection(value, output),
+    );
   }
   if (!isObject(value)) return value;
   const output: Record<string, unknown> = {};
   for (const key of Object.keys(value).sort())
     own(output, key, cloneValue(value[key] as JsonValue));
-  return copyResourceTemplateSelection(
+  return copyResourceValueTombstones(
     value,
-    output as { readonly [key: string]: JsonValue },
+    copyResourceTemplateSelection(
+      value,
+      output as { readonly [key: string]: JsonValue },
+    ),
   );
 }
 
@@ -348,13 +407,18 @@ function selectorValue(
   key: string,
   origin: ResourceOrigin,
   pointer: string,
+  location?: JsoncLocation,
 ): RawResourceLocator {
   const selector = value[key];
   if (typeof selector !== "string" || selector.length === 0) {
     return failResource(
       "invalid-resolved-input",
       `${key} selector must be a non-empty string`,
-      { source: origin, pointer: `${pointer}/${key}` },
+      {
+        source: origin,
+        pointer: `${pointer}/${key}`,
+        ...(location ? { location } : {}),
+      },
     );
   }
   return selector;
@@ -380,8 +444,16 @@ function sliceProvenance(
   return Object.freeze(output);
 }
 
-function authoringContext(pack: ResourcePack, file: string): AuthoringContext {
-  return Object.freeze({ pack, file });
+function authoringContext(
+  pack: ResourcePack,
+  file: string,
+  locations?: Readonly<Record<string, JsoncLocation>>,
+): AuthoringContext {
+  return Object.freeze({
+    pack,
+    file,
+    ...(locations ? { locations } : {}),
+  });
 }
 
 function traversalContext(
@@ -712,6 +784,7 @@ class ResourceResolver {
       authoring: authoringContext(
         pack,
         join(target.lexicalDirectory, basename(loaded.facet.origin.path)),
+        loaded.locations,
       ),
     };
   }
@@ -833,28 +906,84 @@ class ResourceResolver {
     }
   }
 
+  private delegatedFailure(
+    error: ResourceResolutionError,
+    path: readonly ResourceGraphNode[],
+    source: ResourceOrigin | undefined,
+    pointer: string | undefined,
+    location: JsoncLocation | undefined,
+    pointerScope: string | undefined,
+  ): ResourceResolutionError {
+    const failure = error.failure;
+    const chain = failure.chain ?? this.graphChain(path);
+    const failurePointer = composeFailurePointer(
+      pointer,
+      failure.pointer,
+      pointerScope,
+    );
+    return new ResourceResolutionError(
+      {
+        ...failure,
+        ...(source && !failure.source ? { source } : {}),
+        ...(failurePointer ? { pointer: failurePointer } : {}),
+        ...(location && !failure.location ? { location } : {}),
+        ...(chain ? { chain } : {}),
+      },
+      this.failureContext(error),
+    );
+  }
+
   private delegateResource<T>(
     action: () => T,
     path: readonly ResourceGraphNode[],
     source: ResourceOrigin | undefined,
     pointer: string | undefined,
+    location?: JsoncLocation,
+    pointerScope?: string,
   ): T {
     try {
       return action();
     } catch (error) {
       if (!(error instanceof ResourceResolutionError)) throw error;
-      const failure = error.failure;
-      const chain = failure.chain ?? this.graphChain(path);
-      throw new ResourceResolutionError(
-        {
-          ...failure,
-          ...(source && !failure.source ? { source } : {}),
-          ...(pointer && !failure.pointer ? { pointer } : {}),
-          ...(chain ? { chain } : {}),
-        },
-        this.failureContext(error),
+      throw this.delegatedFailure(
+        error,
+        path,
+        source,
+        pointer,
+        location,
+        pointerScope,
       );
     }
+  }
+
+  private resolveTemplateChild(
+    loaded: LoadedFacet<TemplateFacet>,
+    slot: Slot,
+    path: readonly ResourceGraphNode[],
+    hops: number,
+    pointerScope: string | undefined,
+  ): ResourceTraversal<ResolvedTemplate> {
+    const slotPointer = pointerForSegments(slot.dataPath ?? [slot.property]);
+    const schemaPointer = schemaPointerForPath(
+      loaded.loaded.facet.inputSchema,
+      slot.path ?? [slot.property],
+    );
+    return this.delegateResource(
+      () =>
+        this.resolveTemplateAt(
+          loaded.pack,
+          slot.templateId,
+          loaded.authoring.file,
+          path,
+          hops + 1,
+          pointerScope,
+        ),
+      path,
+      loaded.loaded.facet.origin,
+      slotPointer,
+      loaded.loaded.locations?.[schemaPointer],
+      pointerScope,
+    );
   }
 
   private resolveTemplateAt(
@@ -863,6 +992,7 @@ class ResourceResolver {
     authoringFile: string,
     path: readonly ResourceGraphNode[] = [],
     hops = 0,
+    pointerScope?: string,
   ): ResourceTraversal<ResolvedTemplate> {
     const entered = this.enterLoaded(
       this.loadForTraversal(
@@ -880,12 +1010,12 @@ class ResourceResolver {
     for (const slot of slotsOf(
       loaded.loaded.facet.inputSchema as Record<string, unknown>,
     )) {
-      const child = this.resolveTemplateAt(
-        loaded.pack,
-        slot.templateId,
-        loaded.authoring.file,
+      const child = this.resolveTemplateChild(
+        loaded,
+        slot,
         nextPath,
-        hops + 1,
+        hops,
+        pointerScope,
       );
       slots.push(
         Object.freeze({
@@ -901,6 +1031,9 @@ class ResourceResolver {
       locator: loaded.loaded.facet.locator,
       origin: loaded.loaded.facet.origin,
       facet: loaded.loaded.facet,
+      ...(loaded.loaded.locations
+        ? { locations: loaded.loaded.locations }
+        : {}),
       slots: Object.freeze(slots),
       dependencies: Object.freeze([...this.dependencies].sort()),
       unresolvedParents: Object.freeze([...this.unresolvedParents].sort()),
@@ -923,32 +1056,62 @@ class ResourceResolver {
       .value;
   }
 
+  private resolveLoadedSelector<T extends ResourceTraversal<unknown>>(
+    loaded: LoadedFacet<InstanceFacet>,
+    selector: "$template" | "$instance",
+    path: readonly ResourceGraphNode[],
+    pointerScope: string | undefined,
+    resolve: (locator: RawResourceLocator) => T,
+  ): T {
+    const origin = loaded.loaded.facet.origin;
+    const selected = this.delegateResource(
+      () =>
+        selectorValue(
+          loaded.loaded.facet.input,
+          selector,
+          origin,
+          "",
+          loaded.loaded.locations?.[`/${selector}`],
+        ),
+      path,
+      origin,
+      `/${selector}`,
+      undefined,
+      pointerScope,
+    );
+    return this.delegateResource(
+      () => resolve(selected),
+      path,
+      origin,
+      `/${selector}`,
+      loaded.loaded.locations?.[`/${selector}`],
+      pointerScope,
+    );
+  }
+
   private selectInstance(
     loaded: LoadedFacet<InstanceFacet>,
     selector: string | undefined,
     path: readonly ResourceGraphNode[],
     hops: number,
+    pointerScope?: string,
   ): SourceSelection {
     const origin = loaded.loaded.facet.origin;
     if (selector === "$template") {
-      const selected = this.delegateResource(
-        () => selectorValue(loaded.loaded.facet.input, selector, origin, ""),
+      const template = this.resolveLoadedSelector(
+        loaded,
+        selector,
         path,
-        origin,
-        `/${selector}`,
-      );
-      const template = this.delegateResource(
-        () =>
+        pointerScope,
+        (selected) =>
           this.resolveTemplateAt(
             loaded.authoring.pack,
             selected,
             loaded.authoring.file,
             path,
             hops + 1,
+            pointerScope,
           ),
-        path,
-        origin,
-        `/${selector}`,
       );
       return {
         template: template.value,
@@ -958,24 +1121,20 @@ class ResourceResolver {
     }
 
     if (selector === "$instance") {
-      const selected = this.delegateResource(
-        () => selectorValue(loaded.loaded.facet.input, selector, origin, ""),
+      const base = this.resolveLoadedSelector(
+        loaded,
+        selector,
         path,
-        origin,
-        `/${selector}`,
-      );
-      const base = this.delegateResource(
-        () =>
+        pointerScope,
+        (selected) =>
           this.resolveInstanceAt(
             loaded.authoring.pack,
             selected,
             loaded.authoring.file,
             path,
             hops + 1,
+            pointerScope,
           ),
-        path,
-        origin,
-        `/${selector}`,
       );
       return {
         template: base.value.template,
@@ -994,6 +1153,7 @@ class ResourceResolver {
         loaded.authoring.file,
         path,
         hops + 1,
+        pointerScope,
       );
       return {
         template: sibling.value,
@@ -1024,6 +1184,7 @@ class ResourceResolver {
     authoringFile: string,
     path: readonly ResourceGraphNode[] = [],
     hops = 0,
+    pointerScope?: string,
   ): InstanceTraversal {
     const entered = this.enterLoaded(
       this.loadForTraversal(
@@ -1038,6 +1199,14 @@ class ResourceResolver {
     const { loaded, path: nextPath, key } = entered;
 
     const rawInput = loaded.loaded.facet.input;
+    this.assertAuthoredValueLayer(
+      rawInput,
+      "instance",
+      loaded.loaded.facet.origin,
+      loaded.loaded.locations,
+      nextPath,
+      hops,
+    );
     const selectors = selectorKeys(rawInput);
     if (selectors.length > 1) {
       return this.failAt(
@@ -1049,7 +1218,13 @@ class ResourceResolver {
     }
 
     const selector = selectors[0];
-    const selection = this.selectInstance(loaded, selector, nextPath, hops);
+    const selection = this.selectInstance(
+      loaded,
+      selector,
+      nextPath,
+      hops,
+      pointerScope,
+    );
     const localInput = withoutKeys(
       rawInput,
       new Set(["$template", "$instance"]),
@@ -1553,6 +1728,7 @@ class ResourceResolver {
         selectedContext.file,
         path,
         hops + 1,
+        sourcePointer,
       );
       const candidate = slots.find(
         ({ template }) => template.key === instance.value.template.key,
@@ -1779,6 +1955,7 @@ class ResourceResolver {
       context.file,
       path,
       hops + 1,
+      sourcePointer,
     );
     this.requireCompatibleTemplate(
       instance.value.template,
@@ -1859,14 +2036,19 @@ class ResourceResolver {
       };
     }
     const selectorPointer = childPointer("", selector);
+    const authoring =
+      contextAt(context.sourceAuthoring, "") ??
+      authoringContext(context.pack, context.authoringFile);
     return {
       selector,
       origin:
         originAt(context.sourceProvenance, selectorPointer) ?? context.origin,
       pointer: childPointer(context.sourcePointer, selector),
+      location:
+        authoring.locations?.[childPointer(context.sourcePointer, selector)] ??
+        authoring.locations?.[selectorPointer],
       authoring:
-        contextAt(context.sourceAuthoring, selectorPointer) ??
-        authoringContext(context.pack, context.authoringFile),
+        contextAt(context.sourceAuthoring, selectorPointer) ?? authoring,
     };
   }
 
@@ -1895,6 +2077,7 @@ class ResourceResolver {
         sourceContext,
         selector.origin,
         selector.pointer,
+        selector.location,
         selector.authoring,
       );
     if (selector.selector === "$template")
@@ -1903,6 +2086,7 @@ class ResourceResolver {
         sourceContext,
         selector.origin,
         selector.pointer,
+        selector.location,
         selector.authoring,
       );
 
@@ -1924,6 +2108,7 @@ class ResourceResolver {
       sourceContext.authoringFile,
       sourceContext.path,
       sourceContext.hops,
+      sourceContext.sourcePointer,
     );
     return {
       template: template.value,
@@ -1937,32 +2122,25 @@ class ResourceResolver {
     sourceContext: SourceResolutionContext,
     selectorOrigin: ResourceOrigin,
     selectorPointer: string | undefined,
+    selectorLocation: JsoncLocation | undefined,
     selectedContext: AuthoringContext,
   ): SourceSelection {
-    const selected = this.delegateResource(
-      () =>
-        selectorValue(
-          source,
-          "$instance",
-          selectorOrigin,
-          sourceContext.sourcePointer,
-        ),
-      sourceContext.path,
+    const instance = this.resolveSourceSelector(
+      source,
+      sourceContext,
+      "$instance",
       selectorOrigin,
       selectorPointer,
-    );
-    const instance = this.delegateResource(
-      () =>
+      selectorLocation,
+      (selected) =>
         this.resolveInstanceAt(
           selectedContext.pack,
           selected,
           selectedContext.file,
           sourceContext.path,
           sourceContext.hops,
+          sourceContext.sourcePointer,
         ),
-      sourceContext.path,
-      selectorOrigin,
-      selectorPointer,
     );
     return {
       template: instance.value.template,
@@ -1979,38 +2157,65 @@ class ResourceResolver {
     sourceContext: SourceResolutionContext,
     selectorOrigin: ResourceOrigin,
     selectorPointer: string | undefined,
+    selectorLocation: JsoncLocation | undefined,
     selectedContext: AuthoringContext,
   ): SourceSelection {
-    const selected = this.delegateResource(
-      () =>
-        selectorValue(
-          source,
-          "$template",
-          selectorOrigin,
-          sourceContext.sourcePointer,
-        ),
-      sourceContext.path,
+    const template = this.resolveSourceSelector(
+      source,
+      sourceContext,
+      "$template",
       selectorOrigin,
       selectorPointer,
-    );
-    const template = this.delegateResource(
-      () =>
+      selectorLocation,
+      (selected) =>
         this.resolveTemplateAt(
           selectedContext.pack,
           selected,
           selectedContext.file,
           sourceContext.path,
           sourceContext.hops,
+          sourceContext.sourcePointer,
         ),
-      sourceContext.path,
-      selectorOrigin,
-      selectorPointer,
     );
     return {
       template: template.value,
       path: template.path,
       hops: template.hops,
     };
+  }
+
+  private resolveSourceSelector<T extends ResourceTraversal<unknown>>(
+    source: Record<string, JsonValue>,
+    sourceContext: SourceResolutionContext,
+    selector: "$template" | "$instance",
+    selectorOrigin: ResourceOrigin,
+    selectorPointer: string | undefined,
+    selectorLocation: JsoncLocation | undefined,
+    resolve: (locator: RawResourceLocator) => T,
+  ): T {
+    const selected = this.delegateResource(
+      () =>
+        selectorValue(
+          source,
+          selector,
+          selectorOrigin,
+          sourceContext.sourcePointer,
+          selectorLocation,
+        ),
+      sourceContext.path,
+      selectorOrigin,
+      selectorPointer,
+      undefined,
+      sourceContext.sourcePointer,
+    );
+    return this.delegateResource(
+      () => resolve(selected),
+      sourceContext.path,
+      selectorOrigin,
+      selectorPointer,
+      selectorLocation,
+      sourceContext.sourcePointer,
+    );
   }
 
   private sourceObject(
@@ -2028,21 +2233,21 @@ class ResourceResolver {
     );
   }
 
-  private sourceMetadata(
+  private sourceDescription(
     context: "root" | "nested",
     value: JsonObject,
-    provenance: ResourceProvenance,
-    origin: ResourceOrigin,
     subject: "agent" | "skill",
+    origin: ResourceOrigin,
     sourcePointer: string,
     path: readonly ResourceGraphNode[],
     hops: number,
-  ): SourceMetadata {
-    const descriptionValue = value.description;
-    if (
-      context === "root" &&
-      (typeof descriptionValue !== "string" || descriptionValue.length === 0)
-    ) {
+  ): string | undefined {
+    const description = value.description;
+    if (context !== "root" && typeof description === "string")
+      return description;
+    if (typeof description === "string" && description.length > 0)
+      return description;
+    if (context === "root")
       return this.failAt(
         "invalid-resolved-input",
         `${subject} description must be a non-empty string after resolution`,
@@ -2054,9 +2259,78 @@ class ResourceResolver {
             : "/description",
         },
       );
+    return undefined;
+  }
+
+  private sourceValues(
+    value: JsonObject,
+    origin: ResourceOrigin,
+    sourcePointer: string,
+    path: readonly ResourceGraphNode[],
+    hops: number,
+  ): JsonObject | undefined {
+    const rootTombstones = resourceValueTombstones(value) ?? [];
+    const valueTombstones = rootTombstones
+      .filter((pointer) => pointer.startsWith("/values/"))
+      .map((pointer) => pointer.slice("/values".length));
+    if (!Object.hasOwn(value, "values")) {
+      return valueTombstones.length > 0
+        ? withResourceValueTombstones({}, valueTombstones)
+        : undefined;
+    }
+    if (!isObject(value.values))
+      return this.failAt(
+        "invalid-resolved-input",
+        "binding values must be a JSON object",
+        traversalContext(path, hops),
+        {
+          source: origin,
+          pointer: sourcePointer ? `${sourcePointer}/values` : "/values",
+        },
+      );
+    const sourceValues = value.values as JsonObject;
+    const output: Record<string, JsonValue> = {};
+    const tombstones = new Set<string>();
+    for (const key of Object.keys(sourceValues).sort()) {
+      const child = sourceValues[key] as JsonValue;
+      if (child === null) {
+        tombstones.add(`/${escapePointer(key)}`);
+        continue;
+      }
+      own(output, key, cloneValue(child));
     }
 
+    for (const pointer of valueTombstones) tombstones.add(pointer);
+    for (const pointer of resourceValueTombstones(sourceValues) ?? [])
+      tombstones.add(pointer);
+
+    return withResourceValueTombstones(
+      output as JsonObject,
+      [...tombstones].sort(),
+    );
+  }
+
+  private sourceMetadata(
+    context: "root" | "nested",
+    value: JsonObject,
+    provenance: ResourceProvenance,
+    origin: ResourceOrigin,
+    subject: "agent" | "skill",
+    sourcePointer: string,
+    path: readonly ResourceGraphNode[],
+    hops: number,
+  ): SourceMetadata {
     const metadataKeys = new Set(["description", "values"]);
+    const description = this.sourceDescription(
+      context,
+      value,
+      subject,
+      origin,
+      sourcePointer,
+      path,
+      hops,
+    );
+    const values = this.sourceValues(value, origin, sourcePointer, path, hops);
     return {
       input:
         context === "root"
@@ -2066,10 +2340,8 @@ class ResourceResolver {
         context === "root"
           ? removeProvenance(provenance, metadataKeys)
           : provenance,
-      ...(typeof descriptionValue === "string"
-        ? { description: descriptionValue }
-        : {}),
-      ...(isObject(value.values) ? { values: cloneObject(value.values) } : {}),
+      ...(description ? { description } : {}),
+      ...(values ? { values } : {}),
     };
   }
 
@@ -2371,13 +2643,18 @@ class ResourceResolver {
     return { bindings, normalized, provenance };
   }
 
-  resolveDocument(rootFile: string): ResolvedResourceDocument {
-    const loaded = this.loadForTraversal(
-      () => this.loadPreset(this.projectPack, "./", rootFile),
-      [],
-      "preset",
-      "./",
-    );
+  resolveDocument(
+    rootFile: string,
+    rootDocument?: JsonObject,
+  ): ResolvedResourceDocument {
+    const loaded = rootDocument
+      ? this.memoryPreset(rootFile, rootDocument)
+      : this.loadForTraversal(
+          () => this.loadPreset(this.projectPack, "./", rootFile),
+          [],
+          "preset",
+          "./",
+        );
     const node = graphNode(loaded.loaded.facet);
     const path = this.enter(node, [], 0);
     const root = this.resolvePresetLoaded(loaded, node, path, 0);
@@ -2449,6 +2726,32 @@ class ResourceResolver {
     return result;
   }
 
+  private memoryPreset(
+    rootFile: string,
+    document: JsonObject,
+  ): LoadedFacet<Preset> {
+    const target = resolveResourceLocator(this.projectPack, "./", rootFile);
+    const origin = {
+      kind: "project" as const,
+      path: relative(this.projectPack.root, rootFile).replaceAll("\\", "/"),
+    } as ResourceOrigin;
+    return {
+      pack: this.projectPack,
+      target,
+      loaded: {
+        facet: {
+          locator: target.locator,
+          origin,
+          kind: "preset" as const,
+          document: cloneObject(document),
+        },
+        dependencies: Object.freeze([]),
+        unresolvedParents: Object.freeze([]),
+      },
+      authoring: authoringContext(this.projectPack, rootFile),
+    };
+  }
+
   private loadPresetBase(
     loaded: LoadedFacet<Preset>,
     raw: JsonObject,
@@ -2465,11 +2768,19 @@ class ResourceResolver {
         { source: loaded.loaded.facet.origin, pointer: "/extends" },
       );
     }
-    const next = this.loadForTraversal(
-      () => this.loadPreset(loaded.pack, extendsValue, loaded.authoring.file),
+    const next = this.delegateResource(
+      () =>
+        this.loadForTraversal(
+          () =>
+            this.loadPreset(loaded.pack, extendsValue, loaded.authoring.file),
+          path,
+          "preset",
+          extendsValue,
+        ),
       path,
-      "preset",
-      extendsValue,
+      loaded.loaded.facet.origin,
+      "/extends",
+      loaded.loaded.locations?.["/extends"],
     );
     const child = graphNode(next.loaded.facet);
     const childPath = this.enter(child, path, hops + 1);
@@ -2483,6 +2794,14 @@ class ResourceResolver {
     hops: number,
   ): PresetResult {
     const raw = loaded.loaded.facet.document;
+    this.assertAuthoredValueLayer(
+      raw,
+      "preset",
+      loaded.loaded.facet.origin,
+      loaded.loaded.locations,
+      path,
+      hops,
+    );
     const base = this.loadPresetBase(loaded, raw, path, hops);
     const local = withoutKeys(raw, new Set(["extends"]));
     const localProvenance = provenanceForValue(
@@ -2525,6 +2844,31 @@ class ResourceResolver {
       effectiveHops,
     });
     return result;
+  }
+
+  private assertAuthoredValueLayer(
+    source: JsonObject,
+    kind: "instance" | "preset",
+    origin: ResourceOrigin,
+    locations: Readonly<Record<string, JsoncLocation>> | undefined,
+    path: readonly ResourceGraphNode[],
+    hops: number,
+  ): void {
+    const valueIssue = authoredValueLayerIssues(source, {
+      kind,
+      locations,
+    })[0];
+    if (!valueIssue) return;
+    this.failAt(
+      "invalid-resolved-input",
+      valueIssue.message,
+      traversalContext(path, hops),
+      {
+        source: origin,
+        pointer: valueIssue.pointer,
+        ...(valueIssue.location ? { location: valueIssue.location } : {}),
+      },
+    );
   }
 }
 
@@ -2696,7 +3040,7 @@ export function resolveResourceDocument(
     ...options,
   });
   return runResourceRequest(request, (resolver) =>
-    resolver.resolveDocument(request.rootFile),
+    resolver.resolveDocument(request.rootFile, request.rootDocument),
   );
 }
 

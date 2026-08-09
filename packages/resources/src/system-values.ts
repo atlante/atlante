@@ -1,3 +1,5 @@
+// fallow-ignore-file code-duplication -- migration implementation mirrors the retained old package until Cleanup
+
 import { basename } from "node:path";
 
 /**
@@ -20,7 +22,9 @@ function resolveSystemString(source: string): string {
   return source.replace(
     /\{\{sys\.([a-zA-Z0-9_.-]+)\}\}/g,
     (_match, key: string) => {
-      const resolver = SYSTEM_RESOLVERS[key];
+      const resolver = Object.hasOwn(SYSTEM_RESOLVERS, key)
+        ? SYSTEM_RESOLVERS[key]
+        : undefined;
       if (!resolver) throw new UnknownSystemVariableError(key);
       return resolver();
     },

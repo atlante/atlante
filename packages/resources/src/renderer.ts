@@ -6,6 +6,7 @@ import {
   copyResourceTemplateSelection,
   resourceTemplateSelection,
 } from "./resolution.js";
+import type { ResolvedTemplate } from "./resolve.js";
 import { analyzeValueReferences, isValidValueKey } from "./values.js";
 
 export type RenderArgs = {
@@ -239,6 +240,108 @@ export function renderTemplate(
     strict: false,
   });
 
+  return compiled(input);
+}
+
+export type ResolvedRenderArgs = {
+  readonly template: ResolvedTemplate;
+  readonly input: unknown;
+};
+
+/** Renders a template graph that was already selected by resource resolution. */
+export function renderResolvedTemplate(
+  { template, input }: ResolvedRenderArgs,
+  stack: string[] = [],
+): string {
+  if (stack.includes(template.key)) {
+    const chain = [...stack, template.key];
+    throw new Error(`circular template composition: ${chain.join(" -> ")}`);
+  }
+
+  const handlebars = Handlebars.create();
+  handlebars.registerHelper("increment", (value: unknown) => Number(value) + 1);
+  handlebars.registerHelper("input", () => input);
+  handlebars.registerHelper(
+    "anyPolicy",
+    (policies: unknown, phases: unknown) => {
+      const hasWorkflowPolicy =
+        typeof policies === "object" &&
+        policies !== null &&
+        Object.values(policies).some(Boolean);
+      const hasPhasePolicy =
+        Array.isArray(phases) &&
+        phases.some((phase) => {
+          if (typeof phase !== "object" || phase === null) return false;
+          const phasePolicies = (phase as Record<string, unknown>).policies;
+          return (
+            typeof phasePolicies === "object" &&
+            phasePolicies !== null &&
+            Object.values(phasePolicies).some(Boolean)
+          );
+        });
+      return hasWorkflowPolicy || hasPhasePolicy;
+    },
+  );
+  const nextStack = [...stack, template.key];
+  const slots = template.slots.map(({ slot }) => slot);
+  const childTemplate = (slot: (typeof slots)[number]): ResolvedTemplate => {
+    const index = slots.indexOf(slot);
+    const child = index < 0 ? undefined : template.slots[index]?.template;
+    if (!child) throw new Error(`unknown template: ${slot.templateId}`);
+    return child;
+  };
+
+  for (const group of groupSlots(slots)) {
+    const renderSlot = (context: unknown): string => {
+      const contextSlot = selectedSlot(group.slots, context);
+      const contextChild = childTemplate(contextSlot);
+      if (
+        isArrayInputSchema(contextChild.facet.inputSchema) &&
+        Array.isArray(context)
+      ) {
+        return renderResolvedTemplate(
+          { template: contextChild, input: context },
+          nextStack,
+        );
+      }
+
+      const contextPath =
+        contextSlot.arrayItems && context !== input
+          ? arrayItemPath(input, group.path)
+          : undefined;
+      const slotInputsForRender = contextPath
+        ? slotInputs(context, contextPath, false)
+        : slotInputs(input, group.path, contextSlot.arrayItems ?? false);
+      return slotInputsForRender
+        .map((slotInput) => {
+          const slot = selectedSlot(group.slots, slotInput);
+          const child = childTemplate(slot);
+          return renderResolvedTemplate(
+            {
+              template: child,
+              input: unwrapArrayTemplateInput(
+                slotInput,
+                slot.property,
+                child.facet.inputSchema,
+              ),
+            },
+            nextStack,
+          );
+        })
+        .join("");
+    };
+    handlebars.registerPartial(
+      slotPartialName(
+        (group.path.length ? group.path : [group.slots[0]?.property]).join("/"),
+      ),
+      renderSlot,
+    );
+  }
+
+  const compiled = handlebars.compile(template.facet.source, {
+    noEscape: true,
+    strict: false,
+  });
   return compiled(input);
 }
 

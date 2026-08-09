@@ -9,7 +9,10 @@ import {
 } from "./provenance.js";
 import {
   copyResourceTemplateSelection,
+  copyResourceValueTombstones,
   resourceTemplateSelection,
+  resourceValueTombstones,
+  withResourceValueTombstones,
 } from "./resolution.js";
 import type { JsonValue, ResourceOrigin } from "./types.js";
 
@@ -49,7 +52,10 @@ function cloneValue(
     const cloned = value.map((child, index) =>
       cloneValue(child, childPointer(pointer, index), source, fallback, output),
     );
-    return copyResourceTemplateSelection(value, cloned);
+    return copyResourceValueTombstones(
+      value,
+      copyResourceTemplateSelection(value, cloned),
+    );
   }
   if (!isObject(value)) return value;
 
@@ -67,9 +73,12 @@ function cloneValue(
       ),
     );
   }
-  return copyResourceTemplateSelection(
+  return copyResourceValueTombstones(
     value,
-    object as { readonly [key: string]: JsonValue },
+    copyResourceTemplateSelection(
+      value,
+      object as { readonly [key: string]: JsonValue },
+    ),
   );
 }
 
@@ -94,7 +103,58 @@ type MergeContext = Readonly<{
   readonly inheritedOrigin?: ResourceOrigin;
   readonly localOrigin?: ResourceOrigin;
   readonly outputProvenance: Record<string, ResourceOrigin>;
+  readonly tombstones: Set<string>;
 }>;
+
+function appendPointer(prefix: string, pointer: string): string {
+  if (prefix === "") return pointer;
+  if (pointer === "") return prefix;
+  return `${prefix}${pointer}`;
+}
+
+function tombstoned(pointer: string, tombstones: ReadonlySet<string>): boolean {
+  for (const tombstone of tombstones) {
+    if (tombstone === pointer || pointer.startsWith(`${tombstone}/`))
+      return true;
+  }
+  return false;
+}
+
+function clearTombstones(
+  tombstones: Set<string>,
+  pointer: string,
+  includeChildren: boolean,
+): void {
+  for (const tombstone of [...tombstones]) {
+    if (
+      tombstone === pointer ||
+      (includeChildren && tombstone.startsWith(`${pointer}/`))
+    )
+      tombstones.delete(tombstone);
+  }
+}
+
+function recordSidecarTombstones(
+  value: JsonValue,
+  pointer: string,
+  tombstones: Set<string>,
+): void {
+  for (const tombstone of resourceValueTombstones(value) ?? [])
+    tombstones.add(appendPointer(pointer, tombstone));
+}
+
+function subtreeTombstones(
+  pointer: string,
+  tombstones: ReadonlySet<string>,
+): string[] {
+  return [...tombstones]
+    .filter(
+      (tombstone) =>
+        tombstone === pointer || tombstone.startsWith(`${pointer}/`),
+    )
+    .map((tombstone) => tombstone.slice(pointer.length) || "/")
+    .sort();
+}
 
 function copyInheritedField(
   result: Record<string, unknown>,
@@ -104,6 +164,7 @@ function copyInheritedField(
   context: MergeContext,
 ): void {
   if (!inherited || !Object.hasOwn(inherited, key)) return;
+  if (tombstoned(pointer, context.tombstones)) return;
   own(
     result,
     key,
@@ -165,9 +226,13 @@ function mergeObjectNode(
     mergeLocalField(result, inherited, local, key, pointerValue, context);
   }
   const selectionSource = resourceTemplateSelection(local) ? local : inherited;
-  return copyResourceTemplateSelection(
+  const selected = copyResourceTemplateSelection(
     selectionSource,
     result as { readonly [key: string]: JsonValue },
+  );
+  return withResourceValueTombstones(
+    selected,
+    subtreeTombstones(pointer, context.tombstones),
   );
 }
 
@@ -177,9 +242,15 @@ function mergeNode(
   pointer: string,
   context: MergeContext,
 ): JsonValue | typeof DELETED {
-  if (local === null) return DELETED;
+  recordSidecarTombstones(local, pointer, context.tombstones);
+  if (local === null) {
+    clearTombstones(context.tombstones, pointer, true);
+    if (pointer !== "") context.tombstones.add(pointer);
+    return DELETED;
+  }
 
-  if (Array.isArray(local) || !isObject(local))
+  if (Array.isArray(local) || !isObject(local)) {
+    clearTombstones(context.tombstones, pointer, true);
     return cloneValue(
       local,
       pointer,
@@ -187,6 +258,9 @@ function mergeNode(
       context.localOrigin,
       context.outputProvenance,
     );
+  }
+
+  clearTombstones(context.tombstones, pointer, false);
 
   return mergeObjectNode(
     isObject(inherited) ? inherited : undefined,
@@ -215,17 +289,23 @@ export function mergeResourceValues(
     options.localProvenance ??
     (options.localOrigin ? provenanceForValue(local, options.localOrigin) : {});
   const outputProvenance: Record<string, ResourceOrigin> = {};
+  const tombstones = new Set(resourceValueTombstones(inherited) ?? []);
   const merged = mergeNode(inherited, local, "", {
     inheritedProvenance,
     localProvenance,
     inheritedOrigin: options.inheritedOrigin,
     localOrigin: options.localOrigin,
     outputProvenance,
+    tombstones,
   });
   const value = merged === DELETED ? undefined : merged;
+  const outputValue =
+    value === undefined
+      ? value
+      : withResourceValueTombstones(value, [...tombstones].sort());
   return {
-    value,
-    data: value,
+    value: outputValue,
+    data: outputValue,
     provenance: freezeProvenance(outputProvenance),
   };
 }

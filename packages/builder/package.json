@@ -30,8 +30,8 @@
     "./artifacts": "./src/artifacts-public.ts"
   },
   "dependencies": {
+    "@atlante/resources": "workspace:*",
     "@atlante/schema": "workspace:*",
-    "@atlante/templates": "workspace:*",
     "@atlante/validator": "workspace:*"
   }
 }

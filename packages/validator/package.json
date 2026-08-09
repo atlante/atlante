@@ -29,9 +29,8 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@atlante/presets": "workspace:*",
+    "@atlante/resources": "workspace:*",
     "@atlante/schema": "workspace:*",
-    "@atlante/templates": "workspace:*",
     "ajv": "^8.17.1",
     "jsonc-parser": "^3.3.1"
   }

@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { atlanteDocumentSchema, SCHEMA_URI } from "../src/index.js";
+import {
+  atlanteDocumentOverlaySchema,
+  atlanteDocumentSchema,
+  SCHEMA_URI,
+} from "../src/index.js";
 
 const valid = {
   $schema: SCHEMA_URI,
@@ -7,7 +11,6 @@ const valid = {
   agents: {
     reviewer: {
       description: "Reviews changes.",
-      template: "atlante/agent",
       values: { rule: "Reviews only." },
       identity: "You are a reviewer.",
       mission: "Review changes.",
@@ -44,7 +47,6 @@ describe("atlanteDocumentSchema", () => {
       skills: {
         testing: {
           description: "Testing guidance",
-          template: "atlante/skill",
           content: "Run the tests.",
         },
       },
@@ -234,5 +236,184 @@ describe("atlanteDocumentSchema", () => {
       Object.getOwnPropertyDescriptor(result.data.agents, "__proto__")?.value
         ?.identity,
     ).toBe("x");
+  });
+});
+
+describe("atlanteDocumentOverlaySchema", () => {
+  test("accepts a string binding as $instance shorthand for agents and skills", () => {
+    const result = atlanteDocumentOverlaySchema.safeParse({
+      $schema: SCHEMA_URI,
+      agents: { architect: "./resources/architect" },
+      skills: { testing: "atlante/skill" },
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  test("accepts $instance and $template source objects with local overlays", () => {
+    const result = atlanteDocumentOverlaySchema.safeParse({
+      $schema: SCHEMA_URI,
+      agents: {
+        reviewer: {
+          $instance: "./resources/architect",
+          values: { scope: "review" },
+          mission: "Review the change.",
+        },
+      },
+      skills: {
+        testing: {
+          $template: "./resources/skill",
+          description: "Testing guidance.",
+          content: "Run the tests.",
+        },
+      },
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  test("accepts local and built-in root extends locators", () => {
+    for (const extendsValue of ["./base", "atlante/starter"]) {
+      const result = atlanteDocumentOverlaySchema.safeParse({
+        $schema: SCHEMA_URI,
+        extends: extendsValue,
+      });
+
+      expect(result.success).toBe(true);
+    }
+  });
+
+  test("keeps extends, values tombstones, and binding tombstones in raw overlays", () => {
+    const result = atlanteDocumentOverlaySchema.safeParse({
+      $schema: SCHEMA_URI,
+      extends: "./base",
+      values: { inherited: null },
+      agents: { removed: null },
+      skills: { removed: null },
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  test("allows unresolved descriptions in authored sources but requires them canonically", () => {
+    const authored = atlanteDocumentOverlaySchema.safeParse({
+      $schema: SCHEMA_URI,
+      agents: { architect: "./resources/architect" },
+      skills: { testing: { $instance: "./resources/testing" } },
+    });
+    const canonical = atlanteDocumentSchema.safeParse({
+      $schema: SCHEMA_URI,
+      agents: { architect: { identity: "You are an architect." } },
+      skills: { testing: { content: "Run the tests." } },
+    });
+
+    expect(authored.success).toBe(true);
+    expect(canonical.success).toBe(false);
+  });
+
+  test("rejects conflicting selectors", () => {
+    const result = atlanteDocumentOverlaySchema.safeParse({
+      $schema: SCHEMA_URI,
+      agents: {
+        reviewer: {
+          $instance: "./resources/architect",
+          $template: "./resources/agent",
+        },
+      },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  test("rejects malformed and non-string selectors", () => {
+    for (const source of [
+      { $instance: 42 },
+      { $template: null },
+      { $instance: "" },
+    ]) {
+      const result = atlanteDocumentOverlaySchema.safeParse({
+        $schema: SCHEMA_URI,
+        agents: { reviewer: source },
+      });
+
+      expect(result.success).toBe(false);
+    }
+  });
+
+  test("rejects the legacy binding template selector", () => {
+    const authored = atlanteDocumentOverlaySchema.safeParse({
+      $schema: SCHEMA_URI,
+      agents: {
+        reviewer: {
+          template: "atlante/agent",
+          description: "Review changes.",
+        },
+      },
+    });
+    const canonical = atlanteDocumentSchema.safeParse({
+      $schema: SCHEMA_URI,
+      agents: {
+        reviewer: {
+          template: "atlante/agent",
+          description: "Review changes.",
+        },
+      },
+    });
+
+    expect(authored.success).toBe(false);
+    expect(canonical.success).toBe(false);
+  });
+
+  test("keeps template-owned fields open, including nested template markers", () => {
+    const authored = atlanteDocumentOverlaySchema.safeParse({
+      $schema: SCHEMA_URI,
+      skills: {
+        workflow: {
+          description: "Workflow guidance.",
+          sections: [{ template: "atlante/section", content: "Run tests." }],
+        },
+      },
+    });
+    const canonical = atlanteDocumentSchema.safeParse({
+      $schema: SCHEMA_URI,
+      skills: {
+        workflow: {
+          description: "Workflow guidance.",
+          sections: [{ template: "atlante/section", content: "Run tests." }],
+        },
+      },
+    });
+
+    expect(authored.success).toBe(true);
+    expect(canonical.success).toBe(true);
+  });
+
+  test("removes overlay metadata from the canonical shape", () => {
+    const result = atlanteDocumentSchema.safeParse({
+      $schema: SCHEMA_URI,
+      extends: "./base",
+      agents: { removed: null, reviewer: { $template: "./agent" } },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  test("preserves unknown-root rejection and empty ID rules for overlays", () => {
+    const unknownRoot = atlanteDocumentOverlaySchema.safeParse({
+      $schema: SCHEMA_URI,
+      rules: [],
+    });
+    const emptyAgent = atlanteDocumentOverlaySchema.safeParse({
+      $schema: SCHEMA_URI,
+      agents: { "": "./resources/agent" },
+    });
+    const emptySkill = atlanteDocumentOverlaySchema.safeParse({
+      $schema: SCHEMA_URI,
+      skills: { "": "./resources/skill" },
+    });
+
+    expect(unknownRoot.success).toBe(false);
+    expect(emptyAgent.success).toBe(false);
+    expect(emptySkill.success).toBe(false);
   });
 });

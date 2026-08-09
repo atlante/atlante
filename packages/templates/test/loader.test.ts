@@ -56,6 +56,6 @@ describe("loadTemplates", () => {
 
     expect(result.registry.ids()).toEqual([]);
     expect(result.errors).toHaveLength(1);
-    expect(result.errors[0]?.message).toContain("injected stat failure");
+    expect(result.errors[0]?.message).toBe("unreadable template entry");
   });
 });

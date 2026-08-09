@@ -11,13 +11,14 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { resourceTemplateSelection } from "@atlante/resources";
 import { SCHEMA_URI } from "@atlante/schema";
-import { loadBundledTemplates } from "@atlante/templates";
 import { readArtifacts } from "../src/artifacts.js";
 import {
   buildProject,
   type PublishOperation,
   prepareProject,
+  validateProject,
 } from "../src/index.js";
 
 const created: string[] = [];
@@ -34,6 +35,135 @@ function project(document: string): { root: string; config: string } {
   const config = join(root, "atlante.jsonc");
   writeFileSync(config, document);
   return { root, config };
+}
+
+function writeTemplate(
+  root: string,
+  name: string,
+  schema: Record<string, unknown>,
+  source: string,
+): void {
+  const directory = join(root, name);
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(
+    join(directory, "template.jsonc"),
+    JSON.stringify({
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+      ...schema,
+    }),
+  );
+  writeFileSync(join(directory, "template.md"), source);
+}
+
+type NestedChildCase = Readonly<{
+  composition: "oneOf" | "anyOf" | "allOf";
+  order: readonly ("first" | "second")[];
+  shape: "object" | "array";
+}>;
+
+const nestedChildCases: NestedChildCase[] = [
+  { composition: "oneOf", order: ["first", "second"], shape: "object" },
+  { composition: "oneOf", order: ["second", "first"], shape: "object" },
+  { composition: "oneOf", order: ["first", "second"], shape: "array" },
+  { composition: "oneOf", order: ["second", "first"], shape: "array" },
+  { composition: "anyOf", order: ["first", "second"], shape: "object" },
+  { composition: "anyOf", order: ["second", "first"], shape: "object" },
+  { composition: "anyOf", order: ["first", "second"], shape: "array" },
+  { composition: "anyOf", order: ["second", "first"], shape: "array" },
+  { composition: "allOf", order: ["first", "second"], shape: "object" },
+  { composition: "allOf", order: ["second", "first"], shape: "object" },
+  { composition: "allOf", order: ["first", "second"], shape: "array" },
+  { composition: "allOf", order: ["second", "first"], shape: "array" },
+];
+
+function writeNestedChildProject({
+  composition,
+  order,
+  shape,
+}: NestedChildCase): string {
+  const allOf = composition === "allOf";
+  const childInput = (kind: "first" | "second", value: string) => ({
+    choice: {
+      kind: allOf ? "same" : kind,
+      payload: { value },
+    },
+  });
+  const input =
+    shape === "object"
+      ? { child: childInput("second", "object-selected") }
+      : {
+          children: [
+            childInput("first", "array-first"),
+            childInput("second", "array-second"),
+          ],
+        };
+  const slotPath = shape === "object" ? "child" : "children";
+  const { root } = project(
+    JSON.stringify({
+      $schema: SCHEMA_URI,
+      agents: {
+        selected: {
+          $template: "./parent",
+          description: "Selected",
+          ...input,
+        },
+      },
+    }),
+  );
+
+  writeTemplate(
+    root,
+    "parent",
+    {
+      type: "object",
+      properties: {
+        [slotPath]:
+          shape === "object"
+            ? { template: "./child" }
+            : { type: "array", items: { template: "./child" } },
+      },
+      required: [slotPath],
+      additionalProperties: false,
+    },
+    `{{> slot/${slotPath}}}`,
+  );
+  writeTemplate(
+    root,
+    "parent/child",
+    {
+      type: "object",
+      properties: {
+        choice: {
+          [composition]: order.map((branch) => ({
+            type: "object",
+            properties: {
+              kind: { const: allOf ? "same" : branch },
+              payload: { template: `./branch-${branch}` },
+            },
+            required: ["kind", "payload"],
+            additionalProperties: false,
+          })),
+        },
+      },
+      required: ["choice"],
+      additionalProperties: false,
+    },
+    "{{> slot/choice/payload}}",
+  );
+  for (const branch of ["first", "second"] as const)
+    writeTemplate(
+      root,
+      `parent/child/branch-${branch}`,
+      {
+        type: "object",
+        properties: { value: { type: "string" } },
+        required: ["value"],
+        additionalProperties: false,
+      },
+      `${branch.toUpperCase()} {{value}}`,
+    );
+
+  return root;
 }
 
 const oneAgent = (id: string, prompt: string) =>
@@ -53,6 +183,24 @@ function privateArtifactEntries(root: string): string[] {
   return readdirSync(join(root, ".atlante")).filter((entry) =>
     entry.startsWith(".artifacts."),
   );
+}
+
+function artifactTreeBytes(
+  root: string,
+): Array<{ path: string; bytes: Buffer }> {
+  const artifactRoot = join(root, ".atlante", "artifacts");
+  const paths = [
+    "manifest.json",
+    ...["agents", "skills"].flatMap((namespace) =>
+      readdirSync(join(artifactRoot, namespace)).map((file) =>
+        join(namespace, file),
+      ),
+    ),
+  ];
+  return paths.sort().map((path) => ({
+    path,
+    bytes: readFileSync(join(artifactRoot, path)),
+  }));
 }
 
 describe("buildProject", () => {
@@ -83,21 +231,438 @@ describe("buildProject", () => {
     ).toContain('"version": 1');
   });
 
-  test("loads the project once and publishes under the loaded root", () => {
-    const { root } = project(oneAgent("reviewer", "Review the change."));
-    let loadCount = 0;
-
-    const result = buildProject(root, {
-      loadTemplates: () => {
-        loadCount += 1;
-        return loadBundledTemplates();
+  test("validates and builds a custom local template with its relative children and values", () => {
+    const { root } = project(
+      JSON.stringify({
+        $schema: SCHEMA_URI,
+        values: { project: "global" },
+        agents: {
+          custom: {
+            $template: "./custom",
+            description: "Built for {{values.project}}.",
+            values: { project: "local" },
+            left: { value: "{{values.project}}" },
+            right: { value: "right" },
+          },
+        },
+      }),
+    );
+    writeTemplate(
+      root,
+      "custom",
+      {
+        type: "object",
+        properties: {
+          left: { template: "./left" },
+          right: { template: "./right" },
+        },
+        required: ["left", "right"],
+        additionalProperties: false,
       },
-    });
+      "# Custom\n{{> slot/left left}}{{> slot/right right}}\n",
+    );
+    writeTemplate(
+      root,
+      "custom/left",
+      {
+        type: "object",
+        properties: { value: { type: "string" } },
+        required: ["value"],
+        additionalProperties: false,
+      },
+      "LEFT {{value}}",
+    );
+    writeTemplate(
+      root,
+      "custom/right",
+      {
+        type: "object",
+        properties: { value: { type: "string" } },
+        required: ["value"],
+        additionalProperties: false,
+      },
+      "RIGHT {{value}}",
+    );
 
-    expect(loadCount).toBe(1);
-    expect(result.projectRoot).toBe(root);
-    expect(result.artifactsPath).toBe(join(root, ".atlante", "artifacts"));
-    expect(readArtifacts(root)?.agents[0]?.hostAgentId).toBe("reviewer");
+    const validated = validateProject(root);
+    const built = buildProject(root);
+
+    expect(validated.diagnostics).toEqual([]);
+    expect(built.diagnostics).toEqual([]);
+    expect(readArtifacts(root)?.agents).toEqual([
+      expect.objectContaining({
+        hostAgentId: "custom",
+        description: "Built for local.",
+        prompt: "# Custom\nLEFT localRIGHT right\n",
+      }),
+    ]);
+  });
+
+  test("does not resurrect a tombstoned global value during build", () => {
+    const { root } = project(
+      JSON.stringify({
+        $schema: SCHEMA_URI,
+        values: { project: "global" },
+        agents: {
+          reviewer: {
+            description: "Review",
+            values: { project: null },
+            identity: "{{values.project}}",
+            mission: "Mission",
+          },
+        },
+      }),
+    );
+
+    const result = buildProject(root);
+
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: "missing-value",
+        path: "/agents/reviewer/identity",
+      }),
+    );
+    expect(readArtifacts(root)).toBeUndefined();
+  });
+
+  test("renders the AJV-matching inline branch, including nested arrays", () => {
+    for (const composition of ["oneOf", "anyOf", "allOf"] as const) {
+      const { root } = project(
+        JSON.stringify({
+          $schema: SCHEMA_URI,
+          values: {
+            branch: composition === "allOf" ? "same" : "second",
+          },
+          agents: {
+            selected: {
+              $template: "./parent",
+              description: "Selected",
+              choice: {
+                kind: "{{values.branch}}",
+                payload: { value: "single" },
+              },
+              sections: [
+                { kind: "first", payload: { value: "array-first" } },
+                { kind: "second", payload: { value: "array-second" } },
+              ],
+            },
+          },
+        }),
+      );
+      const branches = (property: "choice" | "sections") =>
+        property === "sections"
+          ? {
+              type: "array",
+              items: {
+                oneOf: [
+                  {
+                    type: "object",
+                    properties: {
+                      kind: { const: "first" },
+                      payload: { template: "./branch-first" },
+                    },
+                    required: ["kind", "payload"],
+                    additionalProperties: false,
+                  },
+                  {
+                    type: "object",
+                    properties: {
+                      kind: { const: "second" },
+                      payload: { template: "./branch-second" },
+                    },
+                    required: ["kind", "payload"],
+                    additionalProperties: false,
+                  },
+                ],
+              },
+            }
+          : {
+              [composition]: [
+                {
+                  type: "object",
+                  properties: {
+                    kind: {
+                      const: composition === "allOf" ? "same" : "first",
+                    },
+                    payload: { template: "./branch-first" },
+                  },
+                  required: ["kind", "payload"],
+                  additionalProperties: false,
+                },
+                {
+                  type: "object",
+                  properties: {
+                    kind: {
+                      const: composition === "allOf" ? "same" : "second",
+                    },
+                    payload: { template: "./branch-second" },
+                  },
+                  required: ["kind", "payload"],
+                  additionalProperties: false,
+                },
+              ],
+            };
+      writeTemplate(
+        root,
+        "parent",
+        {
+          type: "object",
+          properties: {
+            choice: branches("choice"),
+            sections: branches("sections"),
+          },
+          required: ["choice", "sections"],
+          additionalProperties: false,
+        },
+        "{{> slot/choice/payload}} {{> slot/sections/payload}}",
+      );
+      writeTemplate(
+        root,
+        "parent/branch-first",
+        {
+          type: "object",
+          properties: { value: { type: "string" } },
+          required: ["value"],
+          additionalProperties: false,
+        },
+        "FIRST {{value}}",
+      );
+      writeTemplate(
+        root,
+        "parent/branch-second",
+        {
+          type: "object",
+          properties: { value: { type: "string" } },
+          required: ["value"],
+          additionalProperties: false,
+        },
+        "SECOND {{value}}",
+      );
+
+      const result = buildProject(root);
+
+      expect(result.diagnostics).toEqual([]);
+      expect(readArtifacts(root)?.agents[0]?.prompt).toBe(
+        `${composition === "allOf" ? "FIRST" : "SECOND"} single FIRST array-firstSECOND array-second`,
+      );
+    }
+  });
+
+  test("keeps inline branch selection independent of declaration order", () => {
+    const prompts: string[] = [];
+    for (const order of [
+      ["first", "second"],
+      ["second", "first"],
+    ] as const) {
+      const { root } = project(
+        JSON.stringify({
+          $schema: SCHEMA_URI,
+          agents: {
+            selected: {
+              $template: "./parent",
+              description: "Selected",
+              choice: { kind: "second", payload: { value: "selected" } },
+            },
+          },
+        }),
+      );
+      for (const branch of ["first", "second"])
+        writeTemplate(
+          root,
+          `parent/branch-${branch}`,
+          {
+            type: "object",
+            properties: { value: { type: "string" } },
+            required: ["value"],
+            additionalProperties: false,
+          },
+          `${branch.toUpperCase()} {{value}}`,
+        );
+      writeTemplate(
+        root,
+        "parent",
+        {
+          type: "object",
+          properties: {
+            choice: {
+              oneOf: order.map((branch) => ({
+                type: "object",
+                properties: {
+                  kind: { const: branch },
+                  payload: { template: `./branch-${branch}` },
+                },
+                required: ["kind", "payload"],
+                additionalProperties: false,
+              })),
+            },
+          },
+          required: ["choice"],
+          additionalProperties: false,
+        },
+        "{{> slot/choice/payload}}",
+      );
+
+      const result = buildProject(root);
+      expect(result.diagnostics).toEqual([]);
+      const prompt = readArtifacts(root)?.agents[0]?.prompt;
+      if (prompt) prompts.push(prompt);
+    }
+
+    expect(prompts).toEqual(["SECOND selected", "SECOND selected"]);
+  });
+
+  test.each(nestedChildCases)(
+    "selects inline branches inside resolved child templates",
+    (testCase) => {
+      const root = writeNestedChildProject(testCase);
+      const result = buildProject(root);
+
+      expect(result.diagnostics).toEqual([]);
+      const branch = testCase.composition === "allOf" ? "FIRST" : "SECOND";
+      expect(readArtifacts(root)?.agents[0]?.prompt).toBe(
+        testCase.shape === "object"
+          ? `${branch} object-selected`
+          : `FIRST array-first${branch} array-second`,
+      );
+    },
+  );
+
+  test("keeps configured child sidecars while selecting a nested inline branch", () => {
+    const { root } = project(
+      JSON.stringify({
+        $schema: SCHEMA_URI,
+        agents: {
+          selected: {
+            $template: "./parent",
+            description: "Selected",
+            child: {
+              kind: "second",
+              payload: { $instance: "./selected-child" },
+            },
+          },
+        },
+      }),
+    );
+    writeTemplate(
+      root,
+      "parent",
+      {
+        type: "object",
+        properties: {
+          child: {
+            oneOf: [
+              {
+                type: "object",
+                properties: {
+                  kind: { const: "first" },
+                  payload: { template: "./child-first" },
+                },
+                required: ["kind", "payload"],
+                additionalProperties: false,
+              },
+              {
+                type: "object",
+                properties: {
+                  kind: { const: "second" },
+                  payload: { template: "./child-second" },
+                },
+                required: ["kind", "payload"],
+                additionalProperties: false,
+              },
+            ],
+          },
+        },
+        required: ["child"],
+        additionalProperties: false,
+      },
+      "{{> slot/child/payload}}",
+    );
+    for (const child of ["first", "second"] as const)
+      writeTemplate(
+        root,
+        `parent/child-${child}`,
+        {
+          type: "object",
+          properties: {
+            choice: {
+              oneOf: [
+                {
+                  type: "object",
+                  properties: {
+                    kind: { const: "first" },
+                    payload: { template: "./branch-first" },
+                  },
+                  required: ["kind", "payload"],
+                  additionalProperties: false,
+                },
+                {
+                  type: "object",
+                  properties: {
+                    kind: { const: "second" },
+                    payload: { template: "./branch-second" },
+                  },
+                  required: ["kind", "payload"],
+                  additionalProperties: false,
+                },
+              ],
+            },
+          },
+          required: ["choice"],
+          additionalProperties: false,
+        },
+        "{{> slot/choice/payload}}",
+      );
+    for (const child of ["first", "second"] as const)
+      for (const branch of ["first", "second"] as const)
+        writeTemplate(
+          root,
+          `parent/child-${child}/branch-${branch}`,
+          {
+            type: "object",
+            properties: { value: { type: "string" } },
+            required: ["value"],
+            additionalProperties: false,
+          },
+          `${branch.toUpperCase()} {{value}}`,
+        );
+    mkdirSync(join(root, "selected-child"), { recursive: true });
+    writeFileSync(
+      join(root, "selected-child", "instance.jsonc"),
+      JSON.stringify({
+        $template: "../parent/child-second",
+        choice: {
+          kind: "second",
+          payload: { value: "configured" },
+        },
+      }),
+    );
+
+    const loaded = validateProject(root);
+    const binding = loaded.resources?.bindings.agents.selected;
+    if (!binding) throw new Error("selected binding missing");
+    const child = binding.input.child as Record<string, unknown>;
+    const payload = child.payload as Record<string, unknown>;
+    const choice = payload.choice as Record<string, unknown>;
+    const nestedPayload = choice.payload as Record<string, unknown>;
+
+    expect(loaded.diagnostics).toEqual([]);
+    expect(resourceTemplateSelection(payload)).toEqual({
+      templateId: "./child-second",
+    });
+    expect(resourceTemplateSelection(nestedPayload)).toEqual({
+      templateId: "./branch-second",
+    });
+    expect(JSON.stringify(binding.input)).toBe(
+      '{"child":{"kind":"second","payload":{"choice":{"kind":"second","payload":{"value":"configured"}}}}}',
+    );
+    expect(
+      Object.getOwnPropertySymbols(binding.template.facet.inputSchema),
+    ).toEqual([]);
+
+    const result = buildProject(root);
+
+    expect(result.diagnostics).toEqual([]);
+    expect(readArtifacts(root)?.agents[0]?.prompt).toBe("SECOND configured");
   });
 
   test("produces deterministic bytes on repeated builds", () => {
@@ -152,10 +717,7 @@ describe("buildProject", () => {
   test("keeps the previous tree when preparation fails", () => {
     const { root } = project(oneAgent("reviewer", "Good prompt."));
     buildProject(root);
-    const before = readFileSync(
-      join(root, ".atlante", "artifacts", "manifest.json"),
-      "utf8",
-    );
+    const before = artifactTreeBytes(root);
 
     writeFileSync(
       join(root, "atlante.jsonc"),
@@ -173,12 +735,7 @@ describe("buildProject", () => {
     const result = buildProject(root);
 
     expect(result.diagnostics[0]?.code).toBe("missing-value");
-    expect(
-      readFileSync(
-        join(root, ".atlante", "artifacts", "manifest.json"),
-        "utf8",
-      ),
-    ).toBe(before);
+    expect(artifactTreeBytes(root)).toEqual(before);
     expect(privateArtifactEntries(root)).toEqual([]);
   });
 

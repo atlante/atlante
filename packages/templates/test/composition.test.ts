@@ -98,6 +98,51 @@ describe("slotsOf", () => {
       "test/instructions",
     ]);
   });
+
+  test("does not treat a JSON Schema property named template as a slot", () => {
+    expect(
+      slotsOf({
+        type: "object",
+        properties: {
+          settings: {
+            type: "object",
+            properties: {
+              template: {
+                type: "string",
+                template: "test/not-a-composition-marker",
+              },
+            },
+          },
+        },
+      }),
+    ).toEqual([]);
+  });
+
+  test("reports object and array marker values as malformed", () => {
+    const issues = walkComposition(
+      registryOf({
+        "test/root": {
+          inputSchema: {
+            type: "object",
+            properties: {
+              objectMarker: { template: {} },
+              arrayMarker: { template: [] },
+            },
+          },
+        },
+      }),
+      "test/root",
+    );
+
+    expect(issues).toHaveLength(2);
+    expect(issues.every((issue) => issue.code === "invalid-input-schema")).toBe(
+      true,
+    );
+    expect(issues.map((issue) => issue.slotPath)).toEqual([
+      ["objectMarker"],
+      ["arrayMarker"],
+    ]);
+  });
 });
 
 describe("walkComposition", () => {
@@ -227,6 +272,25 @@ describe("walkComposition", () => {
       ["metadata", "sections", "items"],
       ["metadata", "choice", "oneOf", "0", "branch"],
     ]);
+  });
+
+  test("does not echo an absolute malformed marker value", () => {
+    const absolute = "/private/tmp/atlante-marker-probe/absolute-template";
+    const issues = walkComposition(
+      registryOf({
+        "test/root": {
+          inputSchema: {
+            type: "object",
+            properties: { choice: { template: absolute } },
+          },
+        },
+      }),
+      "test/root",
+    );
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0]?.code).toBe("invalid-input-schema");
+    expect(JSON.stringify(issues)).not.toContain(absolute);
   });
 
   test("rejects malformed slot markers explicitly", () => {

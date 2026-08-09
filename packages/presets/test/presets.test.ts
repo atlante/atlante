@@ -118,7 +118,7 @@ describe("listPresets", () => {
     });
 
     expect(result.presets).toEqual([]);
-    expect(result.errors[0]?.message).toContain("injected stat failure");
+    expect(result.errors[0]?.message).toBe("unreadable preset entry");
   });
 
   test("returns undefined when the selected document cannot be read", () => {

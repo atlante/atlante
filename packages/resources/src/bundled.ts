@@ -69,10 +69,12 @@ export function loadBundledInstanceMigrationRecords(): {
 
   try {
     entries = readdirSync(BUNDLED_RESOURCES_DIR).sort();
-  } catch (error) {
+  } catch {
     return {
       instances,
-      errors: [{ directory: BUNDLED_RESOURCES_DIR, message: String(error) }],
+      errors: [
+        { directory: "atlante", message: "bundled resources are unreadable" },
+      ],
     };
   }
 
@@ -86,16 +88,16 @@ export function loadBundledInstanceMigrationRecords(): {
     try {
       source = readFileSync(sourcePath, "utf8");
       input = parseJsonc(source);
-    } catch (error) {
+    } catch {
       errors.push({
-        directory,
-        message: `malformed instance.jsonc: ${String(error)}`,
+        directory: `atlante/${entry}`,
+        message: "malformed instance.jsonc",
       });
       continue;
     }
     if (!isSafeJsonObject(input)) {
       errors.push({
-        directory,
+        directory: `atlante/${entry}`,
         message: "invalid instance.jsonc: expected object",
       });
       continue;
@@ -129,12 +131,12 @@ export function loadBundledStarterMigrationRecord(): {
   let document: unknown;
   try {
     document = parseJsonc(readFileSync(sourcePath, "utf8"));
-  } catch (error) {
+  } catch {
     return {
       errors: [
         {
-          directory: BUNDLED_RESOURCES_DIR,
-          message: `malformed atlante.jsonc: ${String(error)}`,
+          directory: "atlante/starter",
+          message: "malformed atlante.jsonc",
         },
       ],
     };
@@ -143,7 +145,7 @@ export function loadBundledStarterMigrationRecord(): {
     return {
       errors: [
         {
-          directory: BUNDLED_RESOURCES_DIR,
+          directory: "atlante/starter",
           message: "invalid atlante.jsonc: expected object",
         },
       ],

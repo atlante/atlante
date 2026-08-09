@@ -5,7 +5,7 @@ import { error, escapeJsonPointerSegment } from "./diagnostic.js";
 
 export const MAX_PRESET_DEPTH = 32;
 
-/** @atlante/validator does not depend on @atlante/presets. */
+/** Generic overlay expansion stays independent of any source-content package. */
 export interface PresetLoader {
   load(id: string): {
     document: AtlanteDocumentOverlay | undefined;

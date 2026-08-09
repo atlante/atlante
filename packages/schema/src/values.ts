@@ -24,16 +24,71 @@ type IssueContext = {
   }): void;
 };
 
+type ValidationIssue = {
+  message: string;
+  path: PropertyKey[];
+  code?: string;
+  errors?: ValidationIssue[][];
+};
+
+function selectUnionBranch(
+  branches: readonly ValidationIssue[][],
+  input: unknown,
+): ValidationIssue[] | undefined {
+  if (typeof input === "string") return branches[0];
+  if (input === null) return branches.at(-1) ?? branches[0];
+  return (
+    branches.find((candidate) =>
+      candidate.some((child) => child.code !== "invalid_type"),
+    ) ?? branches[0]
+  );
+}
+
+function selectedIssues(
+  issues: readonly ValidationIssue[],
+  input: unknown,
+): ValidationIssue[] {
+  const output: ValidationIssue[] = [];
+  for (const issue of issues) {
+    if (issue.code === "invalid_union" && issue.errors) {
+      const branch = selectUnionBranch(issue.errors, input);
+      if (branch) output.push(...selectedIssues(branch, input));
+      continue;
+    }
+    output.push(issue);
+  }
+  return output;
+}
+
 function reportIssues(
   context: IssueContext,
   key: string,
   result: {
     success: boolean;
-    error?: { issues: { message: string; path: PropertyKey[] }[] };
+    error?: { issues: ValidationIssue[] };
+  },
+  input: unknown,
+): boolean {
+  if (result.success) return true;
+  for (const issue of selectedIssues(result.error?.issues ?? [], input))
+    context.addIssue({
+      code: "custom",
+      message: issue.message,
+      path: [key, ...issue.path.map(String)],
+    });
+  return false;
+}
+
+function reportKeyIssues(
+  context: IssueContext,
+  key: string,
+  result: {
+    success: boolean;
+    error?: { issues: ValidationIssue[] };
   },
 ): boolean {
   if (result.success) return true;
-  for (const issue of result.error?.issues ?? [])
+  for (const issue of selectedIssues(result.error?.issues ?? [], key))
     context.addIssue({
       code: "custom",
       message: issue.message,
@@ -58,8 +113,8 @@ export function safeRecord<
       const parsedKey = keySchema.safeParse(key);
       const parsedValue = valueSchema.safeParse(input[key]);
       if (
-        reportIssues(context, key, parsedKey) &&
-        reportIssues(context, key, parsedValue) &&
+        reportKeyIssues(context, key, parsedKey) &&
+        reportIssues(context, key, parsedValue, input[key]) &&
         parsedKey.success &&
         parsedValue.success
       )

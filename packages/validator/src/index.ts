@@ -1,9 +1,10 @@
-export type { Diagnostic } from "./diagnostic.js";
+export type { Diagnostic, DiagnosticChainEntry } from "./diagnostic.js";
 export {
   error,
   escapeJsonPointerSegment,
   formatDiagnostic,
   hasErrors,
+  sortDiagnostics,
   warning,
 } from "./diagnostic.js";
 export {
@@ -11,6 +12,7 @@ export {
   discoverConfigPath,
   findConfigFile,
 } from "./discover.js";
+export type { DocumentLoadOptions } from "./document.js";
 export {
   loadDocument,
   parseDocumentOverlay,
@@ -23,10 +25,12 @@ export {
   createBundledPresetLoader,
   hasAnyExtends,
 } from "./preset-loader.js";
+export type { TemplateRegistry } from "./templates.js";
 export {
   expandInputSchema,
   promptInputOf,
   validateAgentInput,
+  validateResolvedDocument,
   validateSkillInput,
   validateTemplates,
 } from "./templates.js";

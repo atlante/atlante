@@ -184,7 +184,7 @@ describe("template facet loader", () => {
 
     expect(result.registry.ids()).toEqual([]);
     expect(result.errors).toHaveLength(1);
-    expect(result.errors[0]?.message).toContain("injected stat failure");
+    expect(result.errors[0]?.message).toBe("unreadable template entry");
   });
 
   test("reports a missing template facet without throwing", () => {
@@ -204,12 +204,14 @@ describe("template facet loader", () => {
   });
 
   test("reports an unreadable template root", () => {
-    const result = loadTemplateMigrationRegistry(
-      "/definitely/not/a/template/root",
-      "test",
-    );
+    const root = mkdtempSync(join(tmpdir(), "atlante-resources-missing-"));
+    created.push(root);
+    rmSync(root, { recursive: true, force: true });
+
+    const result = loadTemplateMigrationRegistry(root, "test");
 
     expect(result.registry.ids()).toEqual([]);
     expect(result.errors).toHaveLength(1);
+    expect(JSON.stringify(result.errors)).not.toContain(root);
   });
 });

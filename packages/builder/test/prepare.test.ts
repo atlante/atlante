@@ -1,22 +1,44 @@
 import { describe, expect, test } from "bun:test";
+import {
+  loadBundledTemplateMigrationRegistry,
+  loadTemplateMigrationRegistry,
+} from "@atlante/resources";
 import type { AtlanteDocument } from "@atlante/schema";
 import { SCHEMA_URI } from "@atlante/schema";
-import { loadBundledTemplates, loadTemplates } from "@atlante/templates";
 import { prepareProject as resolve } from "../src/index.js";
 
-const { registry } = loadBundledTemplates();
+const { registry } = loadBundledTemplateMigrationRegistry();
 
 const undeclaredPartialRoot = new URL(
-  "../../templates/test/fixtures/undeclared-partial",
+  "../../resources/test/fixtures/undeclared-partial",
   import.meta.url,
 ).pathname;
 
-const { registry: brokenRegistry } = loadTemplates(
+const { registry: brokenRegistry } = loadTemplateMigrationRegistry(
   undeclaredPartialRoot,
   "test",
 );
+const brokenDefaultTemplate = (() => {
+  const template = brokenRegistry.get("test/broken");
+  if (!template) throw new Error("missing broken template fixture");
+  return {
+    ...template,
+    inputSchema: {
+      ...template.inputSchema,
+      properties: {
+        identity: { type: "string" },
+        mission: { type: "string" },
+      },
+    },
+  };
+})();
 const combinedRegistry = {
-  get: (id: string) => brokenRegistry.get(id) ?? registry.get(id),
+  // T7 will select the resolved resource template. Until then, route the
+  // default selectors through this test-only broken-template adapter.
+  get: (id: string) =>
+    id === "atlante/agent" || id === "atlante/skill"
+      ? brokenDefaultTemplate
+      : (brokenRegistry.get(id) ?? registry.get(id)),
   ids: () => [...new Set([...brokenRegistry.ids(), ...registry.ids()])],
 };
 
@@ -29,7 +51,6 @@ const document: AtlanteDocument = {
   agents: {
     reviewer: {
       description: "Reviews changes to {{values.project}}.",
-      template: "atlante/agent",
       identity: "You are a reviewer.",
       mission: "Review changes to {{values.project}}.",
       sections: [{ constraints: ["{{values.rule}}"] }],
@@ -188,7 +209,7 @@ describe("prepareProject", () => {
       {
         $schema: SCHEMA_URI,
         agents: {},
-        skills: { broken: { description: "Broken", template: "test/broken" } },
+        skills: { broken: { description: "Broken" } },
       },
       combinedRegistry,
     );
@@ -403,9 +424,9 @@ describe("prepareProject", () => {
   test("returns a diagnostic instead of throwing when a template renders an undeclared partial", () => {
     const broken: AtlanteDocument = {
       $schema: SCHEMA_URI,
-      agents: { a: { description: "Broken agent.", template: "test/broken" } },
+      agents: { a: { description: "Broken agent." } },
     };
-    const result = resolve(broken, brokenRegistry);
+    const result = resolve(broken, combinedRegistry);
     expect(result.agents).toEqual([]);
     expect(result.diagnostics[0]?.code).toBe("template-render-failed");
   });
@@ -414,10 +435,8 @@ describe("prepareProject", () => {
     const broken: AtlanteDocument = {
       $schema: SCHEMA_URI,
       agents: {
-        good: { description: "Good agent.", identity: "x", mission: "y" },
         "bad/id~one": {
           description: "Broken agent.",
-          template: "test/broken",
         },
       },
     };
@@ -425,7 +444,7 @@ describe("prepareProject", () => {
     expect(result.agents).toEqual([]);
     expect(result.diagnostics[0]?.code).toBe("template-render-failed");
     expect(result.diagnostics[0]?.message).toContain(
-      'agent "bad/id~one" template "test/broken"',
+      'agent "bad/id~one" template "atlante/agent"',
     );
     expect(result.diagnostics[0]?.path).toBe("/agents/bad~1id~0one");
   });

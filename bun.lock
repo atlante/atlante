@@ -15,8 +15,8 @@
       "name": "@atlante/builder",
       "version": "0.1.6",
       "dependencies": {
+        "@atlante/resources": "workspace:*",
         "@atlante/schema": "workspace:*",
-        "@atlante/templates": "workspace:*",
         "@atlante/validator": "workspace:*",
       },
     },
@@ -74,9 +74,8 @@
       "name": "@atlante/validator",
       "version": "0.1.6",
       "dependencies": {
-        "@atlante/presets": "workspace:*",
+        "@atlante/resources": "workspace:*",
         "@atlante/schema": "workspace:*",
-        "@atlante/templates": "workspace:*",
         "ajv": "^8.17.1",
         "jsonc-parser": "^3.3.1",
       },

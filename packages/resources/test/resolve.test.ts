@@ -345,7 +345,7 @@ describe("resource resolution", () => {
     const { root, config } = rootOf();
     writePreset(root, "base", {
       extends: "atlante/starter",
-      values: { inherited: false, local: true },
+      values: { inherited: "false", local: "true" },
     });
     writeFileSync(
       config,
@@ -367,8 +367,8 @@ describe("resource resolution", () => {
 
     expect(result.raw).toMatchObject({ extends: "./base" });
     expect(result.normalized.values).toMatchObject({
-      inherited: false,
-      local: true,
+      inherited: "false",
+      local: "true",
       replaced: "root",
     });
     expect(result.normalized.agents).toHaveProperty("architect");
@@ -728,6 +728,64 @@ describe("resource resolution", () => {
       "configured/instance.jsonc",
       "wrong-child/template.jsonc",
     ]);
+  });
+
+  test("does not mistake an agent input field named agents for a canonical pointer", () => {
+    const { root, config } = rootOf();
+    writeTemplate(root, "agent", {
+      type: "object",
+      properties: { agents: { template: "./child" } },
+    });
+    writeTemplate(root, "agent/child", {
+      type: "object",
+      properties: { child: { template: "./missing" } },
+    });
+    writeFileSync(
+      config,
+      `${JSON.stringify({
+        agents: {
+          reviewer: { $template: "./agent", description: "Review" },
+        },
+      })}\n`,
+    );
+
+    const failure = expectFailure(
+      () => resolveDocument(root, config),
+      "missing-target",
+    );
+
+    expect(failure.failure.pointer).toBe(
+      "/agents/reviewer/$template/agents/child",
+    );
+  });
+
+  test("does not mistake a skill input field named skills for a canonical pointer", () => {
+    const { root, config } = rootOf();
+    writeTemplate(root, "skill", {
+      type: "object",
+      properties: { skills: { template: "./child" } },
+    });
+    writeTemplate(root, "skill/child", {
+      type: "object",
+      properties: { child: { template: "./missing" } },
+    });
+    writeFileSync(
+      config,
+      `${JSON.stringify({
+        skills: {
+          testing: { $template: "./skill", description: "Testing" },
+        },
+      })}\n`,
+    );
+
+    const failure = expectFailure(
+      () => resolveDocument(root, config),
+      "missing-target",
+    );
+
+    expect(failure.failure.pointer).toBe(
+      "/skills/testing/$template/skills/child",
+    );
   });
 
   test("keeps no-match branch diagnostics identical when branch order is reversed", () => {
@@ -1354,7 +1412,9 @@ describe("resource resolution", () => {
       "grandchild-instance/instance.jsonc",
       "wrong-grandchild/template.jsonc",
     ]);
-    expect(failure.failure.pointer).toBe("/grandchild");
+    expect(failure.failure.pointer).toBe(
+      "/agents/nested/child/$instance/grandchild",
+    );
   });
 
   test("enters inline child templates before nested compatibility checks", () => {
@@ -1578,5 +1638,80 @@ describe("resource resolution", () => {
     (first.normalized.agents.stable as Record<string, unknown>).value =
       "changed";
     expect(second.normalized.agents.stable?.value).toBe("one");
+  });
+
+  test("rejects an invalid base instance value before a valid derived override masks it", () => {
+    const { root, config } = rootOf();
+    writeTemplate(root, "agent", {
+      type: "object",
+      properties: { identity: { type: "string" } },
+    });
+    writeInstance(root, "base", {
+      $template: "../agent",
+      values: { count: 3 },
+      identity: "base",
+    });
+    writeInstance(root, "derived", {
+      $instance: "../base",
+      values: { count: "local" },
+    });
+
+    const failure = expectFailure(
+      () =>
+        resolveResourceInstance({
+          pack: createProjectResourcePack(root),
+          locator: "./derived",
+          authoringFile: config,
+        }),
+      "invalid-resolved-input",
+    );
+
+    expect(failure.failure.source?.path as string).toBe("base/instance.jsonc");
+    expect(failure.failure.pointer).toContain("/values/count");
+    expect(failure.failure.location).toEqual({ line: 1, column: 43 });
+  });
+
+  test("keeps binding value tombstones separate from canonical values", () => {
+    const { root, config } = rootOf();
+    writePreset(root, "base", {
+      values: { project: "global" },
+      agents: {
+        reviewer: {
+          values: { project: "base" },
+          description: "Review",
+          identity: "Identity",
+          mission: "Mission",
+        },
+      },
+      skills: {
+        testing: {
+          values: { project: "base" },
+          description: "Testing",
+          title: "Testing",
+          overview: "Overview",
+          sections: [],
+        },
+      },
+    });
+    writeFileSync(
+      config,
+      `${JSON.stringify({
+        extends: "./base",
+        values: { project: "global" },
+        agents: { reviewer: { values: { project: null } } },
+        skills: { testing: { values: { project: null } } },
+      })}\n`,
+    );
+
+    const result = resolveDocument(root, config);
+    const agent = result.bindings.agents.reviewer;
+    const skill = result.bindings.skills.testing;
+    if (!agent || !skill) throw new Error("tombstoned bindings missing");
+
+    expect(agent.values).toEqual({});
+    expect(skill.values).toEqual({});
+    expect(JSON.stringify(agent.values)).not.toContain("null");
+    expect(JSON.stringify(skill.values)).not.toContain("null");
+    expect(JSON.stringify(result.normalized)).not.toContain('"project":null');
   });
 });

@@ -1,11 +1,44 @@
 import { readFileSync, statSync } from "node:fs";
-import { basename } from "node:path";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
+import {
+  BUNDLED_RESOURCE_PACK,
+  createProjectResourcePack,
+  type JsonObject,
+  type ResourcePack,
+  ResourceResolutionError,
+  resolveResourceDocument,
+} from "@atlante/resources";
 import type { AtlanteDocument, AtlanteDocumentOverlay } from "@atlante/schema";
-import { atlanteDocumentSchema, SCHEMA_URI } from "@atlante/schema";
-import { getNodeValue, type ParseError, parseTree } from "jsonc-parser";
-import type { Diagnostic } from "./diagnostic.js";
-import { error, escapeJsonPointerSegment } from "./diagnostic.js";
+import {
+  atlanteDocumentOverlaySchema,
+  atlanteDocumentSchema,
+  SCHEMA_URI,
+} from "@atlante/schema";
+import {
+  findNodeAtLocation,
+  getNodeValue,
+  type ParseError,
+  parseTree,
+} from "jsonc-parser";
+import type { Diagnostic, DiagnosticChainEntry } from "./diagnostic.js";
+import {
+  error,
+  escapeJsonPointerSegment,
+  sortDiagnostics,
+} from "./diagnostic.js";
 import { discoverConfigPath } from "./discover.js";
+import {
+  resourceOriginForDocument,
+  validateResolvedDocument,
+} from "./templates.js";
+
+export type DocumentLoadOptions = {
+  bundledPack?: ResourcePack;
+  statSync?: (
+    path: string,
+    options: { throwIfNoEntry: false },
+  ) => { isDirectory(): boolean } | undefined;
+};
 
 function positionOf(text: string, offset: number) {
   const before = text.slice(0, offset);
@@ -13,8 +46,172 @@ function positionOf(text: string, offset: number) {
   return { line: lines.length, column: (lines.at(-1)?.length ?? 0) + 1 };
 }
 
-/** Shared filename validation + JSON parse pipeline used by both
- *  validateDocumentText and parseDocumentOverlay. */
+function sourceName(path: string): string {
+  return basename(path);
+}
+
+function ownPropertyValue(value: unknown, key: string): unknown {
+  if (typeof value !== "object" || value === null || Array.isArray(value))
+    return undefined;
+  return Object.hasOwn(value, key)
+    ? (value as Record<string, unknown>)[key]
+    : undefined;
+}
+
+function pointerSegments(pointer: string | undefined): string[] {
+  if (!pointer || pointer === "" || pointer === "/") return [];
+  return pointer
+    .split("/")
+    .slice(1)
+    .map((segment) => segment.replaceAll("~1", "/").replaceAll("~0", "~"));
+}
+
+function locationAtPointer(
+  text: string,
+  pointer: string | undefined,
+): { line: number; column: number } | undefined {
+  if (pointer === undefined) return undefined;
+  const parseErrors: ParseError[] = [];
+  const tree = parseTree(text, parseErrors, {
+    allowTrailingComma: true,
+    disallowComments: false,
+  });
+  const node = tree
+    ? findNodeAtLocation(tree, pointerSegments(pointer))
+    : undefined;
+  return node ? positionOf(text, node.offset) : undefined;
+}
+
+type OverlayIssue = {
+  code?: string;
+  message: string;
+  path: PropertyKey[];
+  keys?: string[];
+};
+
+function pointerForPath(path: readonly PropertyKey[]): string {
+  return `/${path.map((segment) => escapeJsonPointerSegment(String(segment))).join("/")}`;
+}
+
+function overlayIssuePaths(issue: OverlayIssue): readonly PropertyKey[][] {
+  if (issue.code === "unrecognized_keys" && issue.keys)
+    return issue.keys.map((key) => [...issue.path, key]);
+  return [issue.path];
+}
+
+function overlayDiagnostics(
+  result: {
+    success: false;
+    error: { issues: OverlayIssue[] };
+  },
+  sourcePath: string,
+  text: string,
+): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  const seen = new Set<string>();
+  for (const issue of result.error.issues) {
+    for (const issuePath of overlayIssuePaths(issue)) {
+      const path = pointerForPath(issuePath);
+      const message =
+        issue.code === "unrecognized_keys" && issuePath.at(-1) !== undefined
+          ? `unrecognized property ${JSON.stringify(String(issuePath.at(-1)))}`
+          : issue.message;
+      const key = `${path}\u0000${message}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      diagnostics.push(
+        error("invalid-document", `${sourceName(sourcePath)}: ${message}`, {
+          path,
+          pointer: path,
+          source: sourceName(sourcePath),
+          location: locationAtPointer(text, path),
+        }),
+      );
+    }
+  }
+  return sortDiagnostics(diagnostics);
+}
+
+function stableSource(path: string, fallback: string): string {
+  return isAbsolute(path) ? basename(path) || fallback : path;
+}
+
+function chainOf(
+  chain: ResourceResolutionError["failure"]["chain"],
+): readonly DiagnosticChainEntry[] | undefined {
+  if (!chain) return undefined;
+  return chain.map((node) => ({
+    kind: node.kind,
+    locator: String(node.locator),
+    source: stableSource(String(node.origin.path), String(node.locator)),
+  }));
+}
+
+function resourceDiagnosticCode(
+  failure: ResourceResolutionError["failure"],
+): string {
+  if (failure.code !== "invalid-resolved-input") return failure.code;
+  if (/^(?:binding|preset) value name /.test(failure.message))
+    return "invalid-value-reference";
+  if (/^(?:binding|preset) value "/.test(failure.message))
+    return "non-string-value";
+  return failure.code;
+}
+
+function resourceDiagnostic(
+  failure: ResourceResolutionError,
+  rootPath: string,
+  rootText: string,
+): Diagnostic {
+  const pointer = failure.failure.pointer;
+  const source = stableSource(
+    String(failure.failure.source?.path ?? sourceName(rootPath)),
+    sourceName(rootPath),
+  );
+  return error(
+    resourceDiagnosticCode(failure.failure),
+    failure.failure.message,
+    {
+      source,
+      ...(pointer ? { path: pointer, pointer } : {}),
+      location:
+        failure.failure.location ??
+        (source === sourceName(rootPath) && pointer
+          ? locationAtPointer(rootText, pointer)
+          : undefined),
+      ...(failure.failure.chain
+        ? { chain: chainOf(failure.failure.chain) }
+        : {}),
+    },
+  );
+}
+
+function canonicalDiagnostics(
+  parsed: ReturnType<typeof atlanteDocumentSchema.safeParse>,
+  resources: ReturnType<typeof resolveResourceDocument>,
+): Diagnostic[] {
+  if (parsed.success) return [];
+  const fallback = resourceOriginForDocument(resources);
+  return parsed.error.issues.map((issue) => {
+    const path = `/${issue.path.map(String).map(escapeJsonPointerSegment).join("/")}`;
+    const source = resources.provenance[path] ?? fallback;
+    return error(
+      "invalid-document",
+      `canonical configuration: ${issue.message}`,
+      {
+        path,
+        pointer: path,
+        ...(source
+          ? {
+              source: stableSource(String(source.path), sourceName("document")),
+            }
+          : {}),
+      },
+    );
+  });
+}
+
+/** Shared filename validation + JSON parse pipeline used by both public parsers. */
 function parseConfigSource(
   text: string,
   sourcePath: string,
@@ -31,7 +228,8 @@ function parseConfigSource(
       diagnostics: [
         error(
           "invalid-config-filename",
-          `${sourcePath}: configuration files must be named atlante.json or atlante.jsonc`,
+          `${sourceName(sourcePath)}: configuration files must be named atlante.json or atlante.jsonc`,
+          { source: sourceName(sourcePath) },
         ),
       ],
     };
@@ -47,7 +245,8 @@ function parseConfigSource(
     const first = parseErrors[0];
     return {
       diagnostics: [
-        error("invalid-json", `${sourcePath}: malformed JSON`, {
+        error("invalid-json", `${sourceName(sourcePath)}: malformed JSON`, {
+          source: sourceName(sourcePath),
           location: first ? positionOf(text, first.offset) : undefined,
         }),
       ],
@@ -57,50 +256,64 @@ function parseConfigSource(
   return { raw: getNodeValue(tree) as unknown, diagnostics: [] };
 }
 
+function unsupportedSchemaDiagnostic(
+  sourcePath: string,
+  text: string,
+): Diagnostic {
+  const path = "/$schema";
+  return error(
+    "unsupported-schema",
+    `${sourceName(sourcePath)}: unsupported $schema; expected the Atlante document schema`,
+    {
+      path,
+      pointer: path,
+      source: sourceName(sourcePath),
+      location: locationAtPointer(text, path),
+    },
+  );
+}
+
+function validationSourcePath(
+  sourcePath: string,
+  options: DocumentLoadOptions,
+): string {
+  if (sourcePath !== "atlante/starter/atlante.jsonc")
+    return resolve(sourcePath);
+  return join(
+    (options.bundledPack ?? BUNDLED_RESOURCE_PACK).root,
+    "atlante.jsonc",
+  );
+}
+
 export function validateDocumentText(
   text: string,
   sourcePath: string,
+  options: DocumentLoadOptions = {},
 ): { document?: AtlanteDocument; diagnostics: Diagnostic[] } {
   const { raw, diagnostics } = parseConfigSource(text, sourcePath);
-  if (raw === undefined) return { diagnostics };
-  return validateParsedDocument(raw, sourcePath);
-}
+  if (raw === undefined) return { diagnostics: sortDiagnostics(diagnostics) };
+  const parsed = parseOverlay(raw, sourcePath, text);
+  if (!parsed.overlay)
+    return { diagnostics: sortDiagnostics(parsed.diagnostics) };
 
-function validateParsedDocument(
-  raw: unknown,
-  sourcePath: string,
-): { document?: AtlanteDocument; diagnostics: Diagnostic[] } {
-  const schemaUri = (raw as { $schema?: unknown })?.$schema;
-  if (schemaUri !== SCHEMA_URI) {
-    return {
-      diagnostics: [
-        error(
-          "unsupported-schema",
-          `${sourcePath}: unsupported $schema ${JSON.stringify(schemaUri)}; expected ${SCHEMA_URI}`,
-          { path: "/$schema" },
-        ),
-      ],
-    };
-  }
-
-  const result = atlanteDocumentSchema.safeParse(raw);
-  if (!result.success) {
-    return {
-      diagnostics: result.error.issues.map((issue) =>
-        error("invalid-document", `${sourcePath}: ${issue.message}`, {
-          path: `/${issue.path.map(String).map(escapeJsonPointerSegment).join("/")}`,
-        }),
-      ),
-    };
-  }
-
-  return { document: result.data, diagnostics: [] };
+  const path = validationSourcePath(sourcePath, options);
+  const result = resolveResourceBackedDocument(
+    path,
+    text,
+    options,
+    { path, projectRoot: dirname(path) },
+    parsed.overlay as unknown as JsonObject,
+  );
+  return {
+    ...(result.document ? { document: result.document } : {}),
+    diagnostics: sortDiagnostics(result.diagnostics),
+  };
 }
 
 /**
- * Parses a document as an overlay — accepts `extends` and tombstone `null`
- * values that would be rejected by the canonical schema. The caller is
- * responsible for expansion and canonical validation afterwards.
+ * Parses a document as an overlay. Resource resolution is deliberately kept
+ * out of this function so callers can inspect authoring syntax without
+ * loading any referenced source.
  */
 export function parseDocumentOverlay(
   text: string,
@@ -111,102 +324,150 @@ export function parseDocumentOverlay(
 } {
   const { raw, diagnostics } = parseConfigSource(text, sourcePath);
   if (raw === undefined) return { overlay: undefined, diagnostics };
-  return parseOverlay(raw, sourcePath);
-}
-
-function own(
-  target: Record<string, unknown>,
-  key: string,
-  value: unknown,
-): void {
-  Object.defineProperty(target, key, {
-    configurable: true,
-    enumerable: true,
-    value,
-    writable: true,
-  });
+  return parseOverlay(raw, sourcePath, text);
 }
 
 function parseOverlay(
   raw: unknown,
   sourcePath: string,
+  text: string,
 ): {
   overlay: AtlanteDocumentOverlay | undefined;
   diagnostics: Diagnostic[];
 } {
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+  const schemaUri = ownPropertyValue(raw, "$schema");
+  if (
+    typeof raw === "object" &&
+    raw !== null &&
+    !Array.isArray(raw) &&
+    schemaUri !== SCHEMA_URI
+  ) {
     return {
       overlay: undefined,
+      diagnostics: [unsupportedSchemaDiagnostic(sourcePath, text)],
+    };
+  }
+
+  const result = atlanteDocumentOverlaySchema.safeParse(raw);
+  if (!result.success)
+    return {
+      overlay: undefined,
+      diagnostics: overlayDiagnostics(result, sourcePath, text),
+    };
+
+  return { overlay: result.data, diagnostics: [] };
+}
+
+type DocumentLocation = { path: string; projectRoot: string };
+
+function resolveResourceBackedDocument(
+  path: string,
+  text: string,
+  options: DocumentLoadOptions,
+  location: DocumentLocation,
+  rootDocument?: JsonObject,
+): {
+  document?: AtlanteDocument;
+  path: string;
+  projectRoot: string;
+  resources?: ReturnType<typeof resolveResourceDocument>;
+  diagnostics: Diagnostic[];
+} {
+  let projectPack: ResourcePack;
+  try {
+    projectPack = createProjectResourcePack(dirname(path));
+  } catch (cause) {
+    if (cause instanceof ResourceResolutionError)
+      return {
+        ...location,
+        diagnostics: [resourceDiagnostic(cause, path, text)],
+      };
+    return {
+      ...location,
       diagnostics: [
-        error("invalid-json", `${sourcePath}: expected a JSON object`),
+        error("resource-load-failed", "resource root could not be loaded", {
+          source: sourceName(path),
+        }),
       ],
     };
   }
 
-  const obj = raw as Record<string, unknown>;
-
-  const schemaUri = obj.$schema;
-  if (schemaUri !== SCHEMA_URI) {
+  let resources: ReturnType<typeof resolveResourceDocument>;
+  try {
+    resources = resolveResourceDocument({
+      pack: projectPack,
+      rootFile: path,
+      ...(rootDocument ? { rootDocument } : {}),
+      ...(options.bundledPack ? { bundledPack: options.bundledPack } : {}),
+    });
+  } catch (cause) {
+    if (cause instanceof ResourceResolutionError)
+      return {
+        ...location,
+        diagnostics: [resourceDiagnostic(cause, path, text)],
+      };
     return {
-      overlay: undefined,
+      ...location,
       diagnostics: [
-        error(
-          "unsupported-schema",
-          `${sourcePath}: unsupported $schema ${JSON.stringify(schemaUri)}; expected ${SCHEMA_URI}`,
-          { path: "/$schema" },
-        ),
+        error("resource-load-failed", "resource resolution failed", {
+          source: sourceName(path),
+        }),
       ],
     };
   }
 
-  const overlay: Record<string, unknown> = Object.create(null);
-  for (const key of Object.getOwnPropertyNames(obj)) {
-    own(overlay, key, obj[key]);
-  }
+  const canonical = atlanteDocumentSchema.safeParse(resources.document);
+  const diagnostics = [
+    ...canonicalDiagnostics(canonical, resources),
+    ...validateResolvedDocument(resources),
+  ];
+  const sorted = sortDiagnostics(diagnostics);
+  if (!canonical.success || sorted.some(({ severity }) => severity === "error"))
+    return { ...location, diagnostics: sorted };
 
   return {
-    overlay: overlay as AtlanteDocumentOverlay,
-    diagnostics: [],
+    ...location,
+    document: canonical.data,
+    resources,
+    diagnostics: sorted,
   };
 }
 
 /** Accepts either a config file path or a directory to discover one in. */
-type LoadDocumentDeps = {
-  statSync?: (
-    path: string,
-    options: { throwIfNoEntry: false },
-  ) => { isDirectory(): boolean } | undefined;
-};
-
 export function loadDocument(
   pathOrDirectory: string,
-  deps: LoadDocumentDeps = {},
+  options: DocumentLoadOptions = {},
 ): {
   document?: AtlanteDocument;
   path?: string;
+  projectRoot?: string;
+  resources?: ReturnType<typeof resolveResourceDocument>;
   diagnostics: Diagnostic[];
 } {
-  let path = pathOrDirectory;
+  const target = resolve(pathOrDirectory);
+  let path = target;
   let isDirectory = false;
   try {
     isDirectory =
-      (deps.statSync ?? statSync)(pathOrDirectory, {
+      (options.statSync ?? statSync)(target, {
         throwIfNoEntry: false,
       })?.isDirectory() ?? false;
-  } catch (cause) {
+  } catch {
     return {
       diagnostics: [
         error(
           "config-unreadable",
-          `cannot inspect ${pathOrDirectory}: ${String(cause)}`,
+          `cannot inspect ${sourceName(target)}: configuration target is unreadable`,
+          { source: sourceName(target) },
         ),
       ],
     };
   }
 
   if (isDirectory) {
-    const discovered = discoverConfigPath(pathOrDirectory);
-    if (!discovered.path) return { diagnostics: discovered.diagnostics };
+    const discovered = discoverConfigPath(target);
+    if (!discovered.path)
+      return { diagnostics: sortDiagnostics(discovered.diagnostics) };
     path = discovered.path;
   }
 
@@ -216,7 +477,8 @@ export function loadDocument(
       diagnostics: [
         error(
           "invalid-config-filename",
-          `${path}: configuration files must be named atlante.json or atlante.jsonc`,
+          `${sourceName(path)}: configuration files must be named atlante.json or atlante.jsonc`,
+          { source: sourceName(path) },
         ),
       ],
     };
@@ -225,13 +487,21 @@ export function loadDocument(
   let text: string;
   try {
     text = readFileSync(path, "utf8");
-  } catch (cause) {
+  } catch {
     return {
       diagnostics: [
-        error("config-unreadable", `cannot read ${path}: ${String(cause)}`),
+        error(
+          "config-unreadable",
+          `cannot read ${sourceName(path)}: configuration file is unreadable`,
+          { source: sourceName(path) },
+        ),
       ],
     };
   }
 
-  return { ...validateDocumentText(text, path), path };
+  const parsed = parseDocumentOverlay(text, path);
+  const location = { path, projectRoot: dirname(path) };
+  if (!parsed.overlay)
+    return { ...location, diagnostics: sortDiagnostics(parsed.diagnostics) };
+  return resolveResourceBackedDocument(path, text, options, location);
 }

@@ -197,7 +197,7 @@ describe("expandInputSchema", () => {
     expect(diagnostics[0]?.path).toBe("/envelope/child/payload/payload");
   });
 
-  test("reports malformed nested markers at their schema paths", () => {
+  test("reports malformed nested markers at canonical input paths", () => {
     const { diagnostics } = expandInputSchema(
       registryOf({
         "test/root": {
@@ -234,8 +234,8 @@ describe("expandInputSchema", () => {
     ).toBe(true);
     expect(diagnostics.map((diagnostic) => diagnostic.path)).toEqual([
       "/metadata/invalid",
-      "/metadata/sections/items",
-      "/metadata/choice/oneOf/0/branch",
+      "/metadata/sections",
+      "/metadata/choice/branch",
     ]);
   });
 });
@@ -475,9 +475,7 @@ describe("validateTemplates", () => {
     );
 
   test("accepts a valid agent binding", () => {
-    expect(
-      check({ template: "atlante/agent", identity: "x", mission: "y" }),
-    ).toEqual([]);
+    expect(check({ identity: "x", mission: "y" })).toEqual([]);
   });
 
   test("accepts an agent instructions section", () => {
@@ -505,10 +503,12 @@ describe("validateTemplates", () => {
   });
 
   test("rejects an unknown template", () => {
-    const diagnostics = check({
-      template: "atlante/nope",
-      identity: "x",
-    });
+    const diagnostics = validateAgentInput(
+      registry,
+      "atlante/nope",
+      { identity: "x" },
+      "reviewer",
+    );
     expect(diagnostics[0]?.code).toBe("unknown-template");
   });
 
@@ -802,7 +802,6 @@ describe("validateTemplates", () => {
   test("does not treat template or values as prompt input", () => {
     expect(
       check({
-        template: "atlante/agent",
         values: { project: "p" },
         identity: "x",
         mission: "y",
@@ -1118,22 +1117,11 @@ describe("validateTemplates", () => {
   });
 
   test("rejects an unknown skill template", () => {
-    const diagnostics = validateTemplates(
-      {
-        $schema: SCHEMA_URI,
-        agents: {},
-        skills: {
-          testing: {
-            description: "Testing",
-            template: "atlante/nope",
-            title: "Testing",
-            overview: "Run tests.",
-            sections: [{ markdown: "Run tests." }],
-          },
-        },
-      },
+    const diagnostics = validateSkillInput(
       registry,
-      "atlante/agent",
+      "atlante/nope",
+      { title: "Testing", overview: "Run tests.", sections: [] },
+      "testing",
     );
     expect(diagnostics[0]?.code).toBe("unknown-template");
     expect(diagnostics[0]?.path).toBe("/skills/testing");
@@ -1186,19 +1174,11 @@ describe("validateTemplates", () => {
 
   test("reports skill composition cycles", () => {
     const { registry: cyclicRegistry } = loadTemplates(cyclicRoot, "test");
-    const diagnostics = validateTemplates(
-      {
-        $schema: SCHEMA_URI,
-        agents: {},
-        skills: {
-          testing: {
-            description: "Testing",
-            template: "test/a",
-          },
-        },
-      },
+    const diagnostics = validateSkillInput(
       cyclicRegistry,
-      "atlante/agent",
+      "test/a",
+      {},
+      "testing",
     );
     expect(diagnostics[0]?.code).toBe("cyclic-template");
     expect(diagnostics[0]?.path).toMatch(/^\/skills\/testing/);

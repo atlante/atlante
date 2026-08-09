@@ -1,4 +1,9 @@
 export type {
+  AuthoredValueIssue,
+  AuthoredValueLayerKind,
+} from "./authored-values.js";
+export { authoredValueLayerIssues } from "./authored-values.js";
+export type {
   BundledInstanceMigrationRecord,
   BundledStarterMigrationRecord,
 } from "./bundled.js";
@@ -11,7 +16,11 @@ export {
   loadBundledTemplateMigrationRegistry,
 } from "./bundled.js";
 export type { CompositionIssue, Slot } from "./composition.js";
-export { slotsOf, walkComposition } from "./composition.js";
+export {
+  isCompositionMarker,
+  slotsOf,
+  walkComposition,
+} from "./composition.js";
 export type {
   ResourcePack,
   ResourcePackKind,
@@ -59,6 +68,12 @@ export {
   MAX_REFERENCE_HOPS,
   snapshotResourceGraph,
 } from "./graph.js";
+export type { JsoncLocation, ParsedJsonc } from "./jsonc.js";
+export {
+  JsoncParseError,
+  parseJsoncWithLocations,
+  parseJsonWithLocations,
+} from "./jsonc.js";
 export type {
   FacetOriginKind,
   TemplateLoadError,
@@ -83,20 +98,28 @@ export {
   prefixProvenance,
   provenanceForValue,
 } from "./provenance.js";
-export type { RenderArgs } from "./renderer.js";
+export type { RenderArgs, ResolvedRenderArgs } from "./renderer.js";
 export {
   InvalidValueReferenceError,
   interpolateValues,
   MissingValueError,
   NonStringValueError,
+  renderResolvedTemplate,
   renderString,
   renderTemplate,
   SLOT_PARTIAL_PREFIX,
   slotPartialName,
   ValueReferenceCollisionError,
 } from "./renderer.js";
-export type { ResourceTemplateSelection } from "./resolution.js";
-export { resourceTemplateSelection } from "./resolution.js";
+export type {
+  ResourceTemplateSelection,
+  ResourceValueTombstones,
+} from "./resolution.js";
+export {
+  resourceTemplateSelection,
+  resourceValueTombstones,
+  withResourceTemplateSelection,
+} from "./resolution.js";
 export type {
   NormalizedResourceDocument,
   ResolveDocumentRequest,

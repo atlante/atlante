@@ -13,7 +13,13 @@ import {
   resolveResourceLocator,
   resourceCandidateWatchPaths,
 } from "./filesystem.js";
-import { isSafeJsonObject, parseJson, parseJsonc } from "./jsonc.js";
+import {
+  isSafeJsonObject,
+  type JsoncLocation,
+  JsoncParseError,
+  parseJsoncWithLocations,
+  parseJsonWithLocations,
+} from "./jsonc.js";
 import { JSON_SCHEMA_DRAFT_2020_12_URI } from "./schema.js";
 import type {
   BundledResourceOrigin,
@@ -36,6 +42,7 @@ export type LoadedResource<T> = Readonly<{
   readonly facet: T;
   readonly dependencies: readonly string[];
   readonly unresolvedParents: readonly string[];
+  readonly locations?: Readonly<Record<string, JsoncLocation>>;
 }>;
 
 type LoadedFacet = TemplateFacet | InstanceFacet | Preset;
@@ -143,6 +150,7 @@ function sourceFailure(
   file?: ResourceFile,
   dependencies: readonly string[] = [],
   unresolvedParents: readonly string[] = [],
+  details: Readonly<{ pointer?: string; location?: JsoncLocation }> = {},
 ): never {
   return failResource(
     code,
@@ -150,9 +158,14 @@ function sourceFailure(
     {
       locator,
       ...(file ? { source: originFor(target, file) } : {}),
+      ...details,
     },
     { dependencies, unresolvedParents },
   );
+}
+
+function parseLocation(cause: unknown): JsoncLocation | undefined {
+  return cause instanceof JsoncParseError ? cause.location : undefined;
 }
 
 function selectedFile(
@@ -231,13 +244,22 @@ function parseObjectFacet(
   file: ResourceFile,
   source: string,
   invalidMessage: string,
-  parser: (source: string) => unknown = parseJsonc,
+  parser: (source: string) => {
+    value: unknown;
+    locations: Readonly<Record<string, JsoncLocation>>;
+  } = parseJsoncWithLocations,
   dependencies: readonly string[] = [],
-): JsonObject {
-  let parsed: unknown;
+): {
+  value: JsonObject;
+  locations: Readonly<Record<string, JsoncLocation>>;
+} {
+  let parsed: {
+    value: unknown;
+    locations: Readonly<Record<string, JsoncLocation>>;
+  };
   try {
     parsed = parser(source);
-  } catch {
+  } catch (cause) {
     return sourceFailure(
       "malformed-jsonc",
       "selected resource JSONC is malformed",
@@ -246,9 +268,10 @@ function parseObjectFacet(
       file,
       normalizeResourcePaths([...dependencies, ...dependencyPaths([file])]),
       [target.directory],
+      { location: parseLocation(cause) },
     );
   }
-  if (!isJsonObject(parsed)) {
+  if (!isJsonObject(parsed.value)) {
     return sourceFailure(
       "invalid-resolved-input",
       invalidMessage,
@@ -257,19 +280,27 @@ function parseObjectFacet(
       file,
       normalizeResourcePaths([...dependencies, ...dependencyPaths([file])]),
       [target.directory],
+      { location: parsed.locations[""] },
     );
   }
-  return parsed;
+  return { value: parsed.value, locations: parsed.locations };
 }
 
 function loadFresh<T extends LoadedFacet>(
-  load: () => { readonly facet: T; readonly dependencies: readonly string[] },
+  load: () => {
+    readonly facet: T;
+    readonly dependencies: readonly string[];
+    readonly locations?: Readonly<Record<string, JsoncLocation>>;
+  },
 ): LoadedResource<T> {
   const loaded = load();
   return {
     facet: cloneFacet(loaded.facet) as T,
     dependencies: Object.freeze(normalizeResourcePaths(loaded.dependencies)),
     unresolvedParents: Object.freeze([]),
+    ...(loaded.locations
+      ? { locations: Object.freeze({ ...loaded.locations }) }
+      : {}),
   };
 }
 
@@ -324,10 +355,13 @@ export function loadTemplateFacet(
       dependencies,
       options,
     );
-    let parsed: unknown;
+    let parsed: {
+      value: unknown;
+      locations: Readonly<Record<string, JsoncLocation>>;
+    };
     try {
-      parsed = parseJsonc(schemaText);
-    } catch {
+      parsed = parseJsoncWithLocations(schemaText);
+    } catch (cause) {
       return sourceFailure(
         "malformed-jsonc",
         "selected resource JSONC is malformed",
@@ -336,9 +370,10 @@ export function loadTemplateFacet(
         schemaFile,
         dependencies,
         [target.directory],
+        { location: parseLocation(cause) },
       );
     }
-    if (!isJsonObject(parsed)) {
+    if (!isJsonObject(parsed.value)) {
       return sourceFailure(
         "invalid-template-schema",
         "template facet must be a JSON object",
@@ -347,11 +382,12 @@ export function loadTemplateFacet(
         schemaFile,
         dependencies,
         [target.directory],
+        { location: parsed.locations[""] },
       );
     }
     if (
-      !Object.hasOwn(parsed, "$schema") ||
-      parsed.$schema !== JSON_SCHEMA_DRAFT_2020_12_URI
+      !Object.hasOwn(parsed.value, "$schema") ||
+      parsed.value.$schema !== JSON_SCHEMA_DRAFT_2020_12_URI
     ) {
       return sourceFailure(
         "invalid-template-schema",
@@ -361,6 +397,9 @@ export function loadTemplateFacet(
         schemaFile,
         dependencies,
         [target.directory],
+        {
+          location: parsed.locations["/$schema"] ?? parsed.locations[""],
+        },
       );
     }
     return {
@@ -368,10 +407,11 @@ export function loadTemplateFacet(
         locator: target.locator,
         origin: originFor(target, schemaFile),
         kind: "template",
-        inputSchema: parsed,
+        inputSchema: parsed.value,
         source,
       },
       dependencies,
+      locations: parsed.locations,
     };
   });
 }
@@ -399,9 +439,10 @@ export function loadInstanceFacet(
         locator: target.locator,
         origin: originFor(target, file),
         kind: "instance",
-        input: parsed,
+        input: parsed.value,
       },
       dependencies: dependencyPaths([file]),
+      locations: parsed.locations,
     };
   });
 }
@@ -518,7 +559,9 @@ export function loadPresetFacet(
       selection.file,
       inputText,
       "preset root must be a JSON object",
-      selection.file.name === "atlante.json" ? parseJson : parseJsonc,
+      selection.file.name === "atlante.json"
+        ? parseJsonWithLocations
+        : parseJsoncWithLocations,
       selection.dependencies,
     );
     return {
@@ -526,9 +569,10 @@ export function loadPresetFacet(
         locator: target.locator,
         origin: originFor(target, selection.file),
         kind: "preset",
-        document: parsed,
+        document: parsed.value,
       },
       dependencies: selection.dependencies,
+      locations: parsed.locations,
     };
   });
 }

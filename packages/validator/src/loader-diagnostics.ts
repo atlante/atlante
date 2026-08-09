@@ -1,25 +1,30 @@
-import type { TemplateLoadError } from "@atlante/templates";
+import { basename, isAbsolute } from "node:path";
 import type { Diagnostic } from "./diagnostic.js";
 import { error } from "./diagnostic.js";
 
-/**
- * Maps loader-level failures (an unreadable, malformed, or duplicate
- * `template.json`) onto the same diagnostic vocabulary every other
- * validation failure uses.
- *
- * `TemplateLoadError` itself stays `{ directory, message }` — no code, no
- * severity — because `@atlante/templates` must not depend on the
- * `Diagnostic` type to remain a dependency-free leaf of the package graph.
- * That left every consumer inventing its own rendering; this is the single
- * place that turns a load error into a diagnostic instead.
- */
+type LoaderFailure = {
+  message: string;
+  directory?: string;
+  source?: string;
+  code?: string;
+};
+
+function stableSource(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  return isAbsolute(value) ? basename(value) : value;
+}
+
+/** Transitional mapping for callers that still report generic loader errors. */
 export function templateLoadDiagnostics(
-  errors: TemplateLoadError[],
+  errors: readonly LoaderFailure[],
 ): Diagnostic[] {
-  return errors.map((templateLoadError) =>
+  return errors.map((loaderError) =>
     error(
-      "template-load-failed",
-      `${templateLoadError.directory}: ${templateLoadError.message}`,
+      loaderError.code ?? "template-load-failed",
+      loaderError.message,
+      stableSource(loaderError.source ?? loaderError.directory)
+        ? { source: stableSource(loaderError.source ?? loaderError.directory) }
+        : {},
     ),
   );
 }

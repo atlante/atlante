@@ -84,6 +84,14 @@ describe("resource system values", () => {
       'unknown system variable "{{sys.nonexistent}}"',
     );
   });
+
+  test("rejects inherited resolver properties without throwing", () => {
+    for (const key of ["constructor", "toString", "__proto__"]) {
+      expect(() => resolveSystemValues({ value: `{{sys.${key}}}` })).toThrow(
+        new UnknownSystemVariableError(key),
+      );
+    }
+  });
 });
 
 describe("SYSTEM_RESOLVERS", () => {

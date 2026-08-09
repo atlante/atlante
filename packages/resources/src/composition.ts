@@ -16,6 +16,7 @@ export type CompositionIssue = {
   templateId: string;
   property?: string;
   slotPath?: string[];
+  dataPath?: string[];
   chain?: string[];
 };
 
@@ -38,6 +39,17 @@ type MarkerContext = {
 
 function isObject(node: unknown): node is Record<string, unknown> {
   return typeof node === "object" && node !== null && !Array.isArray(node);
+}
+
+/** A slot marker candidate is exactly `{ template: ... }`. */
+export function isCompositionMarker(
+  node: unknown,
+): node is Record<string, unknown> & { template: unknown } {
+  return (
+    isObject(node) &&
+    Object.keys(node).length === 1 &&
+    Object.hasOwn(node, "template")
+  );
 }
 
 function isValidTemplateId(value: unknown): value is string {
@@ -67,7 +79,7 @@ function childContext(
 
 function visitSchemaNode(node: unknown, context: MarkerContext): SlotMarker[] {
   if (!isObject(node)) return [];
-  if (Object.hasOwn(node, "template")) {
+  if (isCompositionMarker(node)) {
     return [
       {
         path: context.path,
@@ -219,18 +231,16 @@ function slotFromMarker(marker: SlotMarker & { template: string }): Slot {
 function invalidMarkerIssue(
   rootId: string,
   slotPath: string[],
+  dataPath: string[],
   marker: SlotMarker,
 ): CompositionIssue {
-  const actual =
-    typeof marker.template === "string"
-      ? JSON.stringify(marker.template)
-      : `${typeof marker.template} ${JSON.stringify(marker.template)}`;
   return {
     code: "invalid-input-schema",
-    message: `template "${rootId}": slot "${marker.property}" has invalid template marker ${actual}; expected a non-empty namespaced id matching namespace/name`,
+    message: `template "${rootId}": slot "${marker.property}" has an invalid template marker; expected a non-empty namespaced id matching namespace/name`,
     templateId: rootId,
     property: [...slotPath, ...marker.dataPath].at(-1),
     slotPath: [...slotPath, ...marker.path],
+    dataPath: [...dataPath, ...marker.dataPath],
   };
 }
 
@@ -245,6 +255,7 @@ export function walkComposition(
   stack: string[] = [],
   slotPath: string[] = [],
   property?: string,
+  dataPath: string[] = [],
 ): CompositionIssue[] {
   if (stack.includes(rootId)) {
     const chain = [...stack, rootId];
@@ -277,7 +288,7 @@ export function walkComposition(
   const slots: Slot[] = [];
   for (const marker of markersOf(template.inputSchema)) {
     if (!isValidMarker(marker)) {
-      issues.push(invalidMarkerIssue(rootId, slotPath, marker));
+      issues.push(invalidMarkerIssue(rootId, slotPath, dataPath, marker));
       continue;
     }
     slots.push(slotFromMarker(marker));
@@ -291,6 +302,7 @@ export function walkComposition(
         [...stack, rootId],
         [...slotPath, ...(slot.path ?? [slot.property])],
         slot.property,
+        [...dataPath, ...(slot.dataPath ?? [slot.property])],
       ),
     );
   }

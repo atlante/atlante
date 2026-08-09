@@ -220,9 +220,42 @@ describe("selected resource facets", () => {
     );
   });
 
-  test("rejects prototype-shaped template schemas and resource objects", () => {
+  test("round-trips dangerous-looking resource keys without prototype pollution", () => {
     const { root, source, resource } = fixture();
     const pack = createProjectResourcePack(root);
+    writeFileSync(
+      join(resource, "template.jsonc"),
+      '{ "$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object", "__proto__": { "type": "object" } }\n',
+    );
+    writeFileSync(join(resource, "template.md"), "source\n");
+
+    const template = loadTemplateFacet(pack, "./resource", source).facet;
+    expect(Object.hasOwn(template.inputSchema, "__proto__")).toBe(true);
+    expect(Object.getPrototypeOf(template.inputSchema)).toBe(Object.prototype);
+
+    writeFileSync(
+      join(resource, "instance.jsonc"),
+      '{ "constructor": { "prototype": { "polluted": true } } }\n',
+    );
+    const instance = loadInstanceFacet(pack, "./resource", source).facet;
+    expect(Object.hasOwn(instance.input, "constructor")).toBe(true);
+    expect(
+      Object.getOwnPropertyDescriptor(instance.input, "constructor")?.value,
+    ).toEqual({ prototype: { polluted: true } });
+
+    const preset = join(root, "preset");
+    mkdirSync(preset);
+    writeFileSync(
+      join(preset, "atlante.json"),
+      '{ "prototype": { "constructor": { "prototype": { "polluted": true } } } }\n',
+    );
+    const document = loadPresetFacet(pack, "./preset", source).facet.document;
+    expect(Object.hasOwn(document, "prototype")).toBe(true);
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+  });
+
+  test("does not accept a nested __proto__ object as a template dialect", () => {
+    const { root, source, resource } = fixture();
     writeFileSync(
       join(resource, "template.jsonc"),
       '{ "__proto__": { "$schema": "https://json-schema.org/draft/2020-12/schema", "type": "object" } }\n',
@@ -230,28 +263,13 @@ describe("selected resource facets", () => {
     writeFileSync(join(resource, "template.md"), "source\n");
 
     expectFailure(
-      () => loadTemplateFacet(pack, "./resource", source),
+      () =>
+        loadTemplateFacet(
+          createProjectResourcePack(root),
+          "./resource",
+          source,
+        ),
       "invalid-template-schema",
-    );
-
-    writeFileSync(
-      join(resource, "instance.jsonc"),
-      '{ "constructor": { "prototype": { "polluted": true } } }\n',
-    );
-    expectFailure(
-      () => loadInstanceFacet(pack, "./resource", source),
-      "invalid-resolved-input",
-    );
-
-    const preset = join(root, "preset");
-    mkdirSync(preset);
-    writeFileSync(
-      join(preset, "atlante.jsonc"),
-      '{ "prototype": { "constructor": { "prototype": { "polluted": true } } } }\n',
-    );
-    expectFailure(
-      () => loadPresetFacet(pack, "./preset", source),
-      "invalid-resolved-input",
     );
   });
 

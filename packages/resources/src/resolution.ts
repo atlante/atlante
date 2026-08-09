@@ -6,13 +6,17 @@
 const RESOURCE_TEMPLATE_SELECTION = Symbol(
   "atlante.resource.template-selection",
 );
+const RESOURCE_VALUE_TOMBSTONES = Symbol("atlante.resource.value-tombstones");
 
 const resolverSelections = new WeakSet<object>();
 const resolverSelectedValues = new WeakSet<object>();
+const resolverTombstoneValues = new WeakSet<object>();
 
 export type ResourceTemplateSelection = Readonly<{
   readonly templateId: string;
 }>;
+
+export type ResourceValueTombstones = readonly string[];
 
 function isAttachable(value: unknown): value is object {
   return typeof value === "object" && value !== null;
@@ -71,4 +75,47 @@ export function resourceTemplateSelection(
   );
   if (!marker || !("value" in marker)) return undefined;
   return isSelectionRecord(marker.value) ? marker.value : undefined;
+}
+
+function isTombstoneList(value: unknown): value is ResourceValueTombstones {
+  return (
+    Array.isArray(value) &&
+    value.every((path) => typeof path === "string" && path.startsWith("/"))
+  );
+}
+
+/** Attaches resolver-owned deletion paths without adding JSON-visible keys. */
+export function withResourceValueTombstones<T>(
+  value: T,
+  tombstones: ResourceValueTombstones,
+): T {
+  if (!isAttachable(value) || tombstones.length === 0) return value;
+  const metadata = Object.freeze([...new Set(tombstones)].sort());
+  resolverTombstoneValues.add(value);
+  Object.defineProperty(value, RESOURCE_VALUE_TOMBSTONES, {
+    configurable: true,
+    enumerable: false,
+    value: metadata,
+    writable: false,
+  });
+  return value;
+}
+
+/** Copies only resolver-owned value deletion metadata to a cloned value. */
+export function copyResourceValueTombstones<T>(source: unknown, target: T): T {
+  const tombstones = resourceValueTombstones(source);
+  return tombstones ? withResourceValueTombstones(target, tombstones) : target;
+}
+
+export function resourceValueTombstones(
+  value: unknown,
+): ResourceValueTombstones | undefined {
+  if (!isAttachable(value) || !resolverTombstoneValues.has(value))
+    return undefined;
+  const marker = Object.getOwnPropertyDescriptor(
+    value,
+    RESOURCE_VALUE_TOMBSTONES,
+  );
+  if (!marker || !("value" in marker)) return undefined;
+  return isTombstoneList(marker.value) ? marker.value : undefined;
 }

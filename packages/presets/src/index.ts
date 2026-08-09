@@ -1,3 +1,5 @@
+// fallow-ignore-file code-duplication -- retained preset migration compatibility remains until Cleanup
+
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -43,10 +45,12 @@ export function listPresets(
 
   try {
     entries = (deps.readdirSync ?? readdirSync)(rootDirectory).sort();
-  } catch (error) {
+  } catch {
     return {
       presets,
-      errors: [{ directory: rootDirectory, message: String(error) }],
+      errors: [
+        { directory: PRESET_NAMESPACE, message: "preset root is unreadable" },
+      ],
     };
   }
 
@@ -55,31 +59,34 @@ export function listPresets(
     let isDirectory: boolean;
     try {
       isDirectory = (deps.statSync ?? statSync)(directory).isDirectory();
-    } catch (error) {
+    } catch {
       errors.push({
-        directory,
-        message: `unreadable preset entry: ${String(error)}`,
+        directory: `${PRESET_NAMESPACE}/${entry}`,
+        message: "unreadable preset entry",
       });
       continue;
     }
     if (!isDirectory) continue;
 
     if (!PRESET_NAME_PATTERN.test(entry)) {
-      errors.push({ directory, message: `invalid preset name "${entry}"` });
+      errors.push({
+        directory: `${PRESET_NAMESPACE}/${entry}`,
+        message: `invalid preset name "${entry}"`,
+      });
       continue;
     }
 
     const sources = presetSources(directory, deps.existsSync ?? existsSync);
     if (sources.length === 0) {
       errors.push({
-        directory,
+        directory: `${PRESET_NAMESPACE}/${entry}`,
         message: "missing atlante.jsonc or atlante.json",
       });
       continue;
     }
     if (sources.length > 1) {
       errors.push({
-        directory,
+        directory: `${PRESET_NAMESPACE}/${entry}`,
         message: "both atlante.jsonc and atlante.json exist",
       });
       continue;

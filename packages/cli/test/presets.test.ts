@@ -189,7 +189,12 @@ describe("bundled presets as user configurations", () => {
           "reviewer": { "description": "Reviews changes.", "identity": "Review", "mission": "Find defects" }
         },
         "skills": {
-          "testing": { "description": "Testing guidance", "content": "Run tests." }
+          "testing": {
+            "description": "Testing guidance",
+            "title": "Testing",
+            "overview": "Run tests.",
+            "sections": [{ "markdown": "Run tests." }]
+          }
         }
       }`,
     );

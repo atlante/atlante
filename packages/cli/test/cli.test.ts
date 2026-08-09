@@ -127,7 +127,22 @@ describe("runValidate", () => {
     } finally {
       console.error = original;
     }
-    expect(errors.join("\n")).toContain("unknown-preset");
+    expect(errors.join("\n")).toContain("missing-target");
+  });
+
+  test("accepts config filenames and relative project directories from any cwd", async () => {
+    const dir = project(valid);
+    const previous = process.cwd();
+    try {
+      process.chdir(dir);
+      expect(await runValidate("atlante.jsonc")).toBe(0);
+      expect(await runValidate(".")).toBe(0);
+
+      process.chdir(tmpdir());
+      expect(await runValidate(dir.slice(tmpdir().length + 1))).toBe(0);
+    } finally {
+      process.chdir(previous);
+    }
   });
 });
 
