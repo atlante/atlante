@@ -52,7 +52,7 @@ describe("JSONC parsing", () => {
   test("reports the parser offset and location for malformed input", () => {
     const source = `{
   "ok": true,
-  "broken": 
+  "broken":
 }
 `;
 
