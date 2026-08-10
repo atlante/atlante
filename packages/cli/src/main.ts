@@ -5,7 +5,11 @@ import { runBuildWatch } from "./commands/build-watch.js";
 import { runInit } from "./commands/init.js";
 import { runValidate } from "./commands/validate.js";
 
-export { listPresets, readPreset } from "@atlante/presets";
+export {
+  BUNDLED_RESOURCE_PACK,
+  BUNDLED_RESOURCES_DIR,
+  createBundledResourcePack,
+} from "@atlante/resources";
 export { runBuild } from "./commands/build.js";
 export { runBuildWatch } from "./commands/build-watch.js";
 export { runInit } from "./commands/init.js";
@@ -29,10 +33,7 @@ export function createProgram(): Command {
   program
     .command("build")
     .argument("[path]", "config file or project directory", process.cwd())
-    .option(
-      "--watch",
-      "rebuild on changes to config, presets, and bundled templates",
-    )
+    .option("--watch", "rebuild on changes to config and selected resources")
     .description("build host-independent Atlante artifacts")
     .action((path: string, options: { watch?: boolean }) => {
       if (options.watch) {

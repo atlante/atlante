@@ -1,24 +1,20 @@
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
-import {
-  PRESET_NAME_PATTERN,
-  PRESET_NAMESPACE,
-  PRESETS_DIR,
-} from "@atlante/presets";
-import { BUNDLED_TEMPLATES_DIR } from "@atlante/templates";
-import {
-  CONFIG_FILENAMES,
-  findConfigFile,
-  MAX_PRESET_DEPTH,
-  parseDocumentOverlay,
-} from "@atlante/validator";
+import { lstatSync, realpathSync, statSync } from "node:fs";
+import { basename, dirname, relative, resolve, sep } from "node:path";
+import { loadProject } from "@atlante/builder";
+import { BUNDLED_RESOURCE_PACK } from "@atlante/resources";
+import type { ResourceWatchContext } from "@atlante/validator";
+import { CONFIG_FILENAMES, findConfigFile } from "@atlante/validator";
 
 export type WatchFiles = {
   projectDir: string;
   configPath?: string;
   configCandidates?: string[];
-  presetPaths: string[];
-  templatePaths: string[];
+  /** Files actually selected by the shared resource resolver. */
+  resourcePaths: string[];
+  /** Existing directories to retry unresolved resource targets from. */
+  unresolvedParents: string[];
+  /** Whether the current config/resource graph resolved without errors. */
+  resourceResolutionSucceeded: boolean;
 };
 
 function isConfigFilename(target: string): boolean {
@@ -26,110 +22,121 @@ function isConfigFilename(target: string): boolean {
 }
 
 function projectDirOf(target: string): string {
-  let exists = false;
+  const absoluteTarget = resolve(target);
   try {
-    const stat = statSync(target, { throwIfNoEntry: false });
-    exists = stat !== undefined;
-    if (stat?.isFile() && isConfigFilename(target)) {
-      return dirname(target);
-    }
+    const stat = statSync(absoluteTarget, { throwIfNoEntry: false });
+    if (stat?.isFile() && isConfigFilename(absoluteTarget))
+      return dirname(absoluteTarget);
+    if (stat?.isDirectory()) return absoluteTarget;
   } catch {
     // Fall through to the non-existent-target handling below.
   }
   // A non-existent target whose basename is a config filename is a would-be
-  // config FILE: the watch candidates must resolve to the target itself, so
-  // its parent is the project directory.
-  if (!exists && isConfigFilename(target)) {
-    return dirname(target);
-  }
-  return target;
+  // config FILE: candidates resolve to its parent directory.
+  if (isConfigFilename(absoluteTarget)) return dirname(absoluteTarget);
+  return absoluteTarget;
 }
 
-function bundledPresetPaths(id: string): string[] | undefined {
-  if (!id.startsWith(`${PRESET_NAMESPACE}/`)) return undefined;
-  const name = id.slice(PRESET_NAMESPACE.length + 1);
-  if (!PRESET_NAME_PATTERN.test(name)) return undefined;
-  const directory = join(PRESETS_DIR, name);
-  const candidates = CONFIG_FILENAMES.map((filename) =>
-    join(directory, filename),
-  );
-  const existing = candidates.find(existsSync);
-  return existing ? [existing] : candidates;
-}
-
-function walkExtendsChain(
-  overlay: { extends?: string },
-  visited: Set<string>,
-  paths: string[],
-  depth: number,
-): void {
-  if (depth >= MAX_PRESET_DEPTH) return;
-  const presetId = overlay.extends;
-  if (typeof presetId !== "string" || presetId.length === 0) return;
-  if (visited.has(presetId)) return;
-  visited.add(presetId);
-
-  const presetPaths = bundledPresetPaths(presetId);
-  if (!presetPaths) return;
-
-  paths.push(...presetPaths);
-  const [presetPath] = presetPaths;
-  const presetOverlay =
-    presetPaths.length === 1 && presetPath
-      ? readPresetOverlay(presetPath)
-      : undefined;
-  if (presetOverlay) walkExtendsChain(presetOverlay, visited, paths, depth + 1);
-}
-
-function readPresetOverlay(path: string): { extends?: string } | undefined {
+function rootsFor(projectDir: string): readonly string[] {
+  const roots = new Set([resolve(projectDir)]);
   try {
-    return parseDocumentOverlay(readFileSync(path, "utf8"), path).overlay;
+    roots.add(realpathSync(projectDir));
   } catch {
-    return undefined;
+    // The project root may be created after the first failed build.
   }
+  roots.add(BUNDLED_RESOURCE_PACK.root);
+  roots.add(BUNDLED_RESOURCE_PACK.lexicalRoot);
+  return [...roots];
 }
 
-function presetPathsOf(configText: string, configPath: string): string[] {
-  const parsed = parseDocumentOverlay(configText, configPath);
-  if (!parsed.overlay) return [];
-  const paths: string[] = [];
-  walkExtendsChain(parsed.overlay, new Set(), paths, 0);
-  return paths;
+function isWithinAnyRoot(path: string, roots: readonly string[]): boolean {
+  const candidate = resolve(path);
+  return roots.some((root) => {
+    const result = relative(resolve(root), candidate);
+    return (
+      result === "" ||
+      (result !== ".." &&
+        !result.startsWith(`..${sep}`) &&
+        !result.startsWith(sep))
+    );
+  });
 }
 
-function collectTemplateFiles(directory: string): string[] {
-  const paths: string[] = [];
-  for (const entry of readdirSync(directory, { withFileTypes: true })) {
-    const path = join(directory, entry.name);
-    if (entry.isDirectory()) paths.push(...collectTemplateFiles(path));
-    else if (entry.name === "template.json" || entry.name === "template.md")
-      paths.push(path);
-  }
-  return paths;
-}
-
-export function bundledTemplatePaths(
-  directory: string = BUNDLED_TEMPLATES_DIR,
+function safePaths(
+  paths: readonly string[] | undefined,
+  roots: readonly string[],
+  kind: "file" | "directory",
 ): string[] {
-  if (!existsSync(directory)) return [];
-  return collectTemplateFiles(directory).sort();
+  return [
+    ...new Set(
+      (paths ?? []).filter(
+        (path): path is string =>
+          typeof path === "string" &&
+          isWithinAnyRoot(path, roots) &&
+          (() => {
+            try {
+              const stat = lstatSync(path, { throwIfNoEntry: false });
+              if (kind === "file" && stat === undefined)
+                return (CONFIG_FILENAMES as readonly string[]).includes(
+                  basename(path),
+                );
+              return kind === "file"
+                ? Boolean(stat?.isFile() || stat?.isSymbolicLink())
+                : Boolean(stat?.isDirectory());
+            } catch {
+              return false;
+            }
+          })(),
+      ),
+    ),
+  ].sort();
 }
 
-export function resolveWatchFiles(target: string): WatchFiles {
-  const projectDir = projectDirOf(target);
+function resourceWatchOf(
+  target: string,
+  provided?: ResourceWatchContext,
+): { context?: ResourceWatchContext; succeeded: boolean; configPath?: string } {
   const config = findConfigFile(target);
-  const configPath = config?.path;
-  const configCandidates = configPath
-    ? undefined
-    : [...CONFIG_FILENAMES].map((filename) => join(projectDir, filename));
-  const presetPaths = config ? presetPathsOf(config.text, config.path) : [];
-  const templatePaths = bundledTemplatePaths();
+  if (!config) return { succeeded: false };
+  if (provided)
+    return { configPath: config.path, context: provided, succeeded: true };
+
+  try {
+    const loaded = loadProject(target);
+    return {
+      configPath: loaded.configPath ?? config.path,
+      ...(loaded.resourceWatch ? { context: loaded.resourceWatch } : {}),
+      succeeded:
+        loaded.document !== undefined &&
+        loaded.diagnostics.every(({ severity }) => severity !== "error"),
+    };
+  } catch {
+    return { configPath: config.path, succeeded: false };
+  }
+}
+
+export function resolveWatchFiles(
+  target: string,
+  providedResourceWatch?: ResourceWatchContext,
+): WatchFiles {
+  const projectDir = projectDirOf(target);
+  const resolved = resourceWatchOf(target, providedResourceWatch);
+  const configPath = resolved.configPath;
+  const roots = rootsFor(projectDir);
+  const configCandidates = [...CONFIG_FILENAMES].map((filename) =>
+    resolve(projectDir, filename),
+  );
 
   return {
     projectDir,
     ...(configPath ? { configPath } : {}),
     ...(configCandidates ? { configCandidates } : {}),
-    presetPaths,
-    templatePaths,
+    resourcePaths: safePaths(resolved.context?.dependencies, roots, "file"),
+    unresolvedParents: safePaths(
+      resolved.context?.unresolvedParents,
+      roots,
+      "directory",
+    ),
+    resourceResolutionSucceeded: resolved.succeeded,
   };
 }

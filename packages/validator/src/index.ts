@@ -12,7 +12,7 @@ export {
   discoverConfigPath,
   findConfigFile,
 } from "./discover.js";
-export type { DocumentLoadOptions } from "./document.js";
+export type { DocumentLoadOptions, ResourceWatchContext } from "./document.js";
 export {
   loadDocument,
   parseDocumentOverlay,

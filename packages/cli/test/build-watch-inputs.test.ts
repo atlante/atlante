@@ -1,19 +1,21 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { basename, join, sep } from "node:path";
-import { PRESETS_DIR } from "@atlante/presets";
-import { SCHEMA_URI } from "@atlante/schema";
-import { BUNDLED_TEMPLATES_DIR } from "@atlante/templates";
-import { MAX_PRESET_DEPTH } from "@atlante/validator";
 import {
-  bundledTemplatePaths,
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join, sep } from "node:path";
+import { BUNDLED_RESOURCES_DIR } from "@atlante/resources";
+import { SCHEMA_URI } from "@atlante/schema";
+import {
   resolveWatchFiles,
   type WatchFiles,
 } from "../src/commands/build-watch-inputs.js";
 
 const created: string[] = [];
-const createdPresets: string[] = [];
 
 function tempDir(): string {
   const dir = mkdtempSync(join(tmpdir(), "atlante-watch-inputs-"));
@@ -21,20 +23,16 @@ function tempDir(): string {
   return dir;
 }
 
-function createPresetDirectory(prefix: string): string {
-  const name = `${prefix}-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const dir = join(PRESETS_DIR, name);
-  mkdirSync(dir);
-  createdPresets.push(dir);
-  return dir;
+function canonical(path: string): string {
+  return realpathSync(path, "utf8");
 }
 
 function allPaths(result: WatchFiles): string[] {
   return [
     ...(result.configPath ? [result.configPath] : []),
     ...(result.configCandidates ?? []),
-    ...result.presetPaths,
-    ...result.templatePaths,
+    ...result.resourcePaths,
+    ...result.unresolvedParents,
   ];
 }
 
@@ -45,8 +43,6 @@ const valid = `{
 
 afterEach(() => {
   for (const dir of created.splice(0))
-    rmSync(dir, { recursive: true, force: true });
-  for (const dir of createdPresets.splice(0))
     rmSync(dir, { recursive: true, force: true });
 });
 
@@ -59,50 +55,126 @@ describe("resolveWatchFiles", () => {
 
     expect(result.projectDir).toBe(dir);
     expect(result.configPath).toBe(join(dir, "atlante.jsonc"));
-    expect(result.configCandidates).toBeUndefined();
+    expect(result.configCandidates).toEqual([
+      join(dir, "atlante.jsonc"),
+      join(dir, "atlante.json"),
+    ]);
   });
 
-  test('maps an "extends": "atlante/<name>" config to the preset file under PRESETS_DIR', () => {
+  test("watches both root filenames for a selected local preset", () => {
+    const dir = tempDir();
+    const base = join(dir, "base");
+    mkdirSync(base);
+    writeFileSync(
+      join(dir, "atlante.jsonc"),
+      `{
+        "$schema": "${SCHEMA_URI}",
+        "extends": "./base"
+      }`,
+    );
+    writeFileSync(join(base, "atlante.jsonc"), '{"values": {"base": "yes"}}\n');
+
+    const result = resolveWatchFiles(dir);
+
+    expect(result.resourcePaths).toContain(
+      canonical(join(base, "atlante.jsonc")),
+    );
+    expect(result.resourcePaths).toContain(join(base, "atlante.json"));
+  });
+
+  test("returns only selected transitive project resources", () => {
+    const dir = tempDir();
+    const resources = join(dir, "resources");
+    const template = join(resources, "template");
+    const instance = join(resources, "instance");
+    mkdirSync(template, { recursive: true });
+    mkdirSync(instance, { recursive: true });
+    writeFileSync(
+      join(template, "template.jsonc"),
+      JSON.stringify({
+        $schema: "https://json-schema.org/draft/2020-12/schema",
+        type: "object",
+        properties: { value: { type: "string" } },
+      }),
+    );
+    writeFileSync(join(template, "template.md"), "{{value}}\n");
+    writeFileSync(
+      join(instance, "instance.jsonc"),
+      JSON.stringify({ $template: "../template", value: "local" }),
+    );
+    writeFileSync(
+      join(dir, "atlante.jsonc"),
+      `{
+        "$schema": "${SCHEMA_URI}",
+        "agents": { "local": "./resources/instance" }
+      }`,
+    );
+    const unrelated = join(resources, "unrelated");
+    mkdirSync(unrelated);
+    writeFileSync(join(unrelated, "template.jsonc"), "{ malformed");
+    writeFileSync(join(unrelated, "template.md"), "unrelated");
+
+    const result = resolveWatchFiles(dir);
+
+    expect(result.resourcePaths).toEqual(
+      [
+        join(dir, "atlante.jsonc"),
+        join(instance, "instance.jsonc"),
+        join(template, "template.jsonc"),
+        join(template, "template.md"),
+        join(dir, "atlante.json"),
+      ].map((path) =>
+        path === join(dir, "atlante.json") ? path : canonical(path),
+      ),
+    );
+    expect(result.resourcePaths).not.toContain(
+      join(unrelated, "template.jsonc"),
+    );
+  });
+
+  test("returns selected bundled resources without scanning unrelated siblings", () => {
     const dir = tempDir();
     writeFileSync(
       join(dir, "atlante.jsonc"),
       `{
         "$schema": "${SCHEMA_URI}",
-        "extends": "atlante/starter"
+        "agents": { "architect": { "$instance": "atlante/architect", "description": "Architect" } }
       }`,
     );
 
     const result = resolveWatchFiles(dir);
 
-    expect(result.presetPaths).toEqual([
-      join(PRESETS_DIR, "starter", "atlante.jsonc"),
-    ]);
-  });
-
-  test("lists bundled template.json and template.md paths from BUNDLED_TEMPLATES_DIR", () => {
-    const dir = tempDir();
-    writeFileSync(join(dir, "atlante.jsonc"), valid);
-
-    const result = resolveWatchFiles(dir);
-
-    expect(result.templatePaths).toContain(
-      join(BUNDLED_TEMPLATES_DIR, "agent", "template.json"),
+    expect(result.resourcePaths).toContain(
+      canonical(join(BUNDLED_RESOURCES_DIR, "architect", "instance.jsonc")),
     );
-    expect(result.templatePaths).toContain(
-      join(BUNDLED_TEMPLATES_DIR, "workflow", "template.md"),
+    expect(result.resourcePaths).not.toContain(
+      canonical(join(BUNDLED_RESOURCES_DIR, "artifact", "template.jsonc")),
     );
-    for (const path of result.templatePaths) {
-      expect(path.startsWith(`${BUNDLED_TEMPLATES_DIR}${sep}`)).toBe(true);
-      expect(["template.json", "template.md"]).toContain(
-        path.slice(path.lastIndexOf(sep) + 1),
-      );
+    for (const path of result.resourcePaths) {
+      expect(
+        path.startsWith(`${dir}${sep}`) ||
+          path.startsWith(`${canonical(dir)}${sep}`) ||
+          path.startsWith(`${BUNDLED_RESOURCES_DIR}${sep}`),
+      ).toBe(true);
     }
   });
 
-  test("returns no template paths when the templates directory is missing", () => {
+  test("returns unresolved parent directories for a missing local resource", () => {
     const dir = tempDir();
+    const resources = join(dir, "resources");
+    mkdirSync(resources);
+    writeFileSync(
+      join(dir, "atlante.jsonc"),
+      `{
+        "$schema": "${SCHEMA_URI}",
+        "agents": { "missing": "./resources/missing" }
+      }`,
+    );
 
-    expect(bundledTemplatePaths(join(dir, "missing"))).toEqual([]);
+    const result = resolveWatchFiles(dir);
+
+    expect(result.unresolvedParents).toContain(canonical(resources));
+    expect(result.resourcePaths).not.toContain(join(resources, "missing"));
   });
 
   test("every watch path lies within a known input root", () => {
@@ -117,7 +189,7 @@ describe("resolveWatchFiles", () => {
 
     const result = resolveWatchFiles(dir);
 
-    const roots = [dir, PRESETS_DIR, BUNDLED_TEMPLATES_DIR].map(
+    const roots = [dir, canonical(dir), BUNDLED_RESOURCES_DIR].map(
       (root) => `${root}${sep}`,
     );
     const paths = allPaths(result);
@@ -138,7 +210,6 @@ describe("resolveWatchFiles", () => {
       join(dir, "atlante.jsonc"),
       join(dir, "atlante.json"),
     ]);
-    expect(result.presetPaths).toEqual([]);
   });
 
   test("resolves an explicit config-file target", () => {
@@ -176,94 +247,16 @@ describe("resolveWatchFiles", () => {
     expect(result.configPath).toBe(join(nested, "atlante.json"));
   });
 
-  test("skips unresolvable presets while keeping the config path", () => {
+  test("keeps a missing config limited to project candidates", () => {
     const dir = tempDir();
-    writeFileSync(
-      join(dir, "atlante.jsonc"),
-      `{
-        "$schema": "${SCHEMA_URI}",
-        "extends": "atlante/missing"
-      }`,
-    );
 
     const result = resolveWatchFiles(dir);
 
-    expect(result.configPath).toBe(join(dir, "atlante.jsonc"));
-    expect(result.presetPaths).toEqual([
-      join(PRESETS_DIR, "missing", "atlante.jsonc"),
-      join(PRESETS_DIR, "missing", "atlante.json"),
+    expect(result.resourcePaths).toEqual([]);
+    expect(result.unresolvedParents).toEqual([]);
+    expect(result.configCandidates).toEqual([
+      join(dir, "atlante.jsonc"),
+      join(dir, "atlante.json"),
     ]);
-  });
-
-  test("stops bundled preset traversal at MAX_PRESET_DEPTH", () => {
-    const dir = tempDir();
-    const firstPresetDir = createPresetDirectory("watch-depth");
-    const firstName = basename(firstPresetDir);
-    const presetNames = Array.from(
-      { length: MAX_PRESET_DEPTH + 1 },
-      (_, index) => (index === 0 ? firstName : `${firstName}-${index}`),
-    );
-
-    for (const [index, name] of presetNames.entries()) {
-      const presetDir = index === 0 ? firstPresetDir : join(PRESETS_DIR, name);
-      if (index > 0) {
-        mkdirSync(presetDir);
-        createdPresets.push(presetDir);
-      }
-      const extendsField =
-        index < MAX_PRESET_DEPTH
-          ? `,\n          "extends": "atlante/${presetNames[index + 1]}"`
-          : "";
-      writeFileSync(
-        join(presetDir, "atlante.jsonc"),
-        `{
-          "$schema": "${SCHEMA_URI}",
-          "values": { "project": "demo" }${extendsField}
-        }`,
-      );
-    }
-    writeFileSync(
-      join(dir, "atlante.jsonc"),
-      `{
-        "$schema": "${SCHEMA_URI}",
-        "extends": "atlante/${presetNames[0]}"
-      }`,
-    );
-
-    const result = resolveWatchFiles(dir);
-
-    expect(result.presetPaths).toEqual(
-      presetNames
-        .slice(0, MAX_PRESET_DEPTH)
-        .map((name) => join(PRESETS_DIR, name, "atlante.jsonc")),
-    );
-    const excludedPreset = presetNames[MAX_PRESET_DEPTH];
-    if (!excludedPreset) throw new Error("missing depth-limit fixture");
-    expect(result.presetPaths).not.toContain(
-      join(PRESETS_DIR, excludedPreset, "atlante.jsonc"),
-    );
-  });
-
-  test("skips a preset id that fails the name pattern", () => {
-    const dir = tempDir();
-    writeFileSync(
-      join(dir, "atlante.jsonc"),
-      `{
-        "$schema": "${SCHEMA_URI}",
-        "extends": "atlante/../.."
-      }`,
-    );
-
-    const result = resolveWatchFiles(dir);
-
-    expect(result.configPath).toBe(join(dir, "atlante.jsonc"));
-    expect(result.presetPaths).toEqual([]);
-  });
-
-  test("returns no preset paths for a config without extends", () => {
-    const dir = tempDir();
-    writeFileSync(join(dir, "atlante.jsonc"), valid);
-
-    expect(resolveWatchFiles(dir).presetPaths).toEqual([]);
   });
 });

@@ -42,14 +42,11 @@ const cliResult = await Bun.build({
   outdir: join(cli, "dist", "bin"),
 });
 if (!cliResult.success) throw new Error(cliResult.logs.join("\n"));
-// Copy content assets to the bundle-relative fallback root. The legacy
-// assets remain available until their consumers are migrated in T10.
-// Remove first so stale entries do not survive rebuilds.
+// Copy the one canonical source-content pack to the bundle-relative fallback
+// root. Remove first so stale entries do not survive rebuilds.
 await rm(join(cli, "bundled"), { force: true, recursive: true });
 await Bun.$`mkdir -p ${join(cli, "bundled")}`;
 await Bun.$`cp -R ${join(ROOT, "packages", "resources", "bundled")} ${join(cli, "bundled", "resources")}`;
-await Bun.$`cp -R ${join(ROOT, "packages", "templates", "bundled")} ${join(cli, "bundled", "templates")}`;
-await Bun.$`cp -R ${join(ROOT, "packages", "presets", "bundled")} ${join(cli, "bundled", "presets")}`;
 // Contract check: the shipped launcher must run under node.
 const bundle = await readFile(join(cli, "dist", "bin", "atlante.js"), "utf8");
 if (!bundle.startsWith("#!/usr/bin/env node"))

@@ -4,7 +4,11 @@ import type {
   ResourcePack,
 } from "@atlante/resources";
 import type { AtlanteDocument } from "@atlante/schema";
-import { type Diagnostic, loadDocument } from "@atlante/validator";
+import {
+  type Diagnostic,
+  loadDocument,
+  type ResourceWatchContext,
+} from "@atlante/validator";
 import { resourceTemplateRegistry } from "./resource-registry.js";
 import type { DirectTemplateRegistry } from "./template-compat.js";
 
@@ -18,6 +22,7 @@ export type LoadedProject = {
   projectRoot?: string;
   registry?: DirectTemplateRegistry;
   resources?: ResolvedResourceDocument;
+  resourceWatch?: ResourceWatchContext;
   diagnostics: Diagnostic[];
 };
 
@@ -44,6 +49,7 @@ export function loadProject(
   if (!loaded.document)
     return {
       ...loadedLocation(loaded.path),
+      resourceWatch: loaded.resourceWatch,
       diagnostics: loaded.diagnostics,
     };
 
@@ -51,6 +57,7 @@ export function loadProject(
     ...loadedLocation(loaded.path),
     document: loaded.document,
     resources: loaded.resources,
+    resourceWatch: loaded.resourceWatch,
     registry: loaded.resources
       ? resourceTemplateRegistry(loaded.resources)
       : undefined,

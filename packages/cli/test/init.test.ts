@@ -52,6 +52,13 @@ describe("runInit", () => {
     const dir = tempDir();
     expect(await runInit(dir, {})).toBe(0);
     expect(existsSync(join(dir, "atlante.jsonc"))).toBe(true);
+    const config = readFileSync(join(dir, "atlante.jsonc"), "utf8");
+    expect(config).toContain('"extends": "atlante/starter"');
+    expect(config).not.toContain("node_modules");
+    expect(config).not.toContain("package.json");
+    expect(existsSync(join(dir, "resources"))).toBe(false);
+    expect(existsSync(join(dir, "templates"))).toBe(false);
+    expect(existsSync(join(dir, "presets"))).toBe(false);
     expect(
       existsSync(join(dir, ".atlante", "artifacts", "manifest.json")),
     ).toBe(true);

@@ -40,6 +40,22 @@ export type DocumentLoadOptions = {
   ) => { isDirectory(): boolean } | undefined;
 };
 
+/** Files and parents needed to retry the same resource resolution. */
+export type ResourceWatchContext = Readonly<{
+  readonly dependencies: readonly string[];
+  readonly unresolvedParents: readonly string[];
+}>;
+
+function resourceWatchContext(value: {
+  readonly dependencies: readonly string[];
+  readonly unresolvedParents: readonly string[];
+}): ResourceWatchContext {
+  return Object.freeze({
+    dependencies: Object.freeze([...value.dependencies]),
+    unresolvedParents: Object.freeze([...value.unresolvedParents]),
+  });
+}
+
 function positionOf(text: string, offset: number) {
   const before = text.slice(0, offset);
   const lines = before.split("\n");
@@ -371,6 +387,7 @@ function resolveResourceBackedDocument(
   path: string;
   projectRoot: string;
   resources?: ReturnType<typeof resolveResourceDocument>;
+  resourceWatch?: ResourceWatchContext;
   diagnostics: Diagnostic[];
 } {
   let projectPack: ResourcePack;
@@ -380,6 +397,7 @@ function resolveResourceBackedDocument(
     if (cause instanceof ResourceResolutionError)
       return {
         ...location,
+        resourceWatch: resourceWatchContext(cause),
         diagnostics: [resourceDiagnostic(cause, path, text)],
       };
     return {
@@ -404,6 +422,7 @@ function resolveResourceBackedDocument(
     if (cause instanceof ResourceResolutionError)
       return {
         ...location,
+        resourceWatch: resourceWatchContext(cause),
         diagnostics: [resourceDiagnostic(cause, path, text)],
       };
     return {
@@ -422,13 +441,15 @@ function resolveResourceBackedDocument(
     ...validateResolvedDocument(resources),
   ];
   const sorted = sortDiagnostics(diagnostics);
+  const resourceWatch = resourceWatchContext(resources);
   if (!canonical.success || sorted.some(({ severity }) => severity === "error"))
-    return { ...location, diagnostics: sorted };
+    return { ...location, resourceWatch, diagnostics: sorted };
 
   return {
     ...location,
     document: canonical.data,
     resources,
+    resourceWatch,
     diagnostics: sorted,
   };
 }
@@ -442,6 +463,7 @@ export function loadDocument(
   path?: string;
   projectRoot?: string;
   resources?: ReturnType<typeof resolveResourceDocument>;
+  resourceWatch?: ResourceWatchContext;
   diagnostics: Diagnostic[];
 } {
   const target = resolve(pathOrDirectory);
