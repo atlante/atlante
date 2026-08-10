@@ -79,6 +79,15 @@ function isRootPath(pack: ResourcePack, candidate: string): boolean {
   return lexicalRootFor(pack, candidate) !== undefined;
 }
 
+function pathPrefixes(root: string, normalized: string): readonly string[] {
+  const parts = relative(root, normalized).split(sep).filter(Boolean);
+  let prefix = root;
+  return parts.map((part) => {
+    prefix = join(prefix, part);
+    return prefix;
+  });
+}
+
 type ParentLookup =
   | { readonly kind: "parents"; readonly paths: readonly string[] }
   | { readonly kind: "escaped" };
@@ -174,29 +183,11 @@ type SymlinkPrefixInspection = Readonly<{
   readonly escaped: boolean;
 }>;
 
-function inspectSymlinkPrefix(
+function inspectSymlinkTarget(
   pack: ResourcePack,
   prefix: string,
-  inspected: Set<string>,
-  paths: Set<string>,
 ): SymlinkPrefixInspection {
-  if (inspected.has(prefix)) {
-    return { missing: false, escaped: false };
-  }
-  inspected.add(prefix);
-
-  let stat: ReturnType<typeof lstatSync>;
-  try {
-    stat = lstatSync(prefix);
-  } catch {
-    return { missing: true, escaped: false };
-  }
-  if (!stat.isSymbolicLink()) return { missing: false, escaped: false };
-
-  paths.add(prefix);
   const parent = dirname(prefix);
-  if (isRootPath(pack, parent)) paths.add(parent);
-
   let canonicalParent: string;
   let link: string;
   try {
@@ -226,6 +217,57 @@ function inspectSymlinkPrefix(
   };
 }
 
+function inspectSymlinkPrefix(
+  pack: ResourcePack,
+  prefix: string,
+  inspected: Set<string>,
+  paths: Set<string>,
+): SymlinkPrefixInspection {
+  if (inspected.has(prefix)) {
+    return { missing: false, escaped: false };
+  }
+  inspected.add(prefix);
+
+  let stat: ReturnType<typeof lstatSync>;
+  try {
+    stat = lstatSync(prefix);
+  } catch {
+    return { missing: true, escaped: false };
+  }
+  if (!stat.isSymbolicLink()) return { missing: false, escaped: false };
+
+  paths.add(prefix);
+  const parent = dirname(prefix);
+  if (isRootPath(pack, parent)) paths.add(parent);
+  return inspectSymlinkTarget(pack, prefix);
+}
+
+function inspectCanonicalPrefixes(
+  pack: ResourcePack,
+  root: string,
+  normalized: string,
+  active: Set<string>,
+  completed: Set<string>,
+  unresolved: Set<string>,
+): boolean {
+  for (const prefix of pathPrefixes(root, normalized)) {
+    const inspection = inspectSymlinkPrefix(pack, prefix, new Set(), new Set());
+    if (inspection.escaped) return false;
+    if (inspection.target) {
+      const targetIsSafe = inspectCanonicalPath(
+        pack,
+        inspection.target,
+        active,
+        completed,
+        unresolved,
+      );
+      if (!targetIsSafe) return false;
+    }
+    if (inspection.missing) break;
+  }
+  return true;
+}
+
 function inspectCanonicalPath(
   pack: ResourcePack,
   current: string,
@@ -243,35 +285,14 @@ function inspectCanonicalPath(
 
   let safe = true;
   try {
-    const parts = relative(root, normalized).split(sep).filter(Boolean);
-    let prefix = root;
-    for (const part of parts) {
-      prefix = join(prefix, part);
-      const inspection = inspectSymlinkPrefix(
-        pack,
-        prefix,
-        new Set(),
-        new Set(),
-      );
-      if (inspection.escaped) {
-        safe = false;
-        break;
-      }
-      if (
-        inspection.target &&
-        !inspectCanonicalPath(
-          pack,
-          inspection.target,
-          active,
-          completed,
-          unresolved,
-        )
-      ) {
-        safe = false;
-        break;
-      }
-      if (inspection.missing) break;
-    }
+    safe = inspectCanonicalPrefixes(
+      pack,
+      root,
+      normalized,
+      active,
+      completed,
+      unresolved,
+    );
 
     if (safe) {
       const parents = pendingParents(pack, normalized);
@@ -287,6 +308,34 @@ function inspectCanonicalPath(
 
   if (safe) completed.add(normalized);
   return safe;
+}
+
+function collectLexicalWatchPrefixes(
+  pack: ResourcePack,
+  root: string,
+  normalized: string,
+  paths: Set<string>,
+  unresolved: Set<string>,
+  visited: Set<string>,
+  inspected: Set<string>,
+): boolean {
+  for (const prefix of pathPrefixes(root, normalized)) {
+    const inspection = inspectSymlinkPrefix(pack, prefix, inspected, paths);
+    if (inspection.escaped) return false;
+    if (inspection.watchTarget) {
+      collectLexicalWatchPath(
+        pack,
+        inspection.watchTarget,
+        paths,
+        unresolved,
+        visited,
+        inspected,
+        true,
+      );
+    }
+    if (inspection.missing) break;
+  }
+  return true;
 }
 
 /** Collects authored watch spellings without making them a safety decision. */
@@ -306,29 +355,21 @@ function collectLexicalWatchPath(
   if (visited.has(normalized)) return;
   visited.add(normalized);
 
-  const parts = relative(root, normalized).split(sep).filter(Boolean);
-  let prefix = root;
-  for (const part of parts) {
-    prefix = join(prefix, part);
-    const inspection = inspectSymlinkPrefix(pack, prefix, inspected, paths);
-    if (inspection.escaped) {
-      // The canonical walk has already made the safety decision. An escaped
-      // lexical alternative is not a dependency and must not reject a safe
-      // canonical target.
-      return;
-    }
-    if (inspection.watchTarget) {
-      collectLexicalWatchPath(
-        pack,
-        inspection.watchTarget,
-        paths,
-        unresolved,
-        visited,
-        inspected,
-        true,
-      );
-    }
-    if (inspection.missing) break;
+  if (
+    !collectLexicalWatchPrefixes(
+      pack,
+      root,
+      normalized,
+      paths,
+      unresolved,
+      visited,
+      inspected,
+    )
+  ) {
+    // The canonical walk has already made the safety decision. An escaped
+    // lexical alternative is not a dependency and must not reject a safe
+    // canonical target.
+    return;
   }
 
   if (collectParents) {
@@ -445,6 +486,76 @@ type AuthoringDirectory = Readonly<{
   readonly lexical: string;
 }>;
 
+function canonicalMissingAuthoringDirectory(
+  pack: ResourcePack,
+  authoringFile: string,
+  locator: RawResourceLocator,
+  lexical: string,
+): AuthoringDirectory {
+  const directory = dirname(authoringFile);
+  let canonicalDirectory: string;
+  try {
+    canonicalDirectory = realpathSync(directory);
+  } catch {
+    return failResource("missing-target", "authoring file is unavailable", {
+      locator,
+    });
+  }
+  if (!isWithin(pack.root, canonicalDirectory)) {
+    return failResource(
+      "unsafe-path",
+      "authoring file is outside the resource root",
+      { locator },
+    );
+  }
+  return { canonical: canonicalDirectory, lexical };
+}
+
+function canonicalAuthoringFile(
+  pack: ResourcePack,
+  authoringFile: string,
+  locator: RawResourceLocator,
+  lexical: string,
+): AuthoringDirectory {
+  let authoringPath: string;
+  try {
+    authoringPath = realpathSync(authoringFile);
+  } catch {
+    return canonicalMissingAuthoringDirectory(
+      pack,
+      authoringFile,
+      locator,
+      lexical,
+    );
+  }
+
+  let authoringIsFile: boolean;
+  try {
+    authoringIsFile = lstatSync(authoringPath).isFile();
+  } catch {
+    return failResource("missing-target", "authoring file is unavailable", {
+      locator,
+    });
+  }
+  if (!authoringIsFile) {
+    return failResource(
+      "wrong-target-type",
+      "authoring path is not a regular file",
+      { locator },
+    );
+  }
+
+  const directory = dirname(authoringPath);
+  if (!isWithin(pack.root, directory)) {
+    return failResource(
+      "unsafe-path",
+      "authoring file is outside the resource root",
+      { locator },
+    );
+  }
+  return { canonical: directory, lexical };
+}
+
 function targetFailure(
   pack: ResourcePack,
   locator: RawResourceLocator,
@@ -507,64 +618,12 @@ function canonicalAuthoringDirectory(
       candidateContext(pack, lexicalFile),
     );
   }
-  const lexical = dirname(lexicalFile);
-
-  let authoringPath: string;
-  try {
-    authoringPath = realpathSync(authoringFile);
-  } catch {
-    const directory = dirname(authoringFile);
-    let canonicalDirectory: string;
-    try {
-      canonicalDirectory = realpathSync(directory);
-    } catch {
-      return failResource("missing-target", "authoring file is unavailable", {
-        locator,
-      });
-    }
-    if (!isWithin(pack.root, canonicalDirectory)) {
-      return failResource(
-        "unsafe-path",
-        "authoring file is outside the resource root",
-        {
-          locator,
-        },
-      );
-    }
-    return { canonical: canonicalDirectory, lexical };
-  }
-
-  let authoringIsFile: boolean;
-  try {
-    authoringIsFile = lstatSync(authoringPath).isFile();
-  } catch {
-    return failResource("missing-target", "authoring file is unavailable", {
-      locator,
-    });
-  }
-  if (!authoringIsFile) {
-    return failResource(
-      "wrong-target-type",
-      "authoring path is not a regular file",
-      {
-        locator,
-      },
-    );
-  }
-
-  {
-    const directory = dirname(authoringPath);
-    if (!isWithin(pack.root, directory)) {
-      return failResource(
-        "unsafe-path",
-        "authoring file is outside the resource root",
-        {
-          locator,
-        },
-      );
-    }
-    return { canonical: directory, lexical };
-  }
+  return canonicalAuthoringFile(
+    pack,
+    authoringFile,
+    locator,
+    dirname(lexicalFile),
+  );
 }
 
 function canonicalDirectory(

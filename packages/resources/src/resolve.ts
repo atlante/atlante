@@ -29,6 +29,7 @@ import {
   type ResourceGraphState,
   snapshotResourceGraph,
 } from "./graph.js";
+import { jsonValueAtPath } from "./json-path.js";
 import type { JsoncLocation } from "./jsonc.js";
 import { isSafeJsonObject } from "./jsonc.js";
 import { parseResourceLocator } from "./locator.js";
@@ -268,6 +269,35 @@ type SourceMetadata = Readonly<{
   readonly values?: JsonObject;
 }>;
 
+function sourceValueTombstones(value: JsonObject): string[] {
+  return (resourceValueTombstones(value) ?? [])
+    .filter((pointer) => pointer.startsWith("/values/"))
+    .map((pointer) => pointer.slice("/values".length));
+}
+
+function copySourceValues(
+  sourceValues: JsonObject,
+  inheritedTombstones: readonly string[],
+): JsonObject {
+  const output: Record<string, JsonValue> = {};
+  const tombstones = new Set<string>(inheritedTombstones);
+  for (const key of Object.keys(sourceValues).sort()) {
+    const child = sourceValues[key] as JsonValue;
+    if (child === null) {
+      tombstones.add(`/${escapePointer(key)}`);
+      continue;
+    }
+    own(output, key, cloneValue(child));
+  }
+
+  for (const pointer of resourceValueTombstones(sourceValues) ?? [])
+    tombstones.add(pointer);
+  return withResourceValueTombstones(
+    output as JsonObject,
+    [...tombstones].sort(),
+  );
+}
+
 type BindingCollection = Readonly<{
   readonly bindings: Readonly<Record<string, ResolvedResourceBinding>>;
   readonly normalized: Readonly<Record<string, Record<string, unknown>>>;
@@ -352,6 +382,18 @@ type SlotCandidateContext = Readonly<{
   readonly sourcePointer: string;
 }>;
 
+function unchangedNormalizedValue(
+  value: JsonValue,
+  provenance: ResourceProvenance,
+  authoring: AuthoringProvenance,
+): NormalizedValue {
+  return {
+    value: cloneValue(value),
+    provenance: cloneResourceProvenance(provenance),
+    authoring: sliceContextMap(authoring, ""),
+  };
+}
+
 function isObject(value: unknown): value is Record<string, JsonValue> {
   return (
     typeof value === "object" &&
@@ -359,6 +401,26 @@ function isObject(value: unknown): value is Record<string, JsonValue> {
     !Array.isArray(value) &&
     (Object.getPrototypeOf(value) === Object.prototype ||
       Object.getPrototypeOf(value) === null)
+  );
+}
+
+function selectedSlotCandidate(
+  value: JsonValue,
+  candidates: readonly ResolvedTemplateSlot[],
+): ResolvedTemplateSlot | undefined {
+  const selectedTemplateId = resourceTemplateSelection(value)?.templateId;
+  return candidates.find(({ slot }) => slot.templateId === selectedTemplateId);
+}
+
+function isConfiguredSlotValue(
+  value: JsonValue,
+  candidates: readonly ResolvedTemplateSlot[],
+): boolean {
+  if (isObject(value)) return selectorKeys(value).length > 0;
+  if (typeof value !== "string") return false;
+  return (
+    isBareResourceLocator(value) ||
+    candidates.every(({ template }) => templateAcceptsObject(template))
   );
 }
 
@@ -573,24 +635,6 @@ function replaceContextSubtree<T>(
   }
 }
 
-function valueAt(
-  value: JsonValue,
-  path: readonly string[],
-): JsonValue | undefined {
-  let current: JsonValue | undefined = value;
-  for (const segment of path) {
-    if (Array.isArray(current)) {
-      if (!/^\d+$/.test(segment)) return undefined;
-      current = current[Number(segment)];
-      continue;
-    }
-    if (!isObject(current) || !Object.hasOwn(current, segment))
-      return undefined;
-    current = current[segment] as JsonValue;
-  }
-  return current;
-}
-
 function isBareResourceLocator(value: string): boolean {
   try {
     parseResourceLocator(value);
@@ -634,7 +678,7 @@ function setAt(
   const parentPath = path.slice(0, -1);
   const key = path.at(-1);
   if (key === undefined) return;
-  const parent = valueAt(value, parentPath);
+  const parent = jsonValueAtPath<JsonValue>(value, parentPath);
   if (Array.isArray(parent)) {
     if (/^\d+$/.test(key)) parent[Number(key)] = replacement;
     return;
@@ -1632,11 +1676,7 @@ class ResourceResolver {
     const candidates = uniqueResolvedSlots(slots);
     const first = candidates[0];
     if (!first) {
-      return {
-        value: cloneValue(value),
-        provenance: cloneResourceProvenance(provenance),
-        authoring: sliceContextMap(authoring, ""),
-      };
+      return unchangedNormalizedValue(value, provenance, authoring);
     }
     if (candidates.length === 1) {
       return this.normalizeSlotValue(
@@ -1652,10 +1692,7 @@ class ResourceResolver {
       );
     }
 
-    const selectedTemplateId = resourceTemplateSelection(value)?.templateId;
-    const selected = candidates.find(
-      ({ slot }) => slot.templateId === selectedTemplateId,
-    );
+    const selected = selectedSlotCandidate(value, candidates);
     if (selected) {
       return this.normalizeSlotValue(
         value,
@@ -1670,18 +1707,8 @@ class ResourceResolver {
       );
     }
 
-    const configured =
-      (isObject(value) && selectorKeys(value).length > 0) ||
-      (typeof value === "string" &&
-        (isBareResourceLocator(value) ||
-          candidates.every(({ template }) => templateAcceptsObject(template))));
-    if (!configured) {
-      return {
-        value: cloneValue(value),
-        provenance: cloneResourceProvenance(provenance),
-        authoring: sliceContextMap(authoring, ""),
-      };
-    }
+    if (!isConfiguredSlotValue(value, candidates))
+      return unchangedNormalizedValue(value, provenance, authoring);
 
     return this.normalizeConfiguredSlot({
       value,
@@ -2269,10 +2296,7 @@ class ResourceResolver {
     path: readonly ResourceGraphNode[],
     hops: number,
   ): JsonObject | undefined {
-    const rootTombstones = resourceValueTombstones(value) ?? [];
-    const valueTombstones = rootTombstones
-      .filter((pointer) => pointer.startsWith("/values/"))
-      .map((pointer) => pointer.slice("/values".length));
+    const valueTombstones = sourceValueTombstones(value);
     if (!Object.hasOwn(value, "values")) {
       return valueTombstones.length > 0
         ? withResourceValueTombstones({}, valueTombstones)
@@ -2288,26 +2312,7 @@ class ResourceResolver {
           pointer: sourcePointer ? `${sourcePointer}/values` : "/values",
         },
       );
-    const sourceValues = value.values as JsonObject;
-    const output: Record<string, JsonValue> = {};
-    const tombstones = new Set<string>();
-    for (const key of Object.keys(sourceValues).sort()) {
-      const child = sourceValues[key] as JsonValue;
-      if (child === null) {
-        tombstones.add(`/${escapePointer(key)}`);
-        continue;
-      }
-      own(output, key, cloneValue(child));
-    }
-
-    for (const pointer of valueTombstones) tombstones.add(pointer);
-    for (const pointer of resourceValueTombstones(sourceValues) ?? [])
-      tombstones.add(pointer);
-
-    return withResourceValueTombstones(
-      output as JsonObject,
-      [...tombstones].sort(),
-    );
+    return copySourceValues(value.values as JsonObject, valueTombstones);
   }
 
   private sourceMetadata(

@@ -9,6 +9,7 @@ import {
   interpolateValues,
   isCompositionMarker,
   isValidValueKey,
+  jsonValueAtPath,
   MAX_REFERENCE_HOPS,
   MissingValueError,
   NonStringValueError,
@@ -484,23 +485,113 @@ function schemaNodeAtPath(
   schema: Record<string, unknown>,
   path: readonly string[],
 ): unknown {
-  let current: unknown = schema;
-  for (const segment of path) {
-    if (Array.isArray(current)) {
-      if (!/^\d+$/.test(segment)) return undefined;
-      current = current[Number(segment)];
-      continue;
-    }
-    if (!isRecord(current)) return undefined;
-    if (
-      isRecord(current.properties) &&
-      Object.hasOwn(current.properties, segment)
-    )
-      current = current.properties[segment];
-    else if (Object.hasOwn(current, segment)) current = current[segment];
-    else return undefined;
+  return jsonValueAtPath(schema, path, schemaObjectValue);
+}
+
+function schemaObjectValue(
+  current: Record<string, unknown>,
+  segment: string,
+): unknown {
+  if (
+    isRecord(current.properties) &&
+    Object.hasOwn(current.properties, segment)
+  )
+    return current.properties[segment];
+  return Object.hasOwn(current, segment) ? current[segment] : undefined;
+}
+
+function inputContextsAtArray(
+  context: SelectionInputContext,
+  segment: string,
+): SelectionInputContext[] {
+  if (!/^\d+$/.test(segment)) return [];
+  const child = (context.schema as unknown[])[Number(segment)];
+  if (child === undefined) return [];
+  return [
+    {
+      schema: child,
+      value: context.value,
+      path: context.tupleItems ? [...context.path, segment] : context.path,
+      tupleItems: false,
+    },
+  ];
+}
+
+function inputContextsAtProperty(
+  context: SelectionInputContext,
+  segment: string,
+): SelectionInputContext[] | undefined {
+  const properties = (context.schema as Record<string, unknown>).properties;
+  if (!isRecord(properties) || !Object.hasOwn(properties, segment))
+    return undefined;
+  const value =
+    isRecord(context.value) && Object.hasOwn(context.value, segment)
+      ? context.value[segment]
+      : undefined;
+  return [
+    {
+      schema: properties[segment],
+      value,
+      path: [...context.path, segment],
+      tupleItems: false,
+    },
+  ];
+}
+
+function inputContextsAtSchemaMember(
+  context: SelectionInputContext,
+  segment: string,
+): SelectionInputContext[] {
+  const schema = context.schema as Record<string, unknown>;
+  if (!Object.hasOwn(schema, segment)) return [];
+  const child = schema[segment];
+  if (segment !== "items") {
+    return [
+      {
+        schema: child,
+        value: context.value,
+        path: context.path,
+        tupleItems: false,
+      },
+    ];
   }
-  return current;
+  if (Array.isArray(child))
+    return [
+      {
+        schema: child,
+        value: context.value,
+        path: context.path,
+        tupleItems: true,
+      },
+    ];
+  if (Array.isArray(context.value))
+    return context.value.map((value, index) => ({
+      schema: child,
+      value,
+      path: [...context.path, String(index)],
+      tupleItems: false,
+    }));
+  return [
+    {
+      schema: child,
+      value: undefined,
+      path: context.path,
+      tupleItems: false,
+    },
+  ];
+}
+
+function inputContextsAtSegment(
+  context: SelectionInputContext,
+  segment: string,
+): SelectionInputContext[] {
+  if (Array.isArray(context.schema))
+    return inputContextsAtArray(context, segment);
+  if (!isRecord(context.schema)) return [];
+  return (
+    inputContextsAtProperty(context, segment) ??
+    inputContextsAtSchemaMember(context, segment)
+  );
 }
 
 function inputContextsAtSchemaPath(
@@ -513,83 +604,51 @@ function inputContextsAtSchemaPath(
   ];
 
   for (const segment of path) {
-    contexts = contexts.flatMap((context): SelectionInputContext[] => {
-      if (Array.isArray(context.schema)) {
-        if (!/^\d+$/.test(segment)) return [];
-        const child = context.schema[Number(segment)];
-        if (child === undefined) return [];
-        return [
-          {
-            schema: child,
-            value: context.value,
-            path: context.tupleItems
-              ? [...context.path, segment]
-              : context.path,
-            tupleItems: false,
-          },
-        ];
-      }
-      if (!isRecord(context.schema)) return [];
-
-      if (
-        isRecord(context.schema.properties) &&
-        Object.hasOwn(context.schema.properties, segment)
-      ) {
-        const value =
-          isRecord(context.value) && Object.hasOwn(context.value, segment)
-            ? context.value[segment]
-            : undefined;
-        return [
-          {
-            schema: context.schema.properties[segment],
-            value,
-            path: [...context.path, segment],
-            tupleItems: false,
-          },
-        ];
-      }
-
-      if (!Object.hasOwn(context.schema, segment)) return [];
-      const child = context.schema[segment];
-      if (segment === "items") {
-        if (Array.isArray(child))
-          return [
-            {
-              schema: child,
-              value: context.value,
-              path: context.path,
-              tupleItems: true,
-            },
-          ];
-        if (Array.isArray(context.value))
-          return context.value.map((value, index) => ({
-            schema: child,
-            value,
-            path: [...context.path, String(index)],
-            tupleItems: false,
-          }));
-        return [
-          {
-            schema: child,
-            value: undefined,
-            path: context.path,
-            tupleItems: false,
-          },
-        ];
-      }
-
-      return [
-        {
-          schema: child,
-          value: context.value,
-          path: context.path,
-          tupleItems: false,
-        },
-      ];
-    });
+    contexts = contexts.flatMap((context) =>
+      inputContextsAtSegment(context, segment),
+    );
   }
 
   return contexts;
+}
+
+type SchemaDataPathStep = Readonly<{
+  readonly value: unknown;
+  readonly includeSegment: boolean;
+  readonly tupleItems: boolean;
+}>;
+
+function schemaDataPathStep(
+  current: unknown,
+  segment: string,
+  tupleItems: boolean,
+): SchemaDataPathStep | undefined {
+  if (Array.isArray(current)) {
+    if (!/^\d+$/.test(segment)) return undefined;
+    return {
+      value: current[Number(segment)],
+      includeSegment: tupleItems,
+      tupleItems: false,
+    };
+  }
+  if (!isRecord(current)) return undefined;
+  if (
+    isRecord(current.properties) &&
+    Object.hasOwn(current.properties, segment)
+  ) {
+    return {
+      value: current.properties[segment],
+      includeSegment: true,
+      tupleItems: false,
+    };
+  }
+  if (!Object.hasOwn(current, segment)) return undefined;
+  const value = current[segment];
+  return {
+    value,
+    includeSegment: false,
+    tupleItems: segment === "items" && Array.isArray(value),
+  };
 }
 
 function schemaDataPath(
@@ -600,26 +659,11 @@ function schemaDataPath(
   let tupleItems = false;
   const dataPath: string[] = [];
   for (const segment of path) {
-    if (Array.isArray(current)) {
-      if (!/^\d+$/.test(segment)) break;
-      if (tupleItems) dataPath.push(segment);
-      current = current[Number(segment)];
-      tupleItems = false;
-      continue;
-    }
-    if (!isRecord(current)) break;
-    if (
-      isRecord(current.properties) &&
-      Object.hasOwn(current.properties, segment)
-    ) {
-      dataPath.push(segment);
-      current = current.properties[segment];
-      tupleItems = false;
-      continue;
-    }
-    if (!Object.hasOwn(current, segment)) break;
-    current = current[segment];
-    tupleItems = segment === "items" && Array.isArray(current);
+    const step = schemaDataPathStep(current, segment, tupleItems);
+    if (!step) break;
+    if (step.includeSegment) dataPath.push(segment);
+    current = step.value;
+    tupleItems = step.tupleItems;
   }
   return dataPath;
 }
@@ -640,41 +684,29 @@ function compositionBranchPath(
 }
 
 function concreteValueAtPath(input: unknown, path: readonly string[]): unknown {
-  let current = input;
-  for (const segment of path) {
-    if (Array.isArray(current)) {
-      if (!/^\d+$/.test(segment)) return undefined;
-      current = current[Number(segment)];
-      continue;
-    }
-    if (!isRecord(current) || !Object.hasOwn(current, segment))
-      return undefined;
-    current = current[segment];
-  }
-  return current;
+  return jsonValueAtPath(input, path);
 }
 
-function copyTemplateSelections(source: unknown, target: unknown): void {
-  if (
-    typeof source !== "object" ||
-    source === null ||
-    typeof target !== "object" ||
-    target === null
-  )
-    return;
-  const selection = resourceTemplateSelection(source);
-  if (selection) withResourceTemplateSelection(target, selection.templateId);
-  if (Array.isArray(source) && Array.isArray(target)) {
+function copyTemplateSelectionChildren(source: unknown, target: unknown): void {
+  if (Array.isArray(source)) {
+    if (!Array.isArray(target)) return;
     for (const [index, child] of source.entries())
       copyTemplateSelections(child, target[index]);
     return;
   }
-  if (Array.isArray(source) || Array.isArray(target)) return;
+  if (Array.isArray(target)) return;
   const sourceRecord = source as Record<string, unknown>;
   const targetRecord = target as Record<string, unknown>;
   for (const key of Object.keys(sourceRecord))
     if (Object.hasOwn(targetRecord, key))
       copyTemplateSelections(sourceRecord[key], targetRecord[key]);
+}
+
+function copyTemplateSelections(source: unknown, target: unknown): void {
+  if (!isRecord(source) || !isRecord(target)) return;
+  const selection = resourceTemplateSelection(source);
+  if (selection) withResourceTemplateSelection(target, selection.templateId);
+  copyTemplateSelectionChildren(source, target);
 }
 
 function resolvedSlotGroups(

@@ -190,6 +190,47 @@ describe("resource locator resolution", () => {
     );
   });
 
+  test("preserves authoring-directory failures without requiring a source file", () => {
+    const root = projectRoot();
+    const resource = join(root, "resource");
+    mkdirSync(resource);
+    const pack = createProjectResourcePack(root);
+
+    expect(
+      resolveResourceLocator(pack, "./resource", join(root, "missing.jsonc"))
+        .directory,
+    ).toBe(join(pack.root, "resource"));
+    expectFailure(
+      () =>
+        resolveResourceLocator(
+          pack,
+          "./resource",
+          join(root, "missing", "source.jsonc"),
+        ),
+      "missing-target",
+    );
+
+    const authoringDirectory = join(root, "authoring-directory");
+    mkdirSync(authoringDirectory);
+    expectFailure(
+      () => resolveResourceLocator(pack, "./resource", authoringDirectory),
+      "wrong-target-type",
+    );
+  });
+
+  test("rejects a cyclic in-root symlink target", () => {
+    const root = projectRoot();
+    const containing = authoringFile(root, "source.jsonc");
+    symlinkSync("second", join(root, "first"), "dir");
+    symlinkSync("first", join(root, "second"), "dir");
+    const pack = createProjectResourcePack(root);
+
+    expectFailure(
+      () => resolveResourceLocator(pack, "./first", containing),
+      "unsafe-path",
+    );
+  });
+
   test("resolves relative symlink targets from their canonical parent", () => {
     const root = projectRoot();
     const containing = authoringFile(root, "source.jsonc");

@@ -115,14 +115,6 @@ function parseSource(
   return { value: materialize(parsed), locations };
 }
 
-/** Parses one selected JSONC file and never enumerates sibling resources. */
-export function parseJsonc(source: string): unknown {
-  return parseSource(source, {
-    allowTrailingComma: true,
-    disallowComments: false,
-  }).value;
-}
-
 export function parseJsoncWithLocations(source: string): ParsedJsonc {
   return parseSource(source, {
     allowTrailingComma: true,

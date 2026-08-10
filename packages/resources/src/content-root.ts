@@ -23,6 +23,40 @@ const lexicalRootChains = new WeakMap<
   readonly CapturedSymlink[]
 >();
 
+type SymlinkPrefixResult =
+  | { readonly kind: "missing" }
+  | { readonly kind: "plain" }
+  | { readonly kind: "link"; readonly target: string };
+
+function inspectSymlinkPrefix(
+  path: string,
+  links: CapturedSymlink[],
+): SymlinkPrefixResult {
+  let isSymlink: boolean;
+  try {
+    isSymlink = lstatSync(path).isSymbolicLink();
+  } catch {
+    return { kind: "missing" };
+  }
+  if (!isSymlink) return { kind: "plain" };
+
+  let targetText: string;
+  let canonicalParent: string;
+  try {
+    targetText = readlinkSync(path);
+    canonicalParent = realpathSync(dirname(path));
+  } catch {
+    return { kind: "missing" };
+  }
+
+  const link = { path, target: targetText };
+  if (!links.some((entry) => entry.path === path)) links.push(link);
+  const target = isAbsolute(targetText)
+    ? resolve(targetText)
+    : resolve(canonicalParent, targetText);
+  return { kind: "link", target };
+}
+
 function collectSymlinkChain(
   path: string,
   links: CapturedSymlink[],
@@ -34,43 +68,24 @@ function collectSymlinkChain(
   if (active.has(normalized)) return false;
   active.add(normalized);
 
-  let prefix: string = sep;
-  const parts = normalized.slice(sep.length).split(sep).filter(Boolean);
-  for (const part of parts) {
-    prefix = join(prefix, part);
-    let isSymlink: boolean;
-    try {
-      isSymlink = lstatSync(prefix).isSymbolicLink();
-    } catch {
-      active.delete(normalized);
-      return false;
+  let complete = false;
+  try {
+    let prefix: string = sep;
+    const parts = normalized.slice(sep.length).split(sep).filter(Boolean);
+    for (const part of parts) {
+      prefix = join(prefix, part);
+      const inspection = inspectSymlinkPrefix(prefix, links);
+      if (inspection.kind === "missing") return false;
+      if (inspection.kind === "plain") continue;
+      if (!collectSymlinkChain(inspection.target, links, active, completed))
+        return false;
     }
-    if (!isSymlink) continue;
-
-    let targetText: string;
-    let canonicalParent: string;
-    try {
-      targetText = readlinkSync(prefix);
-      canonicalParent = realpathSync(dirname(prefix));
-    } catch {
-      active.delete(normalized);
-      return false;
-    }
-
-    const link = { path: prefix, target: targetText };
-    if (!links.some((entry) => entry.path === prefix)) links.push(link);
-    const target = isAbsolute(targetText)
-      ? resolve(targetText)
-      : resolve(canonicalParent, targetText);
-    if (!collectSymlinkChain(target, links, active, completed)) {
-      active.delete(normalized);
-      return false;
-    }
+    complete = true;
+    return true;
+  } finally {
+    active.delete(normalized);
+    if (complete) completed.add(normalized);
   }
-
-  active.delete(normalized);
-  completed.add(normalized);
-  return true;
 }
 
 function captureLexicalRootChain(

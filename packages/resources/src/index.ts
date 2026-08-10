@@ -56,6 +56,7 @@ export {
   MAX_REFERENCE_HOPS,
   snapshotResourceGraph,
 } from "./graph.js";
+export { jsonValueAtPath } from "./json-path.js";
 export type { JsoncLocation, ParsedJsonc } from "./jsonc.js";
 export {
   JsoncParseError,
