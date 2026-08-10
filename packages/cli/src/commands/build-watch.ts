@@ -1,6 +1,7 @@
 import {
   lstatSync,
   realpathSync,
+  type Stats,
   statSync,
   unwatchFile,
   watchFile,
@@ -12,7 +13,6 @@ import {
   applyWatchChanges,
   desiredWatchPaths,
   recoveryWatchPaths,
-  successfulWatchPaths,
   watchChanges,
 } from "./build-watch-reconcile.js";
 
@@ -33,20 +33,35 @@ export type BuildWatchHandle = {
 
 const POLL_INTERVAL_MS = 100;
 const DEFAULT_DEBOUNCE_MS = 150;
+type WatchListener = (current: Stats) => void;
+const registeredWatchers = new WeakMap<
+  WatchCallback,
+  Map<string, WatchListener>
+>();
 
 const defaultDeps: Required<BuildWatchDeps> = {
   build: runBuildWithContext,
   watch: (path, callback) => {
     let exists = statSync(path, { throwIfNoEntry: false }) !== undefined;
-    watchFile(path, { interval: POLL_INTERVAL_MS }, (current) => {
+    const listener: WatchListener = (current) => {
       const currentExists = current.nlink > 0;
       if (!exists && !currentExists) return;
       exists = currentExists;
       callback();
-    });
+    };
+    const listeners = registeredWatchers.get(callback) ?? new Map();
+    const previous = listeners.get(path);
+    if (previous) unwatchFile(path, previous);
+    listeners.set(path, listener);
+    registeredWatchers.set(callback, listeners);
+    watchFile(path, { interval: POLL_INTERVAL_MS }, listener);
   },
-  unwatch: (path) => {
-    unwatchFile(path);
+  unwatch: (path, callback) => {
+    const listeners = registeredWatchers.get(callback);
+    const listener = listeners?.get(path);
+    if (!listener) return;
+    unwatchFile(path, listener);
+    listeners?.delete(path);
   },
   debounceMs: DEFAULT_DEBOUNCE_MS,
   onStop: () => {},
@@ -91,14 +106,8 @@ function watchPathsOf(files: WatchFiles): string[] {
   return result;
 }
 
-function codeOf(outcome: number | BuildOutcome): number {
-  return typeof outcome === "number" ? outcome : outcome.code;
-}
-
-function contextOf(
-  outcome: number | BuildOutcome,
-): BuildOutcome["resourceWatch"] {
-  return typeof outcome === "number" ? undefined : outcome.resourceWatch;
+function normalizeBuildOutcome(outcome: number | BuildOutcome): BuildOutcome {
+  return typeof outcome === "number" ? { code: outcome } : outcome;
 }
 
 export function runBuildWatchWithDependencies(
@@ -112,7 +121,6 @@ export function runBuildWatchWithDependencies(
   let building = false;
   let pending = false;
   let stopped = false;
-  let successfulPaths = new Set<string>();
   let recoveryPaths = new Set<string>();
   let lastFiles: WatchFiles | undefined;
   let resolveExited: (code: number) => void = () => {};
@@ -132,26 +140,9 @@ export function runBuildWatchWithDependencies(
   function reconcile(files: WatchFiles, succeeded: boolean): void {
     if (stopped) return;
     const current = new Set(watchPathsOf(files));
-    const desired = desiredWatchPaths(
-      current,
-      successfulPaths,
-      recoveryPaths,
-      succeeded,
-      files.resourceResolutionSucceeded,
-    );
-    successfulPaths = successfulWatchPaths(
-      current,
-      successfulPaths,
-      succeeded,
-      files.resourceResolutionSucceeded,
-    );
-    recoveryPaths = recoveryWatchPaths(
-      current,
-      successfulPaths,
-      recoveryPaths,
-      succeeded,
-      files.resourceResolutionSucceeded,
-    );
+    const fullySucceeded = succeeded && files.resourceResolutionSucceeded;
+    const desired = desiredWatchPaths(current, recoveryPaths, fullySucceeded);
+    recoveryPaths = recoveryWatchPaths(current, recoveryPaths, fullySucceeded);
     applyWatchChanges(
       watchChanges(watched, desired),
       watched,
@@ -167,11 +158,11 @@ export function runBuildWatchWithDependencies(
       return;
     }
     building = true;
-    let outcome: number | BuildOutcome = 1;
+    let outcome: BuildOutcome = { code: 1 };
     let succeeded = false;
     try {
-      outcome = deps.build(target);
-      succeeded = codeOf(outcome) === 0;
+      outcome = normalizeBuildOutcome(deps.build(target));
+      succeeded = outcome.code === 0;
     } catch (cause) {
       console.error(
         `error: ${cause instanceof Error ? cause.message : String(cause)}`,
@@ -179,7 +170,7 @@ export function runBuildWatchWithDependencies(
     }
 
     try {
-      const files = resolveWatchFiles(target, contextOf(outcome));
+      const files = resolveWatchFiles(target, outcome.resourceWatch);
       lastFiles = files;
       reconcile(files, succeeded);
     } catch (cause) {

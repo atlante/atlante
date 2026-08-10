@@ -7,10 +7,12 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
+import * as nodePath from "node:path";
 import { join, sep } from "node:path";
 import { BUNDLED_RESOURCES_DIR } from "@atlante/resources";
 import { SCHEMA_URI } from "@atlante/schema";
 import {
+  isWithinAnyRoot,
   resolveWatchFiles,
   type WatchFiles,
 } from "../src/commands/build-watch-inputs.js";
@@ -260,5 +262,13 @@ describe("resolveWatchFiles", () => {
       join(dir, "atlante.jsonc"),
       join(dir, "atlante.json"),
     ]);
+  });
+});
+
+describe("isWithinAnyRoot", () => {
+  test("rejects a Windows candidate on a different volume", () => {
+    expect(isWithinAnyRoot("D:\\candidate", ["C:\\root"], nodePath.win32)).toBe(
+      false,
+    );
   });
 });

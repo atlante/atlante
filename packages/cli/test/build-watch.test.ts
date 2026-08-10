@@ -12,6 +12,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { SCHEMA_URI } from "@atlante/schema";
 import { runBuild } from "../src/commands/build.js";
 import {
@@ -112,6 +113,40 @@ describe("runBuildWatchWithDependencies", () => {
     await waitFor(() => builds === 2, "rebuild after change");
     expect(builds).toBe(2);
     await handle.stop();
+  });
+
+  test("stopping one handle does not remove another handle's listener", async () => {
+    const dir = tempProject(valid);
+    let firstBuilds = 0;
+    let secondBuilds = 0;
+    const first = runBuildWatchWithDependencies(dir, {
+      build: () => {
+        firstBuilds += 1;
+        return 0;
+      },
+      debounceMs: 20,
+    });
+    const second = runBuildWatchWithDependencies(dir, {
+      build: () => {
+        secondBuilds += 1;
+        return 0;
+      },
+      debounceMs: 20,
+    });
+
+    try {
+      expect(firstBuilds).toBe(1);
+      expect(secondBuilds).toBe(1);
+      await first.stop();
+
+      writeFileSync(join(dir, "atlante.jsonc"), `${valid}\n`);
+      await waitFor(
+        () => secondBuilds === 2,
+        "rebuild on the remaining handle",
+      );
+    } finally {
+      await second.stop();
+    }
   });
 
   test("rebuilds once after a missing local resource is created", async () => {
@@ -571,7 +606,7 @@ describe("runBuildWatchWithDependencies", () => {
     await handle.stop();
   });
 
-  test("deleting the config drops the old watch set and watches the candidates", async () => {
+  test("deleting the config retains the old watch set and watches candidates", async () => {
     const dir = tempProject(valid);
     const watcher = fakeWatcher();
     let builds = 0;
@@ -600,7 +635,7 @@ describe("runBuildWatchWithDependencies", () => {
     await handle.stop();
   });
 
-  test("creating the config drops the stale candidates and watches the config path", async () => {
+  test("creating the config keeps candidate watches alongside the config path", async () => {
     const dir = tempProject();
     const watcher = fakeWatcher();
     let builds = 0;
@@ -633,7 +668,9 @@ describe("runBuildWatchWithDependencies", () => {
 describe("runBuildWatch", () => {
   test("SIGINT stops the watcher and the process exits 0", async () => {
     const dir = tempProject(valid);
-    const binPath = new URL("../bin/atlante.ts", import.meta.url).pathname;
+    const binPath = fileURLToPath(
+      new URL("../bin/atlante.ts", import.meta.url),
+    );
 
     const child = Bun.spawn(["bun", binPath, "build", "--watch", dir], {
       stdout: "pipe",

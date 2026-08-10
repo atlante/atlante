@@ -1,5 +1,6 @@
 import { lstatSync, realpathSync, statSync } from "node:fs";
-import { basename, dirname, relative, resolve, sep } from "node:path";
+import * as nodePath from "node:path";
+import { basename, dirname, resolve } from "node:path";
 import { loadProject } from "@atlante/builder";
 import { BUNDLED_RESOURCE_PACK } from "@atlante/resources";
 import type { ResourceWatchContext } from "@atlante/validator";
@@ -16,6 +17,11 @@ export type WatchFiles = {
   /** Whether the current config/resource graph resolved without errors. */
   resourceResolutionSucceeded: boolean;
 };
+
+type PathImplementation = Pick<
+  typeof nodePath,
+  "resolve" | "relative" | "isAbsolute" | "sep"
+>;
 
 function isConfigFilename(target: string): boolean {
   return (CONFIG_FILENAMES as readonly string[]).includes(basename(target));
@@ -49,15 +55,22 @@ function rootsFor(projectDir: string): readonly string[] {
   return [...roots];
 }
 
-function isWithinAnyRoot(path: string, roots: readonly string[]): boolean {
-  const candidate = resolve(path);
+export function isWithinAnyRoot(
+  path: string,
+  roots: readonly string[],
+  pathImplementation: PathImplementation = nodePath,
+): boolean {
+  const candidate = pathImplementation.resolve(path);
   return roots.some((root) => {
-    const result = relative(resolve(root), candidate);
+    const result = pathImplementation.relative(
+      pathImplementation.resolve(root),
+      candidate,
+    );
     return (
       result === "" ||
-      (result !== ".." &&
-        !result.startsWith(`..${sep}`) &&
-        !result.startsWith(sep))
+      (!pathImplementation.isAbsolute(result) &&
+        result !== ".." &&
+        !result.startsWith(`..${pathImplementation.sep}`))
     );
   });
 }

@@ -5,35 +5,18 @@ export type WatchChanges = Readonly<{
 
 export function desiredWatchPaths(
   current: ReadonlySet<string>,
-  successful: ReadonlySet<string>,
   recovery: ReadonlySet<string>,
-  succeeded: boolean,
-  resourceResolutionSucceeded: boolean,
+  fullySucceeded: boolean,
 ): Set<string> {
-  if (succeeded && resourceResolutionSucceeded) return new Set(current);
-  return new Set([...successful, ...recovery, ...current]);
-}
-
-export function successfulWatchPaths(
-  current: ReadonlySet<string>,
-  previous: ReadonlySet<string>,
-  succeeded: boolean,
-  resourceResolutionSucceeded: boolean,
-): Set<string> {
-  return succeeded && resourceResolutionSucceeded
-    ? new Set(current)
-    : new Set(previous);
+  return fullySucceeded ? new Set(current) : new Set([...recovery, ...current]);
 }
 
 export function recoveryWatchPaths(
   current: ReadonlySet<string>,
-  successful: ReadonlySet<string>,
   previous: ReadonlySet<string>,
-  succeeded: boolean,
-  resourceResolutionSucceeded: boolean,
+  fullySucceeded: boolean,
 ): Set<string> {
-  if (succeeded && resourceResolutionSucceeded) return new Set(current);
-  return new Set([...successful, ...previous, ...current]);
+  return fullySucceeded ? new Set(current) : new Set([...previous, ...current]);
 }
 
 export function watchChanges(
