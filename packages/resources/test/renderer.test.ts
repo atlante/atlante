@@ -12,6 +12,7 @@ import {
   resolveTemplate,
   slotPartialName,
   ValueReferenceCollisionError,
+  withResourceTemplateSelection,
 } from "../src/index.js";
 
 const DRAFT_URI = "https://json-schema.org/draft/2020-12/schema";
@@ -136,6 +137,52 @@ describe("resource renderer", () => {
         ],
       }),
     ).toBe("[one][two][three]");
+  });
+
+  test("renders the selected child when branches share a data path", () => {
+    const root = project();
+    writeTemplate(
+      root,
+      "root",
+      {
+        type: "object",
+        properties: {
+          choice: {
+            oneOf: [
+              {
+                type: "object",
+                properties: { payload: { template: "../first" } },
+              },
+              {
+                type: "object",
+                properties: { payload: { template: "../second" } },
+              },
+            ],
+          },
+        },
+      },
+      partial("choice/payload"),
+    );
+    writeTemplate(
+      root,
+      "first",
+      { type: "object", properties: { value: { type: "string" } } },
+      "first: {{value}}",
+    );
+    writeTemplate(
+      root,
+      "second",
+      { type: "object", properties: { value: { type: "string" } } },
+      "second: {{value}}",
+    );
+
+    const payload = withResourceTemplateSelection(
+      { value: "chosen" },
+      "../second",
+    );
+    expect(render(root, "root", { choice: { payload } })).toBe(
+      "second: chosen",
+    );
   });
 
   test("keeps child Markdown opaque and does not reinterpret or escape it", () => {

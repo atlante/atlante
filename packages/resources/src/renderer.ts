@@ -3,7 +3,7 @@ import {
   copyResourceTemplateSelection,
   resourceTemplateSelection,
 } from "./resolution.js";
-import type { ResolvedTemplate } from "./resolve.js";
+import type { ResolvedTemplate, ResolvedTemplateSlot } from "./resolve.js";
 import { analyzeValueReferences, isValidValueKey } from "./values.js";
 
 export const SLOT_PARTIAL_PREFIX = "slot/";
@@ -91,37 +91,38 @@ function isArrayInputSchema(inputSchema: unknown): boolean {
   );
 }
 
-type RenderSlot = ResolvedTemplate["slots"][number]["slot"];
-
 type SlotGroup = Readonly<{
   readonly path: string[];
-  readonly slots: readonly RenderSlot[];
+  readonly slots: readonly ResolvedTemplateSlot[];
 }>;
 
-function groupSlots(slots: readonly RenderSlot[]): SlotGroup[] {
-  const groups = new Map<string, { path: string[]; slots: RenderSlot[] }>();
-  for (const slot of slots) {
-    const path = slot.dataPath ?? [slot.property];
+function groupSlots(slots: readonly ResolvedTemplateSlot[]): SlotGroup[] {
+  const groups = new Map<
+    string,
+    { path: string[]; slots: ResolvedTemplateSlot[] }
+  >();
+  for (const resolvedSlot of slots) {
+    const path = resolvedSlot.slot.dataPath ?? [resolvedSlot.slot.property];
     const key = JSON.stringify(path);
     const group = groups.get(key);
-    if (group) group.slots.push(slot);
-    else groups.set(key, { path: [...path], slots: [slot] });
+    if (group) group.slots.push(resolvedSlot);
+    else groups.set(key, { path: [...path], slots: [resolvedSlot] });
   }
   return [...groups.values()];
 }
 
 function selectedSlot(
-  slots: readonly RenderSlot[],
+  slots: readonly ResolvedTemplateSlot[],
   input: unknown,
-): RenderSlot {
+): ResolvedTemplateSlot {
   const selected = resourceTemplateSelection(input)?.templateId;
   const matched = selected
-    ? slots.find((slot) => slot.templateId === selected)
+    ? slots.find(({ slot }) => slot.templateId === selected)
     : undefined;
   return (matched ??
     [...slots].sort((left, right) =>
-      left.templateId.localeCompare(right.templateId),
-    )[0]) as RenderSlot;
+      left.slot.templateId.localeCompare(right.slot.templateId),
+    )[0]) as ResolvedTemplateSlot;
 }
 
 export type ResolvedRenderArgs = {
@@ -164,18 +165,12 @@ export function renderResolvedTemplate(
     },
   );
   const nextStack = [...stack, template.key];
-  const slots = template.slots.map(({ slot }) => slot);
-  const childTemplate = (slot: (typeof slots)[number]): ResolvedTemplate => {
-    const index = slots.indexOf(slot);
-    const child = index < 0 ? undefined : template.slots[index]?.template;
-    if (!child) throw new Error(`unknown template: ${slot.templateId}`);
-    return child;
-  };
+  const slots = template.slots;
 
   for (const group of groupSlots(slots)) {
     const renderSlot = (context: unknown): string => {
       const contextSlot = selectedSlot(group.slots, context);
-      const contextChild = childTemplate(contextSlot);
+      const contextChild = contextSlot.template;
       if (
         isArrayInputSchema(contextChild.facet.inputSchema) &&
         Array.isArray(context)
@@ -187,22 +182,22 @@ export function renderResolvedTemplate(
       }
 
       const contextPath =
-        contextSlot.arrayItems && context !== input
+        contextSlot.slot.arrayItems && context !== input
           ? arrayItemPath(input, group.path)
           : undefined;
       const slotInputsForRender = contextPath
         ? slotInputs(context, contextPath, false)
-        : slotInputs(input, group.path, contextSlot.arrayItems ?? false);
+        : slotInputs(input, group.path, contextSlot.slot.arrayItems ?? false);
       return slotInputsForRender
         .map((slotInput) => {
           const slot = selectedSlot(group.slots, slotInput);
-          const child = childTemplate(slot);
+          const child = slot.template;
           return renderResolvedTemplate(
             {
               template: child,
               input: unwrapArrayTemplateInput(
                 slotInput,
-                slot.property,
+                slot.slot.property,
                 child.facet.inputSchema,
               ),
             },
@@ -213,7 +208,9 @@ export function renderResolvedTemplate(
     };
     handlebars.registerPartial(
       slotPartialName(
-        (group.path.length ? group.path : [group.slots[0]?.property]).join("/"),
+        (group.path.length ? group.path : [group.slots[0]?.slot.property]).join(
+          "/",
+        ),
       ),
       renderSlot,
     );
