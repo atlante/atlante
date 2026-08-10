@@ -43,12 +43,26 @@ function materialize(node: Node): unknown {
   return node.value;
 }
 
-function positionOf(source: string, offset: number): JsoncLocation {
-  const before = source.slice(0, offset);
-  const lines = before.split("\n");
+function positionOf(
+  lineStarts: readonly number[],
+  offset: number,
+): JsoncLocation {
+  let low = 0;
+  let high = lineStarts.length;
+  while (low < high) {
+    const middle = low + Math.floor((high - low) / 2);
+    const lineStart = lineStarts[middle];
+    if (lineStart !== undefined && lineStart <= offset) {
+      low = middle + 1;
+    } else {
+      high = middle;
+    }
+  }
+
+  const lineStart = lineStarts[low - 1] ?? 0;
   return {
-    line: lines.length,
-    column: (lines.at(-1)?.length ?? 0) + 1,
+    line: low,
+    column: offset - lineStart + 1,
   };
 }
 
@@ -58,7 +72,7 @@ function pointerSegment(segment: string): string {
 
 function collectObjectLocations(
   node: Node,
-  source: string,
+  lineStarts: readonly number[],
   pointer: string,
   output: Record<string, JsoncLocation>,
 ): void {
@@ -67,7 +81,7 @@ function collectObjectLocations(
     if (!keyNode || !valueNode || typeof keyNode.value !== "string") continue;
     collectLocations(
       valueNode,
-      source,
+      lineStarts,
       `${pointer}/${pointerSegment(keyNode.value)}`,
       output,
     );
@@ -76,27 +90,27 @@ function collectObjectLocations(
 
 function collectArrayLocations(
   node: Node,
-  source: string,
+  lineStarts: readonly number[],
   pointer: string,
   output: Record<string, JsoncLocation>,
 ): void {
   for (const [index, child] of (node.children ?? []).entries())
-    collectLocations(child, source, `${pointer}/${index}`, output);
+    collectLocations(child, lineStarts, `${pointer}/${index}`, output);
 }
 
 function collectLocations(
   node: Node,
-  source: string,
+  lineStarts: readonly number[],
   pointer: string,
   output: Record<string, JsoncLocation>,
 ): void {
-  output[pointer] = positionOf(source, node.offset);
+  output[pointer] = positionOf(lineStarts, node.offset);
   if (node.type === "object") {
-    collectObjectLocations(node, source, pointer, output);
+    collectObjectLocations(node, lineStarts, pointer, output);
     return;
   }
   if (node.type === "array") {
-    collectArrayLocations(node, source, pointer, output);
+    collectArrayLocations(node, lineStarts, pointer, output);
   }
 }
 
@@ -104,14 +118,19 @@ function parseSource(
   source: string,
   options: { allowTrailingComma: boolean; disallowComments: boolean },
 ): ParsedJsonc {
+  const lineStarts = [0];
+  for (let index = 0; index < source.length; index++) {
+    if (source.charCodeAt(index) === 10) lineStarts.push(index + 1);
+  }
+
   const errors: ParseError[] = [];
   const parsed = parseTree(source, errors, options);
   if (errors.length > 0 || !parsed) {
     const offset = errors[0]?.offset ?? 0;
-    throw new JsoncParseError(offset, positionOf(source, offset));
+    throw new JsoncParseError(offset, positionOf(lineStarts, offset));
   }
   const locations: Record<string, JsoncLocation> = {};
-  collectLocations(parsed, source, "", locations);
+  collectLocations(parsed, lineStarts, "", locations);
   return { value: materialize(parsed), locations };
 }
 
