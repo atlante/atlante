@@ -123,9 +123,11 @@ describe("resolveWatchFiles", () => {
         join(template, "template.jsonc"),
         join(template, "template.md"),
         join(dir, "atlante.json"),
-      ].map((path) =>
-        path === join(dir, "atlante.json") ? path : canonical(path),
-      ),
+      ]
+        .map((path) =>
+          path === join(dir, "atlante.json") ? path : canonical(path),
+        )
+        .sort(),
     );
     expect(result.resourcePaths).not.toContain(
       join(unrelated, "template.jsonc"),
