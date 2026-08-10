@@ -32,7 +32,6 @@ try {
   );
 
   await Bun.$`node ${CLI} validate ${project}`.cwd(ROOT);
-  await Bun.$`node ${CLI} build ${project}`.cwd(ROOT);
 
   const artifacts = join(project, ".atlante", "artifacts");
   const manifest = (await Bun.file(
