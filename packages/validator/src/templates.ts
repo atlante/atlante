@@ -1000,14 +1000,9 @@ function bindingDescriptionValidation(
   templateId: string,
   root: "agents" | "skills",
   subject: BindingSubject,
-): { valueDiagnostics: Diagnostic[]; emptyDiagnostics: Diagnostic[] } {
+): Diagnostic[] {
   if (typeof description !== "string") {
-    return {
-      valueDiagnostics: [
-        invalidDescriptionDiagnostic(subject, bindingId, templateId, root),
-      ],
-      emptyDiagnostics: [],
-    };
+    return [invalidDescriptionDiagnostic(subject, bindingId, templateId, root)];
   }
 
   const descriptionValueDiagnostics = missingValueDiagnostics(
@@ -1020,26 +1015,17 @@ function bindingDescriptionValidation(
     ["description"],
   );
   if (descriptionValueDiagnostics.length > 0)
-    return {
-      valueDiagnostics: descriptionValueDiagnostics,
-      emptyDiagnostics: [],
-    };
+    return descriptionValueDiagnostics;
 
   let interpolatedDescription = description;
   try {
     interpolatedDescription = interpolateValues(description, values) as string;
   } catch {
-    return { valueDiagnostics: [], emptyDiagnostics: [] };
+    return [];
   }
-  if (interpolatedDescription.length !== 0)
-    return { valueDiagnostics: [], emptyDiagnostics: [] };
+  if (interpolatedDescription.length !== 0) return [];
 
-  return {
-    valueDiagnostics: [],
-    emptyDiagnostics: [
-      invalidDescriptionDiagnostic(subject, bindingId, templateId, root),
-    ],
-  };
+  return [invalidDescriptionDiagnostic(subject, bindingId, templateId, root)];
 }
 
 function originPath(origin: ResourceOrigin | undefined): string | undefined {
@@ -1077,43 +1063,6 @@ function decorateResourceDiagnostic(
     ...(source ? { source } : {}),
     ...(diagnostic.path ? { pointer: diagnostic.path } : {}),
   };
-}
-
-function resolvedValueDiagnostics(
-  input: unknown,
-  values: Record<string, unknown>,
-  bindingId: string,
-  templateId: string,
-  root: "agents" | "skills",
-  subject: "agent" | "skill",
-): Diagnostic[] {
-  return missingValueDiagnostics(
-    input,
-    values,
-    bindingId,
-    templateId,
-    root,
-    subject,
-  );
-}
-
-function resolvedDescriptionDiagnostics(
-  description: unknown,
-  values: Record<string, unknown>,
-  bindingId: string,
-  templateId: string,
-  root: "agents" | "skills",
-  subject: "agent" | "skill",
-): Diagnostic[] {
-  const result = bindingDescriptionValidation(
-    description,
-    values,
-    bindingId,
-    templateId,
-    root,
-    subject,
-  );
-  return [...result.valueDiagnostics, ...result.emptyDiagnostics];
 }
 
 function unknownSystemValueDiagnostics(
@@ -1335,7 +1284,7 @@ function validateResolvedBinding(
   if (Array.isArray(resolvedValues)) return resolvedValues;
 
   const diagnostics = [
-    ...resolvedDescriptionDiagnostics(
+    ...bindingDescriptionValidation(
       binding.description,
       resolvedValues,
       binding.id,
@@ -1343,7 +1292,7 @@ function validateResolvedBinding(
       root,
       subject,
     ),
-    ...resolvedValueDiagnostics(
+    ...missingValueDiagnostics(
       binding.input,
       resolvedValues,
       binding.id,

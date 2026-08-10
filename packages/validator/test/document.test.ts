@@ -1,7 +1,8 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
+import * as resources from "@atlante/resources";
 import { SCHEMA_URI } from "@atlante/schema";
 import {
   loadDocument,
@@ -137,6 +138,49 @@ describe("validateDocumentText", () => {
       expect(result.document?.agents).toHaveProperty("inherited");
       expect(result.document?.agents).toHaveProperty("derived");
     } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("translates a project resource-pack failure exactly", () => {
+    const root = mkdtempSync(join(tmpdir(), "atlante-document-resource-root-"));
+    const sourcePath = join(root, "atlante.jsonc");
+    writeFileSync(sourcePath, `{ "$schema": "${SCHEMA_URI}" }`);
+    const dependency = join(root, "resource", "template.jsonc");
+    const unresolvedParent = join(root, "resource");
+    const projectPackSpy = spyOn(
+      resources,
+      "createProjectResourcePack",
+    ).mockImplementation(() => {
+      throw new resources.ResourceResolutionError(
+        {
+          code: "missing-target",
+          message: "resource pack root is unavailable",
+        },
+        {
+          dependencies: [dependency],
+          unresolvedParents: [unresolvedParent],
+        },
+      );
+    });
+
+    try {
+      const result = loadDocument(sourcePath);
+
+      expect(result.resourceWatch).toEqual({
+        dependencies: [dependency],
+        unresolvedParents: [unresolvedParent],
+      });
+      expect(result.diagnostics).toEqual([
+        {
+          severity: "error",
+          code: "missing-target",
+          message: "resource pack root is unavailable",
+          source: "atlante.jsonc",
+        },
+      ]);
+    } finally {
+      projectPackSpy.mockRestore();
       rmSync(root, { recursive: true, force: true });
     }
   });

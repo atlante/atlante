@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -203,16 +209,35 @@ describe("resource-backed document validation", () => {
     );
 
     const result = load(configPath);
-    const diagnostic = result.diagnostics[0];
-
-    expect(diagnostic).toMatchObject({
-      code: "malformed-jsonc",
-      path: "/agents/broken/$template",
-      pointer: "/agents/broken/$template",
-      source: "broken/template.jsonc",
+    expect(result.resourceWatch).toEqual({
+      dependencies: [
+        join(realpathSync(root), "atlante.jsonc"),
+        join(realpathSync(root), "broken", "template.jsonc"),
+        join(realpathSync(root), "broken", "template.md"),
+        join(root, "atlante.json"),
+      ].sort(),
+      unresolvedParents: [join(realpathSync(root), "broken")],
     });
-    expect(diagnostic?.location).toEqual({ line: 4, column: 7 });
-    expect(JSON.stringify(diagnostic)).not.toContain(root);
+    expect(result.diagnostics).toEqual([
+      {
+        severity: "error",
+        code: "malformed-jsonc",
+        message: "selected resource JSONC is malformed",
+        path: "/agents/broken/$template",
+        pointer: "/agents/broken/$template",
+        source: "broken/template.jsonc",
+        location: { line: 4, column: 7 },
+        chain: [
+          { kind: "preset", locator: "./", source: "atlante.jsonc" },
+          {
+            kind: "template",
+            locator: "./broken",
+            source: "broken/template.jsonc",
+          },
+        ],
+      },
+    ]);
+    expect(JSON.stringify(result.diagnostics)).not.toContain(root);
   });
 
   test("keeps the authored pointer for an invalid template facet schema", () => {
@@ -1187,6 +1212,33 @@ describe("resource-backed document validation", () => {
         path: "/agents/reviewer/description",
       }),
     );
+  });
+
+  test("reports a non-string resource-backed description after resolution", () => {
+    const { root, configPath } = project({
+      $schema: SCHEMA_URI,
+      agents: {
+        reviewer: {
+          $template: "atlante/agent",
+          description: null,
+          identity: "You review.",
+          mission: "Find defects.",
+        },
+      },
+    });
+
+    const result = load(configPath);
+
+    expect(result.document).toBeUndefined();
+    expect(result.diagnostics).toHaveLength(1);
+    expect(result.diagnostics[0]).toMatchObject({
+      code: "invalid-resolved-input",
+      message: "agent description must be a non-empty string after resolution",
+      path: "/agents/reviewer/description",
+      pointer: "/agents/reviewer/description",
+      source: "atlante.jsonc",
+    });
+    expect(JSON.stringify(result.diagnostics)).not.toContain(root);
   });
 
   test("reports unknown values and system references through resource validation", () => {

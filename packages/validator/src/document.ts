@@ -202,6 +202,29 @@ function resourceDiagnostic(
   );
 }
 
+function resourceLoadFailure(
+  cause: unknown,
+  path: string,
+  text: string,
+  fallbackMessage: string,
+): {
+  resourceWatch?: ResourceWatchContext;
+  diagnostics: Diagnostic[];
+} {
+  if (cause instanceof ResourceResolutionError)
+    return {
+      resourceWatch: resourceWatchContext(cause),
+      diagnostics: [resourceDiagnostic(cause, path, text)],
+    };
+  return {
+    diagnostics: [
+      error("resource-load-failed", fallbackMessage, {
+        source: sourceName(path),
+      }),
+    ],
+  };
+}
+
 function canonicalDiagnostics(
   parsed: ReturnType<typeof atlanteDocumentSchema.safeParse>,
   resources: ReturnType<typeof resolveResourceDocument>,
@@ -394,19 +417,14 @@ function resolveResourceBackedDocument(
   try {
     projectPack = createProjectResourcePack(dirname(path));
   } catch (cause) {
-    if (cause instanceof ResourceResolutionError)
-      return {
-        ...location,
-        resourceWatch: resourceWatchContext(cause),
-        diagnostics: [resourceDiagnostic(cause, path, text)],
-      };
     return {
       ...location,
-      diagnostics: [
-        error("resource-load-failed", "resource root could not be loaded", {
-          source: sourceName(path),
-        }),
-      ],
+      ...resourceLoadFailure(
+        cause,
+        path,
+        text,
+        "resource root could not be loaded",
+      ),
     };
   }
 
@@ -419,19 +437,9 @@ function resolveResourceBackedDocument(
       ...(options.bundledPack ? { bundledPack: options.bundledPack } : {}),
     });
   } catch (cause) {
-    if (cause instanceof ResourceResolutionError)
-      return {
-        ...location,
-        resourceWatch: resourceWatchContext(cause),
-        diagnostics: [resourceDiagnostic(cause, path, text)],
-      };
     return {
       ...location,
-      diagnostics: [
-        error("resource-load-failed", "resource resolution failed", {
-          source: sourceName(path),
-        }),
-      ],
+      ...resourceLoadFailure(cause, path, text, "resource resolution failed"),
     };
   }
 
