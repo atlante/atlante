@@ -2,7 +2,7 @@
   "name": "@atlante/resources",
   "version": "0.1.6",
   "type": "module",
-  "description": "Atlante local resource types and source-content seam",
+  "description": "Atlante private local resource packs, facets, and rendering",
   "license": "MIT",
   "contributors": [
     {

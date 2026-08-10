@@ -1,5 +1,4 @@
 // fallow-ignore-file code-duplication -- resource composition intentionally mirrors templates without a package dependency
-import type { TemplateRegistry } from "./loader.js";
 import { TEMPLATE_ID_PATTERN } from "./schema.js";
 
 export type Slot = {
@@ -8,16 +7,6 @@ export type Slot = {
   path?: string[];
   dataPath?: string[];
   arrayItems?: boolean;
-};
-
-export type CompositionIssue = {
-  code: "unknown-template" | "cyclic-template" | "invalid-input-schema";
-  message: string;
-  templateId: string;
-  property?: string;
-  slotPath?: string[];
-  dataPath?: string[];
-  chain?: string[];
 };
 
 type SlotMarker = {
@@ -228,83 +217,6 @@ function slotFromMarker(marker: SlotMarker & { template: string }): Slot {
   return slot;
 }
 
-function invalidMarkerIssue(
-  rootId: string,
-  slotPath: string[],
-  dataPath: string[],
-  marker: SlotMarker,
-): CompositionIssue {
-  return {
-    code: "invalid-input-schema",
-    message: `template "${rootId}": slot "${marker.property}" has an invalid template marker; expected a non-empty namespaced id matching namespace/name`,
-    templateId: rootId,
-    property: [...slotPath, ...marker.dataPath].at(-1),
-    slotPath: [...slotPath, ...marker.path],
-    dataPath: [...dataPath, ...marker.dataPath],
-  };
-}
-
 export function slotsOf(inputSchema: Record<string, unknown>): Slot[] {
   return markersOf(inputSchema).filter(isValidMarker).map(slotFromMarker);
-}
-
-/** Depth-first walk over the slot graph, collecting every issue it finds. */
-export function walkComposition(
-  registry: TemplateRegistry,
-  rootId: string,
-  stack: string[] = [],
-  slotPath: string[] = [],
-  property?: string,
-  dataPath: string[] = [],
-): CompositionIssue[] {
-  if (stack.includes(rootId)) {
-    const chain = [...stack, rootId];
-    return [
-      {
-        code: "cyclic-template",
-        message: `circular template composition: ${chain.join(" -> ")}`,
-        templateId: rootId,
-        property: property ?? slotPath.at(-1),
-        slotPath,
-        chain,
-      },
-    ];
-  }
-
-  const template = registry.get(rootId);
-  if (!template) {
-    return [
-      {
-        code: "unknown-template",
-        message: `template "${rootId}" does not exist`,
-        templateId: rootId,
-        property: property ?? slotPath.at(-1),
-        slotPath,
-      },
-    ];
-  }
-
-  const issues: CompositionIssue[] = [];
-  const slots: Slot[] = [];
-  for (const marker of markersOf(template.inputSchema)) {
-    if (!isValidMarker(marker)) {
-      issues.push(invalidMarkerIssue(rootId, slotPath, dataPath, marker));
-      continue;
-    }
-    slots.push(slotFromMarker(marker));
-  }
-
-  for (const slot of slots) {
-    issues.push(
-      ...walkComposition(
-        registry,
-        slot.templateId,
-        [...stack, rootId],
-        [...slotPath, ...(slot.path ?? [slot.property])],
-        slot.property,
-        [...dataPath, ...(slot.dataPath ?? [slot.property])],
-      ),
-    );
-  }
-  return issues;
 }

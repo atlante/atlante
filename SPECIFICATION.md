@@ -35,7 +35,8 @@ Version 0.1 includes:
 - deterministic prompt building;
 - OpenCode prompt materialization and the `atlante_skill` lookup tool;
 - the bundled `starter` preset (`atlante init`), addressed as
-  `atlante/starter`;
+  `atlante/starter`, with its agent, skill, template, and instance facets in
+  one temporary `atlante/*` namespace;
 - source-aware resource provenance, deterministic overlays, and fail-closed
   resource diagnostics.
 
@@ -289,8 +290,10 @@ The public v1 language is the JSONC document itself.
 A resource pack owns one fixed, canonical realpath content root. A project pack
 is rooted at the directory containing the discovered `atlante.jsonc` or
 `atlante.json`. The bundled pack is rooted at the embedded
-`@atlante/resources/bundled` directory. The root is captured before resolving
-any child and is immutable for the lifetime of that pack.
+`@atlante/resources/bundled` directory in source and at the single
+`bundled/resources` asset root in the published CLI. The root is captured
+before resolving any child and is immutable for the lifetime of that pack. No
+package or plugin lookup is used for either root.
 
 Resources are directories beneath the selected root. A resource MAY contain
 either facet or both facets:
@@ -849,8 +852,9 @@ separate execution branch for each renderer.
 ## 11. OpenCode Adapter Profile
 
 The OpenCode adapter is the first host integration. Version 0.1 defines its
-prompt materialization responsibilities and preset support. Runtime
-execution and state management are outside this specification.
+prompt materialization responsibilities for artifacts built from resource packs.
+Runtime source resolution, execution, and state management are outside this
+adapter boundary.
 
 The builder treats the Atlante configuration as the source of truth for prompts;
 the adapter treats the verified artifact tree as its only input. Users SHOULD
@@ -956,8 +960,8 @@ duplicate bundled-content loading or weaken the pack containment rules. Package
 and plugin resource locators are not supported by this version.
 
 Version 0.1 MUST include the `atlante/starter` preset as the default
-initialization target. The starter preset MUST provide at least an `architect`
-agent and an `implement` agent.
+initialization target. The starter preset MUST provide the bundled `architect`
+agent and the `brainstorming` and `workflow` skills.
 
 After changing the source configuration, users MUST run `atlante build` before
 the host adapter can observe the change. The adapter consumes the published

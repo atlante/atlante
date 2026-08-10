@@ -576,8 +576,3 @@ export function loadPresetFacet(
     };
   });
 }
-
-export function clearResourceFacetCache(pack: ResourcePack): void {
-  // Kept as a source-compatible no-op after facet results stopped being cached.
-  void pack;
-}

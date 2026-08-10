@@ -3,8 +3,6 @@ import type {
   ResolvedResourceDocument,
   ResolvedTemplate,
   ResourceOrigin,
-  TemplateRegistry as ResourceTemplateRegistry,
-  TemplateMigrationRecord,
 } from "@atlante/resources";
 import {
   InvalidValueReferenceError,
@@ -17,15 +15,12 @@ import {
   resolveSystemValues,
   resourceTemplateSelection,
   resourceValueTombstones,
-  slotsOf,
   TEMPLATE_ID_PATTERN,
   UnknownSystemVariableError,
   ValueReferenceCollisionError,
-  walkComposition,
   walkValueReferences,
   withResourceTemplateSelection,
 } from "@atlante/resources";
-import type { AtlanteDocument } from "@atlante/schema";
 import type { ErrorObject } from "ajv";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import type { Diagnostic } from "./diagnostic.js";
@@ -34,55 +29,6 @@ import {
   escapeJsonPointerSegment,
   sortDiagnostics,
 } from "./diagnostic.js";
-
-/** The semantic-only registry shape retained for direct unit-test adapters. */
-export type TemplateRegistry = {
-  get(id: string):
-    | {
-        readonly inputSchema: Record<string, unknown>;
-        readonly source?: string;
-      }
-    | undefined;
-  ids(): string[];
-};
-
-/*
- * Resource-backed validation does not load this registry. It is only a small
- * structural adapter for direct semantic helpers while callers migrate to
- * validateResolvedDocument.
- */
-function resourceRegistryOf(
-  registry: TemplateRegistry,
-): ResourceTemplateRegistry {
-  return {
-    get(id) {
-      const template = registry.get(id);
-      if (!template) return undefined;
-      return {
-        id,
-        locator: id,
-        origin: {
-          kind: id.startsWith("atlante/") ? "bundled" : "project",
-          path: `${id}/template.jsonc`,
-        },
-        kind: "template",
-        inputSchema: template.inputSchema,
-        source: template.source ?? "",
-        directory: "",
-      } as TemplateMigrationRecord;
-    },
-    ids: () => registry.ids(),
-  };
-}
-
-/** Binding metadata, not template input (SPECIFICATION.md §4.3). */
-const BINDING_KEYS = new Set([
-  "description",
-  "values",
-  "$instance",
-  "$template",
-]);
-const DEFAULT_SKILL_TEMPLATE_ID = "atlante/skill";
 
 function unescapeJsonPointerSegment(segment: string): string {
   return segment.replaceAll("~1", "/").replaceAll("~0", "~");
@@ -217,71 +163,6 @@ function schemaPathForInputPath(
   return schemaPath;
 }
 
-/**
- * Expands every slot reference into the referenced template's inputSchema,
- * producing one complete JSON Schema. Recursion happens through template ids,
- * so cycles are caught by the composition walk rather than by schema nesting.
- */
-export function expandInputSchema(
-  registry: TemplateRegistry,
-  templateId: string,
-  stack: string[] = [],
-): { schema?: Record<string, unknown>; diagnostics: Diagnostic[] } {
-  if (stack.includes(templateId)) {
-    const chain = [...stack, templateId];
-    return {
-      diagnostics: [
-        error(
-          "cyclic-template",
-          `circular template composition: ${chain.join(" -> ")}`,
-        ),
-      ],
-    };
-  }
-
-  if (stack.length === 0) {
-    const issues = walkComposition(resourceRegistryOf(registry), templateId);
-    if (issues.length > 0) {
-      return {
-        diagnostics: issues.map((issue) =>
-          error(issue.code, issue.message, {
-            path: issue.dataPath?.length
-              ? `/${issue.dataPath.map(escapeJsonPointerSegment).join("/")}`
-              : issue.slotPath?.length
-                ? `/${issue.slotPath.map(escapeJsonPointerSegment).join("/")}`
-                : undefined,
-          }),
-        ),
-      };
-    }
-  }
-
-  const template = registry.get(templateId);
-  if (!template) {
-    return {
-      diagnostics: [
-        error("unknown-template", `template "${templateId}" does not exist`),
-      ],
-    };
-  }
-
-  const schema = structuredClone(template.inputSchema);
-
-  for (const slot of slotsOf(template.inputSchema)) {
-    const expanded = expandInputSchema(registry, slot.templateId, [
-      ...stack,
-      templateId,
-    ]);
-    if (!expanded.schema) return expanded;
-    setSchemaPath(schema, slot.path ?? [slot.property], expanded.schema);
-  }
-
-  // The dialect key is only meaningful on the root document.
-  if (stack.length > 0) delete schema.$schema;
-
-  return { schema, diagnostics: [] };
-}
-
 function bindingPath(
   root: "agents" | "skills",
   bindingId: string,
@@ -398,44 +279,6 @@ function schemaContextForIssue(
         pathStartsWith(instancePath, context.inputPath) &&
         schemaPathStartsWith(schemaPath, context.schemaPath),
     );
-}
-
-function validateBindingInput(
-  registry: TemplateRegistry,
-  templateId: string,
-  input: Record<string, unknown>,
-  bindingId: string,
-  root: "agents" | "skills",
-  subject: "agent" | "skill",
-): Diagnostic[] {
-  const { schema, diagnostics } = expandInputSchema(registry, templateId);
-  if (!schema) {
-    return diagnostics.map((diagnostic) => {
-      const slotPath = diagnostic.path ?? "";
-      const path = bindingPath(root, bindingId) + slotPath;
-      const slot = slotPath
-        ? ` at slot "${slotPath
-            .slice(1)
-            .split("/")
-            .map(unescapeJsonPointerSegment)
-            .join(".")}"`
-        : "";
-      return {
-        ...diagnostic,
-        message: `${subject} "${bindingId}"${slot}: ${diagnostic.message}`,
-        path,
-      };
-    });
-  }
-
-  return validateInputSchema(
-    schema,
-    templateId,
-    input,
-    bindingId,
-    root,
-    subject,
-  );
 }
 
 function validateInputSchema(
@@ -1066,38 +909,6 @@ function validateResolvedBindingInput(
   return inputDiagnostics;
 }
 
-export function validateAgentInput(
-  registry: TemplateRegistry,
-  templateId: string,
-  input: Record<string, unknown>,
-  agentId: string,
-): Diagnostic[] {
-  return validateBindingInput(
-    registry,
-    templateId,
-    input,
-    agentId,
-    "agents",
-    "agent",
-  );
-}
-
-export function validateSkillInput(
-  registry: TemplateRegistry,
-  templateId: string,
-  input: Record<string, unknown>,
-  skillId: string,
-): Diagnostic[] {
-  return validateBindingInput(
-    registry,
-    templateId,
-    input,
-    skillId,
-    "skills",
-    "skill",
-  );
-}
-
 function resolvedValue(values: Record<string, unknown>, key: string): unknown {
   return Object.hasOwn(values, key) ? values[key] : undefined;
 }
@@ -1132,105 +943,6 @@ function missingValueDiagnostics(
       );
     }
   });
-  return diagnostics;
-}
-
-export function promptInputOf(
-  binding: Record<string, unknown>,
-  reservedKeys: ReadonlySet<string> = BINDING_KEYS,
-): Record<string, unknown> {
-  return Object.fromEntries(
-    Object.entries(binding).filter(([key]) => !reservedKeys.has(key)),
-  );
-}
-
-function validateAgentBinding(
-  document: AtlanteDocument,
-  registry: TemplateRegistry,
-  defaultTemplateId: string,
-  agentId: string,
-  binding: NonNullable<AtlanteDocument["agents"]>[string],
-): Diagnostic[] {
-  const diagnostics: Diagnostic[] = [];
-  const templateId = defaultTemplateId;
-  const input = promptInputOf(binding);
-  let values: Record<string, unknown>;
-  try {
-    values = resolveSystemValues({
-      ...(document.values ?? {}),
-      ...(binding.values ?? {}),
-    });
-  } catch (cause) {
-    if (cause instanceof UnknownSystemVariableError) {
-      diagnostics.push(
-        error(
-          "unknown-system-variable",
-          `agent "${agentId}" template "${templateId}": ${cause.message}`,
-          {
-            path: bindingPath("agents", agentId),
-          },
-        ),
-      );
-      return diagnostics;
-    }
-    throw cause;
-  }
-  const valueDiagnostics = missingValueDiagnostics(
-    input,
-    values,
-    agentId,
-    templateId,
-    "agents",
-    "agent",
-  );
-  const descriptionDiagnostics = bindingDescriptionValidation(
-    binding.description,
-    values,
-    agentId,
-    templateId,
-    "agents",
-    "agent",
-  );
-  diagnostics.push(
-    ...descriptionDiagnostics.valueDiagnostics,
-    ...valueDiagnostics,
-    ...descriptionDiagnostics.emptyDiagnostics,
-  );
-  if (valueDiagnostics.length > 0) {
-    // Keep template/composition failures, but do not report schema failures
-    // against raw `{{values.x}}` placeholders when a value is missing.
-    diagnostics.push(
-      ...validateAgentInput(registry, templateId, input, agentId).filter(
-        (diagnostic) => diagnostic.code !== "invalid-prompt-input",
-      ),
-    );
-    return diagnostics;
-  }
-
-  // Template schemas must see the same values the renderer will see. A
-  // hand-built document with a non-string value is left for the builder's
-  // defence-in-depth render diagnostic instead of making validation throw.
-  let inputForValidation = input;
-  try {
-    inputForValidation = interpolateValues(input, values);
-  } catch (cause) {
-    if (cause instanceof ValueReferenceCollisionError) {
-      diagnostics.push(
-        error(
-          "value-reference-collision",
-          `agent "${agentId}" template "${templateId}": ${cause.message}`,
-          {
-            path: bindingPath("agents", agentId, cause.path),
-          },
-        ),
-      );
-      return diagnostics;
-    }
-    // The document schema rejects non-string values before normal resolution.
-  }
-  diagnostics.push(
-    ...validateAgentInput(registry, templateId, inputForValidation, agentId),
-  );
   return diagnostics;
 }
 
@@ -1296,153 +1008,6 @@ function bindingDescriptionValidation(
       invalidDescriptionDiagnostic(subject, bindingId, templateId, root),
     ],
   };
-}
-
-function interpolatedSkillInput(
-  input: Record<string, unknown>,
-  values: Record<string, unknown>,
-  skillId: string,
-  templateId: string,
-): { input: Record<string, unknown>; diagnostic?: Diagnostic } {
-  try {
-    return { input: interpolateValues(input, values) };
-  } catch (cause) {
-    if (cause instanceof ValueReferenceCollisionError) {
-      return {
-        input,
-        diagnostic: error(
-          "value-reference-collision",
-          `skill "${skillId}" template "${templateId}": ${cause.message}`,
-          { path: bindingPath("skills", skillId, cause.path) },
-        ),
-      };
-    }
-    return { input };
-  }
-}
-
-function skillValues(
-  document: AtlanteDocument,
-  rawBinding: Record<string, unknown>,
-  skillId: string,
-  templateId: string,
-): { values: Record<string, unknown>; diagnostic?: Diagnostic } {
-  try {
-    return {
-      values: resolveSystemValues({
-        ...(document.values ?? {}),
-        ...((rawBinding.values as Record<string, unknown> | undefined) ?? {}),
-      }),
-    };
-  } catch (cause) {
-    if (cause instanceof UnknownSystemVariableError) {
-      return {
-        values: {},
-        diagnostic: error(
-          "unknown-system-variable",
-          `skill "${skillId}" template "${templateId}": ${cause.message}`,
-          { path: bindingPath("skills", skillId) },
-        ),
-      };
-    }
-    throw cause;
-  }
-}
-
-function validateSkillBinding(
-  document: AtlanteDocument,
-  registry: TemplateRegistry,
-  skillId: string,
-  rawBinding: Record<string, unknown>,
-): Diagnostic[] {
-  const diagnostics: Diagnostic[] = [];
-  const templateId = DEFAULT_SKILL_TEMPLATE_ID;
-  const input = promptInputOf(rawBinding);
-  const resolvedValues = skillValues(document, rawBinding, skillId, templateId);
-  if (resolvedValues.diagnostic) {
-    diagnostics.push(resolvedValues.diagnostic);
-    return diagnostics;
-  }
-  const { values } = resolvedValues;
-
-  const descriptionDiagnostics = bindingDescriptionValidation(
-    rawBinding.description,
-    values,
-    skillId,
-    templateId,
-    "skills",
-    "skill",
-  );
-  const inputValueDiagnostics = missingValueDiagnostics(
-    input,
-    values,
-    skillId,
-    templateId,
-    "skills",
-    "skill",
-  );
-  diagnostics.push(
-    ...descriptionDiagnostics.valueDiagnostics,
-    ...inputValueDiagnostics,
-    ...descriptionDiagnostics.emptyDiagnostics,
-  );
-
-  if (inputValueDiagnostics.length > 0) {
-    diagnostics.push(
-      ...validateSkillInput(registry, templateId, input, skillId).filter(
-        (diagnostic) => diagnostic.code !== "invalid-prompt-input",
-      ),
-    );
-    return diagnostics;
-  }
-
-  const interpolated = interpolatedSkillInput(
-    input,
-    values,
-    skillId,
-    templateId,
-  );
-  if (interpolated.diagnostic) {
-    diagnostics.push(interpolated.diagnostic);
-    return diagnostics;
-  }
-  diagnostics.push(
-    ...validateSkillInput(registry, templateId, interpolated.input, skillId),
-  );
-  return diagnostics;
-}
-
-export function validateTemplates(
-  document: AtlanteDocument,
-  registry: TemplateRegistry,
-  defaultTemplateId: string,
-): Diagnostic[] {
-  const diagnostics: Diagnostic[] = [];
-
-  for (const [agentId, binding] of Object.entries(document.agents ?? {})) {
-    diagnostics.push(
-      ...validateAgentBinding(
-        document,
-        registry,
-        defaultTemplateId,
-        agentId,
-        binding,
-      ),
-    );
-  }
-
-  for (const [skillId, binding] of Object.entries(document.skills ?? {})) {
-    diagnostics.push(
-      ...validateSkillBinding(
-        document,
-        registry,
-        skillId,
-        binding as Record<string, unknown>,
-      ),
-    );
-  }
-
-  return diagnostics;
 }
 
 function originPath(origin: ResourceOrigin | undefined): string | undefined {

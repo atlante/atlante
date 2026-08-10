@@ -231,6 +231,55 @@ describe("buildProject", () => {
     ).toContain('"version": 1');
   });
 
+  test("preserves prior artifacts when a valid resource fails Handlebars rendering", () => {
+    const { root } = project(
+      JSON.stringify({
+        $schema: SCHEMA_URI,
+        agents: {
+          reviewer: {
+            $template: "./agent",
+            description: "Reviews changes.",
+            identity: "You review.",
+            mission: "Find defects.",
+          },
+        },
+      }),
+    );
+    writeTemplate(
+      root,
+      "agent",
+      {
+        type: "object",
+        properties: {
+          identity: { type: "string" },
+          mission: { type: "string" },
+        },
+        required: ["identity", "mission"],
+        additionalProperties: false,
+      },
+      "{{identity}}\n{{mission}}\n",
+    );
+
+    expect(buildProject(root).diagnostics).toEqual([]);
+    const before = artifactTreeBytes(root);
+    writeFileSync(join(root, "agent", "template.md"), "{{#if");
+
+    expect(validateProject(root).diagnostics).toEqual([]);
+    const failed = buildProject(root);
+
+    expect(failed.diagnostics).toContainEqual(
+      expect.objectContaining({ code: "template-render-failed" }),
+    );
+    expect(failed.diagnostics[0]?.message).toContain("agent");
+    expect(artifactTreeBytes(root)).toEqual(before);
+    expect(readArtifacts(root)?.agents).toEqual([
+      expect.objectContaining({
+        hostAgentId: "reviewer",
+        prompt: "You review.\nFind defects.\n",
+      }),
+    ]);
+  });
+
   test("validates and builds a custom local template with its relative children and values", () => {
     const { root } = project(
       JSON.stringify({

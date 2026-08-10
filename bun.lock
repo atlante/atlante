@@ -44,10 +44,6 @@
         "@opencode-ai/plugin": "^1.18.4",
       },
     },
-    "packages/presets": {
-      "name": "@atlante/presets",
-      "version": "0.1.6",
-    },
     "packages/resources": {
       "name": "@atlante/resources",
       "version": "0.1.6",
@@ -61,13 +57,6 @@
       "version": "0.1.6",
       "dependencies": {
         "zod": "^4.0.0",
-      },
-    },
-    "packages/templates": {
-      "name": "@atlante/templates",
-      "version": "0.1.6",
-      "dependencies": {
-        "handlebars": "^4.7.8",
       },
     },
     "packages/validator": {
@@ -90,13 +79,9 @@
 
     "@atlante/opencode-plugin": ["@atlante/opencode-plugin@workspace:packages/opencode-plugin"],
 
-    "@atlante/presets": ["@atlante/presets@workspace:packages/presets"],
-
     "@atlante/resources": ["@atlante/resources@workspace:packages/resources"],
 
     "@atlante/schema": ["@atlante/schema@workspace:packages/schema"],
-
-    "@atlante/templates": ["@atlante/templates@workspace:packages/templates"],
 
     "@atlante/validator": ["@atlante/validator@workspace:packages/validator"],
 

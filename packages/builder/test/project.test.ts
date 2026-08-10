@@ -44,7 +44,7 @@ describe("loadProject", () => {
     expect(loaded.document?.agents?.reviewer?.description).toBe(
       "Reviews changes.",
     );
-    expect(loaded.registry?.get("atlante/agent")).toBeDefined();
+    expect(loaded.resources?.templates.length).toBeGreaterThan(0);
   });
 
   test("accepts an explicit config target", () => {
@@ -64,7 +64,7 @@ describe("loadProject", () => {
     const loaded = loadProject(directory);
 
     expect(loaded.document).toBeUndefined();
-    expect(loaded.registry).toBeUndefined();
+    expect(loaded.resources).toBeUndefined();
     expect(loaded.diagnostics[0]?.code).toBe("ambiguous-config");
   });
 

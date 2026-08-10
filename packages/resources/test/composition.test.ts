@@ -1,102 +1,38 @@
 import { describe, expect, test } from "bun:test";
-import {
-  type JsonObject,
-  loadTemplateMigrationRegistry,
-  slotsOf,
-  type TemplateMigrationRecord,
-  type TemplateRegistry,
-  walkComposition,
-} from "../src/index.js";
+import { isCompositionMarker, type JsonObject, slotsOf } from "../src/index.js";
 
-const cyclicRoot = new URL("./fixtures/cyclic", import.meta.url).pathname;
-const validRoot = new URL("./fixtures/valid", import.meta.url).pathname;
-const danglingSlotRoot = new URL("./fixtures/dangling-slot", import.meta.url)
-  .pathname;
-const diamondRoot = new URL("./fixtures/diamond", import.meta.url).pathname;
-const nestedSlotRoot = new URL("./fixtures/nested-slot", import.meta.url)
-  .pathname;
-const malformedSlotRoot = new URL("./fixtures/malformed-slot", import.meta.url)
-  .pathname;
-
-function registryOf(
-  definitions: Record<string, { inputSchema: JsonObject; source?: string }>,
-): TemplateRegistry {
-  const entries = new Map<string, TemplateMigrationRecord>(
-    Object.entries(definitions).map(([id, definition]) => [
-      id,
-      {
-        id,
-        directory: "<memory>",
-        locator: id,
-        origin: { kind: "project", path: `<memory>/${id}/template.jsonc` },
-        kind: "template" as const,
-        source: definition.source ?? "",
-        inputSchema: definition.inputSchema,
-      },
-    ]),
-  );
-
-  return {
-    get: (id: string) => entries.get(id),
-    ids: () => [...entries.keys()],
-  };
-}
-
-describe("template composition", () => {
-  test("finds a top-level slot from a JSONC template facet", () => {
-    const { registry } = loadTemplateMigrationRegistry(cyclicRoot, "test");
-    const template = registry.get("test/a");
-    if (!template) throw new Error("fixture missing");
-
-    expect(slotsOf(template.inputSchema)).toEqual([
-      { property: "child", templateId: "test/b" },
-    ]);
-  });
-
-  test("finds a top-level slot property", () => {
+describe("resource template composition", () => {
+  test("finds a top-level slot marker", () => {
     expect(
       slotsOf({
         type: "object",
-        properties: { child: { template: "test/child" } },
+        properties: { child: { template: "atlante/markdown" } },
       }),
-    ).toEqual([{ property: "child", templateId: "test/child" }]);
+    ).toEqual([{ property: "child", templateId: "atlante/markdown" }]);
   });
 
-  test("returns no slots for a template without them", () => {
-    const { registry } = loadTemplateMigrationRegistry(validRoot, "test");
-    const template = registry.get("test/greeting");
-    if (!template) throw new Error("fixture missing");
-
-    expect(slotsOf(template.inputSchema)).toEqual([]);
-  });
-
-  test("finds a template reference at a nested object path", () => {
-    const { registry } = loadTemplateMigrationRegistry(nestedSlotRoot, "test");
-    const template = registry.get("test/holder");
-    if (!template) throw new Error("fixture missing");
-
-    const slots = slotsOf(template.inputSchema);
-    expect(slots).toHaveLength(1);
-    expect(slots[0]?.templateId).toBe("test/does-not-exist");
-    expect(slots[0]).toMatchObject({ path: ["outer", "inner"] });
-  });
-
-  test("finds nested object, array, and oneOf branch slots", () => {
+  test("finds nested object, array, and composition-branch slots", () => {
     expect(
       slotsOf({
         type: "object",
         properties: {
           outer: {
             type: "object",
-            properties: { inner: { template: "test/inner" } },
+            properties: { inner: { template: "atlante/markdown" } },
           },
-          sections: { type: "array", items: { template: "test/section" } },
+          sections: { type: "array", items: { template: "atlante/markdown" } },
           choice: {
             oneOf: [
-              { properties: { markdown: { template: "test/markdown" } } },
               {
+                type: "object",
                 properties: {
-                  instructions: { template: "test/instructions" },
+                  markdown: { template: "atlante/markdown" },
+                },
+              },
+              {
+                type: "object",
+                properties: {
+                  instructions: { template: "atlante/instructions" },
                 },
               },
             ],
@@ -106,262 +42,48 @@ describe("template composition", () => {
     ).toEqual([
       {
         property: "inner",
-        templateId: "test/inner",
+        templateId: "atlante/markdown",
         path: ["outer", "inner"],
         dataPath: ["outer", "inner"],
       },
       {
         property: "sections",
-        templateId: "test/section",
+        templateId: "atlante/markdown",
         path: ["sections", "items"],
         dataPath: ["sections"],
         arrayItems: true,
       },
       {
         property: "markdown",
-        templateId: "test/markdown",
+        templateId: "atlante/markdown",
         path: ["choice", "oneOf", "0", "markdown"],
         dataPath: ["choice", "markdown"],
       },
       {
         property: "instructions",
-        templateId: "test/instructions",
+        templateId: "atlante/instructions",
         path: ["choice", "oneOf", "1", "instructions"],
         dataPath: ["choice", "instructions"],
       },
     ]);
   });
 
-  test("does not treat a JSON Schema property named template as a slot", () => {
-    expect(
-      slotsOf({
-        type: "object",
-        properties: {
-          settings: {
+  test("tracks slots beneath nested array items without losing data paths", () => {
+    const slots = slotsOf({
+      type: "object",
+      properties: {
+        groups: {
+          type: "array",
+          items: {
             type: "object",
             properties: {
-              template: {
-                type: "string",
-                template: "test/not-a-composition-marker",
-              },
-            },
-          },
-        },
-      }),
-    ).toEqual([]);
-  });
-
-  test("reports object and array marker values as malformed", () => {
-    const issues = walkComposition(
-      registryOf({
-        "test/root": {
-          inputSchema: {
-            type: "object",
-            properties: {
-              objectMarker: { template: {} },
-              arrayMarker: { template: [] },
-            },
-          },
-        },
-      }),
-      "test/root",
-    );
-
-    expect(issues).toHaveLength(2);
-    expect(issues.every((issue) => issue.code === "invalid-input-schema")).toBe(
-      true,
-    );
-    expect(issues.map((issue) => issue.slotPath)).toEqual([
-      ["objectMarker"],
-      ["arrayMarker"],
-    ]);
-  });
-
-  test("detects a cycle and reports the complete chain", () => {
-    const registry = registryOf({
-      "test/a": {
-        inputSchema: {
-          type: "object",
-          properties: { child: { template: "test/b" } },
-        },
-      },
-      "test/b": {
-        inputSchema: {
-          type: "object",
-          properties: { child: { template: "test/a" } },
-        },
-      },
-    });
-
-    const issues = walkComposition(registry, "test/a");
-
-    expect(issues).toHaveLength(1);
-    expect(issues[0]?.code).toBe("cyclic-template");
-    expect(issues[0]?.chain).toEqual(["test/a", "test/b", "test/a"]);
-  });
-
-  test("detects a cycle from JSONC fixtures and reports the chain", () => {
-    const { registry } = loadTemplateMigrationRegistry(cyclicRoot, "test");
-    const issues = walkComposition(registry, "test/a");
-
-    expect(issues).toHaveLength(1);
-    expect(issues[0]?.code).toBe("cyclic-template");
-    expect(issues[0]?.chain).toEqual(["test/a", "test/b", "test/a"]);
-  });
-
-  test("reports an unknown template id passed as the root", () => {
-    const { registry } = loadTemplateMigrationRegistry(validRoot, "test");
-
-    expect(walkComposition(registry, "test/missing")).toMatchObject([
-      { code: "unknown-template" },
-    ]);
-  });
-
-  test("reports a missing slot and attributes it to the property", () => {
-    const { registry } = loadTemplateMigrationRegistry(
-      danglingSlotRoot,
-      "test",
-    );
-    const issues = walkComposition(registry, "test/holder");
-
-    expect(issues).toHaveLength(1);
-    expect(issues[0]).toMatchObject({
-      code: "unknown-template",
-      templateId: "test/does-not-exist",
-      property: "missingSlot",
-    });
-  });
-
-  test("reports an unknown template at its nested slot path", () => {
-    const { registry } = loadTemplateMigrationRegistry(nestedSlotRoot, "test");
-    const issues = walkComposition(registry, "test/holder");
-
-    expect(issues[0]).toMatchObject({
-      code: "unknown-template",
-      property: "inner",
-      slotPath: ["outer", "inner"],
-    });
-    expect(issues[0]?.message).toContain("test/does-not-exist");
-  });
-
-  test("reports unknown roots and nested slot paths", () => {
-    const registry = registryOf({
-      "test/root": {
-        inputSchema: {
-          type: "object",
-          properties: {
-            envelope: {
-              type: "object",
-              properties: { child: { template: "test/missing" } },
-            },
-          },
-        },
-      },
-    });
-
-    expect(walkComposition(registry, "test/nope")[0]?.code).toBe(
-      "unknown-template",
-    );
-    expect(walkComposition(registry, "test/root")[0]).toMatchObject({
-      code: "unknown-template",
-      templateId: "test/missing",
-      property: "child",
-      slotPath: ["envelope", "child"],
-    });
-  });
-
-  test("returns no issues for a diamond composition", () => {
-    const registry = registryOf({
-      "test/diamond": {
-        inputSchema: {
-          type: "object",
-          properties: {
-            left: { template: "test/leaf" },
-            right: { template: "test/leaf" },
-          },
-        },
-      },
-      "test/leaf": { inputSchema: { type: "object" } },
-    });
-
-    expect(walkComposition(registry, "test/diamond")).toEqual([]);
-  });
-
-  test("returns no issues for a diamond fixture", () => {
-    const { registry } = loadTemplateMigrationRegistry(diamondRoot, "test");
-
-    expect(walkComposition(registry, "test/diamond")).toEqual([]);
-  });
-
-  test("returns no issues for a template without slots", () => {
-    const { registry } = loadTemplateMigrationRegistry(validRoot, "test");
-
-    expect(walkComposition(registry, "test/greeting")).toEqual([]);
-  });
-
-  test("detects cycles reached through nested object slots", () => {
-    const registry = registryOf({
-      "test/root": {
-        inputSchema: {
-          type: "object",
-          properties: {
-            envelope: {
-              type: "object",
-              properties: { child: { template: "test/a" } },
-            },
-          },
-        },
-      },
-      "test/a": {
-        inputSchema: {
-          type: "object",
-          properties: { payload: { template: "test/b" } },
-        },
-      },
-      "test/b": {
-        inputSchema: {
-          type: "object",
-          properties: { payload: { template: "test/a" } },
-        },
-      },
-    });
-
-    const issues = walkComposition(registry, "test/root");
-
-    expect(issues).toHaveLength(1);
-    expect(issues[0]?.chain).toEqual([
-      "test/root",
-      "test/a",
-      "test/b",
-      "test/a",
-    ]);
-    expect(issues[0]?.slotPath).toEqual([
-      "envelope",
-      "child",
-      "payload",
-      "payload",
-    ]);
-  });
-
-  test("reports every malformed marker at its branch path", () => {
-    const registry = registryOf({
-      "test/root": {
-        inputSchema: {
-          type: "object",
-          properties: {
-            metadata: {
-              type: "object",
-              properties: {
-                invalid: { template: 42 },
-                sections: { type: "array", items: { template: "" } },
-                choice: {
-                  oneOf: [
-                    {
-                      properties: {
-                        branch: { template: "not-namespaced" },
-                      },
-                    },
-                  ],
+              rows: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    detail: { template: "atlante/markdown" },
+                  },
                 },
               },
             },
@@ -370,54 +92,63 @@ describe("template composition", () => {
       },
     });
 
-    const issues = walkComposition(registry, "test/root");
-
-    expect(issues).toHaveLength(3);
-    expect(issues.every((issue) => issue.code === "invalid-input-schema")).toBe(
-      true,
-    );
-    expect(issues.map((issue) => issue.slotPath)).toEqual([
-      ["metadata", "invalid"],
-      ["metadata", "sections", "items"],
-      ["metadata", "choice", "oneOf", "0", "branch"],
+    expect(slots).toEqual([
+      {
+        property: "detail",
+        templateId: "atlante/markdown",
+        path: ["groups", "items", "rows", "items", "detail"],
+        dataPath: ["groups", "rows", "detail"],
+        arrayItems: true,
+      },
     ]);
   });
 
-  test("does not echo an absolute malformed marker value", () => {
-    const absolute = "/private/tmp/atlante-marker-probe/absolute-template";
-    const issues = walkComposition(
-      registryOf({
-        "test/root": {
-          inputSchema: {
-            type: "object",
-            properties: { choice: { template: absolute } },
+  test("recognizes only an exact template marker object", () => {
+    expect(isCompositionMarker({ template: "atlante/markdown" })).toBe(true);
+    expect(
+      isCompositionMarker({ template: "atlante/markdown", description: "x" }),
+    ).toBe(false);
+    expect(isCompositionMarker({ template: "" })).toBe(true);
+    expect(isCompositionMarker({ type: "string", template: "atlante/x" })).toBe(
+      false,
+    );
+    expect(isCompositionMarker(["template"])).toBe(false);
+  });
+
+  test("does not treat a JSON Schema property named template as a slot", () => {
+    const schema: JsonObject = {
+      type: "object",
+      properties: {
+        settings: {
+          type: "object",
+          properties: {
+            template: {
+              type: "string",
+              template: "not-a-slot",
+            },
           },
         },
-      }),
-      "test/root",
-    );
+      },
+    };
 
-    expect(issues).toHaveLength(1);
-    expect(issues[0]?.code).toBe("invalid-input-schema");
-    expect(JSON.stringify(issues)).not.toContain(absolute);
+    expect(slotsOf(schema)).toEqual([]);
   });
 
-  test("reports malformed markers from the JSONC fixture", () => {
-    const { registry } = loadTemplateMigrationRegistry(
-      malformedSlotRoot,
-      "test",
-    );
-    const issues = walkComposition(registry, "test/broken");
-
-    expect(issues).toHaveLength(3);
-    expect(issues.every((issue) => issue.code === "invalid-input-schema")).toBe(
-      true,
-    );
-    expect(issues.map((issue) => issue.property)).toEqual([
-      "notString",
-      "empty",
-      "notNamespaced",
+  test("accepts local and bundled locators but ignores malformed markers", () => {
+    expect(
+      slotsOf({
+        type: "object",
+        properties: {
+          local: { template: "../shared" },
+          bundled: { template: "atlante/markdown" },
+          empty: { template: "" },
+          unnamespaced: { template: "markdown" },
+          nonString: { template: 42 },
+        },
+      }),
+    ).toEqual([
+      { property: "local", templateId: "../shared" },
+      { property: "bundled", templateId: "atlante/markdown" },
     ]);
-    expect(issues[0]?.message).toContain("invalid template marker");
   });
 });

@@ -244,7 +244,7 @@ describe("resources package boundary", () => {
       'import { schema } from "@atlante/schema";',
       'import type { Validator } from "@atlante/validator";',
       'void import("@atlante/builder");',
-      'import "@atlante/presets";',
+      'import "@atlante/schema";',
       'require("@atlante/schema");',
     ].join("\n");
 
@@ -272,9 +272,11 @@ describe("resources package boundary", () => {
     ]);
     expect(Object.hasOwn(packageJson, "publishConfig")).toBe(false);
     expect(packageJson.dependencies).not.toHaveProperty("@atlante/builder");
-    expect(packageJson.dependencies).not.toHaveProperty("@atlante/presets");
-    expect(packageJson.dependencies).not.toHaveProperty("@atlante/templates");
-    expect(packageJson.dependencies).not.toHaveProperty("@atlante/validator");
+    expect(
+      Object.keys(packageJson.dependencies ?? {}).some((name) =>
+        /@atlante\/(?:validator|builder|templates|presets)/.test(name),
+      ),
+    ).toBe(false);
   });
 
   test("does not expose the forbidden legacy module vocabulary", () => {

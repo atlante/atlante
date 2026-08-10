@@ -18,19 +18,4 @@ export {
   parseDocumentOverlay,
   validateDocumentText,
 } from "./document.js";
-export type { PresetLoader } from "./expand.js";
-export { expandDocument, MAX_PRESET_DEPTH } from "./expand.js";
-export { templateLoadDiagnostics } from "./loader-diagnostics.js";
-export {
-  createBundledPresetLoader,
-  hasAnyExtends,
-} from "./preset-loader.js";
-export type { TemplateRegistry } from "./templates.js";
-export {
-  expandInputSchema,
-  promptInputOf,
-  validateAgentInput,
-  validateResolvedDocument,
-  validateSkillInput,
-  validateTemplates,
-} from "./templates.js";
+export { validateResolvedDocument } from "./templates.js";

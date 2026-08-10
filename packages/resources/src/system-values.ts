@@ -1,5 +1,3 @@
-// fallow-ignore-file code-duplication -- migration implementation mirrors the retained old package until Cleanup
-
 import { basename } from "node:path";
 
 /**

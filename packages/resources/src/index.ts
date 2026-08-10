@@ -3,24 +3,13 @@ export type {
   AuthoredValueLayerKind,
 } from "./authored-values.js";
 export { authoredValueLayerIssues } from "./authored-values.js";
-export type {
-  BundledInstanceMigrationRecord,
-  BundledStarterMigrationRecord,
-} from "./bundled.js";
 export {
   BUNDLED_RESOURCE_PACK,
   BUNDLED_RESOURCES_DIR,
   createBundledResourcePack,
-  loadBundledInstanceMigrationRecords,
-  loadBundledStarterMigrationRecord,
-  loadBundledTemplateMigrationRegistry,
 } from "./bundled.js";
-export type { CompositionIssue, Slot } from "./composition.js";
-export {
-  isCompositionMarker,
-  slotsOf,
-  walkComposition,
-} from "./composition.js";
+export type { Slot } from "./composition.js";
+export { isCompositionMarker, slotsOf } from "./composition.js";
 export type {
   ResourcePack,
   ResourcePackKind,
@@ -36,7 +25,6 @@ export type {
   ResourceLoadOptions,
 } from "./facets.js";
 export {
-  clearResourceFacetCache,
   loadInstanceFacet,
   loadPresetFacet,
   loadTemplateFacet,
@@ -74,14 +62,6 @@ export {
   parseJsoncWithLocations,
   parseJsonWithLocations,
 } from "./jsonc.js";
-export type {
-  FacetOriginKind,
-  TemplateLoadError,
-  TemplateLoaderDeps,
-  TemplateMigrationRecord,
-  TemplateRegistry,
-} from "./loader.js";
-export { loadTemplateMigrationRegistry, parseJsonc } from "./loader.js";
 export type { ParsedResourceLocator } from "./locator.js";
 export { parseResourceLocator, validateResourceLocator } from "./locator.js";
 export type { ResourceMergeOptions, ResourceMergeResult } from "./merge.js";
@@ -98,7 +78,7 @@ export {
   prefixProvenance,
   provenanceForValue,
 } from "./provenance.js";
-export type { RenderArgs, ResolvedRenderArgs } from "./renderer.js";
+export type { ResolvedRenderArgs } from "./renderer.js";
 export {
   InvalidValueReferenceError,
   interpolateValues,
@@ -106,7 +86,6 @@ export {
   NonStringValueError,
   renderResolvedTemplate,
   renderString,
-  renderTemplate,
   SLOT_PARTIAL_PREFIX,
   slotPartialName,
   ValueReferenceCollisionError,

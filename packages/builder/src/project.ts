@@ -9,8 +9,6 @@ import {
   loadDocument,
   type ResourceWatchContext,
 } from "@atlante/validator";
-import { resourceTemplateRegistry } from "./resource-registry.js";
-import type { DirectTemplateRegistry } from "./template-compat.js";
 
 export type ProjectContext = {
   bundledPack?: ResourcePack;
@@ -20,7 +18,6 @@ export type LoadedProject = {
   document?: AtlanteDocument;
   configPath?: string;
   projectRoot?: string;
-  registry?: DirectTemplateRegistry;
   resources?: ResolvedResourceDocument;
   resourceWatch?: ResourceWatchContext;
   diagnostics: Diagnostic[];
@@ -32,10 +29,7 @@ function loadedLocation(
   return { configPath: path, projectRoot: dirname(path) };
 }
 
-/**
- * Loads one validated resource context. No second template or preset registry
- * is selected for resource-backed projects.
- */
+/** Loads one validated document and its unified resolved resource context. */
 export function loadProject(
   target: string,
   context: ProjectContext = {},
@@ -58,9 +52,6 @@ export function loadProject(
     document: loaded.document,
     resources: loaded.resources,
     resourceWatch: loaded.resourceWatch,
-    registry: loaded.resources
-      ? resourceTemplateRegistry(loaded.resources)
-      : undefined,
     diagnostics: loaded.diagnostics,
   };
 }

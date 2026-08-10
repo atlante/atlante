@@ -1137,6 +1137,140 @@ describe("resource-backed document validation", () => {
     ).toBe(true);
   });
 
+  test("reports a value-reference collision in a resource-backed binding", () => {
+    const { configPath } = project({
+      $schema: SCHEMA_URI,
+      values: { project: "atlante" },
+      agents: {
+        reviewer: {
+          $template: "atlante/agent",
+          description: "Reviews the change.",
+          identity: "You review.",
+          mission: "Find defects.",
+          "{{values.project}}": "first",
+          atlante: "second",
+        },
+      },
+    });
+
+    const result = load(configPath);
+
+    expect(result.document).toBeUndefined();
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: "value-reference-collision",
+        path: "/agents/reviewer",
+      }),
+    );
+  });
+
+  test("reports an empty resource-backed description after interpolation", () => {
+    const { configPath } = project({
+      $schema: SCHEMA_URI,
+      values: { empty: "" },
+      agents: {
+        reviewer: {
+          $template: "atlante/agent",
+          description: "{{values.empty}}",
+          identity: "You review.",
+          mission: "Find defects.",
+        },
+      },
+    });
+
+    const result = load(configPath);
+
+    expect(result.document).toBeUndefined();
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: "invalid-agent-description",
+        path: "/agents/reviewer/description",
+      }),
+    );
+  });
+
+  test("reports unknown values and system references through resource validation", () => {
+    const unknownValue = project({
+      $schema: SCHEMA_URI,
+      agents: {
+        reviewer: {
+          $template: "atlante/agent",
+          description: "Reviews the change.",
+          identity: "{{values.missing}}",
+          mission: "Find defects.",
+        },
+      },
+    });
+    expect(load(unknownValue.configPath).diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: "missing-value",
+        path: "/agents/reviewer/identity",
+      }),
+    );
+
+    const unknownSystem = project({
+      $schema: SCHEMA_URI,
+      values: { project: "{{sys.notAResolver}}" },
+      agents: {
+        reviewer: {
+          $template: "atlante/agent",
+          description: "Reviews the change.",
+          identity: "You review.",
+          mission: "Find defects.",
+        },
+      },
+    });
+    expect(load(unknownSystem.configPath).diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: "unknown-system-variable",
+        path: "/values/project",
+      }),
+    );
+  });
+
+  test.each([
+    [
+      "unknown workflow policy",
+      {
+        policies: { orchestratorWrites: true },
+        phases: [{ kind: "build", instructions: ["Make the change."] }],
+      },
+    ],
+    [
+      "phase without a name or kind",
+      { phases: [{ instructions: ["Make the change."] }] },
+    ],
+    [
+      "invalid phase input",
+      { phases: [{ kind: "build", instructions: [{ description: "old" }] }] },
+    ],
+    [
+      "unknown section input",
+      { sections: [{ markdown: "Run tests.", extra: true }] },
+    ],
+  ] as const)("rejects negative bundled skill input: %s", (_label, input) => {
+    const { configPath } = project({
+      $schema: SCHEMA_URI,
+      skills: {
+        testing: {
+          $template: "atlante/skill",
+          description: "Testing guidance",
+          title: "Testing",
+          overview: "Run tests.",
+          sections:
+            "sections" in input ? input.sections : [{ workflow: input }],
+        },
+      },
+    });
+
+    const result = load(configPath);
+
+    expect(result.document).toBeUndefined();
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({ code: "invalid-prompt-input" }),
+    );
+  });
+
   test("uses the injectable bundled resource pack seam without loading unrelated siblings", () => {
     const bundledRoot = mkdtempSync(
       join(tmpdir(), "atlante-validator-bundled-"),

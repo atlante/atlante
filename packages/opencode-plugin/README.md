@@ -9,10 +9,9 @@ or later.
 ## Published package
 
 The plugin is published to npm as `@atlante/opencode-plugin`. It ships as a
-Bun-bundled artifact (the `dist/` output of `bun run build` at the repository
-root) that inlines the internal Atlante workspaces it uses. `@opencode-ai/plugin`
-is a peer dependency: the host OpenCode installation provides it, so the plugin
-has no runtime dependency on it.
+self-contained Bun-bundled artifact (the `dist/` output of `bun run build` at
+the repository root). `@opencode-ai/plugin` is a peer dependency: the host
+OpenCode installation provides it.
 
 The package exposes two entries:
 
@@ -47,14 +46,14 @@ Invalid input, an unknown name, and an inactive, unavailable, or failed tool
 return an error rather than partial content. Skill content is informational
 Markdown: the adapter does not execute it.
 
-During initialization, the plugin reads `.atlante/artifacts/manifest.json` and
-verifies every declared path, payload encoding, and SHA-256 digest before
-materialization. If artifacts are absent, malformed, unsupported, or changed,
-the `atlante_skill` tool is omitted and the host config is unchanged. After the
-staged result is materialized, the tool is active; a failure after
-materialization, including a runtime failure, moves it to the failed lifecycle
-state. Verification and injection are fail-closed: the host config is updated
-only from a complete verified artifact set, so a failure cannot partially
-mutate the host. The plugin never loads or renders source configuration. The
-native `skill` tool can coexist with `atlante_skill` without either replacing
-the other.
+During initialization, the plugin reads only `.atlante/artifacts/manifest.json`
+and verifies every declared path, payload encoding, and SHA-256 digest before
+materialization. It does not load `atlante.jsonc`, local resources, bundled
+resources, or any resolver/loader. If artifacts are absent, malformed,
+unsupported, or changed, the `atlante_skill` tool is omitted and the host config
+is unchanged. After the staged result is materialized, the tool is active; a
+failure after materialization, including a runtime failure, moves it to the
+failed lifecycle state. Verification and injection are fail-closed: the host
+config is updated only from a complete verified artifact set, so a failure
+cannot partially mutate the host. The native `skill` tool can coexist with
+`atlante_skill` without either replacing the other.

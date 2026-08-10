@@ -4,8 +4,8 @@ import { readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
 
 const ROOT = join(import.meta.dir, "..");
-// Only the two public packages are published. The other five (schema,
-// templates, presets, validator, builder) are private workspaces: they are
+// Only the two public packages are published. The other four (schema,
+// resources, validator, builder) are private workspaces: they are
 // versioned and synchronized by scripts/release.ts, but never published.
 const PACKAGES = ["cli", "opencode-plugin"] as const;
 
@@ -119,11 +119,10 @@ async function preflightArtifacts(): Promise<string[]> {
         if (!head.startsWith("#!/usr/bin/env node"))
           missing.push(`${name}: dist/bin/atlante.js shebang is not node`);
       }
-      for (const asset of ["bundled/templates", "bundled/presets"]) {
-        const assetDir = join(dir, asset);
-        if (!existsSync(assetDir) || (await readdir(assetDir)).length === 0)
-          missing.push(`${name}: ${asset} is missing or empty`);
-      }
+      const asset = "bundled/resources";
+      const assetDir = join(dir, asset);
+      if (!existsSync(assetDir) || (await readdir(assetDir)).length === 0)
+        missing.push(`${name}: ${asset} is missing or empty`);
     } else if (pkg === "opencode-plugin") {
       missing.push(...(await pluginImportIssues(dir, name)));
     }

@@ -1,19 +1,10 @@
-// fallow-ignore-file code-duplication -- resource rendering intentionally mirrors templates without a package dependency
 import Handlebars from "handlebars";
-import { slotsOf, walkComposition } from "./composition.js";
-import type { TemplateRegistry } from "./loader.js";
 import {
   copyResourceTemplateSelection,
   resourceTemplateSelection,
 } from "./resolution.js";
 import type { ResolvedTemplate } from "./resolve.js";
 import { analyzeValueReferences, isValidValueKey } from "./values.js";
-
-export type RenderArgs = {
-  registry: TemplateRegistry;
-  templateId: string;
-  input: unknown;
-};
 
 export const SLOT_PARTIAL_PREFIX = "slot/";
 
@@ -100,7 +91,7 @@ function isArrayInputSchema(inputSchema: unknown): boolean {
   );
 }
 
-type RenderSlot = ReturnType<typeof slotsOf>[number];
+type RenderSlot = ResolvedTemplate["slots"][number]["slot"];
 
 type SlotGroup = Readonly<{
   readonly path: string[];
@@ -131,116 +122,6 @@ function selectedSlot(
     [...slots].sort((left, right) =>
       left.templateId.localeCompare(right.templateId),
     )[0]) as RenderSlot;
-}
-
-/**
- * Renders each child before registering its Markdown as an opaque partial.
- * Prompt text is not HTML-escaped and child output is never parsed again.
- */
-export function renderTemplate(
-  { registry, templateId, input }: RenderArgs,
-  stack: string[] = [],
-): string {
-  if (stack.includes(templateId)) {
-    const chain = [...stack, templateId];
-    throw new Error(`circular template composition: ${chain.join(" -> ")}`);
-  }
-
-  const template = registry.get(templateId);
-  if (!template) throw new Error(`unknown template: ${templateId}`);
-
-  if (stack.length === 0) {
-    const cycle = walkComposition(registry, templateId).find(
-      (issue) => issue.code === "cyclic-template",
-    );
-    if (cycle) throw new Error(cycle.message);
-  }
-
-  const handlebars = Handlebars.create();
-  handlebars.registerHelper("increment", (value: unknown) => Number(value) + 1);
-  handlebars.registerHelper("input", () => input);
-  handlebars.registerHelper(
-    "anyPolicy",
-    (policies: unknown, phases: unknown) => {
-      const hasWorkflowPolicy =
-        typeof policies === "object" &&
-        policies !== null &&
-        Object.values(policies).some(Boolean);
-      const hasPhasePolicy =
-        Array.isArray(phases) &&
-        phases.some((phase) => {
-          if (typeof phase !== "object" || phase === null) return false;
-          const phasePolicies = (phase as Record<string, unknown>).policies;
-          return (
-            typeof phasePolicies === "object" &&
-            phasePolicies !== null &&
-            Object.values(phasePolicies).some(Boolean)
-          );
-        });
-      return hasWorkflowPolicy || hasPhasePolicy;
-    },
-  );
-  const nextStack = [...stack, templateId];
-
-  const slots = slotsOf(template.inputSchema);
-  for (const group of groupSlots(slots)) {
-    const renderSlot = (context: unknown): string => {
-      const contextSlot = selectedSlot(group.slots, context);
-      const contextTemplate = registry.get(contextSlot.templateId);
-      if (
-        isArrayInputSchema(contextTemplate?.inputSchema) &&
-        Array.isArray(context)
-      ) {
-        return renderTemplate(
-          {
-            registry,
-            templateId: contextSlot.templateId,
-            input: context,
-          },
-          nextStack,
-        );
-      }
-
-      const contextPath =
-        contextSlot.arrayItems && context !== input
-          ? arrayItemPath(input, group.path)
-          : undefined;
-      const slotInputsForRender = contextPath
-        ? slotInputs(context, contextPath, false)
-        : slotInputs(input, group.path, contextSlot.arrayItems ?? false);
-      return slotInputsForRender
-        .map((slotInput) => {
-          const slot = selectedSlot(group.slots, slotInput);
-          const childTemplate = registry.get(slot.templateId);
-          return renderTemplate(
-            {
-              registry,
-              templateId: slot.templateId,
-              input: unwrapArrayTemplateInput(
-                slotInput,
-                slot.property,
-                childTemplate?.inputSchema,
-              ),
-            },
-            nextStack,
-          );
-        })
-        .join("");
-    };
-    handlebars.registerPartial(
-      slotPartialName(
-        (group.path.length ? group.path : [group.slots[0]?.property]).join("/"),
-      ),
-      renderSlot,
-    );
-  }
-
-  const compiled = handlebars.compile(template.source, {
-    noEscape: true,
-    strict: false,
-  });
-
-  return compiled(input);
 }
 
 export type ResolvedRenderArgs = {
