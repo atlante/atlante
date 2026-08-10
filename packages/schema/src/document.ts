@@ -172,13 +172,7 @@ const canonicalBindingValidation = rejectReservedKeys(
  * An agent binding leaves prompt fields open: the selected template owns their
  * names and semantics. Unknown-field rejection happens at semantic validation.
  */
-const agentBindingBaseSchema = z.looseObject({
-  ...bindingDescriptionSchema.shape,
-  values: valuesMapSchema.optional(),
-});
-
-/** A skill binding has the same structural contract as an agent binding. */
-const skillBindingBaseSchema = z.looseObject({
+const canonicalBindingBaseSchema = z.looseObject({
   ...bindingDescriptionSchema.shape,
   values: valuesMapSchema.optional(),
 });
@@ -191,13 +185,13 @@ type CanonicalBinding = TemplateOwnedFields & {
 };
 
 export const agentBindingSchema = bindingSchema<CanonicalBinding>(
-  agentBindingBaseSchema,
+  canonicalBindingBaseSchema,
   new Set(["description", "values"]),
   canonicalBindingValidation,
 );
 
 export const skillBindingSchema = bindingSchema<CanonicalBinding>(
-  skillBindingBaseSchema,
+  canonicalBindingBaseSchema,
   new Set(["description", "values"]),
   canonicalBindingValidation,
 );

@@ -1,9 +1,13 @@
 import { describe, expect, test } from "bun:test";
+import { z } from "zod";
 import {
+  agentBindingSchema,
   atlanteDocumentOverlaySchema,
   atlanteDocumentSchema,
   SCHEMA_URI,
+  skillBindingSchema,
 } from "../src/index.js";
+import { safeRecord } from "../src/values.js";
 
 const valid = {
   $schema: SCHEMA_URI,
@@ -415,5 +419,75 @@ describe("atlanteDocumentOverlaySchema", () => {
     expect(unknownRoot.success).toBe(false);
     expect(emptyAgent.success).toBe(false);
     expect(emptySkill.success).toBe(false);
+  });
+});
+
+describe("canonical binding schemas", () => {
+  test("keeps the public agent and skill schemas behaviorally symmetric", () => {
+    const inputs: unknown[] = [
+      {
+        description: "Binding description.",
+        values: { scope: "review" },
+        content: "Binding content.",
+      },
+      { description: "" },
+      { description: "Binding description.", values: { scope: 42 } },
+      { description: "Binding description.", $instance: "./agent" },
+      "not an object",
+    ];
+
+    for (const input of inputs) {
+      const agent = agentBindingSchema.safeParse(input);
+      const skill = skillBindingSchema.safeParse(input);
+
+      expect(skill.success).toBe(agent.success);
+      if (agent.success && skill.success) {
+        expect(skill.data).toEqual(agent.data);
+      } else if (!agent.success && !skill.success) {
+        expect(skill.error.issues).toEqual(agent.error.issues);
+      }
+    }
+  });
+});
+
+describe("safeRecord", () => {
+  test("preserves key and union-value issue paths and branch inputs", () => {
+    const schema = safeRecord(
+      z.string().min(1),
+      z.union([z.string().min(3), z.number().min(10)]),
+    );
+    const result = schema.safeParse({ "": "value", count: 2 });
+
+    expect(result.success).toBe(false);
+    expect(result.success ? [] : result.error.issues).toEqual([
+      {
+        code: "custom",
+        message: "Too small: expected string to have >=1 characters",
+        path: [""],
+      },
+      {
+        code: "custom",
+        message: "Too small: expected number to be >=10",
+        path: ["count"],
+      },
+    ]);
+  });
+
+  test("copies transformed values and own __proto__ keys safely", () => {
+    const schema = safeRecord(
+      z.string().min(1),
+      z.string().transform((value) => value.toUpperCase()),
+    );
+    const result = schema.safeParse(
+      JSON.parse('{"name":"value","__proto__":"safe"}'),
+    );
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.name).toBe("VALUE");
+    expect(Object.hasOwn(result.data, "__proto__")).toBe(true);
+    expect(
+      Object.getOwnPropertyDescriptor(result.data, "__proto__")?.value,
+    ).toBe("SAFE");
   });
 });

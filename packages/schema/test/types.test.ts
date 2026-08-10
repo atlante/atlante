@@ -47,6 +47,9 @@ const canonicalSkill: SkillBinding = {
   content: { template: "ordinary-template-data" },
 };
 
+const canonicalAgentAsSkill: SkillBinding = canonicalAgent;
+const canonicalSkillAsAgent: AgentBinding = canonicalSkill;
+
 const canonicalWithInstance: AgentBinding = {
   description: "A resolved agent binding.",
   // @ts-expect-error A canonical binding cannot retain a source selector.
@@ -99,4 +102,6 @@ void overlayDocument;
 void canonicalWithInstance;
 void canonicalWithTopLevelTemplate;
 void canonicalDocumentWithTopLevelTemplate;
+void canonicalAgentAsSkill;
+void canonicalSkillAsAgent;
 void canonicalDocument;

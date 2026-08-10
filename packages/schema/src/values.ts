@@ -79,24 +79,6 @@ function reportIssues(
   return false;
 }
 
-function reportKeyIssues(
-  context: IssueContext,
-  key: string,
-  result: {
-    success: boolean;
-    error?: { issues: ValidationIssue[] };
-  },
-): boolean {
-  if (result.success) return true;
-  for (const issue of selectedIssues(result.error?.issues ?? [], key))
-    context.addIssue({
-      code: "custom",
-      message: issue.message,
-      path: [key, ...issue.path.map(String)],
-    });
-  return false;
-}
-
 /** Validate original keys, then copy them safely, including `__proto__`. */
 export function safeRecord<
   Key extends z.ZodType<string>,
@@ -113,7 +95,7 @@ export function safeRecord<
       const parsedKey = keySchema.safeParse(key);
       const parsedValue = valueSchema.safeParse(input[key]);
       if (
-        reportKeyIssues(context, key, parsedKey) &&
+        reportIssues(context, key, parsedKey, key) &&
         reportIssues(context, key, parsedValue, input[key]) &&
         parsedKey.success &&
         parsedValue.success
