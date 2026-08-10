@@ -46,6 +46,12 @@ function expectFailure(
   }
 }
 
+function expectDeeplyFrozen(value: unknown): void {
+  if (typeof value !== "object" || value === null) return;
+  expect(Object.isFrozen(value)).toBe(true);
+  for (const child of Object.values(value)) expectDeeplyFrozen(child);
+}
+
 afterEach(() => {
   for (const root of created.splice(0))
     rmSync(root, { recursive: true, force: true });
@@ -169,6 +175,30 @@ describe("selected resource facets", () => {
       join(pack.root, "resource", "template.jsonc"),
       join(pack.root, "resource", "template.md"),
     ]);
+  });
+
+  test("deeply freezes every loaded facet", () => {
+    const { root, source, resource } = fixture();
+    writeFileSync(
+      join(resource, "template.jsonc"),
+      '{ "$schema": "https://json-schema.org/draft/2020-12/schema", "properties": { "nested": { "enum": ["value"] } } }\n',
+    );
+    writeFileSync(join(resource, "template.md"), "source\n");
+    writeFileSync(
+      join(resource, "instance.jsonc"),
+      '{ "nested": { "values": [true] } }\n',
+    );
+    const preset = join(root, "preset");
+    mkdirSync(preset);
+    writeFileSync(
+      join(preset, "atlante.json"),
+      '{ "nested": { "values": [true] } }\n',
+    );
+    const pack = createProjectResourcePack(root);
+
+    expectDeeplyFrozen(loadTemplateFacet(pack, "./resource", source).facet);
+    expectDeeplyFrozen(loadInstanceFacet(pack, "./resource", source).facet);
+    expectDeeplyFrozen(loadPresetFacet(pack, "./preset", source).facet);
   });
 
   test("reloads changed and removed selected files", () => {

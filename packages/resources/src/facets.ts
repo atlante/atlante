@@ -25,7 +25,6 @@ import type {
   BundledResourceOrigin,
   InstanceFacet,
   JsonObject,
-  JsonValue,
   Preset,
   ProjectResourceOrigin,
   RawResourceLocator,
@@ -51,46 +50,11 @@ function isJsonObject(value: unknown): value is JsonObject {
   return isSafeJsonObject(value);
 }
 
-function cloneJson(value: JsonValue): JsonValue {
-  if (Array.isArray(value)) return value.map(cloneJson);
-  if (typeof value !== "object" || value === null) return value;
-  return Object.fromEntries(
-    Object.entries(value).map(([key, child]) => [key, cloneJson(child)]),
-  );
-}
-
 function deepFreeze<T>(value: T): T {
   if (typeof value !== "object" || value === null) return value;
   Object.freeze(value);
   for (const child of Object.values(value)) deepFreeze(child);
   return value;
-}
-
-function cloneFacet(facet: LoadedFacet): LoadedFacet {
-  const identity = {
-    locator: facet.locator,
-    origin: { ...facet.origin },
-  };
-  if (facet.kind === "template") {
-    return deepFreeze({
-      ...identity,
-      kind: "template" as const,
-      inputSchema: cloneJson(facet.inputSchema) as JsonObject,
-      source: facet.source,
-    });
-  }
-  if (facet.kind === "instance") {
-    return deepFreeze({
-      ...identity,
-      kind: "instance" as const,
-      input: cloneJson(facet.input) as JsonObject,
-    });
-  }
-  return deepFreeze({
-    ...identity,
-    kind: "preset" as const,
-    document: cloneJson(facet.document) as JsonObject,
-  });
 }
 
 function dependencyPaths(files: readonly ResourceFile[]): string[] {
@@ -295,7 +259,7 @@ function loadFresh<T extends LoadedFacet>(
 ): LoadedResource<T> {
   const loaded = load();
   return {
-    facet: cloneFacet(loaded.facet) as T,
+    facet: deepFreeze(loaded.facet),
     dependencies: Object.freeze(normalizeResourcePaths(loaded.dependencies)),
     unresolvedParents: Object.freeze([]),
     ...(loaded.locations
