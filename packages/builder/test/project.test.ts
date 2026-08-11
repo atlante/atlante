@@ -1,9 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SCHEMA_URI } from "@atlante/schema";
-import { loadBundledTemplates, loadTemplates } from "@atlante/templates";
 import { loadProject, prepareProject, validateProject } from "../src/index.js";
 
 const created: string[] = [];
@@ -45,7 +44,7 @@ describe("loadProject", () => {
     expect(loaded.document?.agents?.reviewer?.description).toBe(
       "Reviews changes.",
     );
-    expect(loaded.registry?.get("atlante/agent")).toBeDefined();
+    expect(loaded.resources?.templates.length).toBeGreaterThan(0);
   });
 
   test("accepts an explicit config target", () => {
@@ -65,7 +64,7 @@ describe("loadProject", () => {
     const loaded = loadProject(directory);
 
     expect(loaded.document).toBeUndefined();
-    expect(loaded.registry).toBeUndefined();
+    expect(loaded.resources).toBeUndefined();
     expect(loaded.diagnostics[0]?.code).toBe("ambiguous-config");
   });
 
@@ -81,23 +80,9 @@ describe("loadProject", () => {
     expect(loaded.document).toBeUndefined();
     expect(loaded.diagnostics).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ code: "unknown-preset" }),
+        expect.objectContaining({ code: "missing-target" }),
       ]),
     );
-  });
-
-  test("turns bundled template loader failures into diagnostics", () => {
-    const { directory } = project(valid);
-    const loaded = loadProject(directory, {
-      loadTemplates: () => ({
-        registry: { get: () => undefined, ids: () => [] },
-        errors: [{ directory: "bundled", message: "injected failure" }],
-      }),
-    });
-
-    expect(loaded.document).toBeUndefined();
-    expect(loaded.registry).toBeUndefined();
-    expect(loaded.diagnostics[0]?.code).toBe("template-load-failed");
   });
 });
 
@@ -108,29 +93,27 @@ describe("validateProject", () => {
       "agents": {
         "reviewer": {
           "description": "Reviews changes.",
-          "template": "test/broken"
+          "$template": "./agent",
+          "identity": "You review."
         }
       }
     }`);
-    const brokenRoot = new URL(
-      "../../templates/test/fixtures/undeclared-partial",
-      import.meta.url,
-    ).pathname;
-    const { registry: brokenRegistry } = loadTemplates(brokenRoot, "test");
-    const { registry: bundledRegistry } = loadBundledTemplates();
-
-    const validated = validateProject(directory, {
-      loadTemplates: () => ({
-        registry: {
-          get: (id: string) =>
-            brokenRegistry.get(id) ?? bundledRegistry.get(id),
-          ids: () => [
-            ...new Set([...brokenRegistry.ids(), ...bundledRegistry.ids()]),
-          ],
-        },
-        errors: [],
+    const resourceDirectory = join(directory, "agent");
+    mkdirSync(resourceDirectory);
+    writeFileSync(
+      join(resourceDirectory, "template.jsonc"),
+      JSON.stringify({
+        $schema: "https://json-schema.org/draft/2020-12/schema",
+        type: "object",
+        properties: { identity: { type: "string" } },
+        required: ["identity"],
+        additionalProperties: false,
       }),
-    });
+    );
+    // Validation must not render source; rendering remains a T7 concern.
+    writeFileSync(join(resourceDirectory, "template.md"), "{{#if");
+
+    const validated = validateProject(directory);
 
     expect(validated.diagnostics).toEqual([]);
     expect(validated.document).toBeDefined();
@@ -156,6 +139,7 @@ describe("prepareProject", () => {
     expect(prepared.diagnostics).toEqual([]);
     expect(prepared.agents).toHaveLength(1);
     expect(prepared.agents[0]?.hostAgentId).toBe("reviewer");
+    expect(prepared.agents[0]?.templateId).toBe("atlante/agent");
   });
 
   test("returns no descriptors when preparation fails", () => {

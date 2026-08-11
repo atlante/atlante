@@ -3,11 +3,11 @@
 Project loading, validation, host-neutral preparation, and artifact publication for
 [Atlante](https://github.com/atlante/atlante). Requires Node.js 22 or later.
 
-The package loads a project configuration, expands bundled presets, validates
-template inputs, renders agent and skill descriptors, and publishes verified
-host-independent artifacts. The preparation pipeline is deterministic and
-fail-closed: if validation, interpolation, composition, or rendering fails, no
-partial descriptor set is returned.
+The package loads a project configuration, resolves local and bundled resource
+facets, validates template inputs, renders agent and skill descriptors, and
+publishes verified host-independent artifacts. The preparation pipeline is
+deterministic and fail-closed: if validation, interpolation, composition, or
+rendering fails, no partial descriptor set is returned.
 
 ```ts
 import { prepareProject } from "@atlante/builder";
@@ -17,8 +17,9 @@ const prepared = prepareProject("/path/to/project");
 
 `loadProject` exposes canonical project loading and `validateProject` performs
 the same checks without rendering. `mergeValues` performs the non-mutating
-global-plus-local value merge used by preparation. `readArtifacts` is the
-adapter-facing, fail-closed reader exported from `@atlante/builder/artifacts`.
+global-plus-local value merge used by resource-backed preparation. `readArtifacts`
+is the adapter-facing, fail-closed reader exported from
+`@atlante/builder/artifacts`.
 
 `buildProject` prepares the complete artifact set before writing a private sibling
 tree and publishing it by directory rename. Readers can observe a complete old

@@ -1,8 +1,77 @@
-import { expect, test } from "bun:test";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { afterEach, expect, test } from "bun:test";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { buildProject } from "@atlante/builder";
+import { SCHEMA_URI } from "@atlante/schema";
 import type { PluginInput } from "@opencode-ai/plugin";
+
+type HostConfig = {
+  agent?: Record<string, Record<string, unknown>>;
+  permission?: Record<string, unknown>;
+};
+
+const created: string[] = [];
+
+afterEach(() => {
+  for (const directory of created.splice(0))
+    rmSync(directory, { recursive: true, force: true });
+});
+
+function localResourceProject(): string {
+  const root = mkdtempSync(join(tmpdir(), "atlante-built-plugin-"));
+  created.push(root);
+  writeFileSync(
+    join(root, "atlante.jsonc"),
+    `${JSON.stringify({
+      $schema: SCHEMA_URI,
+      agents: {
+        reviewer: {
+          $instance: "./resources/reviewer",
+          description: "A locally authored reviewer.",
+        },
+      },
+      skills: {
+        testing: {
+          $instance: "./resources/testing",
+          description: "A locally authored testing skill.",
+        },
+      },
+    })}\n`,
+  );
+  mkdirSync(join(root, "resources", "reviewer"), { recursive: true });
+  mkdirSync(join(root, "resources", "testing"), { recursive: true });
+  writeFileSync(
+    join(root, "resources", "reviewer", "instance.jsonc"),
+    JSON.stringify({
+      $template: "atlante/agent",
+      identity: "You are a built-path reviewer.",
+      mission: "Verify the generated plugin runtime.",
+    }),
+  );
+  writeFileSync(
+    join(root, "resources", "testing", "instance.jsonc"),
+    JSON.stringify({
+      $template: "atlante/skill",
+      title: "Built testing",
+      overview: "A skill materialized by the generated plugin.",
+      sections: [{ markdown: "Built skill content." }],
+    }),
+  );
+  const result = buildProject(root);
+  if (result.diagnostics.some(({ severity }) => severity === "error"))
+    throw new Error("built plugin resource fixture failed to build");
+  return root;
+}
 
 // These tests execute the real built plugin artifact (run `bun run build`
 // first so dist/index.js and dist/api.js exist; CI runs full:check which
@@ -11,6 +80,8 @@ import type { PluginInput } from "@opencode-ai/plugin";
 const DIST = fileURLToPath(new URL("../dist", import.meta.url));
 const DIST_INDEX = fileURLToPath(new URL("../dist/index.js", import.meta.url));
 const DIST_API = fileURLToPath(new URL("../dist/api.js", import.meta.url));
+const DIST_INDEX_URL = new URL("../dist/index.js", import.meta.url).href;
+const DIST_API_URL = new URL("../dist/api.js", import.meta.url).href;
 const bundleIsBuilt = existsSync(DIST_INDEX) && existsSync(DIST_API);
 
 // Bun splitting emits shared chunk-*.js files next to the entries, so the
@@ -34,7 +105,7 @@ function moduleSpecifiers(source: string): string[] {
 test.skipIf(!bundleIsBuilt)(
   "the built bundle exposes the plugin entry as its default export",
   async () => {
-    const entry = await import("../dist/index.js");
+    const entry = await import(DIST_INDEX_URL);
 
     expect(Object.keys(entry)).toEqual(["default"]);
     expect(typeof entry.default).toBe("function");
@@ -44,7 +115,7 @@ test.skipIf(!bundleIsBuilt)(
 test.skipIf(!bundleIsBuilt)(
   "the built bundle's default entry produces configuration hooks",
   async () => {
-    const { default: AtlantePlugin } = await import("../dist/index.js");
+    const { default: AtlantePlugin } = await import(DIST_INDEX_URL);
     const hooks = await AtlantePlugin({ directory: "" } as PluginInput);
 
     expect(typeof hooks.config).toBe("function");
@@ -54,7 +125,7 @@ test.skipIf(!bundleIsBuilt)(
 test.skipIf(!bundleIsBuilt)(
   "the built bundle preserves the explicit api entry surface",
   async () => {
-    const api = await import("../dist/api.js");
+    const api = await import(DIST_API_URL);
     const runtimeExports = Object.values(api).filter(
       (value) => typeof value === "function",
     );
@@ -81,6 +152,50 @@ test.skipIf(!bundleIsBuilt)(
 
     expect(hasAtlanteSpecifier).toBe(false);
     expect(specifiers).toContain("@opencode-ai/plugin");
+  },
+);
+
+test.skipIf(!bundleIsBuilt)(
+  "the generated plugin materializes built local-resource artifacts at runtime",
+  async () => {
+    const root = localResourceProject();
+    rmSync(join(root, "atlante.jsonc"));
+    rmSync(join(root, "resources"), { recursive: true, force: true });
+
+    const { default: BuiltAtlantePlugin } = await import(DIST_INDEX_URL);
+    const hooks = await BuiltAtlantePlugin({ directory: root } as PluginInput);
+    const config: HostConfig = {};
+
+    await hooks.config?.(config as never);
+
+    expect(config.agent?.reviewer?.prompt).toContain(
+      "You are a built-path reviewer.",
+    );
+    expect(hooks.tool?.atlante_skill).toBeDefined();
+    await expect(
+      hooks.tool?.atlante_skill?.execute({ name: "testing" }, {} as never),
+    ).resolves.toContain("Built skill content.");
+  },
+);
+
+test.skipIf(!bundleIsBuilt)(
+  "the generated plugin atomically ignores invalid artifacts without host mutation",
+  async () => {
+    const root = localResourceProject();
+    writeFileSync(join(root, ".atlante", "artifacts", "manifest.json"), "{");
+
+    const { default: BuiltAtlantePlugin } = await import(DIST_INDEX_URL);
+    const hooks = await BuiltAtlantePlugin({ directory: root } as PluginInput);
+    const config: HostConfig = {
+      agent: { existing: { model: "host-model" } },
+      permission: { edit: "allow" },
+    };
+    const before = structuredClone(config);
+
+    await hooks.config?.(config as never);
+
+    expect(hooks.tool?.atlante_skill).toBeUndefined();
+    expect(config).toEqual(before);
   },
 );
 

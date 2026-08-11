@@ -1,11 +1,25 @@
-import { unwatchFile, watchFile } from "node:fs";
-import { runBuild } from "./build.js";
+import {
+  lstatSync,
+  realpathSync,
+  type Stats,
+  statSync,
+  unwatchFile,
+  watchFile,
+} from "node:fs";
+import { basename, dirname, resolve, sep } from "node:path";
+import { type BuildOutcome, runBuildWithContext } from "./build.js";
 import { resolveWatchFiles, type WatchFiles } from "./build-watch-inputs.js";
+import {
+  applyWatchChanges,
+  desiredWatchPaths,
+  recoveryWatchPaths,
+  watchChanges,
+} from "./build-watch-reconcile.js";
 
 export type WatchCallback = () => void;
 
 export type BuildWatchDeps = {
-  build?: (target: string) => number;
+  build?: (target: string) => number | BuildOutcome;
   watch?: (path: string, callback: WatchCallback) => void;
   unwatch?: (path: string, callback: WatchCallback) => void;
   debounceMs?: number;
@@ -19,26 +33,81 @@ export type BuildWatchHandle = {
 
 const POLL_INTERVAL_MS = 100;
 const DEFAULT_DEBOUNCE_MS = 150;
+type WatchListener = (current: Stats) => void;
+const registeredWatchers = new WeakMap<
+  WatchCallback,
+  Map<string, WatchListener>
+>();
 
 const defaultDeps: Required<BuildWatchDeps> = {
-  build: runBuild,
+  build: runBuildWithContext,
   watch: (path, callback) => {
-    watchFile(path, { interval: POLL_INTERVAL_MS }, () => callback());
+    let exists = statSync(path, { throwIfNoEntry: false }) !== undefined;
+    const listener: WatchListener = (current) => {
+      const currentExists = current.nlink > 0;
+      if (!exists && !currentExists) return;
+      exists = currentExists;
+      callback();
+    };
+    const listeners = registeredWatchers.get(callback) ?? new Map();
+    const previous = listeners.get(path);
+    if (previous) unwatchFile(path, previous);
+    listeners.set(path, listener);
+    registeredWatchers.set(callback, listeners);
+    watchFile(path, { interval: POLL_INTERVAL_MS }, listener);
   },
-  unwatch: (path) => {
-    unwatchFile(path);
+  unwatch: (path, callback) => {
+    const listeners = registeredWatchers.get(callback);
+    const listener = listeners?.get(path);
+    if (!listener) return;
+    unwatchFile(path, listener);
+    listeners?.delete(path);
   },
   debounceMs: DEFAULT_DEBOUNCE_MS,
   onStop: () => {},
 };
 
+function canonicalIdentity(path: string): string {
+  let current = path;
+  const suffix: string[] = [];
+  while (true) {
+    try {
+      return [...[realpathSync(current)], ...suffix].join(sep);
+    } catch {
+      const parent = dirname(current);
+      if (parent === current) return path;
+      suffix.unshift(basename(current));
+      current = parent;
+    }
+  }
+}
+
 function watchPathsOf(files: WatchFiles): string[] {
-  return [
+  const paths = [
     ...(files.configPath ? [files.configPath] : []),
     ...(files.configCandidates ?? []),
-    ...files.presetPaths,
-    ...files.templatePaths,
+    ...files.resourcePaths,
+    ...files.unresolvedParents,
   ];
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const path of paths) {
+    let identity = canonicalIdentity(path);
+    try {
+      if (lstatSync(path, { throwIfNoEntry: false })?.isSymbolicLink())
+        identity = `symlink:${resolve(path)}`;
+    } catch {
+      // Keep the canonical identity for a path that disappears during setup.
+    }
+    if (seen.has(identity)) continue;
+    seen.add(identity);
+    result.push(path);
+  }
+  return result;
+}
+
+function normalizeBuildOutcome(outcome: number | BuildOutcome): BuildOutcome {
+  return typeof outcome === "number" ? { code: outcome } : outcome;
 }
 
 export function runBuildWatchWithDependencies(
@@ -52,6 +121,8 @@ export function runBuildWatchWithDependencies(
   let building = false;
   let pending = false;
   let stopped = false;
+  let recoveryPaths = new Set<string>();
+  let lastFiles: WatchFiles | undefined;
   let resolveExited: (code: number) => void = () => {};
   const exited = new Promise<number>((resolve) => {
     resolveExited = resolve;
@@ -66,21 +137,18 @@ export function runBuildWatchWithDependencies(
     }, deps.debounceMs);
   };
 
-  function reconcile(files: WatchFiles): void {
+  function reconcile(files: WatchFiles, succeeded: boolean): void {
     if (stopped) return;
-    const desired = new Set(watchPathsOf(files));
-    for (const path of watched) {
-      if (!desired.has(path)) {
-        deps.unwatch(path, onChange);
-        watched.delete(path);
-      }
-    }
-    for (const path of desired) {
-      if (!watched.has(path)) {
-        deps.watch(path, onChange);
-        watched.add(path);
-      }
-    }
+    const current = new Set(watchPathsOf(files));
+    const fullySucceeded = succeeded && files.resourceResolutionSucceeded;
+    const desired = desiredWatchPaths(current, recoveryPaths, fullySucceeded);
+    recoveryPaths = recoveryWatchPaths(current, recoveryPaths, fullySucceeded);
+    applyWatchChanges(
+      watchChanges(watched, desired),
+      watched,
+      (path) => deps.watch(path, onChange),
+      (path) => deps.unwatch(path, onChange),
+    );
   }
 
   function runRebuild(): void {
@@ -90,13 +158,26 @@ export function runBuildWatchWithDependencies(
       return;
     }
     building = true;
+    let outcome: BuildOutcome = { code: 1 };
+    let succeeded = false;
     try {
-      deps.build(target);
-      reconcile(resolveWatchFiles(target));
+      outcome = normalizeBuildOutcome(deps.build(target));
+      succeeded = outcome.code === 0;
     } catch (cause) {
       console.error(
         `error: ${cause instanceof Error ? cause.message : String(cause)}`,
       );
+    }
+
+    try {
+      const files = resolveWatchFiles(target, outcome.resourceWatch);
+      lastFiles = files;
+      reconcile(files, succeeded);
+    } catch (cause) {
+      console.error(
+        `error: ${cause instanceof Error ? cause.message : String(cause)}`,
+      );
+      if (lastFiles) reconcile(lastFiles, false);
     } finally {
       building = false;
       if (pending) {

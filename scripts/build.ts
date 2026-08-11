@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { existsSync } from "node:fs";
-import { readFile, rm } from "node:fs/promises";
+import { cp, mkdir, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 
 const ROOT = join(import.meta.dir, "..");
@@ -42,13 +42,15 @@ const cliResult = await Bun.build({
   outdir: join(cli, "dist", "bin"),
 });
 if (!cliResult.success) throw new Error(cliResult.logs.join("\n"));
-// Copy content assets to the bundle-relative fallback root (see
-// packages/templates/src/bundled.ts and packages/presets/src/index.ts).
-// Remove first so stale entries do not survive rebuilds.
+// Copy the one canonical source-content pack to the bundle-relative fallback
+// root. Remove first so stale entries do not survive rebuilds.
 await rm(join(cli, "bundled"), { force: true, recursive: true });
-await Bun.$`mkdir -p ${join(cli, "bundled")}`;
-await Bun.$`cp -R ${join(ROOT, "packages", "templates", "bundled")} ${join(cli, "bundled", "templates")}`;
-await Bun.$`cp -R ${join(ROOT, "packages", "presets", "bundled")} ${join(cli, "bundled", "presets")}`;
+await mkdir(join(cli, "bundled"), { recursive: true });
+await cp(
+  join(ROOT, "packages", "resources", "bundled"),
+  join(cli, "bundled", "resources"),
+  { recursive: true },
+);
 // Contract check: the shipped launcher must run under node.
 const bundle = await readFile(join(cli, "dist", "bin", "atlante.js"), "utf8");
 if (!bundle.startsWith("#!/usr/bin/env node"))

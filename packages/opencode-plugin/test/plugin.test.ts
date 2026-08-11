@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import {
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   symlinkSync,
@@ -51,6 +52,48 @@ function builtProject(config = validWithSkill): string {
   const result = buildProject(dir);
   if (result.diagnostics.some((diagnostic) => diagnostic.severity === "error"))
     throw new Error("test fixture failed to build");
+  return dir;
+}
+
+function builtLocalResourceProject(): string {
+  const dir = project(`{
+    "$schema": "${SCHEMA_URI}",
+    "agents": {
+      "reviewer": {
+        "$instance": "./resources/reviewer",
+        "description": "A locally authored reviewer."
+      }
+    },
+    "skills": {
+      "testing": {
+        "$instance": "./resources/testing",
+        "description": "A locally authored testing skill."
+      }
+    }
+  }`);
+  mkdirSync(join(dir, "resources", "reviewer"), { recursive: true });
+  mkdirSync(join(dir, "resources", "testing"), { recursive: true });
+  writeFileSync(
+    join(dir, "resources", "reviewer", "instance.jsonc"),
+    `{
+      "$template": "atlante/agent",
+      "identity": "You are a locally authored reviewer.",
+      "mission": "Prove that local resources were built before source removal."
+    }`,
+  );
+  writeFileSync(
+    join(dir, "resources", "testing", "instance.jsonc"),
+    `{
+      "$template": "atlante/skill",
+      "title": "Local testing",
+      "overview": "A locally authored skill.",
+      "sections": [{ "markdown": "This content came from a local resource." }]
+    }`,
+  );
+
+  const result = buildProject(dir);
+  if (result.diagnostics.some((diagnostic) => diagnostic.severity === "error"))
+    throw new Error("local resource fixture failed to build");
   return dir;
 }
 
@@ -129,6 +172,23 @@ async function capturedErrors<T>(fn: () => Promise<T>): Promise<string[]> {
 }
 
 describe("AtlantePlugin", () => {
+  test("materializes local-resource artifacts after source files are removed", async () => {
+    const dir = builtLocalResourceProject();
+    rmSync(join(dir, "atlante.jsonc"));
+    rmSync(join(dir, "resources"), { recursive: true, force: true });
+
+    const hooks = await AtlantePlugin(pluginInput(dir));
+    const config: HostConfig = {};
+    await hooks.config?.(config as unknown as Config);
+
+    expect(config.agent?.reviewer?.prompt).toContain(
+      "You are a locally authored reviewer.",
+    );
+    await expect(
+      hooks.tool?.atlante_skill?.execute({ name: "testing" }, {} as never),
+    ).resolves.toContain("This content came from a local resource.");
+  });
+
   test("uses verified built artifacts after the source config is removed", async () => {
     const dir = builtProject();
     unlinkSync(join(dir, "atlante.jsonc"));
@@ -460,32 +520,35 @@ describe("AtlantePlugin", () => {
     ).rejects.toThrow("Atlante skills unavailable");
   });
 
-  test("proves the plugin imports only artifact and host-adapter dependencies", () => {
-    const source = readFileSync(
-      new URL("../src/plugin.ts", import.meta.url),
-      "utf8",
-    );
-    const modules = [...source.matchAll(/from\s+["']([^"']+)["']/g)].map(
-      ([, module]) => module,
-    );
+  test("proves production imports stop at the artifact reader and host adapter", () => {
+    const sourceFiles = readdirSync(new URL("../src", import.meta.url))
+      .filter((file) => file.endsWith(".ts"))
+      .sort();
+    const forbidden =
+      /@atlante\/(?:resources|presets|templates|validator)|(?:^|\/)[^/]*(?:loader|resolver|resolve|resource|template|preset)[^/]*\.js$/;
 
-    expect(new Set(modules)).toEqual(
-      new Set([
-        "@atlante/builder/artifacts",
-        "@opencode-ai/plugin",
-        "./artifacts.js",
-        "./inject.js",
-        "./skill-tool.js",
-      ]),
-    );
-    expect(modules.filter((module) => module?.startsWith("@atlante/"))).toEqual(
-      ["@atlante/builder/artifacts"],
-    );
-    expect(source).not.toMatch(
-      /@atlante\/(?:loader|presets|templates|validator)/,
-    );
-    expect(source).not.toMatch(
-      /\b(?:load|validate|expand|resolve|render)\w*\s*\(/,
-    );
+    for (const file of sourceFiles) {
+      const source = readFileSync(
+        new URL(`../src/${file}`, import.meta.url),
+        "utf8",
+      );
+      const modules = [
+        ...source.matchAll(
+          /(?:from\s+|import\s*\(\s*|require\s*\(\s*|\bimport\s+)["']([^"']+)["']/g,
+        ),
+      ].map(([, module]) => module);
+
+      expect(
+        modules.filter((module) => module && forbidden.test(module)),
+        `${file} imports source-content code`,
+      ).toEqual([]);
+      expect(
+        modules.filter((module) => module?.startsWith("@atlante/")),
+        `${file} imports a private package directly`,
+      ).toEqual(file === "plugin.ts" ? ["@atlante/builder/artifacts"] : []);
+      expect(source).not.toMatch(
+        /@atlante\/(?:resources|presets|templates|validator)/,
+      );
+    }
   });
 });

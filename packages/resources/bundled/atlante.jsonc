@@ -1,0 +1,24 @@
+{
+  "$schema": "https://atlante.sh/schema/v0.1/schema.json",
+  "values": {
+    "project": "{{sys.cwd.basename}}",
+    "quick-check": "",
+    "full-check": ""
+  },
+  "agents": {
+    "architect": {
+      "$instance": "atlante/architect",
+      "description": "Plan, implement, and review Atlante work: clarify scope, delegate execution and reviews, and validate against acceptance criteria. Use for any implementation, review, or workflow session."
+    }
+  },
+  "skills": {
+    "brainstorming": {
+      "$instance": "atlante/brainstorming",
+      "description": "Use before creative or implementation work to collaboratively clarify intent, requirements, and design, then produce an approved implementation handoff."
+    },
+    "workflow": {
+      "$instance": "atlante/delivery-workflow",
+      "description": "Use when an approved issue is ready for implementation: deliver a focused, verified change that satisfies its acceptance criteria."
+    }
+  }
+}

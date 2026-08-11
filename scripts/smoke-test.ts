@@ -32,7 +32,6 @@ try {
   );
 
   await Bun.$`node ${CLI} validate ${project}`.cwd(ROOT);
-  await Bun.$`node ${CLI} build ${project}`.cwd(ROOT);
 
   const artifacts = join(project, ".atlante", "artifacts");
   const manifest = (await Bun.file(
@@ -76,6 +75,74 @@ try {
   assert(
     contents.some((content) => content.includes("# Workflow")),
     "skill artifact missing workflow content",
+  );
+
+  assert(
+    await Bun.file(
+      join(ROOT, "resources", "architect", "instance.jsonc"),
+    ).exists(),
+    "tracked local architect resource is missing",
+  );
+  assert(
+    await Bun.file(
+      join(ROOT, "resources", "delivery-workflow", "instance.jsonc"),
+    ).exists(),
+    "tracked local workflow resource is missing",
+  );
+
+  await Bun.$`node ${CLI} validate ${ROOT}`.cwd(ROOT);
+  await Bun.$`node ${CLI} build ${ROOT}`.cwd(ROOT);
+  const rootManifest = (await Bun.file(
+    join(ROOT, ".atlante", "artifacts", "manifest.json"),
+  ).json()) as {
+    agents: { id: string; description: string; path: string }[];
+    skills: { id: string; description: string; path: string }[];
+  };
+  assert(
+    rootManifest.agents.map(({ id }) => id).join(",") === "architect",
+    "root architect artifact ID changed",
+  );
+  assert(
+    rootManifest.skills
+      .map(({ id }) => id)
+      .sort()
+      .join(",") === "brainstorming,workflow",
+    "root skill artifact IDs changed",
+  );
+  assert(
+    rootManifest.agents[0]?.description ===
+      "Plan, implement, and review Atlante work: clarify scope, delegate execution and reviews, and validate against acceptance criteria. Use for any implementation, review, or workflow session.",
+    "root architect description changed",
+  );
+  assert(
+    rootManifest.skills.find(({ id }) => id === "brainstorming")
+      ?.description ===
+      "Use before creative or implementation work to collaboratively clarify intent, requirements, and design, then produce an approved implementation handoff.",
+    "root brainstorming description changed",
+  );
+  assert(
+    rootManifest.skills.find(({ id }) => id === "workflow")?.description ===
+      "Use when an approved issue is ready for implementation: deliver a focused, verified change that satisfies its acceptance criteria.",
+    "root workflow description changed",
+  );
+  const rootContents = await Promise.all(
+    [...rootManifest.agents, ...rootManifest.skills].map((entry) =>
+      Bun.file(join(ROOT, ".atlante", "artifacts", entry.path)).text(),
+    ),
+  );
+  assert(
+    rootContents.some((content) =>
+      content.includes("You are the lead engineer for Atlante."),
+    ),
+    "root architect content changed",
+  );
+  assert(
+    rootContents.some((content) => content.includes("# Brainstorming")),
+    "root brainstorming content changed",
+  );
+  assert(
+    rootContents.some((content) => content.includes("# Workflow")),
+    "root workflow content changed",
   );
 
   // A broken configuration must fail loudly rather than exit 0.

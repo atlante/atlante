@@ -20,15 +20,14 @@ describe("document JSON Schema", () => {
     >;
     const agents = documentProperties.agents as {
       additionalProperties: {
-        oneOf: [
-          { properties?: Record<string, unknown> },
-          ...Array<{ properties?: Record<string, unknown> }>,
-        ];
+        oneOf: Array<{ type?: string; properties?: Record<string, unknown> }>;
       };
     };
-    const binding = agents.additionalProperties.oneOf[0];
+    const binding = agents.additionalProperties.oneOf.find(
+      (entry) => entry.type === "object",
+    );
 
-    expect(binding.properties).not.toHaveProperty("extends");
+    expect(binding?.properties).not.toHaveProperty("extends");
   });
 
   test("keeps extends in the published root schema for overlays", () => {
@@ -44,38 +43,37 @@ describe("document JSON Schema", () => {
     expect(buildDocumentJsonSchema().required).toEqual(["$schema"]);
   });
 
-  test("requires description in the generated skill binding schema", () => {
+  test("allows unresolved descriptions in the generated skill source schema", () => {
     const properties = buildDocumentJsonSchema().properties as Record<
       string,
       unknown
     >;
     const skills = properties.skills as {
-      additionalProperties: {
-        oneOf: [
-          { required: string[]; properties: Record<string, unknown> },
-          { type: string },
-        ];
-      };
+      additionalProperties: { oneOf: Array<Record<string, unknown>> };
     };
-    const binding = skills.additionalProperties.oneOf[0];
-    expect(binding.required).toContain("description");
-    expect(binding.properties).toHaveProperty("template");
-    expect(binding.properties).toHaveProperty("values");
+    const binding = skills.additionalProperties.oneOf.find(
+      (entry) => entry.type === "object",
+    );
+    expect(binding).toBeDefined();
+    expect(binding?.required ?? []).not.toContain("description");
+    expect(binding?.properties).toHaveProperty("$instance");
+    expect(binding?.properties).toHaveProperty("$template");
+    expect(binding?.properties).not.toHaveProperty("template");
+    expect(binding?.properties).toHaveProperty("values");
   });
 
-  test("requires description in the generated agent binding schema", () => {
+  test("publishes string source shorthand for agents", () => {
     const properties = buildDocumentJsonSchema().properties as Record<
       string,
       unknown
     >;
     const agents = properties.agents as {
-      additionalProperties: {
-        oneOf: [{ required: string[]; properties: Record<string, unknown> }];
-      };
+      additionalProperties: { oneOf: Array<Record<string, unknown>> };
     };
-    const binding = agents.additionalProperties.oneOf[0];
-    expect(binding.required).toContain("description");
-    expect(binding.properties).toHaveProperty("description");
+    expect(agents.additionalProperties.oneOf).toContainEqual({
+      type: "string",
+      minLength: 1,
+    });
   });
 
   test("the committed file matches the generated output", () => {

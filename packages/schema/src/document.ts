@@ -1,45 +1,46 @@
 import { z } from "zod";
-import type { ValuesMapOverlay } from "./values.js";
-import { safeRecord, valuesMapSchema } from "./values.js";
+import type { ValuesMap, ValuesMapOverlay } from "./values.js";
+import {
+  safeRecord,
+  valuesMapOverlaySchema,
+  valuesMapSchema,
+} from "./values.js";
 
 export const SCHEMA_URI = "https://atlante.sh/schema/v0.1/schema.json";
 
-/** Binding metadata shared by every template-backed binding. */
-const bindingDescriptionSchema = z.object({
+/** Authored locators are structurally strings; resource grammar is semantic. */
+export const rawResourceLocatorSchema = z.string().min(1);
+
+export type RawResourceLocator = z.infer<typeof rawResourceLocatorSchema>;
+export type AuthoredResourceLocator = RawResourceLocator;
+
+/** Binding metadata shared by every resolved template-backed binding. */
+export const bindingDescriptionSchema = z.object({
   description: z.string().min(1),
 });
 
-/**
- * An agent binding cannot be strict here: its prompt fields are owned by the
- * selected template's inputSchema, which this package knows nothing about.
- * Unknown-field rejection happens at validation level 2 (SPECIFICATION.md §8.1).
- */
-const agentBindingBaseSchema = z.looseObject({
-  ...bindingDescriptionSchema.shape,
-  template: z.string().min(1).optional(),
-  values: valuesMapSchema.optional(),
-});
-type AgentBindingOutput = z.infer<typeof agentBindingBaseSchema>;
+type ObjectSchemaValidation = (
+  source: Record<string, unknown>,
+  addIssue: (issue: {
+    code: "custom";
+    message: string;
+    path: (string | number)[];
+  }) => void,
+) => void;
 
-/**
- * A skill binding reserves metadata fields while leaving its content fields to
- * the selected template, just like an agent binding.
- */
-const skillBindingBaseSchema = z.looseObject({
-  ...bindingDescriptionSchema.shape,
-  template: z.string().min(1).optional(),
-  values: valuesMapSchema.optional(),
-});
-type SkillBindingOutput = z.infer<typeof skillBindingBaseSchema>;
+function isObject(input: unknown): input is Record<string, unknown> {
+  return typeof input === "object" && input !== null && !Array.isArray(input);
+}
 
 function bindingSchema<Output>(
-  baseSchema: z.ZodType<Output>,
+  baseSchema: z.ZodTypeAny,
   reservedKeys: ReadonlySet<string>,
+  validateObject?: ObjectSchemaValidation,
 ) {
   return z
     .unknown()
     .superRefine((input, context) => {
-      if (typeof input !== "object" || input === null || Array.isArray(input)) {
+      if (!isObject(input)) {
         context.addIssue({ code: "custom", message: "expected an object" });
         return;
       }
@@ -49,9 +50,11 @@ function bindingSchema<Output>(
           context.addIssue({
             code: "custom",
             message: issue.message,
-            path: issue.path,
+            path: issue.path.map(String),
           });
+        return;
       }
+      validateObject?.(input, (issue) => context.addIssue(issue));
     })
     .transform((input) => {
       const parsed = baseSchema.parse(input) as Record<string, unknown>;
@@ -70,26 +73,171 @@ function bindingSchema<Output>(
     });
 }
 
-export const agentBindingSchema = bindingSchema<AgentBindingOutput>(
-  agentBindingBaseSchema,
-  new Set(["description", "template", "values"]),
+function rejectReservedKeys(
+  keys: ReadonlySet<string>,
+  message: string,
+): ObjectSchemaValidation {
+  return (source, addIssue) => {
+    for (const key of keys) {
+      if (Object.hasOwn(source, key))
+        addIssue({ code: "custom", message, path: [key] });
+    }
+  };
+}
+
+function validateSourceObject(
+  source: Record<string, unknown>,
+  addIssue: Parameters<ObjectSchemaValidation>[1],
+): void {
+  if (Object.hasOwn(source, "$instance") && Object.hasOwn(source, "$template"))
+    addIssue({
+      code: "custom",
+      message: "$instance and $template are mutually exclusive",
+      path: ["$template"],
+    });
+  if (Object.hasOwn(source, "template"))
+    addIssue({
+      code: "custom",
+      message: "template is reserved; use $template or $instance",
+      path: ["template"],
+    });
+}
+
+const rawSourceObjectBaseSchema = z.looseObject({
+  $instance: rawResourceLocatorSchema.optional(),
+  $template: rawResourceLocatorSchema.optional(),
+  description: z.union([z.string().min(1), z.null()]).optional(),
+  values: valuesMapOverlaySchema.optional(),
+});
+
+type TemplateOwnedFields = {
+  [key: string]: unknown;
+  template?: never;
+};
+
+type RawBindingFields = TemplateOwnedFields & {
+  description?: string | null;
+  values?: ValuesMapOverlay;
+};
+
+type RawBindingWithoutSelector = RawBindingFields & {
+  $instance?: never;
+  $template?: never;
+};
+
+type RawBindingWithInstance = RawBindingFields & {
+  $instance: RawResourceLocator;
+  $template?: never;
+};
+
+type RawBindingWithTemplate = RawBindingFields & {
+  $instance?: never;
+  $template: RawResourceLocator;
+};
+
+/** Authored binding source object, with at most one source selector. */
+export type RawBinding =
+  | RawBindingWithoutSelector
+  | RawBindingWithInstance
+  | RawBindingWithTemplate;
+
+export type AuthoredBinding = RawBinding;
+
+/** Authored source object: selector metadata plus a template-owned overlay. */
+export const resourceSourceObjectSchema = bindingSchema<RawBinding>(
+  rawSourceObjectBaseSchema,
+  new Set(["$instance", "$template", "description", "values"]),
+  validateSourceObject,
 );
 
-export const skillBindingSchema = bindingSchema<SkillBindingOutput>(
-  skillBindingBaseSchema,
-  new Set(["description", "template", "values"]),
+export type ResourceSourceObject = RawBinding;
+export type RawResourceSourceObject = RawBinding;
+
+/** Authored source shorthand or an object with a local overlay. */
+export const resourceSourceSchema = z.union([
+  rawResourceLocatorSchema,
+  resourceSourceObjectSchema,
+]);
+
+export type ResourceSource = RawResourceLocator | RawBinding;
+export type RawResourceSource = ResourceSource;
+
+/** A resolved binding cannot retain source selectors or the legacy selector. */
+const canonicalBindingValidation = rejectReservedKeys(
+  new Set(["$instance", "$template", "template"]),
+  "binding source selectors are not part of the canonical document",
 );
 
-/** Canonical document — after expansion, no `extends` or tombstone `null`s. */
+/**
+ * An agent binding leaves prompt fields open: the selected template owns their
+ * names and semantics. Unknown-field rejection happens at semantic validation.
+ */
+const canonicalBindingBaseSchema = z.looseObject({
+  ...bindingDescriptionSchema.shape,
+  values: valuesMapSchema.optional(),
+});
+
+type CanonicalBinding = TemplateOwnedFields & {
+  $instance?: never;
+  $template?: never;
+  description: string;
+  values?: ValuesMap;
+};
+
+export const agentBindingSchema = bindingSchema<CanonicalBinding>(
+  canonicalBindingBaseSchema,
+  new Set(["description", "values"]),
+  canonicalBindingValidation,
+);
+
+export const skillBindingSchema = bindingSchema<CanonicalBinding>(
+  canonicalBindingBaseSchema,
+  new Set(["description", "values"]),
+  canonicalBindingValidation,
+);
+
+export type AgentBinding = CanonicalBinding;
+export type SkillBinding = CanonicalBinding;
+
+/** Raw source objects used by agent and skill maps before resource resolution. */
+export const agentBindingOverlaySchema = resourceSourceObjectSchema;
+export const skillBindingOverlaySchema = resourceSourceObjectSchema;
+
+export type AgentBindingOverlay = z.infer<typeof agentBindingOverlaySchema>;
+export type SkillBindingOverlay = z.infer<typeof skillBindingOverlaySchema>;
+
+const agentsOverlaySchema = safeRecord(
+  z.string().min(1),
+  z.union([resourceSourceSchema, z.null()]),
+);
+const skillsOverlaySchema = safeRecord(
+  z.string().min(1),
+  z.union([resourceSourceSchema, z.null()]),
+);
+
+export type AgentsOverlay = z.infer<typeof agentsOverlaySchema>;
+export type SkillsOverlay = z.infer<typeof skillsOverlaySchema>;
+
+/** Authored document overlay, before resource and tombstone resolution. */
+export const atlanteDocumentOverlaySchema = z.strictObject({
+  $schema: z.literal(SCHEMA_URI),
+  extends: rawResourceLocatorSchema.optional(),
+  values: valuesMapOverlaySchema.optional(),
+  agents: agentsOverlaySchema.optional(),
+  skills: skillsOverlaySchema.optional(),
+});
+
+export type AtlanteDocumentOverlay = z.infer<
+  typeof atlanteDocumentOverlaySchema
+>;
+
+/** Canonical document after expansion: no extends, selectors, or tombstones. */
 export const atlanteDocumentSchema = z.strictObject({
   $schema: z.literal(SCHEMA_URI),
   values: valuesMapSchema.optional(),
   agents: safeRecord(z.string().min(1), agentBindingSchema).default({}),
   skills: safeRecord(z.string().min(1), skillBindingSchema).default({}),
 });
-
-export type AgentBinding = z.infer<typeof agentBindingSchema>;
-export type SkillBinding = z.infer<typeof skillBindingSchema>;
 
 type AtlanteDocumentOutput = z.infer<typeof atlanteDocumentSchema>;
 
@@ -99,40 +247,4 @@ export type AtlanteDocument = Omit<
 > & {
   agents?: AtlanteDocumentOutput["agents"];
   skills?: AtlanteDocumentOutput["skills"];
-};
-
-// ---------------------------------------------------------------------------
-// Overlay types — used during expansion before canonical validation
-// ---------------------------------------------------------------------------
-
-/** An agent binding in an overlay document: allows `null` tombstones. */
-export type AgentBindingOverlay = {
-  description?: string | null;
-  template?: string | null;
-  values?: ValuesMapOverlay;
-  [key: string]: unknown;
-};
-
-/** Agents map in an overlay document: values can be `null` (tombstone). */
-export type AgentsOverlay = Record<string, AgentBindingOverlay | null>;
-
-/** A skill binding in an overlay document: allows `null` tombstones. */
-export type SkillBindingOverlay = {
-  description?: string | null;
-  template?: string | null;
-  values?: ValuesMapOverlay;
-  [key: string]: unknown;
-};
-
-/** Skills map in an overlay document: values can be `null` (tombstone). */
-export type SkillsOverlay = Record<string, SkillBindingOverlay | null>;
-
-/** Raw overlay document before expansion: allows document-level `extends` and tombstone `null`s.
- * `agents` is optional — it can be inherited from a preset. */
-export type AtlanteDocumentOverlay = {
-  $schema: string;
-  extends?: string;
-  values?: ValuesMapOverlay;
-  agents?: AgentsOverlay;
-  skills?: SkillsOverlay;
 };

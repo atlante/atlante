@@ -1,0 +1,25 @@
+{
+  "$template": "atlante/skill",
+  "title": "Brainstorming",
+  "overview": "Create a shared foundation for deliberate, well-scoped work by turning early uncertainty into a coherent direction the developer can carry forward.",
+  "sections": [
+    {
+      "constraints": [
+        "Do not begin workflow, implementation, or file modifications until the presented design is approved by the developer.",
+        "Apply this gate even to simple work, including work simple enough to skip a full plan; the design may be brief when the work is simple.",
+        "Surface real complexity honestly; never downplay it to appear confident."
+      ]
+    },
+    {
+      "instructions": [
+        "Explore the current project context, including files, documentation, and recent commits.",
+        "Assess scope before detailed questions; decompose requests that span independent subsystems into focused issues and refine one at a time.",
+        "Ask exactly one question at a time to understand purpose, constraints, and success criteria; prefer multiple-choice questions when useful.",
+        "Propose two or three approaches with trade-offs, lead with a recommendation, and remove unnecessary scope using YAGNI.",
+        "Present the design in sections sized to the work, covering relevant architecture, components, data flow, error handling, and testing; validate the developer's understanding and approval after each section.",
+        "After the developer approves the design, produce the artifact they requested—such as an issue or file—that records the approved scope, approach, requirements, and acceptance criteria as the implementation handoff.",
+        "Review the issue artifact for placeholders, contradictions, ambiguity, and excessive scope; resolve any problems before handing it off."
+      ]
+    }
+  ]
+}

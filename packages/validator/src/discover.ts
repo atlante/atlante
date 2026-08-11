@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { basename, join } from "node:path";
+import { basename, join, resolve } from "node:path";
 import type { Diagnostic } from "./diagnostic.js";
 import { error } from "./diagnostic.js";
 
@@ -13,7 +13,8 @@ export function discoverConfigPath(directory: string): {
   path?: string;
   diagnostics: Diagnostic[];
 } {
-  const found = CONFIG_FILENAMES.map((name) => join(directory, name)).filter(
+  const root = resolve(directory);
+  const found = CONFIG_FILENAMES.map((name) => join(root, name)).filter(
     (candidate) => existsSync(candidate),
   );
 
@@ -22,7 +23,8 @@ export function discoverConfigPath(directory: string): {
       diagnostics: [
         error(
           "ambiguous-config",
-          `both ${CONFIG_FILENAMES.join(" and ")} exist in ${directory}; pass an explicit path`,
+          `both ${CONFIG_FILENAMES.join(" and ")} exist in the project root; pass an explicit path`,
+          { source: CONFIG_FILENAMES.join("/") },
         ),
       ],
     };
@@ -34,7 +36,8 @@ export function discoverConfigPath(directory: string): {
       diagnostics: [
         error(
           "config-not-found",
-          `no ${CONFIG_FILENAMES.join(" or ")} found in ${directory}`,
+          `no ${CONFIG_FILENAMES.join(" or ")} found in the project root`,
+          { source: CONFIG_FILENAMES.join("/") },
         ),
       ],
     };
@@ -52,13 +55,17 @@ export function findConfigFile(target: string): {
   path: string;
   text: string;
 } | null {
+  const resolvedTarget = resolve(target);
   // 1. If the target is a regular file with a valid basename, read it directly.
   try {
-    const st = statSync(target, { throwIfNoEntry: false });
+    const st = statSync(resolvedTarget, { throwIfNoEntry: false });
     if (st?.isFile()) {
-      const name = basename(target);
+      const name = basename(resolvedTarget);
       if ((CONFIG_FILENAMES as readonly string[]).includes(name)) {
-        return { path: target, text: readFileSync(target, "utf8") };
+        return {
+          path: resolvedTarget,
+          text: readFileSync(resolvedTarget, "utf8"),
+        };
       }
     }
   } catch {
@@ -66,7 +73,7 @@ export function findConfigFile(target: string): {
   }
 
   // 2. Otherwise, treat it as a directory and discover the config file.
-  const discovered = discoverConfigPath(target);
+  const discovered = discoverConfigPath(resolvedTarget);
   if (!discovered.path) return null;
   try {
     return {

@@ -4,12 +4,15 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
+  symlinkSync,
+  unlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { PRESETS_DIR } from "@atlante/presets";
+import { fileURLToPath } from "node:url";
 import { SCHEMA_URI } from "@atlante/schema";
 import { runBuild } from "../src/commands/build.js";
 import {
@@ -18,7 +21,6 @@ import {
 } from "../src/commands/build-watch.js";
 
 const created: string[] = [];
-const createdPresets: string[] = [];
 
 function tempProject(config?: string): string {
   const dir = mkdtempSync(join(tmpdir(), "atlante-build-watch-"));
@@ -27,8 +29,8 @@ function tempProject(config?: string): string {
   return dir;
 }
 
-function uniquePresetName(): string {
-  return `watch-missing-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+function canonical(path: string): string {
+  return realpathSync(path, "utf8");
 }
 
 const valid = `{
@@ -38,8 +40,6 @@ const valid = `{
 
 afterEach(() => {
   for (const dir of created.splice(0))
-    rmSync(dir, { recursive: true, force: true });
-  for (const dir of createdPresets.splice(0))
     rmSync(dir, { recursive: true, force: true });
 });
 
@@ -115,49 +115,198 @@ describe("runBuildWatchWithDependencies", () => {
     await handle.stop();
   });
 
-  for (const presetFilename of ["atlante.jsonc", "atlante.json"]) {
-    test(`creating missing bundled preset ${presetFilename} triggers one rebuild`, async () => {
-      const presetName = uniquePresetName();
-      const presetDir = join(PRESETS_DIR, presetName);
-      const presetJsonc = join(presetDir, "atlante.jsonc");
-      const presetJson = join(presetDir, "atlante.json");
-      const createdPresetPath = join(presetDir, presetFilename);
-      const alternatePresetPath =
-        presetFilename === "atlante.jsonc" ? presetJson : presetJsonc;
-      const dir = tempProject(`{
-        "$schema": "${SCHEMA_URI}",
-        "extends": "atlante/${presetName}"
-      }`);
-      const watcher = fakeWatcher();
-      let builds = 0;
-
-      const handle = runBuildWatchWithDependencies(dir, {
-        build: () => {
-          builds += 1;
-          return 0;
-        },
-        watch: watcher.watch,
-        unwatch: watcher.unwatch,
-        debounceMs: 20,
-      });
-
-      expect(builds).toBe(1);
-      expect(watcher.callbacks.has(presetJsonc)).toBe(true);
-      expect(watcher.callbacks.has(presetJson)).toBe(true);
-
-      mkdirSync(presetDir);
-      createdPresets.push(presetDir);
-      writeFileSync(createdPresetPath, valid);
-      watcher.callbacks.get(createdPresetPath)?.();
-
-      await waitFor(() => builds === 2, "rebuild after preset creation");
-      await Bun.sleep(40);
-      expect(builds).toBe(2);
-      expect(watcher.callbacks.has(createdPresetPath)).toBe(true);
-      expect(watcher.callbacks.has(alternatePresetPath)).toBe(false);
-      await handle.stop();
+  test("stopping one handle does not remove another handle's listener", async () => {
+    const dir = tempProject(valid);
+    let firstBuilds = 0;
+    let secondBuilds = 0;
+    const first = runBuildWatchWithDependencies(dir, {
+      build: () => {
+        firstBuilds += 1;
+        return 0;
+      },
+      debounceMs: 20,
     });
-  }
+    const second = runBuildWatchWithDependencies(dir, {
+      build: () => {
+        secondBuilds += 1;
+        return 0;
+      },
+      debounceMs: 20,
+    });
+
+    try {
+      expect(firstBuilds).toBe(1);
+      expect(secondBuilds).toBe(1);
+      await first.stop();
+
+      writeFileSync(join(dir, "atlante.jsonc"), `${valid}\n`);
+      await waitFor(
+        () => secondBuilds === 2,
+        "rebuild on the remaining handle",
+      );
+    } finally {
+      await second.stop();
+    }
+  });
+
+  test("rebuilds once after a missing local resource is created", async () => {
+    const dir = tempProject(`{
+      "$schema": "${SCHEMA_URI}",
+      "agents": { "local": "./resources/instance" }
+    }`);
+    const resources = join(dir, "resources");
+    const template = join(resources, "template");
+    const instance = join(resources, "instance");
+    mkdirSync(template, { recursive: true });
+    writeFileSync(
+      join(template, "template.jsonc"),
+      JSON.stringify({
+        $schema: "https://json-schema.org/draft/2020-12/schema",
+        type: "object",
+        properties: { value: { type: "string" } },
+      }),
+    );
+    writeFileSync(join(template, "template.md"), "{{value}}\n");
+
+    const watcher = fakeWatcher();
+    let builds = 0;
+    const handle = runBuildWatchWithDependencies(dir, {
+      build: () => {
+        builds += 1;
+        return 1;
+      },
+      watch: watcher.watch,
+      unwatch: watcher.unwatch,
+      debounceMs: 20,
+    });
+
+    expect(builds).toBe(1);
+    expect(watcher.callbacks.has(canonical(resources))).toBe(true);
+
+    mkdirSync(instance);
+    writeFileSync(
+      join(instance, "instance.jsonc"),
+      JSON.stringify({
+        $template: "../template",
+        description: "Created",
+        value: "created",
+      }),
+    );
+    watcher.callbacks.get(canonical(resources))?.();
+
+    await waitFor(() => builds === 2, "rebuild after resource creation");
+    await Bun.sleep(50);
+    expect(builds).toBe(2);
+    expect(
+      watcher.callbacks.has(canonical(join(instance, "instance.jsonc"))),
+    ).toBe(true);
+    await handle.stop();
+  });
+
+  test("reconciles a retargeted resource symlink and drops the stale target", async () => {
+    const dir = tempProject(`{
+      "$schema": "${SCHEMA_URI}",
+      "agents": { "local": "./link" }
+    }`);
+    const first = join(dir, "first");
+    const second = join(dir, "second");
+    for (const [directory, value] of [
+      [first, "first"],
+      [second, "second"],
+    ] as const) {
+      mkdirSync(directory, { recursive: true });
+      writeFileSync(
+        join(directory, "template.jsonc"),
+        JSON.stringify({
+          $schema: "https://json-schema.org/draft/2020-12/schema",
+          type: "object",
+          properties: { value: { type: "string" } },
+        }),
+      );
+      writeFileSync(join(directory, "template.md"), "{{value}}\n");
+      writeFileSync(
+        join(directory, "instance.jsonc"),
+        JSON.stringify({ $template: "./", description: value, value }),
+      );
+    }
+    const link = join(dir, "link");
+    symlinkSync(first, link);
+
+    const watcher = fakeWatcher();
+    let builds = 0;
+    const handle = runBuildWatchWithDependencies(dir, {
+      build: () => {
+        builds += 1;
+        return 0;
+      },
+      watch: watcher.watch,
+      unwatch: watcher.unwatch,
+      debounceMs: 20,
+    });
+
+    expect(
+      watcher.callbacks.has(canonical(join(first, "instance.jsonc"))),
+    ).toBe(true);
+    expect(watcher.callbacks.has(link)).toBe(true);
+
+    unlinkSync(link);
+    symlinkSync(second, link);
+    watcher.callbacks.get(link)?.();
+
+    await waitFor(() => builds === 2, "rebuild after symlink retarget");
+    expect(
+      watcher.callbacks.has(canonical(join(second, "instance.jsonc"))),
+    ).toBe(true);
+    expect(
+      watcher.callbacks.has(canonical(join(first, "instance.jsonc"))),
+    ).toBe(false);
+    await handle.stop();
+  });
+
+  test("preserves successful resource watches through an invalid resource recovery", async () => {
+    const dir = tempProject(`{
+      "$schema": "${SCHEMA_URI}",
+      "agents": { "local": { "$template": "./template", "description": "Local", "value": "value" } }
+    }`);
+    const template = join(dir, "template");
+    mkdirSync(template);
+    const schemaPath = join(template, "template.jsonc");
+    const markdownPath = join(template, "template.md");
+    const schema = JSON.stringify({
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+      type: "object",
+      properties: { value: { type: "string" } },
+    });
+    writeFileSync(schemaPath, schema);
+    writeFileSync(markdownPath, "{{value}}\n");
+
+    const watcher = fakeWatcher();
+    let builds = 0;
+    const handle = runBuildWatchWithDependencies(dir, {
+      build: (target) => {
+        builds += 1;
+        return runBuild(target);
+      },
+      watch: watcher.watch,
+      unwatch: watcher.unwatch,
+      debounceMs: 20,
+    });
+    const manifestPath = join(dir, ".atlante", "artifacts", "manifest.json");
+    const before = readFileSync(manifestPath, "utf8");
+
+    writeFileSync(schemaPath, "{ malformed");
+    watcher.callbacks.get(canonical(schemaPath))?.();
+    await waitFor(() => builds === 2, "rebuild after invalid resource change");
+    expect(readFileSync(manifestPath, "utf8")).toBe(before);
+    expect(watcher.callbacks.has(canonical(markdownPath))).toBe(true);
+
+    writeFileSync(schemaPath, schema);
+    watcher.callbacks.get(canonical(schemaPath))?.();
+    await waitFor(() => builds === 3, "rebuild after resource recovery");
+    await Bun.sleep(50);
+    expect(builds).toBe(3);
+    await handle.stop();
+  });
 
   test("an invalid change does not publish", async () => {
     const dir = tempProject(valid);
@@ -306,7 +455,158 @@ describe("runBuildWatchWithDependencies", () => {
     await handle.stop();
   });
 
-  test("deleting the config drops the old watch set and watches the candidates", async () => {
+  test("accumulates recovery inputs across consecutive failed rebuilds", async () => {
+    const dir = tempProject(valid);
+    const stable = join(dir, "stable.jsonc");
+    const recoveryA = join(dir, "recovery-a.jsonc");
+    const recoveryB = join(dir, "recovery-b.jsonc");
+    for (const path of [stable, recoveryA, recoveryB])
+      writeFileSync(path, "{}");
+
+    const watcher = fakeWatcher();
+    let builds = 0;
+    const outcomes = [
+      {
+        code: 0,
+        resourceWatch: { dependencies: [stable], unresolvedParents: [] },
+      },
+      {
+        code: 1,
+        resourceWatch: { dependencies: [recoveryA], unresolvedParents: [] },
+      },
+      {
+        code: 1,
+        resourceWatch: { dependencies: [recoveryB], unresolvedParents: [] },
+      },
+      {
+        code: 0,
+        resourceWatch: {
+          dependencies: [recoveryA, recoveryB],
+          unresolvedParents: [],
+        },
+      },
+    ] as const;
+    const handle = runBuildWatchWithDependencies(dir, {
+      build: () => outcomes[builds++] ?? outcomes[0],
+      watch: watcher.watch,
+      unwatch: watcher.unwatch,
+      debounceMs: 20,
+    });
+
+    expect(builds).toBe(1);
+    watcher.callbacks.get(stable)?.();
+    await waitFor(() => builds === 2, "rebuild with recovery input A");
+    expect(watcher.callbacks.has(recoveryA)).toBe(true);
+
+    watcher.callbacks.get(stable)?.();
+    await waitFor(() => builds === 3, "rebuild with recovery input B");
+    expect(watcher.callbacks.has(recoveryA)).toBe(true);
+    expect(watcher.callbacks.has(recoveryB)).toBe(true);
+
+    writeFileSync(recoveryA, "repaired");
+    writeFileSync(recoveryB, "repaired");
+    watcher.callbacks.get(recoveryA)?.();
+    watcher.callbacks.get(recoveryB)?.();
+    await waitFor(
+      () => builds === 4,
+      "one rebuild after both recovery inputs repair",
+    );
+    await Bun.sleep(60);
+    expect(builds).toBe(4);
+    await handle.stop();
+  });
+
+  test("recovers a local preset after its alternate root file causes ambiguity", async () => {
+    const dir = tempProject(`{
+      "$schema": "${SCHEMA_URI}",
+      "extends": "./base"
+    }`);
+    const base = join(dir, "base");
+    const selected = join(base, "atlante.jsonc");
+    const alternate = join(base, "atlante.json");
+    mkdirSync(base);
+    writeFileSync(selected, '{"values": {"base": "yes"}}\n');
+    const watcher = fakeWatcher();
+    const messages: string[] = [];
+    let builds = 0;
+    const handle = runBuildWatchWithDependencies(dir, {
+      build: (target) => {
+        const originalError = console.error;
+        console.error = (...args: unknown[]) => messages.push(args.join(" "));
+        try {
+          builds += 1;
+          return runBuild(target);
+        } finally {
+          console.error = originalError;
+        }
+      },
+      watch: watcher.watch,
+      unwatch: watcher.unwatch,
+      debounceMs: 20,
+    });
+
+    expect(builds).toBe(1);
+    expect(watcher.callbacks.has(canonical(selected))).toBe(true);
+    expect(watcher.callbacks.has(alternate)).toBe(true);
+
+    writeFileSync(alternate, '{"values": {"alternate": "yes"}}\n');
+    watcher.callbacks.get(alternate)?.();
+    await waitFor(() => builds === 2, "rebuild after local preset ambiguity");
+    expect(
+      messages.some((message) => message.includes("ambiguous-facet")),
+    ).toBe(true);
+
+    rmSync(alternate);
+    watcher.callbacks.get(alternate)?.();
+    await waitFor(() => builds === 3, "rebuild after local preset recovery");
+    await Bun.sleep(60);
+    expect(builds).toBe(3);
+    await handle.stop();
+  });
+
+  test("recovers a root config after its alternate filename causes ambiguity", async () => {
+    const dir = tempProject(valid);
+    const configPath = join(dir, "atlante.jsonc");
+    const alternate = join(dir, "atlante.json");
+    const watcher = fakeWatcher();
+    const messages: string[] = [];
+    let builds = 0;
+    const handle = runBuildWatchWithDependencies(dir, {
+      build: (target) => {
+        const originalError = console.error;
+        console.error = (...args: unknown[]) => messages.push(args.join(" "));
+        try {
+          builds += 1;
+          return runBuild(target);
+        } finally {
+          console.error = originalError;
+        }
+      },
+      watch: watcher.watch,
+      unwatch: watcher.unwatch,
+      debounceMs: 20,
+    });
+
+    expect(builds).toBe(1);
+    expect(watcher.callbacks.has(configPath)).toBe(true);
+    expect(watcher.callbacks.has(alternate)).toBe(true);
+
+    writeFileSync(alternate, valid);
+    watcher.callbacks.get(alternate)?.();
+    await waitFor(() => builds === 2, "rebuild after root config ambiguity");
+    expect(
+      messages.some((message) => message.includes("ambiguous-config")),
+    ).toBe(true);
+
+    rmSync(alternate);
+    watcher.callbacks.get(alternate)?.();
+    await waitFor(() => builds === 3, "rebuild after root config recovery");
+    await Bun.sleep(60);
+    expect(builds).toBe(3);
+    await handle.stop();
+  });
+
+  test("deleting the config retains the old watch set and watches candidates", async () => {
     const dir = tempProject(valid);
     const watcher = fakeWatcher();
     let builds = 0;
@@ -324,7 +624,7 @@ describe("runBuildWatchWithDependencies", () => {
     const configPath = join(dir, "atlante.jsonc");
     const alternateCandidate = join(dir, "atlante.json");
     expect(watcher.callbacks.has(configPath)).toBe(true);
-    expect(watcher.callbacks.has(alternateCandidate)).toBe(false);
+    expect(watcher.callbacks.has(alternateCandidate)).toBe(true);
 
     rmSync(configPath);
     watcher.callbacks.get(configPath)?.();
@@ -335,7 +635,7 @@ describe("runBuildWatchWithDependencies", () => {
     await handle.stop();
   });
 
-  test("creating the config drops the stale candidates and watches the config path", async () => {
+  test("creating the config keeps candidate watches alongside the config path", async () => {
     const dir = tempProject();
     const watcher = fakeWatcher();
     let builds = 0;
@@ -360,7 +660,7 @@ describe("runBuildWatchWithDependencies", () => {
 
     await waitFor(() => builds === 2, "rebuild after config creation");
     expect(watcher.callbacks.has(configPath)).toBe(true);
-    expect(watcher.callbacks.has(staleCandidate)).toBe(false);
+    expect(watcher.callbacks.has(staleCandidate)).toBe(true);
     await handle.stop();
   });
 });
@@ -368,7 +668,9 @@ describe("runBuildWatchWithDependencies", () => {
 describe("runBuildWatch", () => {
   test("SIGINT stops the watcher and the process exits 0", async () => {
     const dir = tempProject(valid);
-    const binPath = new URL("../bin/atlante.ts", import.meta.url).pathname;
+    const binPath = fileURLToPath(
+      new URL("../bin/atlante.ts", import.meta.url),
+    );
 
     const child = Bun.spawn(["bun", binPath, "build", "--watch", dir], {
       stdout: "pipe",

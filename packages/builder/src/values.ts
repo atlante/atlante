@@ -7,6 +7,12 @@ import type { ValuesMap } from "@atlante/schema";
 export function mergeValues(
   global: ValuesMap | undefined,
   local: ValuesMap | undefined,
+  tombstones: readonly string[] = [],
 ): ValuesMap {
-  return { ...(global ?? {}), ...(local ?? {}) };
+  const values = { ...(global ?? {}), ...(local ?? {}) };
+  for (const pointer of tombstones) {
+    if (!pointer.startsWith("/") || pointer.slice(1).includes("/")) continue;
+    delete values[pointer.slice(1)];
+  }
+  return values;
 }

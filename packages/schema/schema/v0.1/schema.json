@@ -8,6 +8,10 @@
       "type": "string",
       "const": "https://atlante.sh/schema/v0.1/schema.json"
     },
+    "extends": {
+      "type": "string",
+      "minLength": 1
+    },
     "values": {
       "type": "object",
       "propertyNames": {
@@ -34,15 +38,30 @@
       "additionalProperties": {
         "oneOf": [
           {
+            "type": "string",
+            "minLength": 1
+          },
+          {
             "type": "object",
             "properties": {
-              "description": {
+              "$instance": {
                 "type": "string",
                 "minLength": 1
               },
-              "template": {
+              "$template": {
                 "type": "string",
                 "minLength": 1
+              },
+              "description": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "values": {
                 "type": "object",
@@ -62,8 +81,17 @@
                 }
               }
             },
-            "required": ["description"],
-            "additionalProperties": {}
+            "additionalProperties": {},
+            "not": {
+              "required": ["template"]
+            },
+            "allOf": [
+              {
+                "not": {
+                  "required": ["$instance", "$template"]
+                }
+              }
+            ]
           },
           {
             "type": "null"
@@ -80,15 +108,30 @@
       "additionalProperties": {
         "oneOf": [
           {
+            "type": "string",
+            "minLength": 1
+          },
+          {
             "type": "object",
             "properties": {
-              "description": {
+              "$instance": {
                 "type": "string",
                 "minLength": 1
               },
-              "template": {
+              "$template": {
                 "type": "string",
                 "minLength": 1
+              },
+              "description": {
+                "oneOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "values": {
                 "type": "object",
@@ -108,18 +151,23 @@
                 }
               }
             },
-            "required": ["description"],
-            "additionalProperties": {}
+            "additionalProperties": {},
+            "not": {
+              "required": ["template"]
+            },
+            "allOf": [
+              {
+                "not": {
+                  "required": ["$instance", "$template"]
+                }
+              }
+            ]
           },
           {
             "type": "null"
           }
         ]
       }
-    },
-    "extends": {
-      "type": "string",
-      "minLength": 1
     }
   },
   "required": ["$schema"],

@@ -48,8 +48,19 @@ test("reports the package manifest version", () => {
 const LAUNCHER = fileURLToPath(
   new URL("../dist/bin/atlante.js", import.meta.url),
 );
+const BUNDLED = fileURLToPath(new URL("../bundled", import.meta.url));
 const REAL_NODE = Bun.which("node");
 const launcherIsBuilt = existsSync(LAUNCHER) && REAL_NODE !== null;
+const bundledIsBuilt = existsSync(join(BUNDLED, "resources"));
+
+test.skipIf(!bundledIsBuilt)(
+  "the built CLI ships one unified resource pack",
+  () => {
+    expect(existsSync(join(BUNDLED, "resources"))).toBe(true);
+    expect(existsSync(join(BUNDLED, "templates"))).toBe(false);
+    expect(existsSync(join(BUNDLED, "presets"))).toBe(false);
+  },
+);
 
 test.skipIf(!launcherIsBuilt)(
   "the built launcher runs with Node when Bun is unavailable",
@@ -90,6 +101,78 @@ test.skipIf(!launcherIsBuilt)(
   },
 );
 
+test("CLI validates and builds local shorthand, selectors, and local extends", async () => {
+  const dir = project(`{
+    "$schema": "${SCHEMA_URI}",
+    "extends": "./base",
+    "agents": {
+      "shorthand": "./local-instance",
+      "selected": { "$instance": "./local-instance", "description": "Selected" }
+    }
+  }`);
+  mkdirSync(join(dir, "base"));
+  writeFileSync(
+    join(dir, "base", "atlante.jsonc"),
+    `{
+      "$schema": "${SCHEMA_URI}",
+      "agents": { "inherited": { "$template": "../local-template", "description": "Inherited", "identity": "Identity", "mission": "Mission" } }
+    }`,
+  );
+  mkdirSync(join(dir, "local-template"));
+  writeFileSync(
+    join(dir, "local-template", "template.jsonc"),
+    JSON.stringify({
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+      type: "object",
+      properties: {
+        identity: { type: "string" },
+        mission: { type: "string" },
+      },
+      required: ["identity", "mission"],
+      additionalProperties: false,
+    }),
+  );
+  writeFileSync(
+    join(dir, "local-template", "template.md"),
+    "{{identity}}\n{{mission}}\n",
+  );
+  mkdirSync(join(dir, "local-instance"));
+  writeFileSync(
+    join(dir, "local-instance", "instance.jsonc"),
+    JSON.stringify({
+      $template: "../local-template",
+      description: "Local",
+      identity: "Identity",
+      mission: "Mission",
+    }),
+  );
+
+  expect(await runValidate(dir)).toBe(0);
+  expect(await runBuild(dir)).toBe(0);
+  expect(existsSync(join(dir, ".atlante", "artifacts", "manifest.json"))).toBe(
+    true,
+  );
+});
+
+test("CLI resolves bundled resource facets without package lookup", async () => {
+  const dir = project(`{
+    "$schema": "${SCHEMA_URI}",
+    "values": { "project": "demo", "quick-check": "quick", "full-check": "full" },
+    "agents": {
+      "architect": { "$instance": "atlante/architect", "description": "Architect" },
+      "agent": { "$template": "atlante/agent", "description": "Agent", "identity": "Identity", "mission": "Mission" }
+    },
+    "skills": {
+      "brainstorming": { "$instance": "atlante/brainstorming", "description": "Brainstorming" },
+      "workflow": { "$instance": "atlante/delivery-workflow", "description": "Workflow" },
+      "skill": { "$template": "atlante/skill", "description": "Skill", "title": "Skill", "overview": "Overview", "sections": [{ "markdown": "Body" }] }
+    }
+  }`);
+
+  expect(await runValidate(dir)).toBe(0);
+  expect(await runBuild(dir)).toBe(0);
+});
+
 describe("runValidate", () => {
   test("exits 0 on a valid project", async () => {
     expect(await runValidate(project(valid))).toBe(0);
@@ -127,7 +210,22 @@ describe("runValidate", () => {
     } finally {
       console.error = original;
     }
-    expect(errors.join("\n")).toContain("unknown-preset");
+    expect(errors.join("\n")).toContain("missing-target");
+  });
+
+  test("accepts config filenames and relative project directories from any cwd", async () => {
+    const dir = project(valid);
+    const previous = process.cwd();
+    try {
+      process.chdir(dir);
+      expect(await runValidate("atlante.jsonc")).toBe(0);
+      expect(await runValidate(".")).toBe(0);
+
+      process.chdir(tmpdir());
+      expect(await runValidate(dir.slice(tmpdir().length + 1))).toBe(0);
+    } finally {
+      process.chdir(previous);
+    }
   });
 });
 

@@ -13,7 +13,7 @@ host tool, not the agent itself, but the declarative layer in between.
 ## Why
 
 - **Reusable** — share agent configurations across projects via presets
-- **Composable** — build prompts from namespaced templates instead of monolithic
+- **Composable** — build prompts from bundled or local template facets instead of monolithic
   strings
 - **Customizable** — override values per-agent or per-project without touching
   templates
@@ -57,7 +57,7 @@ An `atlante.jsonc` with two agents:
 
   "agents": {
     "implementer": {
-      "template": "atlante/agent",
+      "$template": "atlante/agent",
       "description": "Implements requested changes in the project.",
       "identity": "You are a senior implementer on {{values.project}}.",
       "mission": "Write clean, tested, production-ready code.",
@@ -69,7 +69,7 @@ An `atlante.jsonc` with two agents:
     },
 
     "reviewer": {
-      "template": "atlante/agent",
+      "$template": "atlante/agent",
       "description": "Reviews changes for defects and design issues.",
       "identity": "You are a thorough code reviewer on {{values.project}}.",
       "mission": "Ensure code quality and adherence to standards.",
@@ -115,11 +115,11 @@ resolved skill is available to every host agent through the OpenCode plugin's
 content. Atlante does not execute skill content.
 
 The root document has `$schema`, `values`, `agents`, and optional `skills`
-fields. Inside an agent binding, `description`, `template`, and `values` are
-binding metadata;
-inside a skill binding, `description`, `template`, and `values` are reserved
-metadata. All other binding keys are input owned by the selected template's
-input schema.
+fields. Inside an agent or skill binding, `description`, `$template`,
+`$instance`, and `values` are binding metadata. All other binding keys are input
+owned by the selected template facet's input schema. A bare resource locator is
+`$instance` shorthand; the legacy binding-level `template` selector is not
+supported.
 
 ### How values reach a prompt or skill
 
@@ -147,8 +147,9 @@ syntax is normal, and doing so must not corrupt them.
 
 1. You write an `atlante.jsonc` (or `atlante.json`) with agent and optional
    skill bindings and values.
-2. Templates define how prompts render. Each is a Markdown file paired with a
-   `template.json` Draft 2020-12 input schema.
+2. Resources define how prompts render. A template facet is a Markdown file
+   paired with a `template.jsonc` Draft 2020-12 input schema; an instance facet
+   supplies configured input for a template facet.
 3. The builder merges values, substitutes references, renders templates, and
    publishes host-independent agent and skill artifacts.
 4. An adapter verifies the artifacts and delivers the rendered prompts to the
@@ -156,7 +157,7 @@ syntax is normal, and doing so must not corrupt them.
 
 ```
 atlante.jsonc  →  build  →  verified artifacts  →  adapter  →  host agent/tool
-                  (templates + values)
+                   (resources + values)
 ```
 
 For OpenCode, step 4 happens **once in memory during initialization**: the
@@ -173,23 +174,6 @@ mismatch before materialization. The artifact format version is separate from
 the document `$schema` version. Rendered values may contain sensitive data, so
 keep `.atlante/` local and do not publish artifacts.
 
-## Templates
-
-Bundled templates live in the `atlante/` namespace:
-
-- **`atlante/agent`** — the root prompt renderer: identity, mission,
-  responsibilities, constraints, and ordered, reusable sections
-- **`atlante/workflow`** — a sequential multi-phase workflow with inline
-  instructions, optional `plan`/`build`/`review` semantics, workflow and phase
-  policies, phase-level `subagent` delegation, and living aggregate outputs,
-  composed into agent or skill sections
-- **`atlante/skill`** — structured skill input rendered as Markdown with
-  ordered, reusable sections
-
-Agent and skill section arrays preserve source order. Agent sections may combine
-responsibilities, constraints, Markdown, instructions, and gotchas. Skill
-sections may combine Markdown, constraints, instructions, gotchas, and workflows.
-
 ## Presets
 
 A preset is a pre-filled `atlante.jsonc` to start from. A preset is a
@@ -197,14 +181,17 @@ A preset is a pre-filled `atlante.jsonc` to start from. A preset is a
 consuming validator expands and validates them through the same path used for
 user-authored overlays, so a broken preset is rejected when consumed.
 
-- **`starter`** — `architect` and `implement` agents, the default for `init`;
-  presets may also provide global skills
+- **`starter`** — the bundled `architect` agent plus `brainstorming` and
+  `workflow` skills, the default for `init`
 
 Presets use `{{sys.cwd.basename}}` for their `project` value so you get a
 sensible default without writing a `values` block. Add your own
 `"values": { "project": "my-app" }` when you want to override it.
 
-Run `atlante init` to scaffold from the `starter` preset.
+Run `atlante init` to scaffold from the `starter` preset. `init` writes the
+containing project configuration, registers the OpenCode plugin while
+preserving existing host settings, builds the initial artifact tree, and rolls
+back source/config changes if initialization or the build fails.
 
 ## Packages
 
@@ -215,17 +202,15 @@ Two packages are published to npm:
 | `@atlante/cli` | `init`, `validate`, `build` |
 | `@atlante/opencode-plugin` | In-memory agent injection and `atlante_skill` through OpenCode's `config` hook |
 
-The remaining five packages are private internal workspaces. They are not
-published to npm and exist only inside this repository, where their source is
-bundled into the published artifacts at build time:
+The other four packages are private internal workspaces. They are not published
+to npm:
 
 | Package | Responsibility |
 | --- | --- |
 | `@atlante/schema` | Document structure and the generated, versioned JSON Schema |
-| `@atlante/templates` | Template schemas, loading, composition, rendering |
+| `@atlante/resources` | Local/bundled resource packs, facets, resolution, composition, rendering, and bundled source content |
 | `@atlante/validator` | Discovery, parsing, and two-level validation |
 | `@atlante/builder` | Project preparation, value merging, rendering, and artifact publication |
-| `@atlante/presets` | Bundled preset documents and registry loading |
 
 ## Current scope (v0.1)
 
@@ -238,14 +223,14 @@ bundled into the published artifacts at build time:
 - Deterministic prompt resolution
 - OpenCode adapter for in-memory prompt and skill materialization
 - Bundled `starter` preset via `atlante init`
+- Local resource authoring with local template and instance facets
 
 **Does not include:**
 
 - Model selection, effort, permissions, or host-agent configuration
-- User-defined templates or third-party template authoring
 - Skill execution, runtime skill state, and remote skill loading
 - LLM inference or direct agent execution
-- Preset export, sharing, or remote registry
+- Package/plugin resource resolution and remote resource registries
 
 ## Development
 
@@ -269,9 +254,8 @@ bun link --cwd packages/cli
 
 The linked `atlante` runs `packages/cli/dist/bin/atlante.js`, which is
 gitignored build output. A fresh checkout has neither `packages/cli/dist/`
-nor the generated `packages/cli/bundled/` (bundled templates and presets
-copied at build time); `bun run build` produces both, so re-run it after any
-CLI source changes.
+nor the generated `packages/cli/bundled/` resource pack copied at build time;
+`bun run build` produces both, so re-run it after any CLI source changes.
 
 ## Status
 

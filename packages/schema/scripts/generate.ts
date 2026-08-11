@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { atlanteDocumentSchema, SCHEMA_URI } from "../src/document.js";
+import { atlanteDocumentOverlaySchema, SCHEMA_URI } from "../src/document.js";
 import { VALUE_KEY_PATTERN } from "../src/values.js";
 
 export function buildDocumentJsonSchema(): Record<string, unknown> {
-  const generated = z.toJSONSchema(atlanteDocumentSchema, {
+  const generated = z.toJSONSchema(atlanteDocumentOverlaySchema, {
     target: "draft-2020-12",
     io: "input",
   }) as Record<string, unknown>;
@@ -17,41 +17,36 @@ export function buildDocumentJsonSchema(): Record<string, unknown> {
     },
     additionalProperties: { oneOf: [{ type: "string" }, { type: "null" }] },
   };
-  const bindingDescription = {
-    description: { type: "string", minLength: 1 },
-  };
-  const agentBindingSchema = {
+  const sourceObjectSchema = {
     type: "object",
     properties: {
-      ...bindingDescription,
-      template: { type: "string", minLength: 1 },
+      $instance: { type: "string", minLength: 1 },
+      $template: { type: "string", minLength: 1 },
+      description: {
+        oneOf: [{ type: "string", minLength: 1 }, { type: "null" }],
+      },
       values: valuesSchema,
     },
-    required: ["description"],
     additionalProperties: {},
+    not: { required: ["template"] },
+    allOf: [
+      {
+        not: { required: ["$instance", "$template"] },
+      },
+    ],
   };
-  const skillBindingSchema = {
+  const sourceStringSchema = { type: "string", minLength: 1 };
+  const sourceVariants = [sourceStringSchema, sourceObjectSchema];
+  const bindingVariants = [...sourceVariants, { type: "null" }];
+  const bindingProperties = {
     type: "object",
-    properties: {
-      ...bindingDescription,
-      template: { type: "string", minLength: 1 },
-      values: valuesSchema,
-    },
-    required: ["description"],
-    additionalProperties: {},
+    propertyNames: { type: "string", minLength: 1 },
+    additionalProperties: { oneOf: bindingVariants },
   };
-  documentProperties.extends = { type: "string", minLength: 1 };
+  documentProperties.extends = sourceStringSchema;
   documentProperties.values = valuesSchema;
-  documentProperties.agents = {
-    type: "object",
-    propertyNames: { type: "string", minLength: 1 },
-    additionalProperties: { oneOf: [agentBindingSchema, { type: "null" }] },
-  };
-  documentProperties.skills = {
-    type: "object",
-    propertyNames: { type: "string", minLength: 1 },
-    additionalProperties: { oneOf: [skillBindingSchema, { type: "null" }] },
-  };
+  documentProperties.agents = bindingProperties;
+  documentProperties.skills = bindingProperties;
   generated.required = ["$schema"];
 
   return {
@@ -63,10 +58,15 @@ export function buildDocumentJsonSchema(): Record<string, unknown> {
 }
 
 function serializeDocumentJsonSchema(schema: Record<string, unknown>): string {
-  return `${JSON.stringify(schema, null, 2).replaceAll(
-    /"required": \[\n\s+"([^"\n]+)"\n\s+\]/g,
-    '"required": ["$1"]',
-  )}\n`;
+  return `${JSON.stringify(schema, null, 2)
+    .replaceAll(
+      /"required": \[\n\s+"([^"\n]+)",\n\s+"([^"\n]+)"\n\s+\]/g,
+      '"required": ["$1", "$2"]',
+    )
+    .replaceAll(
+      /"required": \[\n\s+"([^"\n]+)"\n\s+\]/g,
+      '"required": ["$1"]',
+    )}\n`;
 }
 
 if (import.meta.main) {

@@ -1,15 +1,15 @@
 import { lstatSync } from "node:fs";
 import { resolve } from "node:path";
-import type { Diagnostic } from "@atlante/validator";
+import type { Diagnostic, ResourceWatchContext } from "@atlante/validator";
 import { hasErrors } from "@atlante/validator";
 import { createArtifacts } from "./artifacts.js";
-import { prepareDocument } from "./prepare.js";
 import { loadProject, type ProjectContext } from "./project.js";
 import {
   type ArtifactPublicationWarning,
   type PublishDependencies,
   publishArtifacts,
 } from "./publish.js";
+import { prepareResolvedDocument } from "./resource-prepare.js";
 
 export type BuildDependencies = PublishDependencies;
 
@@ -26,6 +26,7 @@ export function assertRealProjectRoot(projectRoot: string): void {
 export type BuildResult = {
   projectRoot: string;
   artifactsPath: string;
+  resourceWatch?: ResourceWatchContext;
   diagnostics: Diagnostic[];
   warnings: ArtifactPublicationWarning[];
 };
@@ -44,13 +45,14 @@ export function buildProject(
   const artifactsPath = resolve(projectRoot, ".atlante", "artifacts");
 
   const prepared =
-    loaded.document && loaded.registry && !hasErrors(loaded.diagnostics)
-      ? prepareDocument(loaded.document, loaded.registry, loaded.diagnostics)
+    loaded.resources && !hasErrors(loaded.diagnostics)
+      ? prepareResolvedDocument(loaded.resources, loaded.diagnostics)
       : { agents: [], skills: [], diagnostics: loaded.diagnostics };
   if (hasErrors(prepared.diagnostics)) {
     return {
       projectRoot,
       artifactsPath,
+      resourceWatch: loaded.resourceWatch,
       diagnostics: prepared.diagnostics,
       warnings: [],
     };
@@ -65,6 +67,7 @@ export function buildProject(
   return {
     projectRoot,
     artifactsPath: published.artifactsPath,
+    resourceWatch: loaded.resourceWatch,
     diagnostics: prepared.diagnostics,
     warnings: published.warnings,
   };
