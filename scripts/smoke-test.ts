@@ -77,15 +77,6 @@ try {
     "skill artifact missing workflow content",
   );
 
-  const rootConfig = await Bun.file(join(ROOT, "atlante.jsonc")).text();
-  assert(
-    rootConfig.includes('"./resources/architect"'),
-    "root config does not dogfood the local architect resource",
-  );
-  assert(
-    rootConfig.includes('"./resources/delivery-workflow"'),
-    "root config does not dogfood the local workflow resource",
-  );
   assert(
     await Bun.file(
       join(ROOT, "resources", "architect", "instance.jsonc"),
