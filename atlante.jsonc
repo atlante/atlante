@@ -1,16 +1,6 @@
 {
   "$schema": "https://atlante.sh/schema/v0.1/schema.json",
   "extends": "atlante/starter",
-  "agents": {
-    "architect": {
-      "$instance": "./resources/architect"
-    }
-  },
-  "skills": {
-    "workflow": {
-      "$instance": "./resources/delivery-workflow"
-    }
-  },
   "values": {
     "project": "Atlante",
     "quick-check": "`bun run quick:check`",
