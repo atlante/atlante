@@ -30,13 +30,22 @@ describe("document JSON Schema", () => {
     expect(binding?.properties).not.toHaveProperty("extends");
   });
 
-  test("keeps extends in the published root schema for overlays", () => {
+  test("publishes the string-or-array extends union for overlays", () => {
     const properties = buildDocumentJsonSchema().properties as Record<
       string,
       unknown
     >;
 
-    expect(properties.extends).toEqual({ type: "string", minLength: 1 });
+    expect(properties.extends).toEqual({
+      oneOf: [
+        { type: "string", minLength: 1 },
+        {
+          type: "array",
+          items: { type: "string", minLength: 1 },
+          minItems: 1,
+        },
+      ],
+    });
   });
 
   test("does not require either binding map in the published schema", () => {

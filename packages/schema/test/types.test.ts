@@ -84,6 +84,23 @@ const overlayDocument: AtlanteDocumentOverlay = {
   },
 };
 
+const overlayDocumentWithOrderedExtends: AtlanteDocumentOverlay = {
+  $schema: "https://atlante.sh/schema/v0.1/schema.json",
+  extends: ["@acme/review-pack/base", "./local"],
+};
+
+const overlayDocumentWithEmptyExtends: AtlanteDocumentOverlay = {
+  $schema: "https://atlante.sh/schema/v0.1/schema.json",
+  // @ts-expect-error Authored extends arrays must contain at least one locator.
+  extends: [],
+};
+
+const overlayDocumentWithInvalidExtendsEntry: AtlanteDocumentOverlay = {
+  $schema: "https://atlante.sh/schema/v0.1/schema.json",
+  // @ts-expect-error Authored extends arrays contain only locator strings.
+  extends: ["./base", 42],
+};
+
 const canonicalDocument: AtlanteDocument = {
   $schema: "https://atlante.sh/schema/v0.1/schema.json",
   agents: {
@@ -99,6 +116,9 @@ void overlayWithTemplate;
 void overlayWithBothSelectors;
 void overlayWithTopLevelTemplate;
 void overlayDocument;
+void overlayDocumentWithOrderedExtends;
+void overlayDocumentWithEmptyExtends;
+void overlayDocumentWithInvalidExtendsEntry;
 void canonicalWithInstance;
 void canonicalWithTopLevelTemplate;
 void canonicalDocumentWithTopLevelTemplate;

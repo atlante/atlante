@@ -287,6 +287,41 @@ describe("atlanteDocumentOverlaySchema", () => {
     }
   });
 
+  test("accepts a non-empty ordered extends locator array", () => {
+    const extendsValue: [string, ...string[]] = [
+      "@acme/review-pack/strict",
+      "./local",
+    ];
+    const result = atlanteDocumentOverlaySchema.safeParse({
+      $schema: SCHEMA_URI,
+      extends: extendsValue,
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.extends).toEqual(extendsValue);
+  });
+
+  test("rejects empty and non-string extends arrays at the authored shape", () => {
+    for (const extendsValue of [[], ["./base", 42], [null]]) {
+      const result = atlanteDocumentOverlaySchema.safeParse({
+        $schema: SCHEMA_URI,
+        extends: extendsValue,
+      });
+
+      expect(result.success).toBe(false);
+    }
+  });
+
+  test("leaves locator grammar to semantic resource validation", () => {
+    const result = atlanteDocumentOverlaySchema.safeParse({
+      $schema: SCHEMA_URI,
+      extends: "https://example.com/review-pack",
+    });
+
+    expect(result.success).toBe(true);
+  });
+
   test("keeps extends, values tombstones, and binding tombstones in raw overlays", () => {
     const result = atlanteDocumentOverlaySchema.safeParse({
       $schema: SCHEMA_URI,

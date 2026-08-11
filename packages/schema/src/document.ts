@@ -14,6 +14,18 @@ export const rawResourceLocatorSchema = z.string().min(1);
 export type RawResourceLocator = z.infer<typeof rawResourceLocatorSchema>;
 export type AuthoredResourceLocator = RawResourceLocator;
 
+const authoredExtendsArraySchema = z
+  .tuple([rawResourceLocatorSchema])
+  .rest(rawResourceLocatorSchema);
+
+/** Authored preset inheritance is one locator or an ordered non-empty list. */
+export const authoredExtendsSchema = z.union([
+  rawResourceLocatorSchema,
+  authoredExtendsArraySchema,
+]);
+
+export type AuthoredExtends = z.infer<typeof authoredExtendsSchema>;
+
 /** Binding metadata shared by every resolved template-backed binding. */
 export const bindingDescriptionSchema = z.object({
   description: z.string().min(1),
@@ -221,7 +233,7 @@ export type SkillsOverlay = z.infer<typeof skillsOverlaySchema>;
 /** Authored document overlay, before resource and tombstone resolution. */
 export const atlanteDocumentOverlaySchema = z.strictObject({
   $schema: z.literal(SCHEMA_URI),
-  extends: rawResourceLocatorSchema.optional(),
+  extends: authoredExtendsSchema.optional(),
   values: valuesMapOverlaySchema.optional(),
   agents: agentsOverlaySchema.optional(),
   skills: skillsOverlaySchema.optional(),
