@@ -174,49 +174,6 @@ mismatch before materialization. The artifact format version is separate from
 the document `$schema` version. Rendered values may contain sensitive data, so
 keep `.atlante/` local and do not publish artifacts.
 
-## Resources and Facets
-
-Bundled resources live in the temporary `atlante/*` namespace. Local resources
-use `./` or `../` paths relative to the file containing the reference:
-
-```text
-resources/reviewer/
-  instance.jsonc
-resources/skill/
-  template.jsonc
-  template.md
-```
-
-A resource may provide a template facet, an instance facet, or both. A template
-facet is `template.jsonc` plus `template.md`; an instance facet is
-`instance.jsonc` and may select or derive an effective template with
-`$template` or `$instance`. `atlante/starter` selects the bundled preset root;
-direct bundled child resources such as `atlante/agent` and
-`atlante/architect` are also addressable.
-
-Resource resolution is lazy: only selected facets and their transitive
-dependencies are read. Paths are resolved from the containing file and remain
-inside one canonical project or bundled content root. Absolute paths, URLs,
-backslash paths, unsafe traversal, external symlinks, and package/plugin lookup
-are rejected. The resolver reports selected files and unresolved parent
-directories so CLI watch mode can recover from newly created resources without
-watching unrelated siblings.
-
-Bundled template facets include:
-
-- **`atlante/agent`** — the root prompt renderer: identity, mission,
-  responsibilities, constraints, and ordered, reusable sections
-- **`atlante/workflow`** — a sequential multi-phase workflow with inline
-  instructions, optional `plan`/`build`/`review` semantics, workflow and phase
-  policies, phase-level `subagent` delegation, and living aggregate outputs,
-  composed into agent or skill sections
-- **`atlante/skill`** — structured skill input rendered as Markdown with
-  ordered, reusable sections
-
-Agent and skill section arrays preserve source order. Agent sections may combine
-responsibilities, constraints, Markdown, instructions, and gotchas. Skill
-sections may combine Markdown, constraints, instructions, gotchas, and workflows.
-
 ## Presets
 
 A preset is a pre-filled `atlante.jsonc` to start from. A preset is a

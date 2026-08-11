@@ -37,8 +37,7 @@ Version 0.1 includes:
 - the bundled `starter` preset (`atlante init`), addressed as
   `atlante/starter`, with its agent, skill, template, and instance facets in
   one temporary `atlante/*` namespace;
-- source-aware resource provenance, deterministic overlays, and fail-closed
-  resource diagnostics.
+- deterministic resource overlays and fail-closed resource diagnostics.
 
 Version 0.1 does not include:
 
@@ -47,8 +46,6 @@ Version 0.1 does not include:
 - LLM inference or direct agent execution;
 - skill execution, skill runtime state, and remote skill loading;
 - preset export, sharing, or remote registry.
-
-The public terms `module`, `$module`, and `module.jsonc` are not introduced.
 
 The excluded runtime capabilities remain possible future extensions of the
 design and must not be implied by the version 0.1 schema.
@@ -103,8 +100,6 @@ code is not part of the configuration format.
 - **Resource locator**: either a containing-file-relative path beginning with
   `./` or `../`, or a temporary built-in locator in the `atlante/*` namespace.
   A local locator has no global ID.
-- **Resource origin**: stable source identity. Project origins use
-  content-root-relative paths; bundled origins use `atlante/<resource>/<facet>`.
 - **Template slot**: a location in a composable template's input schema declared
   as `{ "template": "..." }`, indicating that the slot expects the rendering
   of another template. This is a template-composition marker, not a root
@@ -270,15 +265,13 @@ contract is divided across four layers:
    optional `agents`, `values`, and `skills`) and publishes the versioned JSON
    Schema and corresponding TypeScript types; it does not define prompt or
    skill semantics;
-2. `@atlante/resources` owns resource identities, safe local and bundled
-   locators, facets, provenance, overlays, and the composition, interpolation,
-   and Markdown-rendering engine for bundled source content;
+2. `@atlante/resources` owns resource packs, locators, facets, overlays,
+   composition, interpolation, and Markdown rendering;
 3. `@atlante/validator` applies the raw document structural checks and the
    resolved canonical, semantic, and template-input checks, including
    reference validity and schema validation;
-4. `@atlante/builder` orchestrates preparation and publication, passing
-   resolved inputs to `@atlante/resources` and publishing host-independent
-   artifact descriptors. It does not implement the resource engine.
+4. `@atlante/builder` prepares and publishes host-independent artifact
+   descriptors.
 
 Templates render prompt content; they do not define execution semantics or
 schedule execution.
@@ -287,13 +280,10 @@ The public v1 language is the JSONC document itself.
 
 ### 5.1 Resource pack and facet layout
 
-A resource pack owns one fixed, canonical realpath content root. A project pack
-is rooted at the directory containing the discovered `atlante.jsonc` or
-`atlante.json`. The bundled pack is rooted at the embedded
-`@atlante/resources/bundled` directory in source and at the single
-`bundled/resources` asset root in the published CLI. The root is captured
-before resolving any child and is immutable for the lifetime of that pack. No
-package or plugin lookup is used for either root.
+A resource pack MUST have one trusted content root. A project pack is rooted at
+the directory containing the discovered `atlante.jsonc` or `atlante.json`; a
+bundled pack supplies its own trusted root. All resources in a pack MUST remain
+within that root.
 
 Resources are directories beneath the selected root. A resource MAY contain
 either facet or both facets:
@@ -305,11 +295,10 @@ resource-directory/
   instance.jsonc   # optional instance facet input
 ```
 
-The package-level `atlante.jsonc` or `atlante.json` at a pack root is an
-optional preset root. The bundled pack MUST provide `atlante.jsonc` for the
-starter preset. `atlante/starter` is the explicit temporary locator for that
-root file; direct bundled child directories remain addressable as
-`atlante/<child>`.
+An `atlante.jsonc` or `atlante.json` at a pack root is an optional preset root.
+The bundled pack MUST provide `atlante.jsonc` for the starter preset.
+`atlante/starter` is the explicit temporary locator for that root file; bundled
+child resources are addressable as `atlante/<resource>`.
 
 Resources do not acquire agent or skill IDs. Consuming `agents` and `skills`
 map keys remain the host-facing IDs.
@@ -343,7 +332,7 @@ General authored resource references MUST:
 - resolve relative to the file containing the reference, never the process
   current working directory;
 - identify a directory rather than a facet file; and
-- remain inside the immutable realpath content root of the selected pack.
+- remain inside the selected pack's canonical content root.
 
 `extends` targets a directory containing exactly one `atlante.jsonc` or
 `atlante.json`. `$instance` targets a directory containing `instance.jsonc`.
@@ -351,13 +340,12 @@ General authored resource references MUST:
 `template.md`. Missing or ambiguous target files are errors.
 
 Authored `../` segments are allowed when the normalized target remains inside
-the selected root. Traversal MUST be rejected only when normalization or
-realpath resolution would escape that root. Absolute paths, home-directory
-paths, URLs, backslash separators, and realpath or symlink escapes MUST be
-rejected. Symlinks resolving within the selected root MAY be used. A symlink to
-an external target MUST be rejected. Resource resolution MUST NOT use npm,
-`node_modules`, package-manager layout, or plugin lookup. A future external pack
-MUST establish its own trusted content root rather than weakening this
+the selected root. Traversal MUST be rejected when normalization or symlink
+resolution would escape that root. Absolute paths, home-directory paths, URLs,
+and backslash separators MUST be rejected. Symlinks resolving within the
+selected root MAY be used; a symlink to an external target MUST be rejected.
+Resource resolution MUST NOT use package or plugin lookup. A future external
+pack MUST establish its own trusted content root rather than weakening this
 containment rule.
 
 ### 5.4 Lazy loading
@@ -365,27 +353,19 @@ containment rule.
 Resolution MUST load only the selected facet and its transitive dependencies.
 It MUST NOT enumerate or parse unrelated resource siblings as a prerequisite
 for selecting a resource. A malformed unrelated sibling therefore MUST NOT
-affect a valid configuration. The resolver records selected source files and
-unresolved target parent directories for watch reconciliation.
+affect a valid configuration.
 
-### 5.5 Provenance and normalized data
+### 5.5 Resolution order
 
-Every parsed and merged node retains a non-enumerable or otherwise separate
-authoring origin. Project source identities use content-root-relative POSIX
-paths. Bundled source identities use stable paths such as
-`atlante/architect/instance.jsonc`; normal diagnostics MUST NOT expose
-machine-specific absolute paths. Provenance MUST NOT be attached to normalized
-template input where it could be observed by a renderer.
+Resolution MUST be deterministic. For each selected source, it proceeds as
+follows:
 
-Resolution proceeds deterministically:
-
-1. parse the selected source as JSONC and retain its authoring file;
+1. parse the selected source as JSONC;
 2. resolve `$instance`, `$template`, or the context-supplied template;
 3. merge inherited and local fields;
-4. preserve origins for the winning value of every node;
-5. resolve nested references from the file that authored each reference;
-6. validate effective-template compatibility; and
-7. strip selectors and binding metadata at the relevant boundary before input
+4. resolve nested references relative to the source containing each reference;
+5. validate effective-template compatibility; and
+6. strip selectors and binding metadata at the relevant boundary before input
    validation, interpolation, and rendering.
 
 ### 5.6 Merge contract
@@ -402,15 +382,11 @@ Tombstones are consumed during resolution and MUST NOT reach canonical
 template input or rendered output. Repeated resolution of the same sources
 MUST produce isolated, deterministic normalized data.
 
-### 5.7 Resource graph
+### 5.7 Reference chains and template compatibility
 
-The resolver models preset roots, instance facets, and template facets as typed
-graph nodes (`PresetResourceGraphNode`, `InstanceResourceGraphNode`, and
-`TemplateResourceGraphNode`). A `ResourceGraphChain` is a complete, ordered,
-non-empty chain of those nodes. Cycles are detected across mixed node kinds
-rather than only within one facet kind. A shared maximum of 32 reference hops
-applies to all resource chains. Cycle, depth, and incompatible-template
-diagnostics MUST carry the complete typed chain in deterministic order.
+Resolution MUST detect cycles across preset, instance, and template references.
+Cycle, excessive-depth, and incompatible-template diagnostics MUST identify the
+complete reference chain in deterministic order.
 
 A nested configured instance is compatible with a template slot only when its
 effective template has the exact same canonical template locator required by
@@ -419,16 +395,16 @@ remain template-owned input and are validated by the selected slot template.
 
 ### 5.8 Resource diagnostics and failure behavior
 
-Resource failures are structured with a stable error code, source identity when
-available, authored locator when needed, JSON Pointer, and one-based authoring
-location. Error families cover invalid locator grammar, missing or wrong target
-types, missing or ambiguous facets, malformed JSONC, invalid template schemas,
-conflicting selectors, absent effective templates, unsafe paths, cycles, depth
-exhaustion, incompatible nested templates, and invalid resolved instance input.
+Resource failures MUST identify the relevant source with a stable
+project-relative or bundled locator when available, and MUST include a stable
+error code, JSON Pointer, and one-based authoring location. Error families cover
+invalid locator grammar, missing or wrong target types, missing or ambiguous
+facets, malformed JSONC, invalid template schemas, conflicting selectors, absent
+effective templates, unsafe paths, cycles, excessive depth, incompatible nested
+templates, and invalid resolved instance input.
 
 Diagnostics MUST sort deterministically by source, JSON Pointer, location, and
-code. Normal formatting MUST use stable project-relative or bundled identities,
-not machine-specific absolute paths.
+code and MUST NOT expose machine-specific absolute paths in normal formatting.
 
 The resource system is globally fail-closed. Any resource, resolution, or
 semantic validation error yields no usable normalized document. Preparation
@@ -436,15 +412,6 @@ returns no partial agent or skill descriptors, and a failed build MUST preserve
 the last complete artifact tree. CLI commands report failure. The OpenCode
 adapter continues to consume only a complete verified artifact set and never
 loads source resources.
-
-### 5.9 Watch contract
-
-Watch mode MUST use the selected resource dependency set and unresolved target
-parent directories as its watch inputs. It MUST exclude unrelated resource
-siblings. After a rebuild, it reconciles the dependency set so newly resolved
-transitive resources replace stale candidates. A resource failure is reported,
-but watch mode continues monitoring known sources and unresolved parent
-directories for recovery.
 
 ## 6. Prompt Definition and Template System
 
@@ -505,8 +472,8 @@ source. Resolution MUST produce deterministic output for the same valid input.
 ### 6.4 Variable resolution
 
 Values are resolved into binding metadata and the prompt definition before
-rendering, not exposed to templates. The `@atlante/resources` engine MUST merge
-global and per-agent values, then MUST replace every `{{values.key}}` reference
+rendering, not exposed to templates. Atlante MUST merge global and per-agent
+values, then MUST replace every `{{values.key}}` reference
 appearing in the agent's `description` and prompt definition with the resolved
 value, before the selected template is rendered. Per-agent overrides take
 precedence over global values for that agent, using the key-by-key merge defined
@@ -623,18 +590,15 @@ order:
    checks its document shape, supported schema URI, container types, and the
    shape of authored source selectors. It does not require a referenced
    resource, inspect a template schema, or validate template-owned input.
-2. **Resource resolution** uses `@atlante/resources` to resolve the selected
-   preset, instance, and template graph, load only selected facets, merge the
-   source layers, and produce a canonical candidate. Resource graph failures
-   fail this stage and retain their typed chain.
+2. **Resource resolution** resolves the selected preset, instance, and template
+   references, loads only selected facets, merges the source layers, and
+   produces a canonical candidate. Resource failures fail this stage and retain
+   their reference chain.
 3. **Resolved canonical, semantic, and template validation** validates the
    canonical candidate, value references, effective-template compatibility,
    composition semantics, and template-owned input against the resolved
-   schemas. The validator obtains any interpolated inputs from the resources
-   engine rather than implementing interpolation itself. No build or
-   publication may start until this stage succeeds.
-4. **Build** is the builder orchestration stage. It asks the resources engine
-   to render the validated, interpolated inputs, then prepares and publishes the
+   schemas. No build or publication may start until this stage succeeds.
+4. **Build** renders the validated inputs, then prepares and publishes the
    complete artifact tree.
 
 Validation therefore operates at two levels, but the raw structural level and
@@ -663,15 +627,15 @@ The validator MUST reject:
 
 For every agent and skill, validation MUST use paths rooted at
 `/agents/<agentId>` or `/skills/<skillId>`. It MUST interpolate `description`
-through the resources engine with the same resolved global-plus-local values
-used by the template input, reject missing or invalid value references, and
-reject a description that is empty after interpolation. The reserved fields
+with the same resolved global-plus-local values used by the template input,
+reject missing or invalid value references, and reject a description that is
+empty after interpolation. The reserved fields
 `description`, `$template`,
 `$instance`, and `values` MUST be removed from the input presented to the
 selected agent or skill template; all remaining fields are template-owned input.
-Agent-specific
-diagnostics MUST retain the `agent` subject and `/agents/<agentId>` path; skill
-diagnostics MUST retain the `skill` subject and `/skills/<skillId>` path.
+Agent-specific diagnostics MUST retain the `agent` subject and
+`/agents/<agentId>` path; skill diagnostics MUST retain the `skill` subject and
+`/skills/<skillId>` path.
 
 ### 8.2 Template-level validation
 
@@ -709,26 +673,21 @@ during validation and resolution.
 
 Building transforms the validated canonical document into host-independent
 artifact descriptors. Building MUST be deterministic and MUST NOT execute
-agents, commands, or arbitrary project code. The builder is an orchestration
-boundary: resource selection, composition, interpolation, and rendering are
-delegated to `@atlante/resources`, not reimplemented in the builder.
+agents, commands, or arbitrary project code.
 
 The builder MUST:
 
 1. accept only a document that has passed raw structural validation, resource
    resolution, and resolved canonical/semantic/template validation;
-2. pass the resolved and interpolated template inputs to the resource engine for
-   rendering;
+2. render the resolved and interpolated template inputs;
 3. produce one agent artifact descriptor per binding; and
 4. preserve host-agent IDs and resolved descriptions in every descriptor.
 
 For skills, the builder MUST:
 
-1. pass the resolved explicit `$template` or `$instance` source, or the default
-   bundled `atlante/skill` template facet, to the resource engine;
-2. pass the resolved and interpolated skill inputs from the resource engine to
-   its renderer;
-3. produce one resolved descriptor per binding containing `skillId`, the
+1. render the resolved explicit `$template` or `$instance` source, or the
+   default bundled `atlante/skill` template facet;
+2. produce one resolved descriptor per binding containing `skillId`, the
    effective template identity, `description`, and rendered Markdown `content`.
 
 Build preparation MUST contain `agents`, `skills`, and `diagnostics`. Building is
@@ -819,32 +778,20 @@ The version 0.1 implementation MUST preserve these package responsibilities:
   TypeScript types;
   no prompt or skill-content semantics, no template logic, no host or rendering
   logic;
-- `@atlante/resources`: resource identities and locators; template and instance
-  facets; preset roots; safe lazy loading; provenance-aware merge and graph
-  traversal; the template composition, variable interpolation, Markdown
-  rendering engine; and bundled source content;
+- `@atlante/resources`: resource packs, locators, template and instance facets,
+  preset roots, lazy loading, overlays, composition, variable interpolation,
+  Markdown rendering, and bundled source content;
 - `@atlante/validator`: document structural validation (references, required
   fields, types) and template-level validation (input schema compliance and
   composition acyclicity);
-- `@atlante/builder`: preparation orchestration and host-independent artifact
-  publication. It delegates resource loading, composition, interpolation, and
-  rendering to `@atlante/resources`;
+- `@atlante/builder`: preparation and host-independent artifact publication;
 - `@atlante/opencode-plugin`: OpenCode prompt materialization and skill lookup;
 - `@atlante/cli`: validation, artifact building, and the `atlante init` entry
   point.
 
 `@atlante/resources` is a private workspace package and MUST NOT be published
-as an npm package in version 0.1. It MUST remain independent of
-`@atlante/schema`, `@atlante/validator`, `@atlante/builder`, and the former
-content packages. Later consumers may depend on resources, but resources MUST
-NOT depend upward into validation, building, or host integration. Package and
-plugin resolution are not part of this boundary.
-
-Resource loading and preset validation are separate responsibilities:
-`@atlante/resources` loads selected source content, runs its resource engine,
-and reports typed failures; the consuming validator validates the resulting
-canonical document and template input. No resource loader may eagerly validate
-or parse unrelated siblings.
+as an npm package in version 0.1. Package and plugin resource resolution are not
+part of this version's public boundary.
 
 An adapter MUST consume verified artifact descriptors and MUST NOT contain a
 separate execution branch for each renderer.
@@ -933,31 +880,17 @@ taking precedence:
 #### Validation and resolution
 
 Every entry point that accepts a raw configuration overlay, including the CLI
-and builder, MUST apply the same ordered pipeline before publication. Host
+and builder, MUST apply the ordered pipeline in §8 before publication. Host
 adapters consume published artifacts and do not accept or expand source
-configuration:
-
-1. Run raw document structural validation on the local overlay.
-2. Resolve and recursively expand referenced presets and facets through
-   `@atlante/resources`, detecting mixed resource cycles and depth exhaustion.
-3. Merge inherited and local layers according to the resource merge contract and
-   produce a canonical document without `extends`, source selectors, or
-   tombstones.
-4. Run resolved canonical, semantic, and template validation against that
-   canonical document.
-5. Ask the resource engine to interpolate and render, then publish the complete
-   artifact tree.
-
-Diagnostics MUST identify the local JSON Pointer and typed resource chain for at
-least:
+configuration. Diagnostics MUST identify the local JSON Pointer and complete,
+deterministic resource chain for at least:
 
 - missing or invalid resource locators;
 - mixed resource cycles; and
 - depth limits exceeded.
 
-The validator MUST consume resources through the resource seam and MUST NOT
-duplicate bundled-content loading or weaken the pack containment rules. Package
-and plugin resource locators are not supported by this version.
+The validator MUST NOT weaken the pack containment rules. Package and plugin
+resource locators are not supported by this version.
 
 Version 0.1 MUST include the `atlante/starter` preset as the default
 initialization target. The starter preset MUST provide the bundled `architect`
@@ -979,29 +912,22 @@ Atlante uses separate version domains for separate contracts:
   2020-12 and MUST declare that dialect with its own `$schema` property. This
   identifies the schema language, not a template release.
 - **Resource content**: local facets are selected by containing-file-relative
-  locators and bundled facets by the temporary `atlante/*` namespace. A
-  canonical source origin and the selected facet identity MUST be retained for
-  deterministic diagnostics and provenance. Package versions MUST NOT become
-  serialized resource locators.
+  locators and bundled facets by the temporary `atlante/*` namespace. Package
+  versions MUST NOT become serialized resource locators.
 - **Artifact format**: the `format` and numeric `version` in
   `.atlante/artifacts/manifest.json` identify the host-neutral build-output
   contract. Artifact format versions are independent of document schema
   versions and package releases; an adapter MUST reject unsupported artifact
   formats or versions rather than guessing.
 
-For an immutable or versioned resource distribution contract, template
-implementation changes MUST NOT silently change the behavior selected by an
-existing reproducible configuration; that contract MUST require its defined
-version or digest mechanism when a template schema or rendered output changes.
-Version 0.1 defines no version or digest requirement for local mutable
-resources. A local resource is reproducible when the selected source bytes,
-inputs, and implementation are unchanged, and a local edit takes effect on the
-next build without undeclared serialized metadata. Such a change MUST NOT
-require a new document schema URI unless the document contract itself changes.
+An immutable or versioned resource distribution MUST define its own version or
+digest mechanism for changes to template schemas or rendered output. Version
+0.1 defines no such requirement for local mutable resources: a local edit takes
+effect on the next build and does not require a new document schema URI unless
+the document contract itself changes.
 
 Local resources MUST NOT acquire global IDs. Bundled resources MUST use the
-temporary `atlante/<resource>` locator convention. The containing directory and
-facet identity, rather than a registry-assigned name, determine source identity.
+temporary `atlante/<resource>` locator convention.
 
 An implementation MUST reject a document whose `$schema` URI it does not
 support. Version 0.1 does not define migrations.

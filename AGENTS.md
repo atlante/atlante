@@ -7,7 +7,7 @@ Toolchain for structured, versionable prompts across AI coding harnesses. See [S
 ```
 packages/
   schema/          — document structure contract, JSON Schema, TypeScript types
-  resources/       — local/bundled resource packs, facets, resolution, and rendering
+  resources/       — local and bundled resource packs
   validator/       — two-level validation (document structure + template semantics)
   builder/         — project preparation, artifact building, and publication
   opencode-plugin/ — OpenCode materialization
@@ -15,16 +15,7 @@ packages/
 ```
 
 The six workspaces are `schema`, `resources`, `validator`, `builder`,
-`opencode-plugin`, and `cli`. Only the CLI and OpenCode plugin are publishable;
-`resources` is private and is never resolved through npm, plugins, or
-`node_modules`.
-
-Resources use `template.jsonc` plus `template.md` for template facets and
-`instance.jsonc` for instance facets. Local locators are relative to the file
-containing them; bundled resources use the temporary `atlante/*` namespace.
-Resolution is lazy and fail-closed, with canonical project/bundled roots and
-selected dependency paths for watch mode. The OpenCode plugin consumes only
-verified `.atlante/artifacts` and never loads source configuration.
+`opencode-plugin`, and `cli`. Only the CLI and OpenCode plugin are publishable.
 
 Schema changes require building and validating (`atlante validate`, `atlante build`). `atlante init` builds artifacts automatically; run `atlante build` after later source configuration changes. Tests mirror source paths in each package. No generated output is edited directly.
 
