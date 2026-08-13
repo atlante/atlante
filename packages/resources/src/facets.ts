@@ -1,5 +1,8 @@
 import { relative } from "node:path";
-import type { ResourcePack } from "./content-root.js";
+import {
+  type ResourcePack,
+  resourcePackMetadataPaths,
+} from "./content-root.js";
 import {
   failResource,
   normalizeResourcePaths,
@@ -9,6 +12,7 @@ import {
   inspectResourceFile,
   type ResolvedResourceTarget,
   type ResourceFile,
+  type ResourceFileName,
   readResourceFile,
   resolveResourceLocator,
   resourceCandidateWatchPaths,
@@ -20,21 +24,26 @@ import {
   parseJsoncWithLocations,
   parseJsonWithLocations,
 } from "./jsonc.js";
+import type { PackageResolutionCache } from "./package-resolution.js";
 import { JSON_SCHEMA_DRAFT_2020_12_URI } from "./schema.js";
 import type {
   BundledResourceOrigin,
   InstanceFacet,
   JsonObject,
+  PackageResourceOrigin,
   Preset,
   ProjectResourceOrigin,
   RawResourceLocator,
+  ResourceFacetKind,
   ResourceOrigin,
   TemplateFacet,
 } from "./types.js";
 
 export type ResourceLoadOptions = {
   /** Test/watch integration hook invoked after file preflight and before open. */
-  readonly beforeRead?: () => void;
+  readonly beforeRead?: (path: string) => void;
+  /** Request-local package metadata cache supplied by the graph resolver. */
+  readonly packageCache?: PackageResolutionCache;
 };
 
 export type LoadedResource<T> = Readonly<{
@@ -45,6 +54,71 @@ export type LoadedResource<T> = Readonly<{
 }>;
 
 type LoadedFacet = TemplateFacet | InstanceFacet | Preset;
+
+export type ResourceFacetLoadKind = ResourceFacetKind | "preset";
+
+export type FacetCandidate = Readonly<{
+  readonly name: ResourceFileName;
+  readonly file?: ResourceFile;
+}>;
+
+export function facetCandidateNames(
+  kind: ResourceFacetLoadKind,
+): readonly ResourceFileName[] {
+  return kind === "template"
+    ? ["template.jsonc", "template.md"]
+    : kind === "instance"
+      ? ["instance.jsonc"]
+      : ["atlante.jsonc", "atlante.json"];
+}
+
+function inspectResourceFileWithContext(
+  target: ResolvedResourceTarget,
+  name: ResourceFileName,
+  locator: RawResourceLocator = target.locator,
+  dependencies: readonly string[] = [],
+): ResourceFile | undefined {
+  const candidateDependencies = normalizeResourcePaths([
+    ...target.resolutionDependencies,
+    ...resourceCandidateWatchPaths(target, name),
+  ]);
+  try {
+    return inspectResourceFile(target, name, locator);
+  } catch (error) {
+    if (error instanceof ResourceResolutionError) {
+      throw new ResourceResolutionError(error.failure, {
+        dependencies: [
+          ...dependencies,
+          ...candidateDependencies,
+          ...error.dependencies,
+        ],
+        unresolvedParents: [target.directory, ...error.unresolvedParents],
+      });
+    }
+    throw error;
+  }
+}
+
+export function inspectFacetCandidates(
+  target: ResolvedResourceTarget,
+  kind: ResourceFacetLoadKind,
+  locator: RawResourceLocator = target.locator,
+  dependencies: readonly string[] = [],
+): readonly FacetCandidate[] {
+  const names = facetCandidateNames(kind);
+  const candidateDependencies = normalizeResourcePaths(
+    names.flatMap((name) => resourceCandidateWatchPaths(target, name)),
+  );
+  return Object.freeze(
+    names.map((name) => {
+      const file = inspectResourceFileWithContext(target, name, locator, [
+        ...dependencies,
+        ...candidateDependencies,
+      ]);
+      return Object.freeze({ name, ...(file ? { file } : {}) });
+    }),
+  );
+}
 
 function isJsonObject(value: unknown): value is JsonObject {
   return isSafeJsonObject(value);
@@ -68,6 +142,13 @@ function projectOriginPath(
   target: ResolvedResourceTarget,
   file: ResourceFile,
 ): string {
+  if (target.pack.kind === "package" && target.pack.package) {
+    const packagePath = relative(target.pack.root, file.path).replaceAll(
+      "\\",
+      "/",
+    );
+    return `${target.pack.package.name}@${target.pack.package.version}/${packagePath}`;
+  }
   if (target.pack.kind === "bundled") {
     const locator = String(target.locator);
     if (locator === "atlante/starter") return `atlante/starter/${file.name}`;
@@ -92,6 +173,12 @@ function originFor(
     return {
       kind: "bundled",
       path: path as unknown as BundledResourceOrigin["path"],
+    };
+  }
+  if (target.pack.kind === "package") {
+    return {
+      kind: "package",
+      path: path as unknown as PackageResourceOrigin["path"],
     };
   }
   return {
@@ -124,7 +211,14 @@ function sourceFailure(
       ...(file ? { source: originFor(target, file) } : {}),
       ...details,
     },
-    { dependencies, unresolvedParents },
+    {
+      dependencies: normalizeResourcePaths([
+        ...target.resolutionDependencies,
+        ...resourcePackMetadataPaths(target.pack),
+        ...dependencies,
+      ]),
+      unresolvedParents,
+    },
   );
 }
 
@@ -138,23 +232,16 @@ function selectedFile(
   locator: RawResourceLocator,
   dependencies: readonly string[] = [],
 ): ResourceFile {
-  const candidateDependencies = resourceCandidateWatchPaths(target, name);
-  let file: ResourceFile | undefined;
-  try {
-    file = inspectResourceFile(target, name, locator);
-  } catch (error) {
-    if (error instanceof ResourceResolutionError) {
-      throw new ResourceResolutionError(error.failure, {
-        dependencies: [
-          ...dependencies,
-          ...candidateDependencies,
-          ...error.dependencies,
-        ],
-        unresolvedParents: [target.directory, ...error.unresolvedParents],
-      });
-    }
-    throw error;
-  }
+  const candidateDependencies = normalizeResourcePaths([
+    ...target.resolutionDependencies,
+    ...resourceCandidateWatchPaths(target, name),
+  ]);
+  const file = inspectResourceFileWithContext(
+    target,
+    name,
+    locator,
+    dependencies,
+  );
   if (!file) {
     return sourceFailure(
       "missing-target",
@@ -256,11 +343,18 @@ function loadFresh<T extends LoadedFacet>(
     readonly dependencies: readonly string[];
     readonly locations?: Readonly<Record<string, JsoncLocation>>;
   },
+  target?: ResolvedResourceTarget,
 ): LoadedResource<T> {
   const loaded = load();
   return {
     facet: deepFreeze(loaded.facet),
-    dependencies: Object.freeze(normalizeResourcePaths(loaded.dependencies)),
+    dependencies: Object.freeze(
+      normalizeResourcePaths([
+        ...(target?.resolutionDependencies ?? []),
+        ...(target ? resourcePackMetadataPaths(target.pack) : []),
+        ...loaded.dependencies,
+      ]),
+    ),
     unresolvedParents: Object.freeze([]),
     ...(loaded.locations
       ? { locations: Object.freeze({ ...loaded.locations }) }
@@ -288,7 +382,7 @@ export function loadTemplateFacet(
   authoringFile: string,
   options: ResourceLoadOptions = {},
 ): LoadedResource<TemplateFacet> {
-  const target = resolveResourceLocator(pack, locator, authoringFile);
+  const target = resolveResourceLocator(pack, locator, authoringFile, options);
   ensureResourceTarget(target, locator);
   return loadFresh(() => {
     const knownFacetCandidates = normalizeResourcePaths([
@@ -377,7 +471,7 @@ export function loadTemplateFacet(
       dependencies,
       locations: parsed.locations,
     };
-  });
+  }, target);
 }
 
 export function loadInstanceFacet(
@@ -386,7 +480,7 @@ export function loadInstanceFacet(
   authoringFile: string,
   options: ResourceLoadOptions = {},
 ): LoadedResource<InstanceFacet> {
-  const target = resolveResourceLocator(pack, locator, authoringFile);
+  const target = resolveResourceLocator(pack, locator, authoringFile, options);
   ensureResourceTarget(target, locator);
   return loadFresh(() => {
     const file = selectedFile(target, "instance.jsonc", locator);
@@ -408,7 +502,7 @@ export function loadInstanceFacet(
       dependencies: dependencyPaths([file]),
       locations: parsed.locations,
     };
-  });
+  }, target);
 }
 
 type PresetSelection = Readonly<{
@@ -426,25 +520,16 @@ function inspectPresetCandidates(
   target: ResolvedResourceTarget,
   locator: RawResourceLocator,
 ): PresetCandidates {
-  const knownCandidates = normalizeResourcePaths([
-    ...resourceCandidateWatchPaths(target, "atlante.jsonc"),
-    ...resourceCandidateWatchPaths(target, "atlante.json"),
-  ]);
-  try {
-    return {
-      jsonc: inspectResourceFile(target, "atlante.jsonc", locator),
-      json: inspectResourceFile(target, "atlante.json", locator),
-      knownCandidates,
-    };
-  } catch (error) {
-    if (error instanceof ResourceResolutionError) {
-      throw new ResourceResolutionError(error.failure, {
-        dependencies: [...knownCandidates, ...error.dependencies],
-        unresolvedParents: [target.directory, ...error.unresolvedParents],
-      });
-    }
-    throw error;
-  }
+  const candidates = inspectFacetCandidates(target, "preset", locator);
+  return {
+    jsonc: candidates[0]?.file,
+    json: candidates[1]?.file,
+    knownCandidates: normalizeResourcePaths(
+      candidates.flatMap(({ name }) =>
+        resourceCandidateWatchPaths(target, name),
+      ),
+    ),
+  };
 }
 
 function presetFile(
@@ -507,7 +592,7 @@ export function loadPresetFacet(
   authoringFile: string,
   options: ResourceLoadOptions = {},
 ): LoadedResource<Preset> {
-  const target = resolveResourceLocator(pack, locator, authoringFile);
+  const target = resolveResourceLocator(pack, locator, authoringFile, options);
   return loadFresh(() => {
     const selection = presetFile(target, locator);
     const inputText = readSelected(
@@ -538,5 +623,5 @@ export function loadPresetFacet(
       dependencies: selection.dependencies,
       locations: parsed.locations,
     };
-  });
+  }, target);
 }

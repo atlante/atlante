@@ -10,9 +10,11 @@ import {
 } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import {
+  isResourcePackLexicalPathSafe,
   isResourcePackLexicalRootStable,
   type ResourcePack,
   resourcePackLexicalRootSymlinkPaths,
+  resourcePackMetadataPaths,
 } from "./content-root.js";
 import {
   failResource,
@@ -20,9 +22,19 @@ import {
   ResourceResolutionError,
 } from "./errors.js";
 import { parseResourceLocator } from "./locator.js";
+import {
+  type PackageResolutionCache,
+  packageSubpathCandidate,
+  resolvePackageResourcePack,
+} from "./package-resolution.js";
 import type { RawResourceLocator, ValidatedResourceLocator } from "./types.js";
 
 export type ResourceTargetKind = "resource" | "preset";
+
+export type ResourceLocatorOptions = Readonly<{
+  readonly packageCache?: PackageResolutionCache;
+  readonly beforeRead?: (path: string) => void;
+}>;
 
 export type ResolvedResourceTarget = Readonly<{
   readonly pack: ResourcePack;
@@ -32,6 +44,8 @@ export type ResolvedResourceTarget = Readonly<{
   /** Authored lexical target directory used only for watch reconciliation. */
   readonly lexicalDirectory: string;
   readonly kind: ResourceTargetKind;
+  /** Package/project manifest inputs used to resolve this target. */
+  readonly resolutionDependencies: readonly string[];
   /** Stable canonical root-relative target identity. */
   readonly cacheKey: string;
 }>;
@@ -183,6 +197,23 @@ type SymlinkPrefixInspection = Readonly<{
   readonly escaped: boolean;
 }>;
 
+function canonicalSymlinkTarget(
+  pack: ResourcePack,
+  target: string,
+): string | undefined {
+  try {
+    if (lstatSync(target).isSymbolicLink() && !isRootPath(pack, target))
+      return undefined;
+  } catch {
+    // The canonical target check handles missing in-root links.
+  }
+  try {
+    return realpathSync(target);
+  } catch {
+    return target;
+  }
+}
+
 function inspectSymlinkTarget(
   pack: ResourcePack,
   prefix: string,
@@ -205,14 +236,15 @@ function inspectSymlinkTarget(
   const target = isAbsolute(link)
     ? resolve(link)
     : resolve(canonicalParent, link);
-  if (!isRootPath(pack, target)) {
+  const canonicalTarget = canonicalSymlinkTarget(pack, target);
+  if (!canonicalTarget || !isRootPath(pack, canonicalTarget)) {
     return { missing: false, escaped: true };
   }
   const lexicalTarget = resolve(parent, link);
   return {
     missing: false,
     escaped: false,
-    target,
+    target: isRootPath(pack, target) ? target : canonicalTarget,
     ...(isRootPath(pack, lexicalTarget) ? { watchTarget: lexicalTarget } : {}),
   };
 }
@@ -404,13 +436,15 @@ function symlinkTraversal(
   const paths = new Set(resourcePackLexicalRootSymlinkPaths(pack));
   if (paths.size > 0) paths.add(pack.root);
   const unresolved = new Set<string>();
-  const safe = inspectCanonicalPath(
-    pack,
-    resolve(candidate),
-    new Set(),
-    new Set(),
-    unresolved,
-  );
+  const safe =
+    isResourcePackLexicalPathSafe(pack, resolve(candidate)) &&
+    inspectCanonicalPath(
+      pack,
+      resolve(candidate),
+      new Set(),
+      new Set(),
+      unresolved,
+    );
   collectLexicalWatchPath(
     pack,
     resolve(candidate),
@@ -454,13 +488,30 @@ type ResourceFailureContext = {
   readonly unresolvedParents: readonly string[];
 };
 
+function targetResolutionDependencies(
+  pack: ResourcePack,
+  resolutionDependencies: readonly string[] = [],
+  dependencies: readonly string[] = [],
+): string[] {
+  return normalizeResourcePaths([
+    ...resolutionDependencies,
+    ...resourcePackMetadataPaths(pack),
+    ...dependencies,
+  ]);
+}
+
 function candidateContext(
   pack: ResourcePack,
   candidate: string,
+  resolutionDependencies: readonly string[] = [],
 ): ResourceFailureContext {
   const traversal = symlinkTraversal(pack, candidate);
   return {
-    dependencies: candidateWatchPaths(pack, candidate),
+    dependencies: targetResolutionDependencies(
+      pack,
+      resolutionDependencies,
+      candidateWatchPaths(pack, candidate),
+    ),
     unresolvedParents: normalizeResourcePaths([
       ...safeParentFor(pack, candidate),
       ...traversal.unresolvedParents,
@@ -473,10 +524,11 @@ function targetContext(
   candidate = target.lexicalDirectory,
 ): ResourceFailureContext {
   return {
-    dependencies: normalizeResourcePaths([
-      target.directory,
-      ...candidateWatchPaths(target.pack, candidate),
-    ]),
+    dependencies: targetResolutionDependencies(
+      target.pack,
+      target.resolutionDependencies,
+      [target.directory, ...candidateWatchPaths(target.pack, candidate)],
+    ),
     unresolvedParents: [target.directory],
   };
 }
@@ -560,9 +612,10 @@ function targetFailure(
   pack: ResourcePack,
   locator: RawResourceLocator,
   candidate: string,
+  resolutionDependencies: readonly string[] = [],
 ): never {
   const parents = unresolvedParents(pack, candidate);
-  const context = candidateContext(pack, candidate);
+  const context = candidateContext(pack, candidate, resolutionDependencies);
   const traversal = symlinkTraversal(pack, candidate);
   if (parents.kind === "escaped" || traversal.escaped) {
     return failResource(
@@ -630,13 +683,14 @@ function canonicalDirectory(
   pack: ResourcePack,
   locator: RawResourceLocator,
   candidate: string,
+  resolutionDependencies: readonly string[] = [],
 ): string {
   if (symlinkTraversal(pack, candidate).escaped) {
     return failResource(
       "unsafe-path",
       "resource target escapes the resource root",
       { locator },
-      candidateContext(pack, candidate),
+      candidateContext(pack, candidate, resolutionDependencies),
     );
   }
 
@@ -644,7 +698,7 @@ function canonicalDirectory(
   try {
     target = realpathSync(candidate);
   } catch {
-    return targetFailure(pack, locator, candidate);
+    return targetFailure(pack, locator, candidate, resolutionDependencies);
   }
   if (!isWithin(pack.root, target)) {
     return failResource(
@@ -653,7 +707,7 @@ function canonicalDirectory(
       {
         locator,
       },
-      candidateContext(pack, candidate),
+      candidateContext(pack, candidate, resolutionDependencies),
     );
   }
 
@@ -661,7 +715,7 @@ function canonicalDirectory(
   try {
     targetIsDirectory = lstatSync(target).isDirectory();
   } catch {
-    return targetFailure(pack, locator, candidate);
+    return targetFailure(pack, locator, candidate, resolutionDependencies);
   }
   if (!targetIsDirectory) {
     return failResource(
@@ -670,10 +724,94 @@ function canonicalDirectory(
       {
         locator,
       },
-      candidateContext(pack, candidate),
+      candidateContext(pack, candidate, resolutionDependencies),
     );
   }
   return target;
+}
+
+type PreparedResourceTarget = Readonly<{
+  readonly pack: ResourcePack;
+  readonly candidate: string;
+  readonly lexicalDirectory: string;
+  readonly kind: ResourceTargetKind;
+  readonly resolutionDependencies: readonly string[];
+}>;
+
+function prepareResourceTarget(
+  pack: ResourcePack,
+  parsed: ReturnType<typeof parseResourceLocator>,
+  rawLocator: RawResourceLocator,
+  authoringFile: string,
+  options: ResourceLocatorOptions,
+): PreparedResourceTarget {
+  if (parsed.kind === "builtin") {
+    if (pack.kind !== "bundled")
+      return failResource(
+        "invalid-locator",
+        "built-in locator requires the bundled resource root",
+        { locator: rawLocator },
+      );
+    const kind: ResourceTargetKind =
+      parsed.name === "starter" ? "preset" : "resource";
+    const candidate =
+      parsed.name === "starter" ? pack.root : join(pack.root, parsed.name);
+    return {
+      pack,
+      candidate,
+      lexicalDirectory: candidate,
+      kind,
+      resolutionDependencies: [],
+    };
+  }
+
+  if (parsed.kind === "package") {
+    canonicalAuthoringDirectory(pack, authoringFile, rawLocator);
+    const resolvedPackage = resolvePackageResourcePack(
+      pack,
+      parsed,
+      authoringFile,
+      {
+        cache: options.packageCache,
+        beforeRead: options.beforeRead,
+      },
+    );
+    const selectedPack = resolvedPackage.pack;
+    const packageTarget = packageSubpathCandidate(selectedPack, parsed.subpath);
+    return {
+      pack: selectedPack,
+      candidate: packageTarget.candidate,
+      lexicalDirectory: packageTarget.candidate,
+      kind: packageTarget.kind,
+      resolutionDependencies: resolvedPackage.dependencies,
+    };
+  }
+
+  const containingDirectory = canonicalAuthoringDirectory(
+    pack,
+    authoringFile,
+    rawLocator,
+  );
+  const candidate = resolve(containingDirectory.lexical, parsed.value);
+  if (!isRootPath(pack, candidate))
+    return failResource(
+      "unsafe-path",
+      "resource target escapes the resource root",
+      { locator: rawLocator },
+    );
+  if (!isWithin(pack.root, containingDirectory.canonical))
+    return failResource(
+      "unsafe-path",
+      "authoring file is outside the resource root",
+      { locator: rawLocator },
+    );
+  return {
+    pack,
+    candidate,
+    lexicalDirectory: candidate,
+    kind: "resource",
+    resolutionDependencies: [],
+  };
 }
 
 /** Resolves a validated target without enumerating any sibling directories. */
@@ -681,59 +819,59 @@ export function resolveResourceLocator(
   pack: ResourcePack,
   rawLocator: RawResourceLocator,
   authoringFile: string,
+  options: ResourceLocatorOptions = {},
 ): ResolvedResourceTarget {
   const parsed = parseResourceLocator(rawLocator);
-  let candidate: string;
-  let lexicalDirectory: string;
-  let kind: ResourceTargetKind = "resource";
-
-  if (parsed.kind === "builtin") {
-    if (pack.kind !== "bundled") {
-      return failResource(
-        "invalid-locator",
-        "built-in locator requires the bundled resource root",
-        { locator: rawLocator },
-      );
-    }
-    if (parsed.name === "starter") {
-      candidate = pack.root;
-      kind = "preset";
-    } else {
-      candidate = join(pack.root, parsed.name);
-    }
-    lexicalDirectory = candidate;
-  } else {
-    const containingDirectory = canonicalAuthoringDirectory(
-      pack,
-      authoringFile,
-      rawLocator,
-    );
-    candidate = resolve(containingDirectory.lexical, parsed.value);
-    if (!isRootPath(pack, candidate)) {
-      return failResource(
-        "unsafe-path",
-        "resource target escapes the resource root",
-        { locator: rawLocator },
-      );
-    }
-    if (!isWithin(pack.root, containingDirectory.canonical)) {
-      return failResource(
-        "unsafe-path",
-        "authoring file is outside the resource root",
-        { locator: rawLocator },
-      );
-    }
-    lexicalDirectory = candidate;
-  }
-
-  const directory = canonicalDirectory(pack, rawLocator, candidate);
-  const cacheKey = `${pack.root}\u0000${kind}\u0000${stableRelative(pack.root, directory)}`;
-  return Object.freeze({
+  const prepared = prepareResourceTarget(
     pack,
+    parsed,
+    rawLocator,
+    authoringFile,
+    options,
+  );
+
+  let directory: string;
+  try {
+    directory = canonicalDirectory(
+      prepared.pack,
+      rawLocator,
+      prepared.candidate,
+      prepared.resolutionDependencies,
+    );
+  } catch (error) {
+    if (
+      parsed.kind === "package" &&
+      error instanceof ResourceResolutionError &&
+      error.failure.code === "missing-target"
+    ) {
+      throw new ResourceResolutionError(
+        {
+          ...error.failure,
+          code: "missing-package-subpath",
+          message: "package subpath is unavailable",
+        },
+        {
+          dependencies: targetResolutionDependencies(
+            prepared.pack,
+            prepared.resolutionDependencies,
+            error.dependencies,
+          ),
+          unresolvedParents: error.unresolvedParents,
+        },
+      );
+    }
+    throw error;
+  }
+  const cacheKey = `${prepared.pack.root}\u0000${prepared.kind}\u0000${stableRelative(prepared.pack.root, directory)}`;
+  return Object.freeze({
+    pack: prepared.pack,
     locator: parsed.value,
     directory,
-    lexicalDirectory,
-    kind,
+    lexicalDirectory: prepared.lexicalDirectory,
+    kind: prepared.kind,
+    resolutionDependencies: Object.freeze(
+      normalizeResourcePaths(prepared.resolutionDependencies),
+    ),
     cacheKey,
   });
 }
@@ -743,7 +881,11 @@ function fileContext(
   file: ResourceFile,
 ): ResourceFailureContext {
   return {
-    dependencies: normalizeResourcePaths([file.path, ...file.watchPaths]),
+    dependencies: targetResolutionDependencies(
+      target.pack,
+      target.resolutionDependencies,
+      [file.path, ...file.watchPaths],
+    ),
     unresolvedParents: [target.directory],
   };
 }
@@ -773,16 +915,21 @@ function missingFile(
   name: ResourceFileName,
 ): never {
   const candidate = join(target.lexicalDirectory, name);
-  const context = candidateContext(target.pack, candidate);
+  const context = candidateContext(
+    target.pack,
+    candidate,
+    target.resolutionDependencies,
+  );
   return failResource(
     "missing-target",
     "resource facet file is unavailable",
     { locator },
     {
-      dependencies: normalizeResourcePaths([
-        target.directory,
-        ...context.dependencies,
-      ]),
+      dependencies: targetResolutionDependencies(
+        target.pack,
+        target.resolutionDependencies,
+        [target.directory, ...context.dependencies],
+      ),
       unresolvedParents: normalizeResourcePaths([
         target.directory,
         ...context.unresolvedParents,
@@ -804,7 +951,7 @@ export function inspectResourceFile(
       "unsafe-path",
       "resource file changed outside the resource root",
       { locator },
-      candidateContext(target.pack, candidate),
+      candidateContext(target.pack, candidate, target.resolutionDependencies),
     );
   }
   let candidateStat: ReturnType<typeof lstatSync>;
@@ -825,7 +972,7 @@ export function inspectResourceFile(
       "unsafe-path",
       "resource file changed outside the resource root",
       { locator },
-      candidateContext(target.pack, candidate),
+      candidateContext(target.pack, candidate, target.resolutionDependencies),
     );
   }
 
@@ -843,10 +990,11 @@ export function inspectResourceFile(
         locator,
       },
       {
-        dependencies: normalizeResourcePaths([
-          target.directory,
-          ...candidateWatchPaths(target.pack, candidate),
-        ]),
+        dependencies: targetResolutionDependencies(
+          target.pack,
+          target.resolutionDependencies,
+          [target.directory, ...candidateWatchPaths(target.pack, candidate)],
+        ),
         unresolvedParents: [target.directory],
       },
     );
@@ -934,11 +1082,11 @@ function openAndReadResourceFile(
   target: ResolvedResourceTarget,
   file: ResourceFile,
   locator: RawResourceLocator,
-  beforeRead?: () => void,
+  beforeRead?: (path: string) => void,
 ): Uint8Array {
   let fd: number | undefined;
   try {
-    beforeRead?.();
+    beforeRead?.(file.path);
     fd = openSync(file.path, readFlags());
     if (!fstatSync(fd).isFile()) {
       return failResource(
@@ -1012,7 +1160,7 @@ export function readResourceFile(
   target: ResolvedResourceTarget,
   file: ResourceFile,
   locator: RawResourceLocator = target.locator,
-  beforeRead?: () => void,
+  beforeRead?: (path: string) => void,
 ): string {
   assertStableTarget(target, locator);
   assertStableFile(target, file, locator);

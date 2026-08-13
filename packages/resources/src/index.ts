@@ -17,6 +17,8 @@ export type {
 export {
   createProjectResourcePack,
   createResourcePack,
+  isResourcePackPathContained,
+  resourcePackMetadataPaths,
 } from "./content-root.js";
 export type { ResourceFailureContext } from "./errors.js";
 export { ResourceResolutionError } from "./errors.js";
@@ -33,6 +35,7 @@ export type {
   ResolvedResourceTarget,
   ResourceFile,
   ResourceFileName,
+  ResourceLocatorOptions,
   ResourceTargetKind,
 } from "./filesystem.js";
 export {
@@ -71,6 +74,15 @@ export {
   mergeResourceValues,
   provenanceOfResourceValue,
 } from "./merge.js";
+export type {
+  PackageResolutionCache,
+  PackageResolutionOptions,
+  ResolvedPackage,
+} from "./package-resolution.js";
+export {
+  createPackageResolutionCache,
+  resolvePackageResourcePack,
+} from "./package-resolution.js";
 export type { ResourceProvenance } from "./provenance.js";
 export {
   childPointer,
@@ -140,10 +152,13 @@ export type {
   JsonObject,
   JsonValue,
   LocalResourceLocator,
+  PackageResourceLocator,
+  PackageResourceOrigin,
   Preset,
   PresetResourceGraphNode,
   ProjectResourceOrigin,
   RawBundledResourceOrigin,
+  RawPackageResourceOrigin,
   RawProjectResourceOrigin,
   RawResourceLocator,
   RawResourceOrigin,
@@ -159,10 +174,12 @@ export type {
   ResourceLocation,
   ResourceLocator,
   ResourceOrigin,
+  ResourcePackageIdentity,
   TemplateFacet,
   TemplateResourceGraphNode,
   ValidatedBuiltinResourceLocator,
   ValidatedLocalResourceLocator,
+  ValidatedPackageResourceLocator,
   ValidatedResourceLocator,
 } from "./types.js";
 export type { ValueReference, ValueReferenceVisitor } from "./values.js";

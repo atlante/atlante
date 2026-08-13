@@ -184,6 +184,74 @@ describe("resource filesystem", () => {
     expect(loaded.dependencies).not.toContain(outside);
   });
 
+  test("rejects external symlink ancestors that re-enter the root", () => {
+    const root = rootOf();
+    const source = sourceFile(root);
+    const target = resource(root, "target");
+    writeFileSync(join(target, "template.jsonc"), schema);
+    writeFileSync(join(target, "template.md"), "target\n");
+
+    const fileTarget = resource(root, "file-target");
+    writeFileSync(join(fileTarget, "template.jsonc"), schema);
+    const external = rootOf();
+    const reentry = join(external, "reentry");
+    symlinkSync(root, reentry, "dir");
+    const externalAncestor = join(root, "external-ancestor");
+    symlinkSync(external, externalAncestor, "dir");
+    const reenteredFacet = join(root, "reentered.md");
+    writeFileSync(reenteredFacet, "reentered\n");
+
+    symlinkSync(
+      join(externalAncestor, "reentry", "target"),
+      join(root, "external-target"),
+      "dir",
+    );
+    symlinkSync(
+      join(externalAncestor, "reentry", "reentered.md"),
+      join(fileTarget, "template.md"),
+      "file",
+    );
+
+    const pack = createProjectResourcePack(root);
+    for (const load of [
+      () => loadTemplateFacet(pack, "./external-target", source),
+      () => loadTemplateFacet(pack, "./file-target", source),
+    ]) {
+      const failure = expectFailure(load, "unsafe-path");
+      expect(failure.dependencies).not.toContain(external);
+      expect(failure.dependencies).not.toContain(reentry);
+      expect(failure.unresolvedParents).not.toContain(external);
+      expect(failure.unresolvedParents).not.toContain(reentry);
+    }
+  });
+
+  test("rejects a symlink target with an external intermediate re-entry hop", () => {
+    const root = rootOf();
+    const source = sourceFile(root);
+    const target = resource(root, "resource");
+    writeFileSync(join(target, "template.jsonc"), schema);
+    writeFileSync(join(target, "template.md"), "target\n");
+
+    const external = rootOf();
+    const reentry = join(external, "reentry");
+    symlinkSync(root, reentry, "dir");
+    symlinkSync(
+      join(external, "reentry", "resource"),
+      join(root, "external-intermediate"),
+      "dir",
+    );
+
+    const pack = createProjectResourcePack(root);
+    const failure = expectFailure(
+      () => loadTemplateFacet(pack, "./external-intermediate", source),
+      "unsafe-path",
+    );
+    expect(failure.dependencies).not.toContain(external);
+    expect(failure.dependencies).not.toContain(reentry);
+    expect(failure.unresolvedParents).not.toContain(external);
+    expect(failure.unresolvedParents).not.toContain(reentry);
+  });
+
   test("returns dependency files and unresolved target parent directories", () => {
     const root = rootOf();
     const source = sourceFile(root);

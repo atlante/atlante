@@ -2,13 +2,21 @@ import { basename, join, relative } from "node:path";
 import { authoredValueLayerIssues } from "./authored-values.js";
 import { BUNDLED_RESOURCE_PACK } from "./bundled.js";
 import { type Slot, slotsOf } from "./composition.js";
-import type { ResourcePack } from "./content-root.js";
+import {
+  isResourcePackPathContained,
+  type ResourcePack,
+  resourcePackMetadataPaths,
+} from "./content-root.js";
 import {
   failGraphResource,
   failResource,
+  normalizeResourcePaths,
   ResourceResolutionError,
 } from "./errors.js";
 import {
+  type FacetCandidate,
+  facetCandidateNames,
+  inspectFacetCandidates,
   type LoadedResource,
   loadInstanceFacet,
   loadPresetFacet,
@@ -17,7 +25,9 @@ import {
 import {
   inspectResourceFile,
   type ResolvedResourceTarget,
+  type ResourceLocatorOptions,
   resolveResourceLocator,
+  resourceCandidateWatchPaths,
 } from "./filesystem.js";
 import {
   addResourceGraphEdge,
@@ -35,6 +45,7 @@ import { isSafeJsonObject } from "./jsonc.js";
 import { parseResourceLocator } from "./locator.js";
 import { mergeResourceValues } from "./merge.js";
 import { own } from "./object.js";
+import { createPackageResolutionCache } from "./package-resolution.js";
 import {
   childPointer,
   cloneResourceProvenance,
@@ -68,6 +79,8 @@ import type {
 export type ResourceResolveOptions = Readonly<{
   /** Custom bundled root for tests or an embedded distribution. */
   readonly bundledPack?: ResourcePack;
+  /** Existing facet read seam, also used by package metadata reads. */
+  readonly beforeRead?: (path: string) => void;
 }>;
 
 export type ResolveInstanceRequest = ResourceResolveOptions & {
@@ -164,6 +177,107 @@ type LoadedFacet<T> = Readonly<{
   readonly loaded: LoadedResource<T>;
   readonly authoring: AuthoringContext;
 }>;
+
+type FacetCacheKind = "template" | "instance" | "preset";
+
+type CachedFacetCandidate = Readonly<{
+  readonly name: FacetCandidate["name"];
+  readonly path?: string;
+}>;
+
+type CachedFacet = Readonly<{
+  readonly facet: TemplateFacet | InstanceFacet | Preset;
+  readonly canonicalDependencies: readonly string[];
+  readonly candidates: readonly CachedFacetCandidate[];
+  readonly locations?: Readonly<Record<string, JsoncLocation>>;
+}>;
+
+function cachedFacetDependencies(
+  target: ResolvedResourceTarget,
+  facet: CachedFacet["facet"],
+  canonicalDependencies: readonly string[],
+): readonly string[] {
+  return normalizeResourcePaths([
+    ...canonicalDependencies,
+    ...target.resolutionDependencies,
+    ...resourcePackMetadataPaths(target.pack),
+    target.lexicalDirectory,
+    ...facetCandidateNames(facet.kind).flatMap((name) =>
+      resourceCandidateWatchPaths(target, name),
+    ),
+  ]);
+}
+
+function facetCandidateIdentities(
+  candidates: readonly FacetCandidate[],
+): readonly CachedFacetCandidate[] {
+  return Object.freeze(
+    candidates.map(({ name, file }) =>
+      Object.freeze({ name, ...(file ? { path: file.path } : {}) }),
+    ),
+  );
+}
+
+function sameFacetCandidateIdentities(
+  expected: readonly CachedFacetCandidate[],
+  current: readonly FacetCandidate[],
+): boolean {
+  return (
+    expected.length === current.length &&
+    expected.every((candidate, index) => {
+      const observed = current[index];
+      return (
+        observed?.name === candidate.name &&
+        observed.file?.path === candidate.path
+      );
+    })
+  );
+}
+
+function facetCacheFailure(
+  target: ResolvedResourceTarget,
+  facet: FacetCacheKind,
+  locator: RawResourceLocator,
+  dependencies: readonly string[] = [],
+): never {
+  return failResource(
+    "unsafe-path",
+    "resource file changed outside the resource root",
+    { locator },
+    {
+      dependencies: normalizeResourcePaths([
+        ...target.resolutionDependencies,
+        ...resourcePackMetadataPaths(target.pack),
+        target.directory,
+        target.lexicalDirectory,
+        ...facetCandidateNames(facet).flatMap((name) =>
+          resourceCandidateWatchPaths(target, name),
+        ),
+        ...dependencies,
+      ]),
+      unresolvedParents: [target.directory],
+    },
+  );
+}
+
+function inspectFacetCandidatesForCache(
+  target: ResolvedResourceTarget,
+  facet: FacetCacheKind,
+  locator: RawResourceLocator,
+  dependencies: readonly string[] = [],
+): readonly FacetCandidate[] {
+  try {
+    return inspectFacetCandidates(target, facet, locator, dependencies);
+  } catch (error) {
+    if (error instanceof ResourceResolutionError) {
+      return facetCacheFailure(target, facet, locator, [
+        ...dependencies,
+        ...error.dependencies,
+      ]);
+    }
+    throw error;
+  }
+}
 
 type AuthoringContext = Readonly<{
   readonly pack: ResourcePack;
@@ -743,6 +857,8 @@ function runResourceRequest<T extends ResourceRequest, Result>(
 
 class ResourceResolver {
   private readonly bundledPack: ResourcePack;
+  private readonly beforeRead: ResourceResolveOptions["beforeRead"];
+  private readonly packageCache = createPackageResolutionCache();
   private readonly graph: ResourceGraphState = createResourceGraphState();
   private readonly dependencies = new Set<string>();
   private readonly unresolvedParents = new Set<string>();
@@ -752,12 +868,14 @@ class ResourceResolver {
     string,
     ResolvedResourceInstance
   >();
+  private readonly facetCache = new Map<string, CachedFacet>();
 
   constructor(
     private readonly projectPack: ResourcePack,
     options: ResourceResolveOptions,
   ) {
     this.bundledPack = options.bundledPack ?? BUNDLED_RESOURCE_PACK;
+    this.beforeRead = options.beforeRead;
   }
 
   run<T>(action: () => T): T {
@@ -839,11 +957,15 @@ class ResourceResolver {
     authoringFile: string,
   ): LoadedFacet<TemplateFacet> {
     const selectedPack = this.packForReference(pack, locator);
-    const target = requireTarget(selectedPack, locator, authoringFile);
-    return this.loadedFile(
-      selectedPack,
-      target,
-      loadTemplateFacet(selectedPack, locator, authoringFile),
+    const target = requireTarget(selectedPack, locator, authoringFile, {
+      packageCache: this.packageCache,
+      beforeRead: this.beforeRead,
+    });
+    return this.cachedFacet(target, "template", () =>
+      loadTemplateFacet(selectedPack, locator, authoringFile, {
+        packageCache: this.packageCache,
+        beforeRead: this.beforeRead,
+      }),
     );
   }
 
@@ -853,11 +975,15 @@ class ResourceResolver {
     authoringFile: string,
   ): LoadedFacet<InstanceFacet> {
     const selectedPack = this.packForReference(pack, locator);
-    const target = requireTarget(selectedPack, locator, authoringFile);
-    return this.loadedFile(
-      selectedPack,
-      target,
-      loadInstanceFacet(selectedPack, locator, authoringFile),
+    const target = requireTarget(selectedPack, locator, authoringFile, {
+      packageCache: this.packageCache,
+      beforeRead: this.beforeRead,
+    });
+    return this.cachedFacet(target, "instance", () =>
+      loadInstanceFacet(selectedPack, locator, authoringFile, {
+        packageCache: this.packageCache,
+        beforeRead: this.beforeRead,
+      }),
     );
   }
 
@@ -867,12 +993,124 @@ class ResourceResolver {
     authoringFile: string,
   ): LoadedFacet<Preset> {
     const selectedPack = this.packForReference(pack, locator);
-    const target = requireTarget(selectedPack, locator, authoringFile);
-    return this.loadedFile(
-      selectedPack,
-      target,
-      loadPresetFacet(selectedPack, locator, authoringFile),
+    const target = requireTarget(selectedPack, locator, authoringFile, {
+      packageCache: this.packageCache,
+      beforeRead: this.beforeRead,
+    });
+    return this.cachedFacet(target, "preset", () =>
+      loadPresetFacet(selectedPack, locator, authoringFile, {
+        packageCache: this.packageCache,
+        beforeRead: this.beforeRead,
+      }),
     );
+  }
+
+  private cachedFacet<T extends TemplateFacet | InstanceFacet | Preset>(
+    target: ResolvedResourceTarget,
+    facet: FacetCacheKind,
+    load: () => LoadedResource<T>,
+  ): LoadedFacet<T> {
+    const cacheKey = `${target.cacheKey}\u0000${facet}`;
+    if (target.pack.kind === "package") {
+      const cached = this.facetCache.get(cacheKey);
+      if (cached) {
+        const candidates = inspectFacetCandidatesForCache(
+          target,
+          facet,
+          target.locator,
+          cached.canonicalDependencies,
+        );
+        if (!sameFacetCandidateIdentities(cached.candidates, candidates)) {
+          return facetCacheFailure(
+            target,
+            facet,
+            target.locator,
+            cached.canonicalDependencies,
+          );
+        }
+        return this.loadedFile(
+          target.pack,
+          target,
+          Object.freeze({
+            facet: Object.freeze({
+              ...cached.facet,
+              locator: target.locator,
+            }) as T,
+            dependencies: Object.freeze(
+              cachedFacetDependencies(
+                target,
+                cached.facet,
+                cached.canonicalDependencies,
+              ),
+            ),
+            unresolvedParents: Object.freeze([]),
+            ...(cached.locations
+              ? { locations: Object.freeze({ ...cached.locations }) }
+              : {}),
+          }),
+        );
+      }
+    }
+    if (target.pack.kind === "package") {
+      const initialCandidates = inspectFacetCandidatesForCache(
+        target,
+        facet,
+        target.locator,
+      );
+      const loaded = load();
+      const finalCandidates = inspectFacetCandidatesForCache(
+        target,
+        facet,
+        target.locator,
+        loaded.dependencies,
+      );
+      if (
+        !sameFacetCandidateIdentities(
+          facetCandidateIdentities(initialCandidates),
+          finalCandidates,
+        )
+      ) {
+        return facetCacheFailure(
+          target,
+          facet,
+          target.locator,
+          loaded.dependencies,
+        );
+      }
+      this.facetCache.set(
+        cacheKey,
+        Object.freeze({
+          facet: loaded.facet,
+          canonicalDependencies: Object.freeze(
+            normalizeResourcePaths(
+              loaded.dependencies.filter((path) =>
+                isResourcePackPathContained(target.pack, path),
+              ),
+            ),
+          ),
+          candidates: facetCandidateIdentities(finalCandidates),
+          ...(loaded.locations ? { locations: loaded.locations } : {}),
+        }),
+      );
+      return this.loadedFile(
+        target.pack,
+        target,
+        Object.freeze({
+          ...loaded,
+          dependencies: Object.freeze(
+            cachedFacetDependencies(
+              target,
+              loaded.facet,
+              loaded.dependencies.filter((path) =>
+                isResourcePackPathContained(target.pack, path),
+              ),
+            ),
+          ),
+        }),
+      );
+    }
+    const loaded = load();
+    return this.loadedFile(target.pack, target, loaded);
   }
 
   private enterLoaded<T extends TemplateFacet | InstanceFacet>(
@@ -2881,10 +3119,11 @@ function requireTarget(
   pack: ResourcePack,
   locator: RawResourceLocator,
   authoringFile: string,
+  options: ResourceLocatorOptions = {},
 ): ResolvedResourceTarget {
   // Kept as a small seam so every facet read still goes through the T3
   // locator checks before the selected facet loader opens a file.
-  return resolveResourceLocator(pack, locator, authoringFile);
+  return resolveResourceLocator(pack, locator, authoringFile, options);
 }
 
 function escapePointer(value: string): string {

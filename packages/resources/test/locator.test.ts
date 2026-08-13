@@ -15,6 +15,7 @@ import {
   loadInstanceFacet,
   loadPresetFacet,
   loadTemplateFacet,
+  parseResourceLocator,
   ResourceResolutionError,
   resolveResourceLocator,
 } from "../src/index.js";
@@ -116,6 +117,17 @@ describe("resource locator resolution", () => {
     ).toBe(join(pack.root, "sibling"));
   });
 
+  test("allows facet-named packages but rejects facet-file locators", () => {
+    expect(parseResourceLocator("template.md")).toMatchObject({
+      kind: "package",
+      packageName: "template.md",
+      subpath: undefined,
+    });
+
+    for (const locator of ["./resource/template.md", "pkg/template.md"])
+      expectFailure(() => parseResourceLocator(locator), "invalid-locator");
+  });
+
   test("rejects absolute, URL, home, backslash, lexical traversal, and symlink escape locators", () => {
     const root = projectRoot();
     const containing = authoringFile(root, "source.jsonc");
@@ -129,7 +141,6 @@ describe("resource locator resolution", () => {
       ".\\resource",
       "./resource\\child",
       "./resource\u0000child",
-      "resource",
       "atlante/",
       "atlante/one/two",
       "./resource/template.jsonc",
@@ -140,6 +151,11 @@ describe("resource locator resolution", () => {
         "invalid-locator",
       );
     }
+
+    expectFailure(
+      () => resolveResourceLocator(pack, "resource", containing),
+      "package-not-declared",
+    );
 
     mkdirSync(join(root, "nested"));
     expectFailure(

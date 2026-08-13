@@ -1,8 +1,9 @@
 import { lstatSync, readlinkSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { failResource } from "./errors.js";
+import { failResource, normalizeResourcePaths } from "./errors.js";
+import type { ResourcePackageIdentity } from "./types.js";
 
-export type ResourcePackKind = "project" | "bundled";
+export type ResourcePackKind = "project" | "bundled" | "package";
 
 /** A captured root is immutable for the lifetime of the resource pack. */
 export type ResourcePack = Readonly<{
@@ -11,6 +12,8 @@ export type ResourcePack = Readonly<{
   readonly root: string;
   /** Absolute path spelling used for lexical watch paths. */
   readonly lexicalRoot: string;
+  /** Package identity is present only for package resource roots. */
+  readonly package?: ResourcePackageIdentity;
 }>;
 
 type CapturedSymlink = Readonly<{
@@ -112,6 +115,214 @@ function sameChain(
   );
 }
 
+function isWithin(root: string, candidate: string): boolean {
+  const pathToRoot = relative(root, candidate);
+  return (
+    pathToRoot === "" ||
+    (pathToRoot !== ".." &&
+      !pathToRoot.startsWith(`..${sep}`) &&
+      !isAbsolute(pathToRoot))
+  );
+}
+
+function missingPath(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const code = (error as { readonly code?: unknown }).code;
+  return code === "ENOENT" || code === "ENOTDIR";
+}
+
+function capturedTarget(link: CapturedSymlink): string | undefined {
+  try {
+    const canonicalParent = realpathSync(dirname(link.path));
+    return isAbsolute(link.target)
+      ? resolve(link.target)
+      : resolve(canonicalParent, link.target);
+  } catch {
+    return undefined;
+  }
+}
+
+function isRootChainPath(
+  lexicalRoot: string,
+  root: string,
+  candidate: string,
+): boolean {
+  const normalized = resolve(candidate);
+  return (
+    isWithin(lexicalRoot, normalized) ||
+    isWithin(root, normalized) ||
+    isWithin(normalized, lexicalRoot) ||
+    isWithin(normalized, root)
+  );
+}
+
+function isTerminalRootLink(root: string, target: string): boolean {
+  try {
+    return !lstatSync(target).isSymbolicLink() && realpathSync(target) === root;
+  } catch {
+    return false;
+  }
+}
+
+function isPackageRootChainSafe(
+  lexicalRoot: string,
+  root: string,
+  chain: readonly CapturedSymlink[],
+): boolean {
+  return chain.every((link) => {
+    const target = capturedTarget(link);
+    if (!target) return false;
+    return (
+      isRootChainPath(lexicalRoot, root, link.path) &&
+      (isRootChainPath(lexicalRoot, root, target) ||
+        (resolve(link.path) === resolve(lexicalRoot) &&
+          isTerminalRootLink(root, target)))
+    );
+  });
+}
+
+function lexicalPathBase(pack: ResourcePack, path: string): string | undefined {
+  const normalized = resolve(path);
+  if (isWithin(pack.lexicalRoot, normalized)) return pack.lexicalRoot;
+  if (isWithin(pack.root, normalized)) return pack.root;
+  if (pack.kind === "package") {
+    const target = packageRootLinkTarget(pack);
+    if (target && isWithin(target, normalized)) return pack.root;
+  }
+  return undefined;
+}
+
+function packageRootLinkTarget(pack: ResourcePack): string | undefined {
+  const rootLink = (lexicalRootChains.get(pack) ?? []).find(
+    (link) => resolve(link.path) === pack.lexicalRoot,
+  );
+  return rootLink ? capturedTarget(rootLink) : undefined;
+}
+
+function canonicalPackagePath(
+  pack: ResourcePack,
+  path: string,
+): string | undefined {
+  if (pack.kind !== "package") return undefined;
+  const normalized = resolve(path);
+  const target = packageRootLinkTarget(pack);
+  if (!target || !isWithin(target, normalized)) return undefined;
+  return join(pack.root, relative(target, normalized));
+}
+
+function lexicalPrefixes(root: string, path: string): readonly string[] {
+  const prefixes = [root];
+  const parts = relative(root, path).split(sep).filter(Boolean);
+  let prefix = root;
+  for (const part of parts) {
+    prefix = join(prefix, part);
+    prefixes.push(prefix);
+  }
+  return prefixes;
+}
+
+type LexicalSymlinkInspection =
+  | { readonly kind: "missing" }
+  | { readonly kind: "plain" }
+  | { readonly kind: "unsafe" }
+  | { readonly kind: "link"; readonly target: string };
+
+/** Allows only the selected root alias to transition to its captured root. */
+function rootAliasTarget(
+  pack: ResourcePack,
+  prefix: string,
+): string | undefined {
+  if (resolve(prefix) !== pack.lexicalRoot) return undefined;
+  try {
+    return realpathSync(prefix) === pack.root ? pack.root : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function inspectLexicalSymlink(
+  pack: ResourcePack,
+  prefix: string,
+): LexicalSymlinkInspection {
+  let stat: ReturnType<typeof lstatSync>;
+  try {
+    stat = lstatSync(prefix);
+  } catch (error) {
+    return missingPath(error) ? { kind: "missing" } : { kind: "unsafe" };
+  }
+  if (!stat.isSymbolicLink()) return { kind: "plain" };
+
+  const rootTarget = rootAliasTarget(pack, prefix);
+  if (rootTarget) return { kind: "link", target: rootTarget };
+
+  let targetText: string;
+  let canonicalParent: string;
+  try {
+    targetText = readlinkSync(prefix);
+    canonicalParent = realpathSync(dirname(prefix));
+  } catch {
+    return { kind: "unsafe" };
+  }
+  if (!isWithin(pack.root, canonicalParent)) return { kind: "unsafe" };
+
+  const target = isAbsolute(targetText)
+    ? resolve(targetText)
+    : resolve(canonicalParent, targetText);
+  return { kind: "link", target };
+}
+
+function walkLexicalPrefixes(
+  pack: ResourcePack,
+  root: string,
+  path: string,
+  visit: (path: string) => boolean,
+): boolean {
+  for (const prefix of lexicalPrefixes(root, path)) {
+    const inspection = inspectLexicalSymlink(pack, prefix);
+    if (inspection.kind === "missing") return true;
+    if (inspection.kind === "plain") continue;
+    if (inspection.kind === "unsafe" || !visit(inspection.target)) return false;
+  }
+  return true;
+}
+
+/**
+ * Verifies every lexical symlink hop without trusting a safe final realpath.
+ * Captured chain links are stability/watch evidence, not generic walk bases.
+ */
+export function isResourcePackLexicalPathSafe(
+  pack: ResourcePack,
+  candidate: string,
+): boolean {
+  const active = new Set<string>();
+  const completed = new Set<string>();
+
+  function walk(path: string): boolean {
+    const normalized = resolve(path);
+    const base = lexicalPathBase(pack, normalized);
+    const canonical = canonicalPackagePath(pack, normalized) ?? normalized;
+    if (!base && canonical === normalized) return false;
+    const walkBase = base ?? pack.root;
+
+    const key = `${walkBase}\u0000${canonical}`;
+    if (active.has(key)) return false;
+    if (completed.has(key)) return true;
+    active.add(key);
+
+    let safe = true;
+    try {
+      safe = walkLexicalPrefixes(pack, walkBase, canonical, walk);
+    } finally {
+      active.delete(key);
+    }
+
+    if (safe) completed.add(key);
+    return safe;
+  }
+
+  return walk(candidate);
+}
+
 /** Revalidates the lexical root and every captured symlink hop. */
 export function isResourcePackLexicalRootStable(pack: ResourcePack): boolean {
   const captured = lexicalRootChains.get(pack);
@@ -147,10 +358,31 @@ export function resourcePackLexicalRootSymlinkPaths(
   );
 }
 
+/** Checks a canonical candidate against a captured pack root. */
+export function isResourcePackPathContained(
+  pack: ResourcePack,
+  candidate: string,
+): boolean {
+  return isWithin(pack.root, resolve(candidate));
+}
+
+/** Returns package metadata and captured lexical-root paths for watch inputs. */
+export function resourcePackMetadataPaths(
+  pack: ResourcePack,
+): readonly string[] {
+  if (!pack.package) return [];
+  return normalizeResourcePaths([
+    pack.package.manifestPath,
+    pack.package.lexicalManifestPath,
+    ...resourcePackLexicalRootSymlinkPaths(pack),
+  ]);
+}
+
 /** Captures a realpath root before any resource child is resolved. */
 export function createResourcePack(
   rootDirectory: string,
   kind: ResourcePackKind,
+  packageIdentity?: ResourcePackageIdentity,
 ): ResourcePack {
   if (!isAbsolute(rootDirectory)) {
     failResource(
@@ -184,8 +416,35 @@ export function createResourcePack(
       "resource pack root symlink chain is unavailable",
     );
   }
+  if (
+    kind === "package" &&
+    !isPackageRootChainSafe(lexicalRoot, root, lexicalRootChain)
+  ) {
+    failResource(
+      "unsafe-path",
+      "package root symlink chain leaves its authorized roots",
+    );
+  }
 
-  const pack = Object.freeze({ kind, root, lexicalRoot });
+  const pack = Object.freeze({
+    kind,
+    root,
+    lexicalRoot,
+    ...(packageIdentity
+      ? {
+          package: Object.freeze({
+            ...packageIdentity,
+            dependencies: Object.freeze({ ...packageIdentity.dependencies }),
+            optionalDependencies: Object.freeze({
+              ...packageIdentity.optionalDependencies,
+            }),
+            devDependencies: Object.freeze({
+              ...packageIdentity.devDependencies,
+            }),
+          }),
+        }
+      : {}),
+  });
   lexicalRootChains.set(pack, lexicalRootChain);
   return pack;
 }

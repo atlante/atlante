@@ -981,7 +981,7 @@ describe("resource-backed document validation", () => {
       join(outer, "instance.jsonc"),
       `{
   "$template": "../parent",
-  "child": { "$template": "not-a-locator" }
+  "child": { "$template": "https://example.com/template" }
 }
 `,
     );
