@@ -2995,6 +2995,140 @@ class ResourceResolver {
     };
   }
 
+  private presetExtendsLocators(
+    loaded: LoadedFacet<Preset>,
+    extendsValue: JsonValue,
+    path: readonly ResourceGraphNode[],
+    hops: number,
+  ): readonly RawResourceLocator[] {
+    const isArrayExtends = Array.isArray(extendsValue);
+    if (
+      (typeof extendsValue !== "string" || extendsValue.length === 0) &&
+      (!isArrayExtends || extendsValue.length === 0)
+    ) {
+      return this.failAt(
+        "invalid-resolved-input",
+        "preset extends must be a non-empty string or array",
+        traversalContext(path, hops),
+        {
+          source: loaded.loaded.facet.origin,
+          pointer: "/extends",
+          location: loaded.loaded.locations?.["/extends"],
+        },
+      );
+    }
+    if (!isArrayExtends) return [extendsValue as RawResourceLocator];
+
+    return extendsValue.map((locator, index): RawResourceLocator => {
+      if (typeof locator !== "string" || locator.length === 0) {
+        return this.failAt(
+          "invalid-resolved-input",
+          "preset extends entries must be non-empty strings",
+          traversalContext(path, hops),
+          {
+            source: loaded.loaded.facet.origin,
+            pointer: `/extends/${index}`,
+            location: loaded.loaded.locations?.[`/extends/${index}`],
+          },
+        );
+      }
+      return locator;
+    });
+  }
+
+  private resolvePresetChild(
+    loaded: LoadedFacet<Preset>,
+    locator: RawResourceLocator,
+    path: readonly ResourceGraphNode[],
+    hops: number,
+    pointer: string,
+  ): PresetResult {
+    const next = this.delegateResource(
+      () =>
+        this.loadForTraversal(
+          () => this.loadPreset(loaded.pack, locator, loaded.authoring.file),
+          path,
+          "preset",
+          locator,
+        ),
+      path,
+      loaded.loaded.facet.origin,
+      pointer,
+      loaded.loaded.locations?.[pointer],
+    );
+    const child = graphNode(next.loaded.facet);
+    const childPath = this.enter(child, path, hops + 1);
+    return this.resolvePresetLoaded(next, child, childPath, hops + 1);
+  }
+
+  private mergePresetSibling(
+    base: PresetResult | undefined,
+    child: PresetResult,
+    path: readonly ResourceGraphNode[],
+    hops: number,
+  ): PresetResult {
+    const merged = this.mergeValues(base?.effectiveRaw, child.effectiveRaw, {
+      inheritedProvenance: base?.provenance,
+      inheritedAuthoring: base?.authoring,
+      inheritedOrigin: base?.facet.origin,
+      localOrigin: child.facet.origin,
+      localProvenance: child.provenance,
+      localAuthoring: child.authoring,
+    });
+    if (!isSafeJsonObject(merged.value)) {
+      return this.failAt(
+        "invalid-resolved-input",
+        "preset root must resolve to a JSON object",
+        traversalContext(path, hops),
+        { source: child.facet.origin },
+      );
+    }
+    return Object.freeze({
+      ...child,
+      effectiveRaw: cloneObject(merged.value),
+      provenance: cloneResourceProvenance(merged.provenance),
+      authoring: merged.authoring,
+      traversal: mergeContextMap(
+        merged.provenance,
+        child.provenance,
+        child.traversal,
+        base?.traversal,
+      ),
+      effectiveHops: this.maxPresetBranchDepth(base, child),
+    });
+  }
+
+  private maxPresetBranchDepth(
+    base: PresetResult | undefined,
+    child: PresetResult,
+  ): number {
+    return Math.max(base?.effectiveHops ?? 0, child.effectiveHops);
+  }
+
+  private resolvePresetArray(
+    loaded: LoadedFacet<Preset>,
+    locators: readonly RawResourceLocator[],
+    path: readonly ResourceGraphNode[],
+    hops: number,
+  ): PresetResult {
+    let base: PresetResult | undefined;
+    for (const [index, locator] of locators.entries()) {
+      base = this.mergePresetSibling(
+        base,
+        this.resolvePresetChild(
+          loaded,
+          locator,
+          path,
+          hops,
+          `/extends/${index}`,
+        ),
+        path,
+        hops,
+      );
+    }
+    return base as PresetResult;
+  }
+
   private loadPresetBase(
     loaded: LoadedFacet<Preset>,
     raw: JsonObject,
@@ -3002,32 +3136,22 @@ class ResourceResolver {
     hops: number,
   ): PresetResult | undefined {
     if (!Object.hasOwn(raw, "extends")) return undefined;
-    const extendsValue = raw.extends;
-    if (typeof extendsValue !== "string" || extendsValue.length === 0) {
-      return this.failAt(
-        "invalid-resolved-input",
-        "preset extends must be a non-empty string",
-        traversalContext(path, hops),
-        { source: loaded.loaded.facet.origin, pointer: "/extends" },
-      );
-    }
-    const next = this.delegateResource(
-      () =>
-        this.loadForTraversal(
-          () =>
-            this.loadPreset(loaded.pack, extendsValue, loaded.authoring.file),
-          path,
-          "preset",
-          extendsValue,
-        ),
+    const extendsValue = raw.extends as JsonValue;
+    const locators = this.presetExtendsLocators(
+      loaded,
+      extendsValue,
       path,
-      loaded.loaded.facet.origin,
-      "/extends",
-      loaded.loaded.locations?.["/extends"],
+      hops,
     );
-    const child = graphNode(next.loaded.facet);
-    const childPath = this.enter(child, path, hops + 1);
-    return this.resolvePresetLoaded(next, child, childPath, hops + 1);
+    if (!Array.isArray(extendsValue))
+      return this.resolvePresetChild(
+        loaded,
+        locators[0] as RawResourceLocator,
+        path,
+        hops,
+        "/extends",
+      );
+    return this.resolvePresetArray(loaded, locators, path, hops);
   }
 
   private resolvePresetLoaded(

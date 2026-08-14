@@ -1,13 +1,21 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type {
+  JsonObject,
   ResourceFailureCode,
   ResourceResolutionError,
 } from "../src/index.js";
 import {
   createProjectResourcePack,
+  resolveResourceDocument,
   resolveResourceInstance,
 } from "../src/index.js";
 
@@ -47,6 +55,16 @@ function template(
     `${JSON.stringify({ $schema: schemaUri, ...schema })}\n`,
   );
   writeFileSync(join(directory, "template.md"), "template\n");
+}
+
+function preset(
+  root: string,
+  name: string,
+  input: Record<string, unknown>,
+): void {
+  const directory = join(root, name);
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(join(directory, "atlante.jsonc"), `${JSON.stringify(input)}\n`);
 }
 
 function expectFailure(
@@ -154,5 +172,103 @@ describe("resource graph", () => {
     expect(JSON.stringify(first.failure)).toBe(JSON.stringify(second.failure));
     expect(first.failure).not.toBe(second.failure);
     expect(first.failure.chain).not.toBe(second.failure.chain);
+  });
+
+  test("keeps preset cycle chains typed across local and package resources", () => {
+    const { root, source } = rootOf();
+    writeFileSync(
+      join(root, "package.json"),
+      `${JSON.stringify({
+        name: "atlante-graph-fixture",
+        version: "1.0.0",
+        dependencies: { "acme-pack": "1.0.0" },
+      })}\n`,
+    );
+    const packageRoot = join(root, "node_modules", "acme-pack");
+    mkdirSync(packageRoot, { recursive: true });
+    writeFileSync(
+      join(packageRoot, "package.json"),
+      `${JSON.stringify({
+        name: "acme-pack",
+        version: "1.0.0",
+        atlante: { format: 1 },
+      })}\n`,
+    );
+    preset(root, "local", { extends: "acme-pack" });
+    preset(packageRoot, ".", { extends: "./bridge" });
+    preset(packageRoot, "bridge", { extends: "acme-pack" });
+
+    const failure = expectFailure(
+      () =>
+        resolveResourceDocument({
+          pack: createProjectResourcePack(root),
+          rootFile: realpathSync(source),
+          rootDocument: { extends: "./local" } as JsonObject,
+        }),
+      "resource-cycle",
+    );
+
+    const chain = failure.failure.chain;
+    if (!chain) throw new Error("cycle chain missing");
+    expect(chain.map(({ kind }) => kind)).toEqual([
+      "preset",
+      "preset",
+      "preset",
+      "preset",
+      "preset",
+    ]);
+    expect(chain.map(({ locator }) => String(locator))).toEqual([
+      "./",
+      "./local",
+      "acme-pack",
+      "./bridge",
+      "acme-pack",
+    ]);
+    expect(
+      chain.map(({ origin }) => `${origin.kind}:${String(origin.path)}`),
+    ).toEqual([
+      "project:source.jsonc",
+      "project:local/atlante.jsonc",
+      "package:acme-pack@1.0.0/atlante.jsonc",
+      "package:acme-pack@1.0.0/bridge/atlante.jsonc",
+      "package:acme-pack@1.0.0/atlante.jsonc",
+    ]);
+  });
+
+  test("measures preset depth per independent extends branch", () => {
+    const { root, source } = rootOf();
+    const siblings: string[] = [];
+    for (let index = 0; index < 40; index++) {
+      const name = `sibling-${index}`;
+      preset(root, name, {});
+      siblings.push(`./${name}`);
+    }
+
+    const resolve = (extendsValue: readonly string[]) =>
+      resolveResourceDocument({
+        pack: createProjectResourcePack(root),
+        rootFile: realpathSync(source),
+        rootDocument: { extends: extendsValue } as JsonObject,
+      });
+
+    expect(() => resolve(siblings)).not.toThrow();
+
+    const deep: string[] = [];
+    for (let index = 0; index < 33; index++) {
+      const name = `deep-${index}`;
+      preset(root, name, {
+        ...(index === 32 ? {} : { extends: `../deep-${index + 1}` }),
+      });
+      deep.push(`./${name}`);
+    }
+
+    const failure = expectFailure(
+      () => resolve([...siblings, deep[0] as string]),
+      "resource-depth-exceeded",
+    );
+    expect(failure.failure.chain?.length).toBe(34);
+    expect(String(failure.failure.chain?.[1]?.origin.path)).toBe(
+      "deep-0/atlante.jsonc",
+    );
   });
 });

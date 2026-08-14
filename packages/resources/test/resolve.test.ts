@@ -443,6 +443,120 @@ describe("resource resolution", () => {
     ).toBe("atlante/starter/atlante.jsonc");
   });
 
+  test("merges ordered preset layers left-to-right with winning provenance", () => {
+    const { root, config } = rootOf();
+    writePreset(root, "first", {
+      settings: {
+        removed: "first",
+        scalar: "first",
+        array: ["first"],
+        nested: { first: "first", shared: "first" },
+      },
+    });
+    writePreset(root, "second", {
+      settings: {
+        removed: null,
+        scalar: "second",
+        array: ["second"],
+        nested: { second: "second", shared: "second" },
+      },
+    });
+    writeFileSync(
+      config,
+      `${JSON.stringify({
+        extends: ["./first", "./second"],
+        settings: {
+          local: "local",
+          scalar: "local",
+          array: ["local"],
+          nested: { local: "local", shared: "local" },
+        },
+      })}\n`,
+    );
+
+    const result = resolveDocument(root, config);
+
+    expect(result.effectiveRaw.settings).toEqual({
+      array: ["local"],
+      local: "local",
+      nested: {
+        first: "first",
+        local: "local",
+        second: "second",
+        shared: "local",
+      },
+      scalar: "local",
+    });
+    expect(originPath(result.provenance, "/settings/nested/first")).toBe(
+      "first/atlante.jsonc",
+    );
+    expect(originPath(result.provenance, "/settings/nested/second")).toBe(
+      "second/atlante.jsonc",
+    );
+    expect(originPath(result.provenance, "/settings/nested/shared")).toBe(
+      "atlante.jsonc",
+    );
+    expect(originPath(result.provenance, "/settings/scalar")).toBe(
+      "atlante.jsonc",
+    );
+    expect(originPath(result.provenance, "/settings/array/0")).toBe(
+      "atlante.jsonc",
+    );
+    expect(result.provenance["/settings/removed"]).toBeUndefined();
+  });
+
+  test("preserves order through nested inherited extends arrays", () => {
+    const { root, config } = rootOf();
+    writePreset(root, "first", { settings: { order: "first", first: true } });
+    writePreset(root, "second", {
+      settings: { order: "second", second: true },
+    });
+    writePreset(root, "nested", {
+      extends: ["../first", "../second"],
+      settings: { nested: true },
+    });
+    writePreset(root, "third", {
+      settings: { order: "third", third: true },
+    });
+    writeFileSync(
+      config,
+      `${JSON.stringify({
+        extends: ["./nested", "./third"],
+        settings: { local: true },
+      })}\n`,
+    );
+
+    const result = resolveDocument(root, config);
+
+    expect(result.normalized.settings).toEqual({
+      first: true,
+      local: true,
+      nested: true,
+      order: "third",
+      second: true,
+      third: true,
+    });
+    expect(originPath(result.provenance, "/settings/order")).toBe(
+      "third/atlante.jsonc",
+    );
+  });
+
+  test("allows the same preset at multiple authored array positions", () => {
+    const { root, config } = rootOf();
+    writePreset(root, "base", {
+      settings: { base: true, shared: "base" },
+    });
+    writeFileSync(
+      config,
+      `${JSON.stringify({ extends: ["./base", "./base"] })}\n`,
+    );
+
+    expect(resolveDocument(root, config).normalized.settings).toEqual({
+      base: true,
+      shared: "base",
+    });
+  });
+
   test("does not reread unchanged cached package facet content", () => {
     const { root, config } = rootOf();
     const { template } = writePackageTemplate(root);

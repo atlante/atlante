@@ -189,6 +189,40 @@ describe("resource-backed document validation", () => {
     expect(JSON.stringify(diagnostic)).not.toContain(configPath);
   });
 
+  test("anchors an invalid inherited extends array entry at its source location", () => {
+    const { root, configPath } = project({
+      $schema: SCHEMA_URI,
+      extends: "./base",
+    });
+    const base = join(root, "base");
+    mkdirSync(base);
+    mkdirSync(join(root, "valid"));
+    writeFileSync(join(root, "valid", "atlante.jsonc"), "{}\n");
+    writeFileSync(
+      join(base, "atlante.jsonc"),
+      `${JSON.stringify({ extends: ["./valid", 42] }, null, 2)}\n`,
+    );
+
+    const result = load(configPath);
+    const diagnostic = result.diagnostics.find(
+      ({ code }) => code === "invalid-resolved-input",
+    );
+
+    expect(result.document).toBeUndefined();
+    expect(diagnostic).toMatchObject({
+      code: "invalid-resolved-input",
+      path: "/extends/1",
+      pointer: "/extends/1",
+      source: "base/atlante.jsonc",
+      location: { line: 4, column: 5 },
+      chain: [
+        { kind: "preset", locator: "./", source: "atlante.jsonc" },
+        { kind: "preset", locator: "./base", source: "base/atlante.jsonc" },
+      ],
+    });
+    expect(JSON.stringify(diagnostic)).not.toContain(root);
+  });
+
   test("preserves facet parser coordinates and the authored selector pointer", () => {
     const { root, configPath } = project({
       $schema: SCHEMA_URI,
