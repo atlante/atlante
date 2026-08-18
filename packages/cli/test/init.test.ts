@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import {
+  cpSync,
   existsSync,
   mkdtempSync,
   readFileSync,
@@ -10,6 +11,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { BuildResult } from "@atlante/builder";
 import { buildProject } from "@atlante/builder";
 import { readArtifacts } from "@atlante/builder/artifacts";
@@ -21,10 +23,24 @@ import {
 import { runInit, runValidate } from "../src/main.js";
 
 const created: string[] = [];
+const firstPartyPackRoot = fileURLToPath(
+  new URL("../../pack/", import.meta.url),
+);
 
 function tempDir(): string {
   const dir = mkdtempSync(join(tmpdir(), "atlante-init-"));
   created.push(dir);
+  cpSync(firstPartyPackRoot, join(dir, "node_modules", "@atlante", "pack"), {
+    recursive: true,
+  });
+  writeFileSync(
+    join(dir, "package.json"),
+    `${JSON.stringify({
+      name: "atlante-init-fixture",
+      version: "1.0.0",
+      devDependencies: { "@atlante/pack": "workspace:0.1.6" },
+    })}\n`,
+  );
   return dir;
 }
 
@@ -53,7 +69,7 @@ describe("runInit", () => {
     expect(await runInit(dir, {})).toBe(0);
     expect(existsSync(join(dir, "atlante.jsonc"))).toBe(true);
     const config = readFileSync(join(dir, "atlante.jsonc"), "utf8");
-    expect(config).toContain('"extends": "atlante/starter"');
+    expect(config).toContain('"extends": "@atlante/pack"');
     expect(config).not.toContain("node_modules");
     expect(config).not.toContain("package.json");
     expect(existsSync(join(dir, "resources"))).toBe(false);
@@ -373,7 +389,7 @@ describe("runInit", () => {
     const dir = tempDir();
     expect(await runInit(dir, { preset: "starter" })).toBe(0);
     const text = readFileSync(join(dir, "atlante.jsonc"), "utf8");
-    expect(text).toContain("atlante/starter");
+    expect(text).toContain("@atlante/pack");
     expect(text).toContain("extends");
     expect(await runValidate(dir)).toBe(0);
   });

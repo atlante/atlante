@@ -10,13 +10,13 @@ const overlayWithInstance: AgentBindingOverlay = {
   $instance: "./resources/agent",
   description: "An authored agent binding.",
   prompt: {
-    template: "atlante/prompt-slot",
+    template: "@atlante/pack/prompt-slot",
   },
 };
 
 const overlayWithTemplate: AgentBindingOverlay = {
   $template: "./resources/agent",
-  sections: [{ template: "atlante/section", content: "Review changes." }],
+  sections: [{ template: "@atlante/pack/section", content: "Review changes." }],
 };
 
 const overlayWithoutSelector: AgentBindingOverlay = {
@@ -34,12 +34,12 @@ const overlayWithBothSelectors: AgentBindingOverlay = {
 
 const overlayWithTopLevelTemplate: AgentBindingOverlay = {
   // @ts-expect-error `template` is only valid inside template-owned fields.
-  template: "atlante/agent",
+  template: "@atlante/pack/agent",
 };
 
 const canonicalAgent: AgentBinding = {
   description: "A resolved agent binding.",
-  sections: [{ template: "atlante/section" }],
+  sections: [{ template: "@atlante/pack/section" }],
 };
 
 const canonicalSkill: SkillBinding = {
@@ -59,7 +59,7 @@ const canonicalWithInstance: AgentBinding = {
 const canonicalWithTopLevelTemplate: SkillBinding = {
   description: "A resolved skill binding.",
   // @ts-expect-error A canonical binding cannot have a direct binding-level template.
-  template: "atlante/skill",
+  template: "@atlante/pack/skill",
 };
 
 const canonicalDocumentWithTopLevelTemplate: AtlanteDocument = {
@@ -68,14 +68,14 @@ const canonicalDocumentWithTopLevelTemplate: AtlanteDocument = {
     reviewer: {
       description: "A resolved agent binding.",
       // @ts-expect-error Canonical document bindings cannot have a direct template.
-      template: "atlante/agent",
+      template: "@atlante/pack/agent",
     },
   },
 };
 
 const overlayDocument: AtlanteDocumentOverlay = {
   $schema: "https://atlante.sh/schema/v0.1/schema.json",
-  extends: "atlante/starter",
+  extends: "@atlante/pack",
   agents: {
     reviewer: overlayWithInstance,
   },

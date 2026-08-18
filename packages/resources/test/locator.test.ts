@@ -10,10 +10,7 @@ import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, sep } from "node:path";
 import type { ResourceFailureCode } from "../src/index.js";
 import {
-  createBundledResourcePack,
   createProjectResourcePack,
-  loadInstanceFacet,
-  loadPresetFacet,
   loadTemplateFacet,
   parseResourceLocator,
   ResourceResolutionError,
@@ -73,41 +70,22 @@ describe("resource locator resolution", () => {
     ).toBe(join(pack.root, "config", "sibling"));
   });
 
-  test("resolves built-in starter, template, and instance locators without package lookup", () => {
-    const pack = createBundledResourcePack();
-    const containing = join(pack.root, "authoring.jsonc");
-
-    expect(
-      String(
-        resolveResourceLocator(pack, "atlante/starter", containing).locator,
-      ),
-    ).toBe("atlante/starter");
-    expect(
-      String(resolveResourceLocator(pack, "atlante/agent", containing).locator),
-    ).toBe("atlante/agent");
-    expect(
-      String(
-        resolveResourceLocator(pack, "atlante/architect", containing).locator,
-      ),
-    ).toBe("atlante/architect");
-
-    expect(
-      loadPresetFacet(pack, "atlante/starter", containing).facet.kind,
-    ).toBe("preset");
-    expect(
-      loadTemplateFacet(pack, "atlante/agent", containing).facet.kind,
-    ).toBe("template");
-    expect(
-      loadInstanceFacet(pack, "atlante/architect", containing).facet.kind,
-    ).toBe("instance");
+  test("rejects the temporary vocabulary and retains package locators", () => {
+    expect(parseResourceLocator("@atlante/pack/agent")).toMatchObject({
+      kind: "package",
+      packageName: "@atlante/pack",
+      subpath: "agent",
+    });
+    for (const locator of ["atlante/starter", "atlante/agent", "atlante/skill"])
+      expectFailure(() => parseResourceLocator(locator), "invalid-locator");
   });
 
-  test("resolves bundled relative references within the bundled root", () => {
+  test("resolves relative references within the project root", () => {
     const root = projectRoot();
     const containing = authoringFile(root, "one/source.jsonc");
     mkdirSync(join(root, "one", "child"), { recursive: true });
     mkdirSync(join(root, "sibling"));
-    const pack = createBundledResourcePack(root);
+    const pack = createProjectResourcePack(root);
 
     expect(resolveResourceLocator(pack, "./child", containing).directory).toBe(
       join(pack.root, "one", "child"),

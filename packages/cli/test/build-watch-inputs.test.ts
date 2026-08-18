@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import {
+  cpSync,
   mkdirSync,
   mkdtempSync,
   realpathSync,
@@ -9,7 +10,7 @@ import {
 import { tmpdir } from "node:os";
 import * as nodePath from "node:path";
 import { join, sep } from "node:path";
-import { BUNDLED_RESOURCES_DIR } from "@atlante/resources";
+import { fileURLToPath } from "node:url";
 import { SCHEMA_URI } from "@atlante/schema";
 import {
   isWithinAnyRoot,
@@ -18,6 +19,23 @@ import {
 } from "../src/commands/build-watch-inputs.js";
 
 const created: string[] = [];
+const firstPartyPackRoot = fileURLToPath(
+  new URL("../../pack/", import.meta.url),
+);
+
+function installFirstPartyPack(root: string): void {
+  cpSync(firstPartyPackRoot, join(root, "node_modules", "@atlante", "pack"), {
+    recursive: true,
+  });
+  writeFileSync(
+    join(root, "package.json"),
+    `${JSON.stringify({
+      name: "atlante-watch-fixture",
+      version: "1.0.0",
+      devDependencies: { "@atlante/pack": "workspace:0.1.6" },
+    })}\n`,
+  );
+}
 
 function tempDir(): string {
   const dir = mkdtempSync(join(tmpdir(), "atlante-watch-inputs-"));
@@ -136,29 +154,48 @@ describe("resolveWatchFiles", () => {
     );
   });
 
-  test("returns selected bundled resources without scanning unrelated siblings", () => {
+  test("returns selected package resources without scanning unrelated siblings", () => {
     const dir = tempDir();
+    installFirstPartyPack(dir);
     writeFileSync(
       join(dir, "atlante.jsonc"),
       `{
         "$schema": "${SCHEMA_URI}",
-        "agents": { "architect": { "$instance": "atlante/architect", "description": "Architect" } }
+         "agents": { "architect": { "$instance": "@atlante/pack/architect", "description": "Architect" } }
       }`,
     );
 
     const result = resolveWatchFiles(dir);
 
     expect(result.resourcePaths).toContain(
-      canonical(join(BUNDLED_RESOURCES_DIR, "architect", "instance.jsonc")),
+      canonical(
+        join(
+          dir,
+          "node_modules",
+          "@atlante",
+          "pack",
+          "architect",
+          "instance.jsonc",
+        ),
+      ),
     );
     expect(result.resourcePaths).not.toContain(
-      canonical(join(BUNDLED_RESOURCES_DIR, "artifact", "template.jsonc")),
+      canonical(
+        join(
+          dir,
+          "node_modules",
+          "@atlante",
+          "pack",
+          "artifact",
+          "template.jsonc",
+        ),
+      ),
     );
     for (const path of result.resourcePaths) {
       expect(
         path.startsWith(`${dir}${sep}`) ||
           path.startsWith(`${canonical(dir)}${sep}`) ||
-          path.startsWith(`${BUNDLED_RESOURCES_DIR}${sep}`),
+          path.startsWith(`${join(dir, "node_modules")}${sep}`),
       ).toBe(true);
     }
   });
@@ -183,19 +220,18 @@ describe("resolveWatchFiles", () => {
 
   test("every watch path lies within a known input root", () => {
     const dir = tempDir();
+    installFirstPartyPack(dir);
     writeFileSync(
       join(dir, "atlante.jsonc"),
       `{
         "$schema": "${SCHEMA_URI}",
-        "extends": "atlante/starter"
+        "extends": "@atlante/pack"
       }`,
     );
 
     const result = resolveWatchFiles(dir);
 
-    const roots = [dir, canonical(dir), BUNDLED_RESOURCES_DIR].map(
-      (root) => `${root}${sep}`,
-    );
+    const roots = [dir, canonical(dir)].map((root) => `${root}${sep}`);
     const paths = allPaths(result);
     expect(paths.length).toBeGreaterThan(0);
     for (const path of paths) {

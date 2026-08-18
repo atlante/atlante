@@ -52,9 +52,9 @@ function bareConfig(): string {
   return `{
   "$schema": "${SCHEMA_URI}",
 
-  // Extend the bundled starter preset. You can override any value or agent
+  // Extend the first-party package preset. You can override any value or agent
   // below; your local configuration takes precedence over the inherited one.
-  "extends": "atlante/starter",
+  "extends": "@atlante/pack",
 }
 `;
 }

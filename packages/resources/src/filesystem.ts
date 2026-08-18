@@ -745,26 +745,6 @@ function prepareResourceTarget(
   authoringFile: string,
   options: ResourceLocatorOptions,
 ): PreparedResourceTarget {
-  if (parsed.kind === "builtin") {
-    if (pack.kind !== "bundled")
-      return failResource(
-        "invalid-locator",
-        "built-in locator requires the bundled resource root",
-        { locator: rawLocator },
-      );
-    const kind: ResourceTargetKind =
-      parsed.name === "starter" ? "preset" : "resource";
-    const candidate =
-      parsed.name === "starter" ? pack.root : join(pack.root, parsed.name);
-    return {
-      pack,
-      candidate,
-      lexicalDirectory: candidate,
-      kind,
-      resolutionDependencies: [],
-    };
-  }
-
   if (parsed.kind === "package") {
     canonicalAuthoringDirectory(pack, authoringFile, rawLocator);
     const resolvedPackage = resolvePackageResourcePack(

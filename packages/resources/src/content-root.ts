@@ -3,7 +3,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { failResource, normalizeResourcePaths } from "./errors.js";
 import type { ResourcePackageIdentity } from "./types.js";
 
-export type ResourcePackKind = "project" | "bundled" | "package";
+export type ResourcePackKind = "project" | "package";
 
 /** A captured root is immutable for the lifetime of the resource pack. */
 export type ResourcePack = Readonly<{

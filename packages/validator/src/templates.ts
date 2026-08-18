@@ -13,10 +13,10 @@ import {
   MAX_REFERENCE_HOPS,
   MissingValueError,
   NonStringValueError,
+  parseResourceLocator,
   resolveSystemValues,
   resourceTemplateSelection,
   resourceValueTombstones,
-  TEMPLATE_ID_PATTERN,
   UnknownSystemVariableError,
   ValueReferenceCollisionError,
   walkValueReferences,
@@ -405,12 +405,13 @@ function schemaCompilationDiagnostic(
 }
 
 function validTemplateMarker(value: unknown): value is string {
-  return (
-    typeof value === "string" &&
-    (TEMPLATE_ID_PATTERN.test(value) ||
-      (value.length >= 2 &&
-        (value.startsWith("./") || value.startsWith("../"))))
-  );
+  if (typeof value !== "string") return false;
+  try {
+    const parsed = parseResourceLocator(value);
+    return parsed.kind === "local" || parsed.subpath !== undefined;
+  } catch {
+    return false;
+  }
 }
 
 function invalidTemplateMarker(
@@ -430,7 +431,7 @@ function invalidTemplateMarker(
   const schemaPointer = `/${schemaPath.map(escapeJsonPointerSegment).join("/")}`;
   return error(
     "invalid-input-schema",
-    `template "${template.key}": invalid template marker; expected a non-empty namespaced id or relative locator`,
+    `template "${template.key}": invalid template marker; expected a package locator or relative locator`,
     {
       path: pointer,
       source: String(template.origin.path),

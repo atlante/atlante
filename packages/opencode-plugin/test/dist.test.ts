@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import {
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -21,6 +22,9 @@ type HostConfig = {
 };
 
 const created: string[] = [];
+const firstPartyPackRoot = fileURLToPath(
+  new URL("../../pack/", import.meta.url),
+);
 
 afterEach(() => {
   for (const directory of created.splice(0))
@@ -30,6 +34,17 @@ afterEach(() => {
 function localResourceProject(): string {
   const root = mkdtempSync(join(tmpdir(), "atlante-built-plugin-"));
   created.push(root);
+  cpSync(firstPartyPackRoot, join(root, "node_modules", "@atlante", "pack"), {
+    recursive: true,
+  });
+  writeFileSync(
+    join(root, "package.json"),
+    `${JSON.stringify({
+      name: "atlante-built-plugin-fixture",
+      version: "1.0.0",
+      devDependencies: { "@atlante/pack": "workspace:0.1.6" },
+    })}\n`,
+  );
   writeFileSync(
     join(root, "atlante.jsonc"),
     `${JSON.stringify({
@@ -53,7 +68,7 @@ function localResourceProject(): string {
   writeFileSync(
     join(root, "resources", "reviewer", "instance.jsonc"),
     JSON.stringify({
-      $template: "atlante/agent",
+      $template: "@atlante/pack/agent",
       identity: "You are a built-path reviewer.",
       mission: "Verify the generated plugin runtime.",
     }),
@@ -61,7 +76,7 @@ function localResourceProject(): string {
   writeFileSync(
     join(root, "resources", "testing", "instance.jsonc"),
     JSON.stringify({
-      $template: "atlante/skill",
+      $template: "@atlante/pack/skill",
       title: "Built testing",
       overview: "A skill materialized by the generated plugin.",
       sections: [{ markdown: "Built skill content." }],

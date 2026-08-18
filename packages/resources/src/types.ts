@@ -11,7 +11,6 @@ export type JsonObject = { readonly [key: string]: JsonValue };
 
 declare const validatedLocatorBrand: unique symbol;
 declare const validatedProjectOriginPathBrand: unique symbol;
-declare const validatedBundledOriginPathBrand: unique symbol;
 declare const validatedPackageOriginPathBrand: unique symbol;
 
 /**
@@ -28,11 +27,6 @@ export type ValidatedLocalResourceLocator = (`./${string}` | `../${string}`) & {
   readonly [validatedLocatorBrand]: "local";
 };
 
-/** A validated direct child of the temporary first-party namespace. */
-export type ValidatedBuiltinResourceLocator = `atlante/${string}` & {
-  readonly [validatedLocatorBrand]: "builtin";
-};
-
 /** A validated npm package locator with an optional contained subpath. */
 export type ValidatedPackageResourceLocator = string & {
   readonly [validatedLocatorBrand]: "package";
@@ -40,24 +34,16 @@ export type ValidatedPackageResourceLocator = string & {
 
 export type ValidatedResourceLocator =
   | ValidatedLocalResourceLocator
-  | ValidatedBuiltinResourceLocator
   | ValidatedPackageResourceLocator;
 
 /** Trusted aliases retained for resource identities and graph nodes. */
 export type LocalResourceLocator = ValidatedLocalResourceLocator;
-export type BuiltinResourceLocator = ValidatedBuiltinResourceLocator;
 export type PackageResourceLocator = ValidatedPackageResourceLocator;
 export type ResourceLocator = ValidatedResourceLocator;
 
 export type RawProjectResourceOrigin = {
   readonly kind: "project";
   /** Untrusted content-root-relative path authored by a source file. */
-  readonly path: string;
-};
-
-export type RawBundledResourceOrigin = {
-  readonly kind: "bundled";
-  /** Untrusted bundled source identity authored by a loader. */
   readonly path: string;
 };
 
@@ -69,7 +55,6 @@ export type RawPackageResourceOrigin = {
 
 export type RawResourceOrigin =
   | RawProjectResourceOrigin
-  | RawBundledResourceOrigin
   | RawPackageResourceOrigin;
 
 export type ProjectResourceOrigin = {
@@ -77,14 +62,6 @@ export type ProjectResourceOrigin = {
   /** Validated content-root-relative, stable source path. */
   readonly path: string & {
     readonly [validatedProjectOriginPathBrand]: "project";
-  };
-};
-
-export type BundledResourceOrigin = {
-  readonly kind: "bundled";
-  /** Validated stable identity such as atlante/agent/template.jsonc. */
-  readonly path: `atlante/${string}` & {
-    readonly [validatedBundledOriginPathBrand]: "bundled";
   };
 };
 
@@ -96,10 +73,7 @@ export type PackageResourceOrigin = {
   };
 };
 
-export type ResourceOrigin =
-  | ProjectResourceOrigin
-  | BundledResourceOrigin
-  | PackageResourceOrigin;
+export type ResourceOrigin = ProjectResourceOrigin | PackageResourceOrigin;
 
 export type ResourceIdentity = {
   readonly locator: ResourceLocator;

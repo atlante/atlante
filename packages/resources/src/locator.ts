@@ -1,12 +1,10 @@
 import { failResource } from "./errors.js";
 import type {
   RawResourceLocator,
-  ValidatedBuiltinResourceLocator,
   ValidatedPackageResourceLocator,
   ValidatedResourceLocator,
 } from "./types.js";
 
-const BUILTIN_NAME_PATTERN = /^[a-z0-9-]+$/;
 const PACKAGE_NAME_PATTERN = /^[a-z0-9][a-z0-9._-]*$/;
 const PACKAGE_PATH_PATTERN = /^[^/\\]+$/;
 const FACET_FILENAMES = new Set([
@@ -19,11 +17,6 @@ const FACET_FILENAMES = new Set([
 
 export type ParsedResourceLocator =
   | { readonly kind: "local"; readonly value: ValidatedResourceLocator }
-  | {
-      readonly kind: "builtin";
-      readonly value: ValidatedBuiltinResourceLocator;
-      readonly name: string;
-    }
   | {
       readonly kind: "package";
       readonly value: ValidatedPackageResourceLocator;
@@ -49,16 +42,6 @@ function hasForbiddenLocatorSyntax(raw: string): boolean {
 
 function namesFacetFile(raw: string): boolean {
   return raw.split("/").some((part) => FACET_FILENAMES.has(part));
-}
-
-function builtinName(raw: string): string | undefined {
-  if (!raw.startsWith("atlante/")) return undefined;
-  const parts = raw.split("/");
-  const name = parts[1];
-  if (parts.length !== 2 || !name || !BUILTIN_NAME_PATTERN.test(name)) {
-    return undefined;
-  }
-  return name;
 }
 
 function packageNameParts(
@@ -105,10 +88,10 @@ export function validateResourceLocator(
   if (typeof raw !== "string" || raw.length === 0) return invalid(raw);
   if (hasForbiddenLocatorSyntax(raw)) return invalid(raw);
 
-  if (raw.startsWith("atlante/")) {
-    if (!builtinName(raw)) return invalid(raw);
-    return raw as ValidatedBuiltinResourceLocator;
-  }
+  // This prefix was the temporary built-in resource vocabulary. Keep it
+  // invalid rather than silently interpreting old locators as a package named
+  // `atlante`.
+  if (raw.startsWith("atlante/")) return invalid(raw);
 
   if (raw.startsWith("./") || raw.startsWith("../")) {
     if (raw.includes("//") || namesFacetFile(raw)) return invalid(raw);
@@ -129,13 +112,6 @@ export function parseResourceLocator(
   raw: RawResourceLocator,
 ): ParsedResourceLocator {
   const value = validateResourceLocator(raw);
-  if (value.startsWith("atlante/")) {
-    return {
-      kind: "builtin",
-      value: value as ValidatedBuiltinResourceLocator,
-      name: value.slice("atlante/".length),
-    };
-  }
   if (value.startsWith("./") || value.startsWith("../"))
     return { kind: "local", value };
 

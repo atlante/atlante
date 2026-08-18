@@ -5,11 +5,6 @@ import { runBuildWatch } from "./commands/build-watch.js";
 import { runInit } from "./commands/init.js";
 import { runValidate } from "./commands/validate.js";
 
-export {
-  BUNDLED_RESOURCE_PACK,
-  BUNDLED_RESOURCES_DIR,
-  createBundledResourcePack,
-} from "@atlante/resources";
 export { runBuild } from "./commands/build.js";
 export { runBuildWatch } from "./commands/build-watch.js";
 export { runInit } from "./commands/init.js";

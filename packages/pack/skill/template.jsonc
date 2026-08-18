@@ -11,30 +11,30 @@
         "type": "object",
         "oneOf": [
           {
-            "properties": { "markdown": { "template": "atlante/markdown" } },
+            "properties": { "markdown": { "template": "@atlante/pack/markdown" } },
             "required": ["markdown"],
             "additionalProperties": false
           },
           {
             "properties": {
-              "instructions": { "template": "atlante/instructions" }
+              "instructions": { "template": "@atlante/pack/instructions" }
             },
             "required": ["instructions"],
             "additionalProperties": false
           },
           {
-            "properties": { "gotchas": { "template": "atlante/gotchas" } },
+            "properties": { "gotchas": { "template": "@atlante/pack/gotchas" } },
             "required": ["gotchas"],
             "additionalProperties": false
           },
           {
-            "properties": { "workflow": { "template": "atlante/workflow" } },
+            "properties": { "workflow": { "template": "@atlante/pack/workflow" } },
             "required": ["workflow"],
             "additionalProperties": false
           },
           {
             "properties": {
-              "constraints": { "template": "atlante/constraints" }
+              "constraints": { "template": "@atlante/pack/constraints" }
             },
             "required": ["constraints"],
             "additionalProperties": false

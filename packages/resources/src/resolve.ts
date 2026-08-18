@@ -1,6 +1,5 @@
 import { basename, join, relative } from "node:path";
 import { authoredValueLayerIssues } from "./authored-values.js";
-import { BUNDLED_RESOURCE_PACK } from "./bundled.js";
 import { type Slot, slotsOf } from "./composition.js";
 import {
   isResourcePackPathContained,
@@ -77,8 +76,6 @@ import type {
 } from "./types.js";
 
 export type ResourceResolveOptions = Readonly<{
-  /** Custom bundled root for tests or an embedded distribution. */
-  readonly bundledPack?: ResourcePack;
   /** Existing facet read seam, also used by package metadata reads. */
   readonly beforeRead?: (path: string) => void;
 }>;
@@ -822,16 +819,6 @@ function graphNode(
   } as ResourceGraphNode;
 }
 
-function normalizeRequest<T extends ResourceResolveOptions>(
-  request: T,
-  fallbackPack: ResourcePack,
-): ResourceResolveOptions & { readonly bundledPack: ResourcePack } {
-  return {
-    ...request,
-    bundledPack: request.bundledPack ?? fallbackPack,
-  };
-}
-
 type ResourceRequest = ResourceResolveOptions & {
   readonly pack: ResourcePack;
 };
@@ -848,15 +835,11 @@ function runResourceRequest<T extends ResourceRequest, Result>(
   request: T,
   action: (resolver: ResourceResolver) => Result,
 ): Result {
-  const resolver = new ResourceResolver(
-    request.pack,
-    normalizeRequest(request, BUNDLED_RESOURCE_PACK),
-  );
+  const resolver = new ResourceResolver(request.pack, request);
   return resolver.run(() => action(resolver));
 }
 
 class ResourceResolver {
-  private readonly bundledPack: ResourcePack;
   private readonly beforeRead: ResourceResolveOptions["beforeRead"];
   private readonly packageCache = createPackageResolutionCache();
   private readonly graph: ResourceGraphState = createResourceGraphState();
@@ -874,7 +857,6 @@ class ResourceResolver {
     private readonly projectPack: ResourcePack,
     options: ResourceResolveOptions,
   ) {
-    this.bundledPack = options.bundledPack ?? BUNDLED_RESOURCE_PACK;
     this.beforeRead = options.beforeRead;
   }
 
@@ -906,15 +888,6 @@ class ResourceResolver {
     loaded.unresolvedParents.forEach((path) => {
       this.unresolvedParents.add(path);
     });
-  }
-
-  private packForReference(
-    pack: ResourcePack,
-    locator: RawResourceLocator,
-  ): ResourcePack {
-    return parseResourceLocator(locator).kind === "builtin"
-      ? this.bundledPack
-      : pack;
   }
 
   private enter(
@@ -956,13 +929,12 @@ class ResourceResolver {
     locator: RawResourceLocator,
     authoringFile: string,
   ): LoadedFacet<TemplateFacet> {
-    const selectedPack = this.packForReference(pack, locator);
-    const target = requireTarget(selectedPack, locator, authoringFile, {
+    const target = requireTarget(pack, locator, authoringFile, {
       packageCache: this.packageCache,
       beforeRead: this.beforeRead,
     });
     return this.cachedFacet(target, "template", () =>
-      loadTemplateFacet(selectedPack, locator, authoringFile, {
+      loadTemplateFacet(pack, locator, authoringFile, {
         packageCache: this.packageCache,
         beforeRead: this.beforeRead,
       }),
@@ -974,13 +946,12 @@ class ResourceResolver {
     locator: RawResourceLocator,
     authoringFile: string,
   ): LoadedFacet<InstanceFacet> {
-    const selectedPack = this.packForReference(pack, locator);
-    const target = requireTarget(selectedPack, locator, authoringFile, {
+    const target = requireTarget(pack, locator, authoringFile, {
       packageCache: this.packageCache,
       beforeRead: this.beforeRead,
     });
     return this.cachedFacet(target, "instance", () =>
-      loadInstanceFacet(selectedPack, locator, authoringFile, {
+      loadInstanceFacet(pack, locator, authoringFile, {
         packageCache: this.packageCache,
         beforeRead: this.beforeRead,
       }),
@@ -992,13 +963,12 @@ class ResourceResolver {
     locator: RawResourceLocator,
     authoringFile: string,
   ): LoadedFacet<Preset> {
-    const selectedPack = this.packForReference(pack, locator);
-    const target = requireTarget(selectedPack, locator, authoringFile, {
+    const target = requireTarget(pack, locator, authoringFile, {
       packageCache: this.packageCache,
       beforeRead: this.beforeRead,
     });
     return this.cachedFacet(target, "preset", () =>
-      loadPresetFacet(selectedPack, locator, authoringFile, {
+      loadPresetFacet(pack, locator, authoringFile, {
         packageCache: this.packageCache,
         beforeRead: this.beforeRead,
       }),
@@ -2369,7 +2339,9 @@ class ResourceResolver {
 
     const template = this.resolveTemplateAt(
       sourceContext.pack,
-      sourceContext.subject === "skill" ? "atlante/skill" : "atlante/agent",
+      sourceContext.subject === "skill"
+        ? "@atlante/pack/skill"
+        : "@atlante/pack/agent",
       sourceContext.authoringFile,
       sourceContext.path,
       sourceContext.hops,

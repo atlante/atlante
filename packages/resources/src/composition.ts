@@ -1,5 +1,6 @@
 // fallow-ignore-file code-duplication -- resource composition intentionally mirrors templates without a package dependency
-import { TEMPLATE_ID_PATTERN } from "./schema.js";
+
+import { parseResourceLocator } from "./locator.js";
 
 export type Slot = {
   property: string;
@@ -42,12 +43,13 @@ export function isCompositionMarker(
 }
 
 function isValidTemplateId(value: unknown): value is string {
-  return (
-    typeof value === "string" &&
-    (TEMPLATE_ID_PATTERN.test(value) ||
-      (value.length >= 2 &&
-        (value.startsWith("./") || value.startsWith("../"))))
-  );
+  if (typeof value !== "string") return false;
+  try {
+    const parsed = parseResourceLocator(value);
+    return parsed.kind === "local" || parsed.subpath !== undefined;
+  } catch {
+    return false;
+  }
 }
 
 function isValidMarker(

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import {
+  cpSync,
   mkdirSync,
   mkdtempSync,
   realpathSync,
@@ -9,6 +10,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type {
   ResourceFailureCode,
   ResourceOrigin,
@@ -16,7 +18,6 @@ import type {
 } from "../src/index.js";
 import {
   canonicalGraphKey,
-  createBundledResourcePack,
   createProjectResourcePack,
   resolveResourceDocument,
   resolveResourceInstance,
@@ -26,10 +27,45 @@ import {
 
 const created: string[] = [];
 const schemaUri = "https://json-schema.org/draft/2020-12/schema";
+const repositoryRoot = fileURLToPath(new URL("../../../", import.meta.url));
+const firstPartyPackRoot = join(repositoryRoot, "packages", "pack");
 
 function rootOf(): { root: string; config: string } {
   const root = mkdtempSync(join(tmpdir(), "atlante-resolve-"));
   created.push(root);
+  cpSync(firstPartyPackRoot, join(root, "node_modules", "@atlante", "pack"), {
+    recursive: true,
+  });
+  writeFileSync(
+    join(root, "package.json"),
+    `${JSON.stringify({
+      name: "atlante-resolve-fixture",
+      version: "1.0.0",
+      devDependencies: { "@atlante/pack": "workspace:0.1.6" },
+    })}\n`,
+  );
+  const config = join(root, "atlante.jsonc");
+  writeFileSync(config, "{}\n");
+  return { root, config };
+}
+
+function firstPartyRootOf(): { root: string; config: string } {
+  const root = mkdtempSync(join(repositoryRoot, ".pack-resolve-test-"));
+  created.push(root);
+  mkdirSync(join(root, "node_modules", "@atlante"), { recursive: true });
+  symlinkSync(
+    firstPartyPackRoot,
+    join(root, "node_modules", "@atlante", "pack"),
+    "dir",
+  );
+  writeFileSync(
+    join(root, "package.json"),
+    JSON.stringify({
+      name: "atlante-resolve-first-party-fixture",
+      version: "1.0.0",
+      devDependencies: { "@atlante/pack": "workspace:0.1.6" },
+    }),
+  );
   const config = join(root, "atlante.jsonc");
   writeFileSync(config, "{}\n");
   return { root, config };
@@ -170,7 +206,6 @@ function resolveDocument(root: string, config: string) {
   return resolveResourceDocument({
     pack: createProjectResourcePack(root),
     rootFile: config,
-    bundledPack: createBundledResourcePack(),
   });
 }
 
@@ -399,10 +434,10 @@ describe("resource resolution", () => {
     );
   });
 
-  test("resolves local and atlante/starter extends from the containing config", () => {
-    const { root, config } = rootOf();
+  test("resolves local and first-party package extends from the containing config", () => {
+    const { root, config } = firstPartyRootOf();
     writePreset(root, "base", {
-      extends: "atlante/starter",
+      extends: "@atlante/pack",
       values: { inherited: "false", local: "true" },
     });
     writeFileSync(
@@ -412,7 +447,7 @@ describe("resource resolution", () => {
         values: { replaced: "root" },
         agents: {
           local: {
-            $template: "atlante/agent",
+            $template: "@atlante/pack/agent",
             description: "Local agent",
             identity: "Identity",
             mission: "Mission",
@@ -440,7 +475,7 @@ describe("resource resolution", () => {
     );
     expect(
       result.provenance["/agents/architect/description"]?.path as string,
-    ).toBe("atlante/starter/atlante.jsonc");
+    ).toBe("@atlante/pack@0.1.6/atlante.jsonc");
   });
 
   test("merges ordered preset layers left-to-right with winning provenance", () => {

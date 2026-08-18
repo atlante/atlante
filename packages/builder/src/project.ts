@@ -1,8 +1,5 @@
 import { dirname } from "node:path";
-import type {
-  ResolvedResourceDocument,
-  ResourcePack,
-} from "@atlante/resources";
+import type { ResolvedResourceDocument } from "@atlante/resources";
 import type { AtlanteDocument } from "@atlante/schema";
 import {
   type Diagnostic,
@@ -10,9 +7,7 @@ import {
   type ResourceWatchContext,
 } from "@atlante/validator";
 
-export type ProjectContext = {
-  bundledPack?: ResourcePack;
-};
+export type ProjectContext = Record<string, never>;
 
 export type LoadedProject = {
   document?: AtlanteDocument;
@@ -34,10 +29,8 @@ export function loadProject(
   target: string,
   context: ProjectContext = {},
 ): LoadedProject {
-  const loaded = loadDocument(
-    target,
-    context.bundledPack ? { bundledPack: context.bundledPack } : {},
-  );
+  void context;
+  const loaded = loadDocument(target);
   if (!loaded.path) return { diagnostics: loaded.diagnostics };
 
   if (!loaded.document)

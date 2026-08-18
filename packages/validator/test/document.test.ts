@@ -1,7 +1,8 @@
 import { describe, expect, spyOn, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import * as resources from "@atlante/resources";
 import { SCHEMA_URI } from "@atlante/schema";
 import {
@@ -17,9 +18,37 @@ const valid = `{
    "agents": { "reviewer": { "description": "Agent", "identity": "x", "mission": "y" } }
 }`;
 
+const firstPartyPackRoot = fileURLToPath(
+  new URL("../../pack/", import.meta.url),
+);
+
+function installFirstPartyPack(root: string): void {
+  cpSync(firstPartyPackRoot, join(root, "node_modules", "@atlante", "pack"), {
+    recursive: true,
+  });
+  writeFileSync(
+    join(root, "package.json"),
+    `${JSON.stringify({
+      name: "atlante-validator-document-fixture",
+      version: "1.0.0",
+      devDependencies: { "@atlante/pack": "workspace:0.1.6" },
+    })}\n`,
+  );
+}
+
+function validateWithFirstPartyPack(text: string, filename = "atlante.jsonc") {
+  const root = mkdtempSync(join(tmpdir(), "atlante-document-pack-"));
+  installFirstPartyPack(root);
+  try {
+    return validateDocumentText(text, join(root, filename));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
 describe("validateDocumentText", () => {
   test("accepts a JSONC document with comments", () => {
-    const result = validateDocumentText(valid, "atlante.jsonc");
+    const result = validateWithFirstPartyPack(valid);
     expect(result.diagnostics).toEqual([]);
     expect(result.document?.agents?.reviewer?.identity).toBe("x");
   });
@@ -31,7 +60,7 @@ describe("validateDocumentText", () => {
         reviewer: { description: "Agent", identity: "x", mission: "y" },
       },
     });
-    const result = validateDocumentText(strict, "atlante.json");
+    const result = validateWithFirstPartyPack(strict, "atlante.json");
     expect(result.diagnostics).toEqual([]);
     expect(result.document).toBeDefined();
   });
@@ -116,11 +145,12 @@ describe("validateDocumentText", () => {
     writeFileSync(
       join(derived, "instance.jsonc"),
       JSON.stringify({
-        $template: "atlante/agent",
+        $template: "@atlante/pack/agent",
         identity: "Derived identity",
         mission: "Derived mission",
       }),
     );
+    installFirstPartyPack(root);
 
     try {
       const result = validateDocumentText(
@@ -203,19 +233,15 @@ describe("validateDocumentText", () => {
   });
 
   test("accepts a document without agents or skills and normalizes both maps", () => {
-    const result = validateDocumentText(
-      `{ "$schema": "${SCHEMA_URI}" }`,
-      "atlante.jsonc",
-    );
+    const result = validateWithFirstPartyPack(`{ "$schema": "${SCHEMA_URI}" }`);
     expect(result.diagnostics).toEqual([]);
     expect(result.document?.agents).toEqual({});
     expect(result.document?.skills).toEqual({});
   });
 
   test("accepts a skill-only document", () => {
-    const result = validateDocumentText(
+    const result = validateWithFirstPartyPack(
       `{ "$schema": "${SCHEMA_URI}", "skills": { "testing": { "description": "Run tests", "title": "Testing", "overview": "Run tests.", "sections": [{ "markdown": "Run tests." }] } } }`,
-      "atlante.jsonc",
     );
     expect(result.diagnostics).toEqual([]);
     expect(result.document?.agents).toEqual({});
@@ -230,13 +256,12 @@ describe("validateDocumentText", () => {
   });
 
   test("sorts validateDocumentText diagnostics independently of input order", () => {
-    const result = validateDocumentText(
+    const result = validateWithFirstPartyPack(
       `{
         "$schema": "${SCHEMA_URI}",
         "values": { "count": 1 },
-        "agents": { "reviewer": { "template": "atlante/agent", "description": "Review" } }
+        "agents": { "reviewer": { "template": "@atlante/pack/agent", "description": "Review" } }
       }`,
-      "atlante.jsonc",
     );
 
     expect(result.diagnostics.map(({ path }) => path)).toEqual([
@@ -246,13 +271,12 @@ describe("validateDocumentText", () => {
   });
 
   test("round-trips dangerous-looking JSONC keys without prototype pollution", () => {
-    const result = validateDocumentText(
+    const result = validateWithFirstPartyPack(
       `{
         "$schema": "${SCHEMA_URI}",
         "values": { "__proto__": "safe" },
         "agents": { "__proto__": { "description": "Agent", "identity": "x", "mission": "y" } }
       }`,
-      "atlante.jsonc",
     );
 
     expect(result.diagnostics).toEqual([]);
@@ -279,18 +303,16 @@ describe("validateDocumentText", () => {
   });
 
   test("accepts a valid root skills map", () => {
-    const result = validateDocumentText(
+    const result = validateWithFirstPartyPack(
       `{ "$schema": "${SCHEMA_URI}", "agents": {}, "skills": { "testing": { "description": "Run tests", "title": "Testing", "overview": "Run tests.", "sections": [{ "markdown": "Run tests." }] } } }`,
-      "atlante.jsonc",
     );
     expect(result.diagnostics).toEqual([]);
     expect(result.document?.skills?.testing?.description).toBe("Run tests");
   });
 
   test("accepts agent and skill bindings together", () => {
-    const result = validateDocumentText(
+    const result = validateWithFirstPartyPack(
       `{ "$schema": "${SCHEMA_URI}", "agents": { "reviewer": { "description": "Agent", "identity": "x", "mission": "y" } }, "skills": { "testing": { "description": "Run tests", "title": "Testing", "overview": "Run tests.", "sections": [{ "markdown": "Run tests." }] } } }`,
-      "atlante.jsonc",
     );
     expect(result.diagnostics).toEqual([]);
     expect(result.document?.agents?.reviewer?.mission).toBe("y");
@@ -301,7 +323,7 @@ describe("validateDocumentText", () => {
     const text = `{
       "$schema": "${SCHEMA_URI}",
       "values": { "count": 1 },
-      "agents": { "reviewer": { "template": "atlante/agent" } }
+      "agents": { "reviewer": { "template": "@atlante/pack/agent" } }
     }`;
     const parsed = parseDocumentOverlay(text, "atlante.jsonc");
 
@@ -320,7 +342,9 @@ describe("validateDocumentText", () => {
     ).toBe(true);
 
     expect(parsed.diagnostics).toHaveLength(2);
-    expect(JSON.stringify(parsed.diagnostics)).not.toContain("atlante/agent");
+    expect(JSON.stringify(parsed.diagnostics)).not.toContain(
+      "@atlante/pack/agent",
+    );
   });
 });
 
@@ -381,6 +405,7 @@ describe("loadDocument", () => {
   test("loads an explicit file path", () => {
     const dir = mkdtempSync(join(tmpdir(), "atlante-document-"));
     const path = join(dir, "atlante.jsonc");
+    installFirstPartyPack(dir);
     writeFileSync(path, valid);
     try {
       const result = loadDocument(path);
@@ -427,6 +452,7 @@ describe("loadDocument", () => {
   test("normalizes explicit and discovered paths before resource resolution", () => {
     const root = mkdtempSync(join(tmpdir(), "atlante-document-relative-"));
     const previous = process.cwd();
+    installFirstPartyPack(root);
     writeFileSync(
       join(root, "atlante.jsonc"),
       `{ "$schema": "${SCHEMA_URI}" }`,

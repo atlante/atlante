@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import {
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -16,11 +17,25 @@ import packageJson from "../package.json" with { type: "json" };
 import { createProgram, runBuild, runValidate } from "../src/main.js";
 
 const created: string[] = [];
+const firstPartyPackRoot = fileURLToPath(
+  new URL("../../pack/", import.meta.url),
+);
 
 function project(config: string): string {
   const dir = mkdtempSync(join(tmpdir(), "atlante-cli-"));
   created.push(dir);
   writeFileSync(join(dir, "atlante.jsonc"), config);
+  cpSync(firstPartyPackRoot, join(dir, "node_modules", "@atlante", "pack"), {
+    recursive: true,
+  });
+  writeFileSync(
+    join(dir, "package.json"),
+    `${JSON.stringify({
+      name: "atlante-cli-fixture",
+      version: "1.0.0",
+      devDependencies: { "@atlante/pack": "workspace:0.1.6" },
+    })}\n`,
+  );
   return dir;
 }
 
@@ -48,19 +63,8 @@ test("reports the package manifest version", () => {
 const LAUNCHER = fileURLToPath(
   new URL("../dist/bin/atlante.js", import.meta.url),
 );
-const BUNDLED = fileURLToPath(new URL("../bundled", import.meta.url));
 const REAL_NODE = Bun.which("node");
 const launcherIsBuilt = existsSync(LAUNCHER) && REAL_NODE !== null;
-const bundledIsBuilt = existsSync(join(BUNDLED, "resources"));
-
-test.skipIf(!bundledIsBuilt)(
-  "the built CLI ships one unified resource pack",
-  () => {
-    expect(existsSync(join(BUNDLED, "resources"))).toBe(true);
-    expect(existsSync(join(BUNDLED, "templates"))).toBe(false);
-    expect(existsSync(join(BUNDLED, "presets"))).toBe(false);
-  },
-);
 
 test.skipIf(!launcherIsBuilt)(
   "the built launcher runs with Node when Bun is unavailable",
@@ -154,18 +158,18 @@ test("CLI validates and builds local shorthand, selectors, and local extends", a
   );
 });
 
-test("CLI resolves bundled resource facets without package lookup", async () => {
+test("CLI resolves first-party package resource facets", async () => {
   const dir = project(`{
     "$schema": "${SCHEMA_URI}",
     "values": { "project": "demo", "quick-check": "quick", "full-check": "full" },
     "agents": {
-      "architect": { "$instance": "atlante/architect", "description": "Architect" },
-      "agent": { "$template": "atlante/agent", "description": "Agent", "identity": "Identity", "mission": "Mission" }
+      "architect": { "$instance": "@atlante/pack/architect", "description": "Architect" },
+      "agent": { "$template": "@atlante/pack/agent", "description": "Agent", "identity": "Identity", "mission": "Mission" }
     },
     "skills": {
-      "brainstorming": { "$instance": "atlante/brainstorming", "description": "Brainstorming" },
-      "workflow": { "$instance": "atlante/delivery-workflow", "description": "Workflow" },
-      "skill": { "$template": "atlante/skill", "description": "Skill", "title": "Skill", "overview": "Overview", "sections": [{ "markdown": "Body" }] }
+      "brainstorming": { "$instance": "@atlante/pack/brainstorming", "description": "Brainstorming" },
+      "workflow": { "$instance": "@atlante/pack/delivery-workflow", "description": "Workflow" },
+      "skill": { "$template": "@atlante/pack/skill", "description": "Skill", "title": "Skill", "overview": "Overview", "sections": [{ "markdown": "Body" }] }
     }
   }`);
 
@@ -199,7 +203,7 @@ describe("runValidate", () => {
   test("fails validation on preset expansion diagnostics", async () => {
     const dir = project(`{
       "$schema": "${SCHEMA_URI}",
-      "extends": "atlante/missing",
+      "extends": "@atlante/pack/missing",
       "agents": {}
     }`);
     const errors: string[] = [];
@@ -210,7 +214,7 @@ describe("runValidate", () => {
     } finally {
       console.error = original;
     }
-    expect(errors.join("\n")).toContain("missing-target");
+    expect(errors.join("\n")).toContain("missing-package-subpath");
   });
 
   test("accepts config filenames and relative project directories from any cwd", async () => {

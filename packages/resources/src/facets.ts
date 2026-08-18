@@ -27,7 +27,6 @@ import {
 import type { PackageResolutionCache } from "./package-resolution.js";
 import { JSON_SCHEMA_DRAFT_2020_12_URI } from "./schema.js";
 import type {
-  BundledResourceOrigin,
   InstanceFacet,
   JsonObject,
   PackageResourceOrigin,
@@ -149,18 +148,6 @@ function projectOriginPath(
     );
     return `${target.pack.package.name}@${target.pack.package.version}/${packagePath}`;
   }
-  if (target.pack.kind === "bundled") {
-    const locator = String(target.locator);
-    if (locator === "atlante/starter") return `atlante/starter/${file.name}`;
-    if (locator.startsWith("atlante/")) {
-      return `atlante/${locator.slice("atlante/".length)}/${file.name}`;
-    }
-    const bundledPath = relative(target.pack.root, file.path).replaceAll(
-      "\\",
-      "/",
-    );
-    return `atlante/${bundledPath}`;
-  }
   return relative(target.pack.root, file.path).replaceAll("\\", "/");
 }
 
@@ -169,12 +156,6 @@ function originFor(
   file: ResourceFile,
 ): ResourceOrigin {
   const path = projectOriginPath(target, file);
-  if (target.pack.kind === "bundled") {
-    return {
-      kind: "bundled",
-      path: path as unknown as BundledResourceOrigin["path"],
-    };
-  }
   if (target.pack.kind === "package") {
     return {
       kind: "package",

@@ -1,7 +1,6 @@
 import { readFileSync, statSync } from "node:fs";
-import { basename, dirname, isAbsolute, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, resolve } from "node:path";
 import {
-  BUNDLED_RESOURCE_PACK,
   createProjectResourcePack,
   type JsonObject,
   type ResourcePack,
@@ -33,7 +32,6 @@ import {
 } from "./templates.js";
 
 export type DocumentLoadOptions = {
-  bundledPack?: ResourcePack;
   statSync?: (
     path: string,
     options: { throwIfNoEntry: false },
@@ -312,22 +310,9 @@ function unsupportedSchemaDiagnostic(
   );
 }
 
-function validationSourcePath(
-  sourcePath: string,
-  options: DocumentLoadOptions,
-): string {
-  if (sourcePath !== "atlante/starter/atlante.jsonc")
-    return resolve(sourcePath);
-  return join(
-    (options.bundledPack ?? BUNDLED_RESOURCE_PACK).root,
-    "atlante.jsonc",
-  );
-}
-
 export function validateDocumentText(
   text: string,
   sourcePath: string,
-  options: DocumentLoadOptions = {},
 ): { document?: AtlanteDocument; diagnostics: Diagnostic[] } {
   const { raw, diagnostics } = parseConfigSource(text, sourcePath);
   if (raw === undefined) return { diagnostics: sortDiagnostics(diagnostics) };
@@ -335,11 +320,10 @@ export function validateDocumentText(
   if (!parsed.overlay)
     return { diagnostics: sortDiagnostics(parsed.diagnostics) };
 
-  const path = validationSourcePath(sourcePath, options);
+  const path = resolve(sourcePath);
   const result = resolveResourceBackedDocument(
     path,
     text,
-    options,
     { path, projectRoot: dirname(path) },
     parsed.overlay as unknown as JsonObject,
   );
@@ -402,7 +386,6 @@ type DocumentLocation = { path: string; projectRoot: string };
 function resolveResourceBackedDocument(
   path: string,
   text: string,
-  options: DocumentLoadOptions,
   location: DocumentLocation,
   rootDocument?: JsonObject,
 ): {
@@ -434,7 +417,6 @@ function resolveResourceBackedDocument(
       pack: projectPack,
       rootFile: path,
       ...(rootDocument ? { rootDocument } : {}),
-      ...(options.bundledPack ? { bundledPack: options.bundledPack } : {}),
     });
   } catch (cause) {
     return {
@@ -533,5 +515,5 @@ export function loadDocument(
   const location = { path, projectRoot: dirname(path) };
   if (!parsed.overlay)
     return { ...location, diagnostics: sortDiagnostics(parsed.diagnostics) };
-  return resolveResourceBackedDocument(path, text, options, location);
+  return resolveResourceBackedDocument(path, text, location);
 }

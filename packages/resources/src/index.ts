@@ -3,11 +3,6 @@ export type {
   AuthoredValueLayerKind,
 } from "./authored-values.js";
 export { authoredValueLayerIssues } from "./authored-values.js";
-export {
-  BUNDLED_RESOURCE_PACK,
-  BUNDLED_RESOURCES_DIR,
-  createBundledResourcePack,
-} from "./bundled.js";
 export type { Slot } from "./composition.js";
 export { isCompositionMarker, slotsOf } from "./composition.js";
 export type {
@@ -135,7 +130,6 @@ export {
 } from "./resolve.js";
 export {
   JSON_SCHEMA_DRAFT_2020_12_URI,
-  TEMPLATE_ID_PATTERN,
   TEMPLATE_NAME_PATTERN,
 } from "./schema.js";
 export {
@@ -145,8 +139,6 @@ export {
 } from "./system-values.js";
 export type {
   AuthoredResourceLocator,
-  BuiltinResourceLocator,
-  BundledResourceOrigin,
   InstanceFacet,
   InstanceResourceGraphNode,
   JsonObject,
@@ -157,7 +149,6 @@ export type {
   Preset,
   PresetResourceGraphNode,
   ProjectResourceOrigin,
-  RawBundledResourceOrigin,
   RawPackageResourceOrigin,
   RawProjectResourceOrigin,
   RawResourceLocator,
@@ -177,7 +168,6 @@ export type {
   ResourcePackageIdentity,
   TemplateFacet,
   TemplateResourceGraphNode,
-  ValidatedBuiltinResourceLocator,
   ValidatedLocalResourceLocator,
   ValidatedPackageResourceLocator,
   ValidatedResourceLocator,

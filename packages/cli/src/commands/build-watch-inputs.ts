@@ -2,7 +2,6 @@ import { lstatSync, realpathSync, statSync } from "node:fs";
 import * as nodePath from "node:path";
 import { basename, dirname, resolve } from "node:path";
 import { loadProject } from "@atlante/builder";
-import { BUNDLED_RESOURCE_PACK } from "@atlante/resources";
 import type { ResourceWatchContext } from "@atlante/validator";
 import { CONFIG_FILENAMES, findConfigFile } from "@atlante/validator";
 
@@ -50,8 +49,6 @@ function rootsFor(projectDir: string): readonly string[] {
   } catch {
     // The project root may be created after the first failed build.
   }
-  roots.add(BUNDLED_RESOURCE_PACK.root);
-  roots.add(BUNDLED_RESOURCE_PACK.lexicalRoot);
   return [...roots];
 }
 

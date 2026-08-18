@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import {
+  cpSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -12,6 +13,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { buildProject } from "@atlante/builder";
 import { SCHEMA_URI } from "@atlante/schema";
 import type { Config, PluginInput } from "@opencode-ai/plugin";
@@ -34,6 +36,9 @@ type ArtifactManifest = {
 };
 
 const created: string[] = [];
+const firstPartyPackRoot = fileURLToPath(
+  new URL("../../pack/", import.meta.url),
+);
 
 function tempDir(prefix = "atlante-plugin-"): string {
   const dir = mkdtempSync(join(tmpdir(), prefix));
@@ -44,6 +49,17 @@ function tempDir(prefix = "atlante-plugin-"): string {
 function project(config: string): string {
   const dir = tempDir();
   writeFileSync(join(dir, "atlante.jsonc"), config);
+  cpSync(firstPartyPackRoot, join(dir, "node_modules", "@atlante", "pack"), {
+    recursive: true,
+  });
+  writeFileSync(
+    join(dir, "package.json"),
+    `${JSON.stringify({
+      name: "atlante-plugin-fixture",
+      version: "1.0.0",
+      devDependencies: { "@atlante/pack": "workspace:0.1.6" },
+    })}\n`,
+  );
   return dir;
 }
 
@@ -76,7 +92,7 @@ function builtLocalResourceProject(): string {
   writeFileSync(
     join(dir, "resources", "reviewer", "instance.jsonc"),
     `{
-      "$template": "atlante/agent",
+      "$template": "@atlante/pack/agent",
       "identity": "You are a locally authored reviewer.",
       "mission": "Prove that local resources were built before source removal."
     }`,
@@ -84,7 +100,7 @@ function builtLocalResourceProject(): string {
   writeFileSync(
     join(dir, "resources", "testing", "instance.jsonc"),
     `{
-      "$template": "atlante/skill",
+      "$template": "@atlante/pack/skill",
       "title": "Local testing",
       "overview": "A locally authored skill.",
       "sections": [{ "markdown": "This content came from a local resource." }]

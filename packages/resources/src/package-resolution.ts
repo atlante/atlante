@@ -606,13 +606,6 @@ function packageDeclaration(
       );
     return { dependencies: [], self: false };
   }
-  if (authoringPack.kind !== "project")
-    return failResource(
-      "package-not-declared",
-      "bundled resources cannot author package locators",
-      { locator },
-    );
-
   const manifest = projectManifest(authoringPack, locator, options);
   if (!isDeclared(packageName, manifest))
     return failResource(
