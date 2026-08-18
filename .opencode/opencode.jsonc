@@ -18,7 +18,7 @@
   "agent": {
     "architect": {
       "mode": "primary",
-      "model": "opencode-go/gpt-5.6-sol",
+      "model": "opencode-go/gpt-5.6-luna",
       "reasoningEffort": "max",
       "permission": {
         "*": "allow",
