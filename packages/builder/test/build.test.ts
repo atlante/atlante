@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { createHash } from "node:crypto";
 import {
   cpSync,
   existsSync,
@@ -23,6 +24,12 @@ import {
   prepareProject,
   validateProject,
 } from "../src/index.js";
+import {
+  EXTERNAL_AGENT_PROMPT,
+  EXTERNAL_SKILL_CONTENT,
+  writeExternalPack,
+  writeExternalPackContent,
+} from "./external-pack-fixture.js";
 
 const created: string[] = [];
 const firstPartyPackRoot = fileURLToPath(
@@ -70,6 +77,59 @@ function writeTemplate(
     }),
   );
   writeFileSync(join(directory, "template.md"), source);
+}
+
+function digest(value: Uint8Array | string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function externalPackProject(): { root: string; packRoot: string } {
+  const { root } = project(
+    JSON.stringify({
+      $schema: SCHEMA_URI,
+      extends: "@acme/review-pack/strict",
+    }),
+  );
+  const packRoot = join(root, "node_modules", "@acme", "review-pack");
+  mkdirSync(packRoot, { recursive: true });
+  writeExternalPack(packRoot);
+  writeFileSync(
+    join(root, "package.json"),
+    `${JSON.stringify({
+      name: "atlante-builder-external-pack-fixture",
+      version: "1.0.0",
+      devDependencies: {
+        "@atlante/pack": "workspace:0.1.6",
+        "@acme/review-pack": "file:external-pack",
+      },
+    })}\n`,
+  );
+  return { root, packRoot };
+}
+
+function localEquivalentProject(): string {
+  const { root } = project(
+    JSON.stringify({
+      $schema: SCHEMA_URI,
+      values: { project: "strict-project" },
+      agents: {
+        reviewer: {
+          $instance: "./reviewer",
+          description: "External reviewer for {{values.project}}.",
+          mission: "Review the strict artifact.",
+        },
+      },
+      skills: {
+        testing: {
+          $instance: "./testing",
+          description: "Strict external testing for {{values.project}}.",
+          body: "Strict external body.",
+        },
+      },
+    }),
+  );
+  writeExternalPackContent(root);
+  return root;
 }
 
 type NestedChildCase = Readonly<{
@@ -362,6 +422,68 @@ describe("buildProject", () => {
         prompt: "# Custom\nLEFT localRIGHT right\n",
       }),
     ]);
+  });
+
+  test("builds a declared external pack into the unchanged artifact contract", () => {
+    const external = externalPackProject();
+    const local = localEquivalentProject();
+
+    const externalResult = buildProject(external.root);
+    const localResult = buildProject(local);
+
+    expect(externalResult.diagnostics).toEqual([]);
+    expect(localResult.diagnostics).toEqual([]);
+    expect(externalResult.resourceWatch?.trustedRoots).toContainEqual({
+      canonical: realpathSync(external.packRoot),
+      lexical: external.packRoot,
+    });
+
+    const expectedManifest = {
+      format: "atlante-artifacts",
+      version: 1,
+      agents: [
+        {
+          id: "reviewer",
+          description: "External reviewer for strict-project.",
+          path: `agents/reviewer-${digest("reviewer")}-${digest(EXTERNAL_AGENT_PROMPT)}.md`,
+          sha256: digest(EXTERNAL_AGENT_PROMPT),
+        },
+      ],
+      skills: [
+        {
+          id: "testing",
+          description: "Strict external testing for strict-project.",
+          path: `skills/testing-${digest("testing")}-${digest(EXTERNAL_SKILL_CONTENT)}.md`,
+          sha256: digest(EXTERNAL_SKILL_CONTENT),
+        },
+      ],
+    };
+
+    expect(
+      JSON.parse(
+        readFileSync(
+          join(external.root, ".atlante", "artifacts", "manifest.json"),
+          "utf8",
+        ),
+      ),
+    ).toEqual(expectedManifest);
+    expect(artifactTreeBytes(external.root)).toEqual(artifactTreeBytes(local));
+    expect(artifactTreeBytes(external.root)).toEqual(
+      [
+        {
+          path: expectedManifest.agents[0]?.path ?? "",
+          bytes: Buffer.from(EXTERNAL_AGENT_PROMPT),
+        },
+        {
+          path: expectedManifest.skills[0]?.path ?? "",
+          bytes: Buffer.from(EXTERNAL_SKILL_CONTENT),
+        },
+        {
+          path: "manifest.json",
+          bytes: Buffer.from(`${JSON.stringify(expectedManifest, null, 2)}\n`),
+        },
+      ].sort((left, right) => left.path.localeCompare(right.path)),
+    );
   });
 
   test("does not resurrect a tombstoned global value during build", () => {
