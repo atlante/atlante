@@ -13,12 +13,15 @@ import {
 import { tmpdir } from "node:os";
 import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { loadProject, type ProjectContext } from "@atlante/builder";
+import { createPackageResourcePack } from "@atlante/resources";
 import { SCHEMA_URI } from "@atlante/schema";
-import { runBuild } from "../src/commands/build.js";
+import { runBuild, runBuildWithContext } from "../src/commands/build.js";
 import {
   runBuildWatchWithDependencies,
   type WatchCallback,
 } from "../src/commands/build-watch.js";
+import { runValidate } from "../src/commands/validate.js";
 
 const created: string[] = [];
 
@@ -42,6 +45,63 @@ function firstPartyProjectWithoutUserDeclaration(): string {
     })}\n`,
   );
   return dir;
+}
+
+function firstPartyContextFixture(): {
+  dir: string;
+  manifest: string;
+  template: string;
+  context: ProjectContext;
+} {
+  const dir = tempProject(`{
+    "$schema": "${SCHEMA_URI}",
+    "extends": "@atlante/pack",
+    "agents": {
+      "reviewer": {
+        "$template": "@atlante/pack/agent",
+        "description": "Review",
+        "identity": "Identity"
+      }
+    }
+  }`);
+  const packRoot = mkdtempSync(join(tmpdir(), "atlante-first-party-pack-"));
+  created.push(packRoot);
+  const manifest = join(packRoot, "package.json");
+  const templateDirectory = join(packRoot, "agent");
+  const template = join(templateDirectory, "template.md");
+  mkdirSync(templateDirectory, { recursive: true });
+  writeFileSync(
+    manifest,
+    `${JSON.stringify({
+      name: "@atlante/pack",
+      version: "1.2.3",
+      atlante: { format: 1 },
+    })}\n`,
+  );
+  writeFileSync(
+    join(packRoot, "atlante.jsonc"),
+    '{ "values": { "pack": "valid" } }\n',
+  );
+  writeFileSync(
+    join(templateDirectory, "template.jsonc"),
+    `${JSON.stringify({
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+      type: "object",
+      properties: { identity: { type: "string" } },
+      required: ["identity"],
+      additionalProperties: false,
+    })}\n`,
+  );
+  writeFileSync(template, "{{identity}}\n");
+
+  return {
+    dir,
+    manifest,
+    template,
+    context: {
+      firstPartyPack: createPackageResourcePack(packRoot, "@atlante/pack"),
+    },
+  };
 }
 
 function writeExternalPackage(
@@ -174,6 +234,127 @@ function fakeWatcher(): WatcherFake {
 }
 
 describe("runBuildWatchWithDependencies", () => {
+  test("revalidates a captured first-party pack for every request and recovers facets", async () => {
+    const fixture = firstPartyContextFixture();
+    const watcher = fakeWatcher();
+    const validManifest: Record<string, unknown> = {
+      name: "@atlante/pack",
+      version: "1.2.3",
+      atlante: { format: 1 },
+    };
+    const invalidManifests: ReadonlyArray<{
+      readonly manifest: Record<string, unknown>;
+      readonly message: string;
+    }> = [
+      {
+        manifest: { ...validManifest, name: "@atlante/not-pack" },
+        message:
+          "package metadata must declare the resolved package name and version",
+      },
+      {
+        manifest: { ...validManifest, version: "not-semver" },
+        message: "package metadata version must be a strict semver value",
+      },
+      {
+        manifest: {
+          name: validManifest.name,
+          version: validManifest.version,
+        },
+        message: "package metadata must declare numeric atlante.format 1",
+      },
+      {
+        manifest: { ...validManifest, atlante: { format: 2 } },
+        message:
+          "package atlante.format is unsupported; expected numeric format 1",
+      },
+    ];
+    const outcomes: number[] = [];
+    const errors: string[] = [];
+    const originalError = console.error;
+    console.error = (...args: unknown[]) => errors.push(args.join(" "));
+
+    const handle = runBuildWatchWithDependencies(
+      fixture.dir,
+      {
+        build: (target) => {
+          const outcome = runBuildWithContext(target, fixture.context);
+          outcomes.push(outcome.code);
+          return outcome;
+        },
+        watch: watcher.watch,
+        unwatch: watcher.unwatch,
+        debounceMs: 20,
+      },
+      fixture.context,
+    );
+
+    try {
+      expect(outcomes).toEqual([0]);
+      const manifestCallback = watcher.callbacks.get(
+        realpathSync(fixture.manifest),
+      );
+      expect(manifestCallback).toBeDefined();
+
+      for (const [index, { manifest, message }] of invalidManifests.entries()) {
+        writeFileSync(fixture.manifest, `${JSON.stringify(manifest)}\n`);
+        const requestErrors: string[] = [];
+        const requestError = console.error;
+        console.error = (...args: unknown[]) =>
+          requestErrors.push(args.join(" "));
+        try {
+          expect(await runValidate(fixture.dir, fixture.context)).toBe(1);
+          expect(runBuildWithContext(fixture.dir, fixture.context).code).toBe(
+            1,
+          );
+        } finally {
+          console.error = requestError;
+        }
+        expect(requestErrors).toHaveLength(2);
+        expect(requestErrors[0]).toBe(requestErrors[1]);
+        expect(requestErrors[0]).toContain(message);
+
+        manifestCallback?.();
+        await waitFor(
+          () => outcomes.length === index + 2,
+          "failed watch rebuild",
+        );
+        expect(outcomes.at(-1)).toBe(1);
+      }
+
+      const repairedManifest = { ...validManifest, version: "2.0.0" };
+      writeFileSync(fixture.manifest, `${JSON.stringify(repairedManifest)}\n`);
+      manifestCallback?.();
+      await waitFor(
+        () => outcomes.length === invalidManifests.length + 2,
+        "watch recovery after package metadata repair",
+      );
+      expect(outcomes.at(-1)).toBe(0);
+      expect(fixture.context.firstPartyPack?.package?.version).toBe("1.2.3");
+      const loaded = loadProject(fixture.dir, fixture.context);
+      expect({
+        kind: loaded.resources?.provenance["/values/pack"]?.kind,
+        path: String(loaded.resources?.provenance["/values/pack"]?.path),
+      }).toEqual({
+        kind: "package",
+        path: "@atlante/pack@2.0.0/atlante.jsonc",
+      });
+
+      writeFileSync(fixture.template, "Changed {{identity}}\n");
+      watcher.callbacks.get(realpathSync(fixture.template))?.();
+      await waitFor(
+        () => outcomes.length === invalidManifests.length + 3,
+        "watch recovery after facet change",
+      );
+      expect(outcomes.at(-1)).toBe(0);
+      expect(errors).toHaveLength(invalidManifests.length);
+      for (const [index, { message }] of invalidManifests.entries())
+        expect(errors[index]).toContain(message);
+    } finally {
+      console.error = originalError;
+      await handle.stop();
+    }
+  });
+
   test("uses the CLI first-party context for fallback watch loading", async () => {
     const dir = firstPartyProjectWithoutUserDeclaration();
     const watcher = fakeWatcher();

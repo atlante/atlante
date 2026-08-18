@@ -51,6 +51,7 @@ type ProjectManifest = Readonly<{
 export type PackageResolutionCache = {
   readonly projectManifests: Map<string, ProjectManifest>;
   readonly packageMetadata: Map<string, CanonicalPackageMetadata>;
+  readonly firstPartyPacks: Map<string, ResourcePack>;
 };
 
 type CanonicalPackageMetadata = Readonly<{
@@ -86,17 +87,30 @@ export function createPackageResolutionCache(): PackageResolutionCache {
   return {
     projectManifests: new Map(),
     packageMetadata: new Map(),
+    firstPartyPacks: new Map(),
   };
 }
 
 /** Creates a validated package root without resolving or executing package code. */
+function createPackageResourcePackWithLocator(
+  rootDirectory: string,
+  packageName: string,
+  locator: RawResourceLocator,
+): ResourcePack {
+  const rootPack = createResourcePack(rootDirectory, "package");
+  const identity = validatePackManifest(rootPack, locator, packageName, {});
+  return createResourcePack(rootDirectory, "package", identity);
+}
+
 export function createPackageResourcePack(
   rootDirectory: string,
   packageName: string,
 ): ResourcePack {
-  const rootPack = createResourcePack(rootDirectory, "package");
-  const identity = validatePackManifest(rootPack, packageName, packageName, {});
-  return createResourcePack(rootDirectory, "package", identity);
+  return createPackageResourcePackWithLocator(
+    rootDirectory,
+    packageName,
+    packageName,
+  );
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -1083,6 +1097,38 @@ function packageIdentityForReference(
   };
 }
 
+function firstPartyRootChanged(
+  pack: ResourcePack,
+  locator: RawResourceLocator,
+): never {
+  return failResource(
+    "unsafe-path",
+    "first-party package root changed",
+    { locator },
+    {
+      dependencies: resourcePackMetadataPaths(pack),
+      unresolvedParents: [pack.root],
+      trustedRoots: [resourcePackWatchRoot(pack)],
+    },
+  );
+}
+
+function refreshFirstPartyPack(
+  pack: ResourcePack,
+  locator: RawResourceLocator,
+): ResourcePack {
+  if (!isResourcePackLexicalRootStable(pack))
+    return firstPartyRootChanged(pack, locator);
+
+  const refreshed = createPackageResourcePackWithLocator(
+    pack.lexicalRoot,
+    "@atlante/pack",
+    locator,
+  );
+  if (refreshed.root !== pack.root) return firstPartyRootChanged(pack, locator);
+  return refreshed;
+}
+
 /** Resolves one package locator without scanning node_modules or loading code. */
 export function resolvePackageResourcePack(
   authoringPack: ResourcePack,
@@ -1103,11 +1149,17 @@ export function resolvePackageResourcePack(
     options.resourceContext.firstPartyPack.package?.name === packageName
       ? options.resourceContext.firstPartyPack
       : undefined;
-  if (firstPartyPack)
+  if (firstPartyPack) {
+    const cacheKey = firstPartyPack.root;
+    const refreshed =
+      options.cache?.firstPartyPacks.get(cacheKey) ??
+      refreshFirstPartyPack(firstPartyPack, locator.value);
+    options.cache?.firstPartyPacks.set(cacheKey, refreshed);
     return {
-      pack: firstPartyPack,
-      dependencies: resourcePackMetadataPaths(firstPartyPack),
+      pack: refreshed,
+      dependencies: resourcePackMetadataPaths(refreshed),
     };
+  }
 
   const declaration = packageDeclaration(
     authoringPack,
