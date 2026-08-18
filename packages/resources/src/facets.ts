@@ -2,6 +2,7 @@ import { relative } from "node:path";
 import {
   type ResourcePack,
   resourcePackMetadataPaths,
+  resourcePackWatchRoot,
 } from "./content-root.js";
 import {
   failResource,
@@ -92,6 +93,12 @@ function inspectResourceFileWithContext(
           ...error.dependencies,
         ],
         unresolvedParents: [target.directory, ...error.unresolvedParents],
+        trustedRoots: [
+          ...error.trustedRoots,
+          ...(target.pack.kind === "package"
+            ? [resourcePackWatchRoot(target.pack)]
+            : []),
+        ],
       });
     }
     throw error;
@@ -199,6 +206,9 @@ function sourceFailure(
         ...dependencies,
       ]),
       unresolvedParents,
+      ...(target.pack.kind === "package"
+        ? { trustedRoots: [resourcePackWatchRoot(target.pack)] }
+        : {}),
     },
   );
 }
@@ -256,6 +266,12 @@ function readSelected(
           ...error.dependencies,
         ],
         unresolvedParents: [target.directory, ...error.unresolvedParents],
+        trustedRoots: [
+          ...error.trustedRoots,
+          ...(target.pack.kind === "package"
+            ? [resourcePackWatchRoot(target.pack)]
+            : []),
+        ],
       });
     }
     return sourceFailure(

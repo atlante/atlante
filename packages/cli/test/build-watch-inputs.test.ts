@@ -5,6 +5,7 @@ import {
   mkdtempSync,
   realpathSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -198,6 +199,99 @@ describe("resolveWatchFiles", () => {
           path.startsWith(`${join(dir, "node_modules")}${sep}`),
       ).toBe(true);
     }
+  });
+
+  test("authorizes selected external package files and exposes both pack roots", () => {
+    const dir = tempDir();
+    const workspace = tempDir();
+    const packageRoot = join(workspace, "review-pack");
+    const installed = join(dir, "node_modules", "review-pack");
+    const agent = join(packageRoot, "agent");
+    mkdirSync(agent, { recursive: true });
+    mkdirSync(join(dir, "node_modules"), { recursive: true });
+    symlinkSync(packageRoot, installed, "dir");
+    writeFileSync(
+      join(dir, "package.json"),
+      `${JSON.stringify({
+        name: "atlante-watch-fixture",
+        version: "1.0.0",
+        dependencies: { "review-pack": "file:workspace" },
+      })}\n`,
+    );
+    writeFileSync(
+      join(dir, "atlante.jsonc"),
+      `${JSON.stringify({
+        $schema: SCHEMA_URI,
+        extends: "review-pack",
+        agents: {
+          reviewer: {
+            $template: "review-pack/agent",
+            description: "Review",
+            identity: "Identity",
+          },
+        },
+      })}\n`,
+    );
+    writeFileSync(
+      join(packageRoot, "package.json"),
+      `${JSON.stringify({
+        name: "review-pack",
+        version: "1.2.3",
+        atlante: { format: 1 },
+      })}\n`,
+    );
+    writeFileSync(join(packageRoot, "atlante.jsonc"), "{}\n");
+    writeFileSync(
+      join(agent, "template.jsonc"),
+      `${JSON.stringify({
+        $schema: "https://json-schema.org/draft/2020-12/schema",
+        type: "object",
+        properties: { identity: { type: "string" } },
+        required: ["identity"],
+        additionalProperties: false,
+      })}\n`,
+    );
+    writeFileSync(join(agent, "template.md"), "{{identity}}\n");
+    const unrelated = join(packageRoot, "broken");
+    mkdirSync(unrelated);
+    writeFileSync(join(unrelated, "template.jsonc"), "{ broken\n");
+    writeFileSync(join(unrelated, "template.md"), "unrelated\n");
+
+    const result = resolveWatchFiles(dir);
+
+    expect(result.resourcePaths).toEqual(
+      expect.arrayContaining([
+        realpathSync(join(packageRoot, "package.json")),
+        join(installed, "package.json"),
+        realpathSync(join(agent, "template.jsonc")),
+        realpathSync(join(agent, "template.md")),
+      ]),
+    );
+    expect(result.resourcePaths).toContain(installed);
+    expect(result.resourcePaths).not.toContain(
+      realpathSync(join(unrelated, "template.jsonc")),
+    );
+    expect(result.trustedRoots).toContainEqual({
+      canonical: realpathSync(packageRoot),
+      lexical: installed,
+    });
+  });
+
+  test("rejects absolute failure paths outside project and trusted pack roots", () => {
+    const dir = tempDir();
+    const trusted = tempDir();
+    const outside = tempDir();
+    const outsideFile = join(outside, "failure.jsonc");
+    writeFileSync(outsideFile, "{}\n");
+
+    const result = resolveWatchFiles(dir, {
+      dependencies: [outsideFile],
+      unresolvedParents: [outside],
+      trustedRoots: [{ canonical: trusted, lexical: trusted }],
+    });
+
+    expect(result.resourcePaths).not.toContain(outsideFile);
+    expect(result.unresolvedParents).not.toContain(outside);
   });
 
   test("returns unresolved parent directories for a missing local resource", () => {

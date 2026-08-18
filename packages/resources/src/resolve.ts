@@ -5,11 +5,13 @@ import {
   isResourcePackPathContained,
   type ResourcePack,
   resourcePackMetadataPaths,
+  resourcePackWatchRoot,
 } from "./content-root.js";
 import {
   failGraphResource,
   failResource,
   normalizeResourcePaths,
+  normalizeResourceRoots,
   ResourceResolutionError,
 } from "./errors.js";
 import {
@@ -72,6 +74,7 @@ import type {
   ResourceGraphNode,
   ResourceLocator,
   ResourceOrigin,
+  ResourceWatchRoot,
   TemplateFacet,
 } from "./types.js";
 
@@ -166,6 +169,7 @@ export type ResolvedResourceDocument = Readonly<{
   readonly instances: readonly ResolvedResourceInstance[];
   readonly dependencies: readonly string[];
   readonly unresolvedParents: readonly string[];
+  readonly trustedRoots: readonly ResourceWatchRoot[];
 }>;
 
 type LoadedFacet<T> = Readonly<{
@@ -845,6 +849,7 @@ class ResourceResolver {
   private readonly graph: ResourceGraphState = createResourceGraphState();
   private readonly dependencies = new Set<string>();
   private readonly unresolvedParents = new Set<string>();
+  private readonly trustedRoots = new Map<string, ResourceWatchRoot>();
   /** Output indexes only; traversal never reads these resolved results. */
   private readonly resolvedTemplates = new Map<string, ResolvedTemplate>();
   private readonly resolvedInstances = new Map<
@@ -878,7 +883,17 @@ class ResourceResolver {
         ...this.unresolvedParents,
         ...error.unresolvedParents,
       ],
+      trustedRoots: normalizeResourceRoots([
+        ...this.trustedRoots.values(),
+        ...error.trustedRoots,
+      ]),
     });
+  }
+
+  private collectPack(pack: ResourcePack): void {
+    if (pack.kind !== "package") return;
+    const root = resourcePackWatchRoot(pack);
+    this.trustedRoots.set(`${root.canonical}\u0000${root.lexical}`, root);
   }
 
   private collect<T>(loaded: LoadedResource<T>): void {
@@ -911,6 +926,7 @@ class ResourceResolver {
     target: ResolvedResourceTarget,
     loaded: LoadedResource<T>,
   ): LoadedFacet<T> {
+    this.collectPack(pack);
     this.collect(loaded);
     return {
       pack,
@@ -933,6 +949,7 @@ class ResourceResolver {
       packageCache: this.packageCache,
       beforeRead: this.beforeRead,
     });
+    this.collectPack(target.pack);
     return this.cachedFacet(target, "template", () =>
       loadTemplateFacet(pack, locator, authoringFile, {
         packageCache: this.packageCache,
@@ -950,6 +967,7 @@ class ResourceResolver {
       packageCache: this.packageCache,
       beforeRead: this.beforeRead,
     });
+    this.collectPack(target.pack);
     return this.cachedFacet(target, "instance", () =>
       loadInstanceFacet(pack, locator, authoringFile, {
         packageCache: this.packageCache,
@@ -967,6 +985,7 @@ class ResourceResolver {
       packageCache: this.packageCache,
       beforeRead: this.beforeRead,
     });
+    this.collectPack(target.pack);
     return this.cachedFacet(target, "preset", () =>
       loadPresetFacet(pack, locator, authoringFile, {
         packageCache: this.packageCache,
@@ -1568,6 +1587,7 @@ class ResourceResolver {
   private failureContext(error?: ResourceResolutionError): {
     readonly dependencies: readonly string[];
     readonly unresolvedParents: readonly string[];
+    readonly trustedRoots: readonly ResourceWatchRoot[];
   } {
     return {
       dependencies: [...this.dependencies, ...(error?.dependencies ?? [])],
@@ -1575,6 +1595,10 @@ class ResourceResolver {
         ...this.unresolvedParents,
         ...(error?.unresolvedParents ?? []),
       ],
+      trustedRoots: normalizeResourceRoots([
+        ...this.trustedRoots.values(),
+        ...(error?.trustedRoots ?? []),
+      ]),
     };
   }
 
@@ -2937,6 +2961,9 @@ class ResourceResolver {
       ),
       dependencies: Object.freeze([...this.dependencies].sort()),
       unresolvedParents: Object.freeze([...this.unresolvedParents].sort()),
+      trustedRoots: Object.freeze(
+        normalizeResourceRoots([...this.trustedRoots.values()]),
+      ),
     });
     return result;
   }

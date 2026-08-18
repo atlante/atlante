@@ -2028,6 +2028,151 @@ describe("resource-backed document validation", () => {
     expect(JSON.stringify(diagnostic)).not.toContain(root);
   });
 
+  type ExternalPackageFailureKind =
+    | "lookup"
+    | "metadata"
+    | "missing format"
+    | "unsupported format"
+    | "subpath"
+    | "facet";
+
+  type ExternalPackageFixture = {
+    root: string;
+    configPath: string;
+    packageRoot: string;
+  };
+
+  function externalPackageDocument(
+    failureKind: ExternalPackageFailureKind,
+  ): Record<string, unknown> {
+    return {
+      $schema: SCHEMA_URI,
+      extends:
+        failureKind === "subpath" ? "review-pack/missing" : "review-pack",
+      ...(failureKind === "facet"
+        ? {
+            agents: {
+              broken: {
+                $template: "review-pack/agent",
+                description: "Broken",
+              },
+            },
+          }
+        : {}),
+    };
+  }
+
+  function externalPackageManifest(
+    failureKind: ExternalPackageFailureKind,
+  ): string {
+    if (failureKind === "metadata") return "{ broken\n";
+    const manifest = {
+      name: "review-pack",
+      version: "1.2.3",
+      ...(failureKind === "missing format"
+        ? {}
+        : {
+            atlante: {
+              format: failureKind === "unsupported format" ? 2 : 1,
+            },
+          }),
+    };
+    return `${JSON.stringify(manifest)}\n`;
+  }
+
+  function externalPackageFixture(
+    failureKind: ExternalPackageFailureKind,
+  ): ExternalPackageFixture {
+    const { root, configPath } = project(externalPackageDocument(failureKind));
+    const packageRoot = join(root, "node_modules", "review-pack");
+    if (failureKind !== "lookup") {
+      mkdirSync(packageRoot, { recursive: true });
+      writeFileSync(
+        join(packageRoot, "package.json"),
+        externalPackageManifest(failureKind),
+      );
+      writeFileSync(join(packageRoot, "atlante.jsonc"), "{}\n");
+    }
+    if (failureKind === "facet") {
+      const agent = join(packageRoot, "agent");
+      mkdirSync(agent);
+      writeFileSync(join(agent, "template.jsonc"), "{ broken\n");
+      writeFileSync(join(agent, "template.md"), "broken\n");
+    }
+    writeFileSync(
+      join(root, "package.json"),
+      `${JSON.stringify({
+        name: "atlante-validator-fixture",
+        version: "1.0.0",
+        ...(failureKind === "lookup"
+          ? {}
+          : { dependencies: { "review-pack": "1.2.3" } }),
+      })}\n`,
+    );
+    return { root, configPath, packageRoot };
+  }
+
+  function expectExternalPackageFailure(
+    fixture: ExternalPackageFixture,
+    failureKind: ExternalPackageFailureKind,
+    expectedCode: string,
+  ): void {
+    const result = load(fixture.configPath);
+    const diagnostic = result.diagnostics.find(
+      ({ code }) => code === expectedCode,
+    );
+    const facetPath = "/agents/broken/$template";
+    const path = failureKind === "facet" ? facetPath : "/extends";
+
+    expect(result.document).toBeUndefined();
+    expect(result.resources).toBeUndefined();
+    expect(diagnostic).toMatchObject({
+      code: expectedCode,
+      source:
+        failureKind === "facet"
+          ? "review-pack@1.2.3/agent/template.jsonc"
+          : "atlante.jsonc",
+      pointer: path,
+      path,
+    });
+    expect(diagnostic?.location?.line).toBeGreaterThan(0);
+    expect(diagnostic?.chain?.[0]).toMatchObject({
+      kind: "preset",
+      locator: "./",
+    });
+    if (failureKind === "facet")
+      expect(diagnostic?.chain).toContainEqual(
+        expect.objectContaining({
+          kind: "template",
+          locator: "review-pack/agent",
+          source: "review-pack@1.2.3/agent/template.jsonc",
+        }),
+      );
+    expect(JSON.stringify(result.diagnostics)).not.toContain(fixture.root);
+    if (failureKind !== "lookup")
+      expect(result.resourceWatch?.trustedRoots).toContainEqual({
+        canonical: realpathSync(fixture.packageRoot),
+        lexical: fixture.packageRoot,
+      });
+  }
+
+  test.each([
+    ["lookup", "package-not-declared"],
+    ["metadata", "package-metadata-unreadable"],
+    ["missing format", "missing-pack-format"],
+    ["unsupported format", "unsupported-pack-format"],
+    ["subpath", "missing-package-subpath"],
+    ["facet", "malformed-jsonc"],
+  ] as const)(
+    "translates external package %s failures into stable source diagnostics",
+    (failureKind, expectedCode) =>
+      expectExternalPackageFailure(
+        externalPackageFixture(failureKind),
+        failureKind,
+        expectedCode,
+      ),
+  );
+
   test.each(["global", "agent", "skill", "instance"] as const)(
     "rejects invalid authored value keys in a %s layer",
     (layer) => {

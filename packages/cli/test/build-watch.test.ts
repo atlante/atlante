@@ -29,6 +29,67 @@ function tempProject(config?: string): string {
   return dir;
 }
 
+function writeExternalPackage(
+  root: string,
+  version = "1.2.3",
+): { manifest: string; template: string; source: string } {
+  const agent = join(root, "agent");
+  mkdirSync(agent, { recursive: true });
+  const manifest = join(root, "package.json");
+  const template = join(agent, "template.jsonc");
+  const source = join(agent, "template.md");
+  writeFileSync(
+    manifest,
+    `${JSON.stringify({
+      name: "review-pack",
+      version,
+      atlante: { format: 1 },
+    })}\n`,
+  );
+  writeFileSync(join(root, "atlante.jsonc"), "{}\n");
+  writeFileSync(
+    template,
+    `${JSON.stringify({
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+      type: "object",
+      properties: { identity: { type: "string" } },
+      required: ["identity"],
+      additionalProperties: false,
+    })}\n`,
+  );
+  writeFileSync(source, "{{identity}}\n");
+  return { manifest, template, source };
+}
+
+function externalPackageProject(): {
+  dir: string;
+  packageRoot: string;
+  files: { manifest: string; template: string; source: string };
+} {
+  const dir = tempProject(`{
+    "$schema": "${SCHEMA_URI}",
+    "extends": "review-pack",
+    "agents": {
+      "reviewer": {
+        "$template": "review-pack/agent",
+        "description": "Review",
+        "identity": "Identity"
+      }
+    }
+  }`);
+  const packageRoot = join(dir, "node_modules", "review-pack");
+  mkdirSync(join(dir, "node_modules"), { recursive: true });
+  writeFileSync(
+    join(dir, "package.json"),
+    `${JSON.stringify({
+      name: "atlante-watch-fixture",
+      version: "1.0.0",
+      dependencies: { "review-pack": "1.2.3" },
+    })}\n`,
+  );
+  return { dir, packageRoot, files: writeExternalPackage(packageRoot) };
+}
+
 function canonical(path: string): string {
   return realpathSync(path, "utf8");
 }
@@ -453,6 +514,111 @@ describe("runBuildWatchWithDependencies", () => {
 
     await waitFor(() => builds === 2, "rebuild after first failure");
     await handle.stop();
+  });
+
+  test("retries a missing package when its safe parent receives the package", async () => {
+    const dir = tempProject(`{
+      "$schema": "${SCHEMA_URI}",
+      "extends": "review-pack",
+      "agents": {
+        "reviewer": {
+          "$template": "review-pack/agent",
+          "description": "Review",
+          "identity": "Identity"
+        }
+      }
+    }`);
+    const nodeModules = join(dir, "node_modules");
+    mkdirSync(nodeModules);
+    writeFileSync(
+      join(dir, "package.json"),
+      `${JSON.stringify({
+        name: "atlante-watch-fixture",
+        version: "1.0.0",
+        dependencies: { "review-pack": "1.2.3" },
+      })}\n`,
+    );
+    const watcher = fakeWatcher();
+    let builds = 0;
+
+    await withSilencedConsole(async () => {
+      const handle = runBuildWatchWithDependencies(dir, {
+        build: (target) => {
+          builds += 1;
+          return runBuild(target);
+        },
+        watch: watcher.watch,
+        unwatch: watcher.unwatch,
+        debounceMs: 20,
+      });
+
+      try {
+        expect(builds).toBe(1);
+        const retryParent = canonical(nodeModules);
+        expect(watcher.callbacks.has(retryParent)).toBe(true);
+
+        const packageRoot = join(nodeModules, "review-pack");
+        const files = writeExternalPackage(packageRoot);
+        watcher.callbacks.get(retryParent)?.();
+
+        await waitFor(() => builds === 2, "rebuild after package installation");
+        expect(watcher.callbacks.has(canonical(files.manifest))).toBe(true);
+        expect(watcher.callbacks.has(canonical(files.template))).toBe(true);
+      } finally {
+        await handle.stop();
+      }
+    });
+  });
+
+  test("reconciles external metadata and facets while retaining failed inputs and artifacts", async () => {
+    const { dir, packageRoot, files } = externalPackageProject();
+    const watcher = fakeWatcher();
+    let builds = 0;
+
+    await withSilencedConsole(async () => {
+      const handle = runBuildWatchWithDependencies(dir, {
+        build: (target) => {
+          builds += 1;
+          return runBuild(target);
+        },
+        watch: watcher.watch,
+        unwatch: watcher.unwatch,
+        debounceMs: 20,
+      });
+      try {
+        expect(builds).toBe(1);
+        const manifestPath = join(
+          dir,
+          ".atlante",
+          "artifacts",
+          "manifest.json",
+        );
+        const before = readFileSync(manifestPath, "utf8");
+        expect(watcher.callbacks.has(canonical(files.manifest))).toBe(true);
+        expect(watcher.callbacks.has(canonical(files.source))).toBe(true);
+
+        writeExternalPackage(packageRoot, "1.2.4");
+        watcher.callbacks.get(canonical(files.manifest))?.();
+        await waitFor(
+          () => builds === 2,
+          "rebuild after package metadata change",
+        );
+        expect(readFileSync(manifestPath, "utf8")).toBe(before);
+
+        writeFileSync(files.source, "{{#if\n");
+        watcher.callbacks.get(canonical(files.source))?.();
+        await waitFor(() => builds === 3, "failed rebuild after facet change");
+        expect(readFileSync(manifestPath, "utf8")).toBe(before);
+        expect(watcher.callbacks.has(canonical(files.template))).toBe(true);
+        expect(watcher.callbacks.has(canonical(files.source))).toBe(true);
+
+        writeFileSync(files.source, "{{identity}}\n");
+        watcher.callbacks.get(canonical(files.source))?.();
+        await waitFor(() => builds === 4, "rebuild after facet recovery");
+      } finally {
+        await handle.stop();
+      }
+    });
   });
 
   test("accumulates recovery inputs across consecutive failed rebuilds", async () => {

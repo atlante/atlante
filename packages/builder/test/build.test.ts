@@ -6,6 +6,7 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -800,6 +801,83 @@ describe("buildProject", () => {
     const result = buildProject(root);
 
     expect(result.diagnostics[0]?.code).toBe("missing-value");
+    expect(artifactTreeBytes(root)).toEqual(before);
+    expect(privateArtifactEntries(root)).toEqual([]);
+  });
+
+  test("keeps the last complete tree when an external package fails", () => {
+    const { root } = project(
+      JSON.stringify({ $schema: SCHEMA_URI, extends: "review-pack" }),
+    );
+    const packageRoot = join(root, "node_modules", "review-pack");
+    mkdirSync(packageRoot, { recursive: true });
+    writeFileSync(
+      join(root, "package.json"),
+      `${JSON.stringify({
+        name: "atlante-builder-fixture",
+        version: "1.0.0",
+        dependencies: { "review-pack": "1.2.3" },
+      })}\n`,
+    );
+    writeFileSync(
+      join(packageRoot, "package.json"),
+      `${JSON.stringify({
+        name: "review-pack",
+        version: "1.2.3",
+        atlante: { format: 1 },
+      })}\n`,
+    );
+    writeFileSync(
+      join(packageRoot, "atlante.jsonc"),
+      `${JSON.stringify({
+        $schema: SCHEMA_URI,
+        agents: {
+          reviewer: {
+            $template: "review-pack/agent",
+            description: "Reviews changes.",
+            identity: "You review.",
+          },
+        },
+      })}\n`,
+    );
+    const agent = join(packageRoot, "agent");
+    mkdirSync(agent);
+    writeFileSync(
+      join(agent, "template.jsonc"),
+      `${JSON.stringify({
+        $schema: "https://json-schema.org/draft/2020-12/schema",
+        type: "object",
+        properties: { identity: { type: "string" } },
+        required: ["identity"],
+        additionalProperties: false,
+      })}\n`,
+    );
+    writeFileSync(join(agent, "template.md"), "{{identity}}\n");
+
+    const first = buildProject(root);
+    expect(first.diagnostics).toEqual([]);
+    const before = artifactTreeBytes(root);
+    expect(first.resourceWatch?.trustedRoots).toContainEqual({
+      canonical: realpathSync(packageRoot),
+      lexical: packageRoot,
+    });
+
+    writeFileSync(
+      join(packageRoot, "package.json"),
+      `${JSON.stringify({
+        name: "review-pack",
+        version: "1.2.3",
+        atlante: { format: 2 },
+      })}\n`,
+    );
+    const failed = buildProject(root);
+
+    expect(failed.diagnostics).toContainEqual(
+      expect.objectContaining({ code: "unsupported-pack-format" }),
+    );
+    const prepared = prepareProject(root);
+    expect(prepared.agents).toEqual([]);
+    expect(prepared.skills).toEqual([]);
     expect(artifactTreeBytes(root)).toEqual(before);
     expect(privateArtifactEntries(root)).toEqual([]);
   });

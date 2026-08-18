@@ -75,6 +75,14 @@ export type PackageResourceOrigin = {
 
 export type ResourceOrigin = ProjectResourceOrigin | PackageResourceOrigin;
 
+/** Authorization data for external resource paths during watch reconciliation. */
+export type ResourceWatchRoot = Readonly<{
+  /** Canonical realpath used for containment checks. */
+  readonly canonical: string;
+  /** Lexical spelling used by package-manager symlink watch inputs. */
+  readonly lexical: string;
+}>;
+
 export type ResourceIdentity = {
   readonly locator: ResourceLocator;
   readonly origin: ResourceOrigin;

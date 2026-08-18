@@ -166,6 +166,7 @@ export type {
   ResourceLocator,
   ResourceOrigin,
   ResourcePackageIdentity,
+  ResourceWatchRoot,
   TemplateFacet,
   TemplateResourceGraphNode,
   ValidatedLocalResourceLocator,

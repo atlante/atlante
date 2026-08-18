@@ -16,6 +16,7 @@ import {
   type ResourcePack,
   resourcePackLexicalRootSymlinkPaths,
   resourcePackMetadataPaths,
+  resourcePackWatchRoot,
 } from "./content-root.js";
 import {
   failResource,
@@ -23,7 +24,11 @@ import {
   ResourceResolutionError,
 } from "./errors.js";
 import type { ParsedResourceLocator } from "./locator.js";
-import type { RawResourceLocator, ResourcePackageIdentity } from "./types.js";
+import type {
+  RawResourceLocator,
+  ResourcePackageIdentity,
+  ResourceWatchRoot,
+} from "./types.js";
 
 const STRICT_SEMVER_PATTERN =
   /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?![\s\S])/;
@@ -55,6 +60,14 @@ type CanonicalPackageMetadata = Readonly<{
   readonly optionalDependencies: Readonly<Record<string, string>>;
   readonly devDependencies: Readonly<Record<string, string>>;
 }>;
+
+function packageTrustContext(pack: ResourcePack): {
+  readonly trustedRoots?: readonly ResourceWatchRoot[];
+} {
+  return pack.kind === "package"
+    ? { trustedRoots: [resourcePackWatchRoot(pack)] }
+    : {};
+}
 
 export type PackageResolutionOptions = Readonly<{
   readonly cache?: PackageResolutionCache;
@@ -117,6 +130,7 @@ function metadataFailure(
     {
       dependencies: metadataPaths(pack, manifestPath),
       unresolvedParents: [pack.root],
+      ...packageTrustContext(pack),
     },
   );
 }
@@ -146,6 +160,12 @@ function enrichPackageFailure(
       error.dependencies,
     ),
     unresolvedParents: [authoringPack.root, ...error.unresolvedParents],
+    trustedRoots: [
+      ...error.trustedRoots,
+      ...(authoringPack.kind === "package"
+        ? [resourcePackWatchRoot(authoringPack)]
+        : []),
+    ],
   });
 }
 
@@ -172,7 +192,11 @@ function assertManifestPathSafe(
       "unsafe-path",
       "package metadata root changed outside the resource root",
       { locator },
-      { dependencies, unresolvedParents: [pack.root] },
+      {
+        dependencies,
+        unresolvedParents: [pack.root],
+        ...packageTrustContext(pack),
+      },
     );
   }
   if (isResourcePackLexicalPathSafe(pack, lexicalManifestPath)) return;
@@ -180,7 +204,11 @@ function assertManifestPathSafe(
     "unsafe-path",
     "package metadata escapes the resource root",
     { locator },
-    { dependencies, unresolvedParents: [pack.root] },
+    {
+      dependencies,
+      unresolvedParents: [pack.root],
+      ...packageTrustContext(pack),
+    },
   );
 }
 
@@ -214,6 +242,7 @@ function manifestFile(
       {
         dependencies: manifestPathDependencies(pack, lexicalManifestPath),
         unresolvedParents: [pack.root],
+        ...packageTrustContext(pack),
       },
     );
   assertManifestPathSafe(pack, locator, lexicalManifestPath);
@@ -277,6 +306,7 @@ function assertManifestStable(
     {
       dependencies: metadataPaths(pack, manifest.manifestPath),
       unresolvedParents: [pack.root],
+      ...packageTrustContext(pack),
     },
   );
 }
@@ -602,6 +632,7 @@ function packageDeclaration(
         {
           dependencies: resourcePackMetadataPaths(authoringPack),
           unresolvedParents: [authoringPack.root],
+          ...packageTrustContext(authoringPack),
         },
       );
     return { dependencies: [], self: false };
@@ -615,6 +646,7 @@ function packageDeclaration(
       {
         dependencies: metadataPaths(authoringPack, manifest.manifestPath),
         unresolvedParents: [authoringPack.root],
+        ...packageTrustContext(authoringPack),
       },
     );
   return {
@@ -649,6 +681,7 @@ function assertPackageAuthoringManifest(
     {
       dependencies: resourcePackMetadataPaths(authoringPack),
       unresolvedParents: [authoringPack.root],
+      ...packageTrustContext(authoringPack),
     },
   );
 }
@@ -751,6 +784,9 @@ function packageNotInstalled(
           declarationDependencies,
         ),
         unresolvedParents: [lookup.retryParent],
+        ...(authoringPack.kind === "package"
+          ? { trustedRoots: [resourcePackWatchRoot(authoringPack)] }
+          : {}),
       },
     );
   return failResource(
@@ -763,6 +799,7 @@ function packageNotInstalled(
         declarationDependencies,
       ),
       unresolvedParents: [lookup.retryParent],
+      ...packageTrustContext(authoringPack),
     },
   );
 }
@@ -802,6 +839,7 @@ function candidatePackage(
           declarationDependencies,
         ),
         unresolvedParents: [lookup.retryParent],
+        ...packageTrustContext(authoringPack),
       },
     );
   }
@@ -898,6 +936,7 @@ function cachedSelectedPackage(
             manifest.lexicalManifestPath,
           ),
           unresolvedParents: [candidatePack.root],
+          ...packageTrustContext(candidatePack),
         },
       ),
       authoringPack,

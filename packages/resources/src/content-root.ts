@@ -1,7 +1,7 @@
 import { lstatSync, readlinkSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { failResource, normalizeResourcePaths } from "./errors.js";
-import type { ResourcePackageIdentity } from "./types.js";
+import type { ResourcePackageIdentity, ResourceWatchRoot } from "./types.js";
 
 export type ResourcePackKind = "project" | "package";
 
@@ -15,6 +15,11 @@ export type ResourcePack = Readonly<{
   /** Package identity is present only for package resource roots. */
   readonly package?: ResourcePackageIdentity;
 }>;
+
+/** Returns authorization data without exposing package metadata as identity. */
+export function resourcePackWatchRoot(pack: ResourcePack): ResourceWatchRoot {
+  return Object.freeze({ canonical: pack.root, lexical: pack.lexicalRoot });
+}
 
 type CapturedSymlink = Readonly<{
   readonly path: string;

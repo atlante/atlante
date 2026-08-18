@@ -15,6 +15,7 @@ import {
   type ResourcePack,
   resourcePackLexicalRootSymlinkPaths,
   resourcePackMetadataPaths,
+  resourcePackWatchRoot,
 } from "./content-root.js";
 import {
   failResource,
@@ -27,7 +28,11 @@ import {
   packageSubpathCandidate,
   resolvePackageResourcePack,
 } from "./package-resolution.js";
-import type { RawResourceLocator, ValidatedResourceLocator } from "./types.js";
+import type {
+  RawResourceLocator,
+  ResourceWatchRoot,
+  ValidatedResourceLocator,
+} from "./types.js";
 
 export type ResourceTargetKind = "resource" | "preset";
 
@@ -486,7 +491,20 @@ export function resourceCandidateWatchPaths(
 type ResourceFailureContext = {
   readonly dependencies: readonly string[];
   readonly unresolvedParents: readonly string[];
+  readonly trustedRoots?: readonly ResourceWatchRoot[];
 };
+
+function withPackTrust(
+  pack: ResourcePack,
+  context: Omit<ResourceFailureContext, "trustedRoots">,
+): ResourceFailureContext {
+  return {
+    ...context,
+    ...(pack.kind === "package"
+      ? { trustedRoots: [resourcePackWatchRoot(pack)] }
+      : {}),
+  };
+}
 
 function targetResolutionDependencies(
   pack: ResourcePack,
@@ -506,7 +524,7 @@ function candidateContext(
   resolutionDependencies: readonly string[] = [],
 ): ResourceFailureContext {
   const traversal = symlinkTraversal(pack, candidate);
-  return {
+  return withPackTrust(pack, {
     dependencies: targetResolutionDependencies(
       pack,
       resolutionDependencies,
@@ -516,21 +534,21 @@ function candidateContext(
       ...safeParentFor(pack, candidate),
       ...traversal.unresolvedParents,
     ]),
-  };
+  });
 }
 
 function targetContext(
   target: ResolvedResourceTarget,
   candidate = target.lexicalDirectory,
 ): ResourceFailureContext {
-  return {
+  return withPackTrust(target.pack, {
     dependencies: targetResolutionDependencies(
       target.pack,
       target.resolutionDependencies,
       [target.directory, ...candidateWatchPaths(target.pack, candidate)],
     ),
     unresolvedParents: [target.directory],
-  };
+  });
 }
 
 type AuthoringDirectory = Readonly<{
@@ -631,14 +649,14 @@ function targetFailure(
     "missing-target",
     "resource target is unavailable",
     { locator },
-    {
+    withPackTrust(pack, {
       dependencies: context.dependencies,
       unresolvedParents: normalizeResourcePaths([
         ...parents.paths,
         ...context.unresolvedParents,
         ...traversal.unresolvedParents,
       ]),
-    },
+    }),
   );
 }
 
@@ -830,14 +848,14 @@ export function resolveResourceLocator(
           code: "missing-package-subpath",
           message: "package subpath is unavailable",
         },
-        {
+        withPackTrust(prepared.pack, {
           dependencies: targetResolutionDependencies(
             prepared.pack,
             prepared.resolutionDependencies,
             error.dependencies,
           ),
           unresolvedParents: error.unresolvedParents,
-        },
+        }),
       );
     }
     throw error;
@@ -860,14 +878,14 @@ function fileContext(
   target: ResolvedResourceTarget,
   file: ResourceFile,
 ): ResourceFailureContext {
-  return {
+  return withPackTrust(target.pack, {
     dependencies: targetResolutionDependencies(
       target.pack,
       target.resolutionDependencies,
       [file.path, ...file.watchPaths],
     ),
     unresolvedParents: [target.directory],
-  };
+  });
 }
 
 function unsafeRead(
@@ -904,7 +922,7 @@ function missingFile(
     "missing-target",
     "resource facet file is unavailable",
     { locator },
-    {
+    withPackTrust(target.pack, {
       dependencies: targetResolutionDependencies(
         target.pack,
         target.resolutionDependencies,
@@ -914,7 +932,7 @@ function missingFile(
         target.directory,
         ...context.unresolvedParents,
       ]),
-    },
+    }),
   );
 }
 
@@ -969,14 +987,14 @@ export function inspectResourceFile(
       {
         locator,
       },
-      {
+      withPackTrust(target.pack, {
         dependencies: targetResolutionDependencies(
           target.pack,
           target.resolutionDependencies,
           [target.directory, ...candidateWatchPaths(target.pack, candidate)],
         ),
         unresolvedParents: [target.directory],
-      },
+      }),
     );
   }
   return Object.freeze({

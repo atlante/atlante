@@ -5,6 +5,7 @@ import {
   type JsonObject,
   type ResourcePack,
   ResourceResolutionError,
+  type ResourceWatchRoot,
   resolveResourceDocument,
 } from "@atlante/resources";
 import type { AtlanteDocument, AtlanteDocumentOverlay } from "@atlante/schema";
@@ -42,15 +43,24 @@ export type DocumentLoadOptions = {
 export type ResourceWatchContext = Readonly<{
   readonly dependencies: readonly string[];
   readonly unresolvedParents: readonly string[];
+  /** Explicit resource roots authorized for external watch paths. */
+  readonly trustedRoots?: readonly ResourceWatchRoot[];
 }>;
 
 function resourceWatchContext(value: {
   readonly dependencies: readonly string[];
   readonly unresolvedParents: readonly string[];
+  readonly trustedRoots?: readonly ResourceWatchRoot[];
 }): ResourceWatchContext {
+  const trustedRoots = (value.trustedRoots ?? []).map((root) =>
+    Object.freeze({ ...root }),
+  );
   return Object.freeze({
     dependencies: Object.freeze([...value.dependencies]),
     unresolvedParents: Object.freeze([...value.unresolvedParents]),
+    ...(trustedRoots.length
+      ? { trustedRoots: Object.freeze(trustedRoots) }
+      : {}),
   });
 }
 
@@ -383,6 +393,15 @@ function parseOverlay(
 
 type DocumentLocation = { path: string; projectRoot: string };
 
+export type LoadResult = {
+  document?: AtlanteDocument;
+  path?: string;
+  projectRoot?: string;
+  resources?: ReturnType<typeof resolveResourceDocument>;
+  resourceWatch?: ResourceWatchContext;
+  diagnostics: Diagnostic[];
+};
+
 function resolveResourceBackedDocument(
   path: string,
   text: string,
@@ -448,14 +467,7 @@ function resolveResourceBackedDocument(
 export function loadDocument(
   pathOrDirectory: string,
   options: DocumentLoadOptions = {},
-): {
-  document?: AtlanteDocument;
-  path?: string;
-  projectRoot?: string;
-  resources?: ReturnType<typeof resolveResourceDocument>;
-  resourceWatch?: ResourceWatchContext;
-  diagnostics: Diagnostic[];
-} {
+): LoadResult {
   const target = resolve(pathOrDirectory);
   let path = target;
   let isDirectory = false;
