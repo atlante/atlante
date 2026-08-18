@@ -100,7 +100,7 @@ function externalPackProject(): { root: string; packRoot: string } {
       version: "1.0.0",
       devDependencies: {
         "@atlante/pack": "workspace:0.1.6",
-        "@acme/review-pack": "file:external-pack",
+        "@acme/review-pack": "1.2.3",
       },
     })}\n`,
   );

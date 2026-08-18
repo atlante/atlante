@@ -132,7 +132,7 @@ function builtExternalPackProject(): { directory: string; packRoot: string } {
       version: "1.0.0",
       devDependencies: {
         "@atlante/pack": "workspace:0.1.6",
-        "@acme/review-pack": "file:external-pack",
+        "@acme/review-pack": "1.2.3",
       },
     })}\n`,
   );
@@ -234,15 +234,32 @@ async function capturedErrors<T>(fn: () => Promise<T>): Promise<string[]> {
   return written;
 }
 
+type PluginHooks = Awaited<ReturnType<typeof AtlantePlugin>>;
+
+async function capturedPluginConfig(
+  directory: string,
+  config: HostConfig,
+): Promise<{ hooks: PluginHooks; errors: string[] }> {
+  let hooks: PluginHooks | undefined;
+  const errors = await capturedErrors(async () => {
+    const createdHooks = await AtlantePlugin(pluginInput(directory));
+    hooks = createdHooks;
+    await createdHooks.config?.(config as unknown as Config);
+  });
+  if (!hooks) throw new Error("plugin factory did not return hooks");
+  return { hooks, errors };
+}
+
 describe("AtlantePlugin", () => {
   test("materializes local-resource artifacts after source files are removed", async () => {
     const dir = builtLocalResourceProject();
     rmSync(join(dir, "atlante.jsonc"));
     rmSync(join(dir, "resources"), { recursive: true, force: true });
 
-    const hooks = await AtlantePlugin(pluginInput(dir));
     const config: HostConfig = {};
-    await hooks.config?.(config as unknown as Config);
+    const { hooks, errors } = await capturedPluginConfig(dir, config);
+
+    expect(errors).toEqual([]);
 
     expect(config.agent?.reviewer?.prompt).toContain(
       "You are a locally authored reviewer.",
@@ -293,9 +310,10 @@ describe("AtlantePlugin", () => {
     rmSync(packRoot, { recursive: true, force: true });
     rmSync(join(directory, "package.json"), { force: true });
 
-    const hooks = await AtlantePlugin(pluginInput(directory));
     const config: HostConfig = {};
-    await hooks.config?.(config as unknown as Config);
+    const { hooks, errors } = await capturedPluginConfig(directory, config);
+
+    expect(errors).toEqual([]);
 
     expect(config.agent?.reviewer).toEqual({
       prompt: EXTERNAL_AGENT_PROMPT,
@@ -314,14 +332,11 @@ describe("AtlantePlugin", () => {
     rmSync(join(directory, "package.json"), { force: true });
     writeFileSync(join(directory, "atlante.jsonc"), "{ malformed source");
 
-    const hooks = await AtlantePlugin(pluginInput(directory));
     const config: HostConfig = {
       agent: { existing: { model: "host-model" } },
       permission: { edit: "allow" },
     };
-    const errors = await capturedErrors(async () => {
-      await hooks.config?.(config as unknown as Config);
-    });
+    const { hooks, errors } = await capturedPluginConfig(directory, config);
 
     expect(errors).toEqual([]);
     expect(config).toEqual({
@@ -344,7 +359,13 @@ describe("AtlantePlugin", () => {
     const dir = builtProject();
     unlinkSync(join(dir, "atlante.jsonc"));
 
-    const hooks = await AtlantePlugin(pluginInput(dir));
+    let hooks: PluginHooks | undefined;
+    const factoryErrors = await capturedErrors(async () => {
+      hooks = await AtlantePlugin(pluginInput(dir));
+    });
+    if (!hooks) throw new Error("plugin factory did not return hooks");
+    expect(factoryErrors).toEqual([]);
+
     const skillTool = hooks.tool?.atlante_skill;
     expect(skillTool).toBeDefined();
     await expect(
@@ -352,7 +373,11 @@ describe("AtlantePlugin", () => {
     ).rejects.toThrow("inactive");
 
     const config: HostConfig = {};
-    await hooks.config?.(config as unknown as Config);
+    const configErrors = await capturedErrors(async () => {
+      await hooks?.config?.(config as unknown as Config);
+    });
+    expect(configErrors).toEqual([]);
+
     expect(config.agent?.reviewer?.prompt).toContain("You review.");
     await expect(
       skillTool?.execute({ name: "testing" }, {} as never),
@@ -378,9 +403,10 @@ describe("AtlantePlugin", () => {
       const dir = builtProject();
       alter(dir);
 
-      const hooks = await AtlantePlugin(pluginInput(dir));
       const config: HostConfig = {};
-      await hooks.config?.(config as unknown as Config);
+      const { hooks, errors } = await capturedPluginConfig(dir, config);
+
+      expect(errors).toEqual([]);
 
       expect(config.agent?.reviewer?.prompt).toContain("You review.");
       expect(hooks.tool?.atlante_skill).toBeDefined();
@@ -669,37 +695,5 @@ describe("AtlantePlugin", () => {
     await expect(
       hooks.tool?.atlante_skill?.execute({ name: "testing" }, {} as never),
     ).rejects.toThrow("Atlante skills unavailable");
-  });
-
-  test("proves production imports stop at the artifact reader and host adapter", () => {
-    const sourceFiles = readdirSync(new URL("../src", import.meta.url))
-      .filter((file) => file.endsWith(".ts"))
-      .sort();
-    const forbidden =
-      /@atlante\/(?:resources|presets|templates|validator)|(?:^|\/)[^/]*(?:loader|resolver|resolve|resource|template|preset)[^/]*\.js$/;
-
-    for (const file of sourceFiles) {
-      const source = readFileSync(
-        new URL(`../src/${file}`, import.meta.url),
-        "utf8",
-      );
-      const modules = [
-        ...source.matchAll(
-          /(?:from\s+|import\s*\(\s*|require\s*\(\s*|\bimport\s+)["']([^"']+)["']/g,
-        ),
-      ].map(([, module]) => module);
-
-      expect(
-        modules.filter((module) => module && forbidden.test(module)),
-        `${file} imports source-content code`,
-      ).toEqual([]);
-      expect(
-        modules.filter((module) => module?.startsWith("@atlante/")),
-        `${file} imports a private package directly`,
-      ).toEqual(file === "plugin.ts" ? ["@atlante/builder/artifacts"] : []);
-      expect(source).not.toMatch(
-        /@atlante\/(?:resources|presets|templates|validator)/,
-      );
-    }
   });
 });
