@@ -1,7 +1,8 @@
 import { dirname } from "node:path";
+import type { ResourceResolutionContext } from "@atlante/resources";
 import { type LoadResult, loadDocument } from "@atlante/validator";
 
-export type ProjectContext = Record<string, never>;
+export type ProjectContext = ResourceResolutionContext;
 
 export type LoadedProject = Omit<LoadResult, "path"> & {
   configPath?: string;
@@ -18,8 +19,7 @@ export function loadProject(
   target: string,
   context: ProjectContext = {},
 ): LoadedProject {
-  void context;
-  const loaded = loadDocument(target);
+  const loaded = loadDocument(target, { resourceContext: context });
   if (!loaded.path) return { diagnostics: loaded.diagnostics };
 
   if (!loaded.document)

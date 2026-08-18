@@ -8,6 +8,7 @@ export { isCompositionMarker, slotsOf } from "./composition.js";
 export type {
   ResourcePack,
   ResourcePackKind,
+  ResourceResolutionContext,
 } from "./content-root.js";
 export {
   createProjectResourcePack,
@@ -76,6 +77,7 @@ export type {
 } from "./package-resolution.js";
 export {
   createPackageResolutionCache,
+  createPackageResourcePack,
   resolvePackageResourcePack,
 } from "./package-resolution.js";
 export type { ResourceProvenance } from "./provenance.js";

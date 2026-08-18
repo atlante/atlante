@@ -1,7 +1,7 @@
 import { lstatSync, realpathSync, statSync } from "node:fs";
 import * as nodePath from "node:path";
 import { basename, dirname, resolve } from "node:path";
-import { loadProject } from "@atlante/builder";
+import { loadProject, type ProjectContext } from "@atlante/builder";
 import type { ResourceWatchRoot } from "@atlante/resources";
 import type { ResourceWatchContext } from "@atlante/validator";
 import { CONFIG_FILENAMES, findConfigFile } from "@atlante/validator";
@@ -118,6 +118,7 @@ function safePaths(
 function resourceWatchOf(
   target: string,
   provided?: ResourceWatchContext,
+  context: ProjectContext = {},
 ): { context?: ResourceWatchContext; succeeded: boolean; configPath?: string } {
   const config = findConfigFile(target);
   if (!config) return { succeeded: false };
@@ -125,7 +126,7 @@ function resourceWatchOf(
     return { configPath: config.path, context: provided, succeeded: true };
 
   try {
-    const loaded = loadProject(target);
+    const loaded = loadProject(target, context);
     return {
       configPath: loaded.configPath ?? config.path,
       ...(loaded.resourceWatch ? { context: loaded.resourceWatch } : {}),
@@ -141,9 +142,10 @@ function resourceWatchOf(
 export function resolveWatchFiles(
   target: string,
   providedResourceWatch?: ResourceWatchContext,
+  context: ProjectContext = {},
 ): WatchFiles {
   const projectDir = projectDirOf(target);
-  const resolved = resourceWatchOf(target, providedResourceWatch);
+  const resolved = resourceWatchOf(target, providedResourceWatch, context);
   const configPath = resolved.configPath;
   const trustedRoots = resolved.context?.trustedRoots ?? [];
   const roots = watchRoots(projectDir, trustedRoots);

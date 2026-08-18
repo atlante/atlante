@@ -16,6 +16,11 @@ export type ResourcePack = Readonly<{
   readonly package?: ResourcePackageIdentity;
 }>;
 
+/** Trusted roots supplied by a host for first-party package resolution. */
+export type ResourceResolutionContext = Readonly<{
+  readonly firstPartyPack?: ResourcePack;
+}>;
+
 /** Returns authorization data without exposing package metadata as identity. */
 export function resourcePackWatchRoot(pack: ResourcePack): ResourceWatchRoot {
   return Object.freeze({ canonical: pack.root, lexical: pack.lexicalRoot });

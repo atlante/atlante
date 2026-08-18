@@ -13,6 +13,7 @@ import {
   isResourcePackLexicalPathSafe,
   isResourcePackLexicalRootStable,
   type ResourcePack,
+  type ResourceResolutionContext,
   resourcePackLexicalRootSymlinkPaths,
   resourcePackMetadataPaths,
   resourcePackWatchRoot,
@@ -39,6 +40,7 @@ export type ResourceTargetKind = "resource" | "preset";
 export type ResourceLocatorOptions = Readonly<{
   readonly packageCache?: PackageResolutionCache;
   readonly beforeRead?: (path: string) => void;
+  readonly resourceContext?: ResourceResolutionContext;
 }>;
 
 export type ResolvedResourceTarget = Readonly<{
@@ -772,6 +774,7 @@ function prepareResourceTarget(
       {
         cache: options.packageCache,
         beforeRead: options.beforeRead,
+        resourceContext: options.resourceContext,
       },
     );
     const selectedPack = resolvedPackage.pack;

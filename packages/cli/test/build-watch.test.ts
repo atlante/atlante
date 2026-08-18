@@ -29,6 +29,21 @@ function tempProject(config?: string): string {
   return dir;
 }
 
+function firstPartyProjectWithoutUserDeclaration(): string {
+  const dir = tempProject(`{
+    "$schema": "${SCHEMA_URI}",
+    "extends": "@atlante/pack"
+  }`);
+  writeFileSync(
+    join(dir, "package.json"),
+    `${JSON.stringify({
+      name: "atlante-build-watch-no-pack-fixture",
+      version: "1.0.0",
+    })}\n`,
+  );
+  return dir;
+}
+
 function writeExternalPackage(
   root: string,
   version = "1.2.3",
@@ -159,6 +174,29 @@ function fakeWatcher(): WatcherFake {
 }
 
 describe("runBuildWatchWithDependencies", () => {
+  test("uses the CLI first-party context for fallback watch loading", async () => {
+    const dir = firstPartyProjectWithoutUserDeclaration();
+    const watcher = fakeWatcher();
+
+    const handle = runBuildWatchWithDependencies(dir, {
+      watch: watcher.watch,
+      unwatch: watcher.unwatch,
+      build: (target) => runBuild(target),
+      debounceMs: 20,
+    });
+
+    try {
+      expect(watcher.callbacks.size).toBeGreaterThan(0);
+      expect(
+        [...watcher.callbacks.keys()].some((path) =>
+          path.endsWith("packages/pack/package.json"),
+        ),
+      ).toBe(true);
+    } finally {
+      await handle.stop();
+    }
+  });
+
   test("a change to a watched file triggers a rebuild", async () => {
     const dir = tempProject(valid);
     const watcher = fakeWatcher();

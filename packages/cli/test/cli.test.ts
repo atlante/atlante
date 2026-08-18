@@ -5,6 +5,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -39,6 +40,20 @@ function project(config: string): string {
   return dir;
 }
 
+function projectWithoutUserPack(config: string): string {
+  const dir = mkdtempSync(join(tmpdir(), "atlante-cli-no-pack-"));
+  created.push(dir);
+  writeFileSync(join(dir, "atlante.jsonc"), config);
+  writeFileSync(
+    join(dir, "package.json"),
+    `${JSON.stringify({
+      name: "atlante-cli-no-pack-fixture",
+      version: "1.0.0",
+    })}\n`,
+  );
+  return dir;
+}
+
 const valid = `{
   "$schema": "${SCHEMA_URI}",
   "values": { "project": "demo" },
@@ -64,7 +79,12 @@ const LAUNCHER = fileURLToPath(
   new URL("../dist/bin/atlante.js", import.meta.url),
 );
 const REAL_NODE = Bun.which("node");
-const launcherIsBuilt = existsSync(LAUNCHER) && REAL_NODE !== null;
+const launcherIsBuilt =
+  existsSync(LAUNCHER) &&
+  REAL_NODE !== null &&
+  readFileSync(LAUNCHER, "utf8").includes(
+    "function firstPartyProjectContext()",
+  );
 
 test.skipIf(!launcherIsBuilt)(
   "the built launcher runs with Node when Bun is unavailable",
@@ -102,6 +122,28 @@ test.skipIf(!launcherIsBuilt)(
 
     expect(result.status).toBe(0);
     expect(existsSync(join(dir, ".atlante", "artifacts"))).toBe(true);
+  },
+);
+
+test.skipIf(!launcherIsBuilt)(
+  "the built launcher resolves the first-party pack without a project declaration",
+  () => {
+    const dir = projectWithoutUserPack(`{
+      "$schema": "${SCHEMA_URI}",
+      "extends": "@atlante/pack"
+    }`);
+    const executableDir = join(dir, "path");
+    mkdirSync(executableDir);
+    if (!REAL_NODE) throw new Error("real node not found via Bun.which");
+    symlinkSync(REAL_NODE, join(executableDir, "node"));
+
+    const result = spawnSync(LAUNCHER, ["validate", dir], {
+      cwd: dir,
+      encoding: "utf8",
+      env: { ...process.env, PATH: executableDir },
+    });
+
+    expect(result.status).toBe(0);
   },
 );
 
@@ -175,6 +217,19 @@ test("CLI resolves first-party package resource facets", async () => {
 
   expect(await runValidate(dir)).toBe(0);
   expect(await runBuild(dir)).toBe(0);
+});
+
+test("CLI validate and build trust the installed first-party pack without a user declaration", async () => {
+  const dir = projectWithoutUserPack(`{
+    "$schema": "${SCHEMA_URI}",
+    "extends": "@atlante/pack"
+  }`);
+
+  expect(await runValidate(dir)).toBe(0);
+  expect(runBuild(dir)).toBe(0);
+  expect(existsSync(join(dir, ".atlante", "artifacts", "manifest.json"))).toBe(
+    true,
+  );
 });
 
 describe("runValidate", () => {
@@ -282,4 +337,14 @@ test("the build command exposes a --watch option", () => {
     (command) => command.name() === "build",
   );
   expect(build?.options.map((option) => option.long)).toContain("--watch");
+});
+
+test("init preset help describes a package locator rather than starter", () => {
+  const init = createProgram().commands.find(
+    (command) => command.name() === "init",
+  );
+  const preset = init?.options.find((option) => option.long === "--preset");
+
+  expect(preset?.description).toContain("package locator");
+  expect(preset?.description).not.toContain("starter");
 });

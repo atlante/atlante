@@ -4,6 +4,7 @@ import {
   createProjectResourcePack,
   type JsonObject,
   type ResourcePack,
+  type ResourceResolutionContext,
   ResourceResolutionError,
   type ResourceWatchRoot,
   resolveResourceDocument,
@@ -37,6 +38,7 @@ export type DocumentLoadOptions = {
     path: string,
     options: { throwIfNoEntry: false },
   ) => { isDirectory(): boolean } | undefined;
+  resourceContext?: ResourceResolutionContext;
 };
 
 /** Files and parents needed to retry the same resource resolution. */
@@ -323,6 +325,7 @@ function unsupportedSchemaDiagnostic(
 export function validateDocumentText(
   text: string,
   sourcePath: string,
+  options: DocumentLoadOptions = {},
 ): { document?: AtlanteDocument; diagnostics: Diagnostic[] } {
   const { raw, diagnostics } = parseConfigSource(text, sourcePath);
   if (raw === undefined) return { diagnostics: sortDiagnostics(diagnostics) };
@@ -336,6 +339,7 @@ export function validateDocumentText(
     text,
     { path, projectRoot: dirname(path) },
     parsed.overlay as unknown as JsonObject,
+    options.resourceContext,
   );
   return {
     ...(result.document ? { document: result.document } : {}),
@@ -407,6 +411,7 @@ function resolveResourceBackedDocument(
   text: string,
   location: DocumentLocation,
   rootDocument?: JsonObject,
+  resourceContext?: ResourceResolutionContext,
 ): {
   document?: AtlanteDocument;
   path: string;
@@ -436,6 +441,7 @@ function resolveResourceBackedDocument(
       pack: projectPack,
       rootFile: path,
       ...(rootDocument ? { rootDocument } : {}),
+      ...(resourceContext ? { resourceContext } : {}),
     });
   } catch (cause) {
     return {
@@ -527,5 +533,11 @@ export function loadDocument(
   const location = { path, projectRoot: dirname(path) };
   if (!parsed.overlay)
     return { ...location, diagnostics: sortDiagnostics(parsed.diagnostics) };
-  return resolveResourceBackedDocument(path, text, location);
+  return resolveResourceBackedDocument(
+    path,
+    text,
+    location,
+    undefined,
+    options.resourceContext,
+  );
 }

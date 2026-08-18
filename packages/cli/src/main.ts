@@ -42,7 +42,7 @@ export function createProgram(): Command {
   program
     .command("init")
     .argument("[path]", "project directory", process.cwd())
-    .option("--preset <name>", "preset to extend (default: starter)")
+    .option("--preset <locator>", "package locator preset to extend")
     .option("--force", "overwrite an existing Atlante config")
     .description("scaffold an Atlante configuration")
     .action(

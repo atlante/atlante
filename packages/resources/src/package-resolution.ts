@@ -14,6 +14,7 @@ import {
   isResourcePackLexicalRootStable,
   isResourcePackPathContained,
   type ResourcePack,
+  type ResourceResolutionContext,
   resourcePackLexicalRootSymlinkPaths,
   resourcePackMetadataPaths,
   resourcePackWatchRoot,
@@ -73,6 +74,7 @@ export type PackageResolutionOptions = Readonly<{
   readonly cache?: PackageResolutionCache;
   /** Existing facet read seam, also used for selected package metadata. */
   readonly beforeRead?: (path: string) => void;
+  readonly resourceContext?: ResourceResolutionContext;
 }>;
 
 export type ResolvedPackage = Readonly<{
@@ -85,6 +87,16 @@ export function createPackageResolutionCache(): PackageResolutionCache {
     projectManifests: new Map(),
     packageMetadata: new Map(),
   };
+}
+
+/** Creates a validated package root without resolving or executing package code. */
+export function createPackageResourcePack(
+  rootDirectory: string,
+  packageName: string,
+): ResourcePack {
+  const rootPack = createResourcePack(rootDirectory, "package");
+  const identity = validatePackManifest(rootPack, packageName, packageName, {});
+  return createResourcePack(rootDirectory, "package", identity);
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -1084,6 +1096,19 @@ export function resolvePackageResourcePack(
     locator.value,
     authoringFile,
   );
+  const firstPartyPack =
+    authoringPack.kind === "project" &&
+    packageName === "@atlante/pack" &&
+    options.resourceContext?.firstPartyPack?.kind === "package" &&
+    options.resourceContext.firstPartyPack.package?.name === packageName
+      ? options.resourceContext.firstPartyPack
+      : undefined;
+  if (firstPartyPack)
+    return {
+      pack: firstPartyPack,
+      dependencies: resourcePackMetadataPaths(firstPartyPack),
+    };
+
   const declaration = packageDeclaration(
     authoringPack,
     locator.value,

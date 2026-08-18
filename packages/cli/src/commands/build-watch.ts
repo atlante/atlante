@@ -7,6 +7,8 @@ import {
   watchFile,
 } from "node:fs";
 import { basename, dirname, resolve, sep } from "node:path";
+import type { ProjectContext } from "@atlante/builder";
+import { firstPartyProjectContext } from "../first-party-pack.js";
 import { type BuildOutcome, runBuildWithContext } from "./build.js";
 import { resolveWatchFiles, type WatchFiles } from "./build-watch-inputs.js";
 import {
@@ -113,8 +115,15 @@ function normalizeBuildOutcome(outcome: number | BuildOutcome): BuildOutcome {
 export function runBuildWatchWithDependencies(
   target: string,
   dependencies: BuildWatchDeps = {},
+  context: ProjectContext = firstPartyProjectContext(),
 ): BuildWatchHandle {
-  const deps: Required<BuildWatchDeps> = { ...defaultDeps, ...dependencies };
+  const deps: Required<BuildWatchDeps> = {
+    ...defaultDeps,
+    ...dependencies,
+    build:
+      dependencies.build ??
+      ((path: string) => runBuildWithContext(path, context)),
+  };
 
   const watched = new Set<string>();
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
@@ -170,7 +179,7 @@ export function runBuildWatchWithDependencies(
     }
 
     try {
-      const files = resolveWatchFiles(target, outcome.resourceWatch);
+      const files = resolveWatchFiles(target, outcome.resourceWatch, context);
       lastFiles = files;
       reconcile(files, succeeded);
     } catch (cause) {

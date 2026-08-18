@@ -4,6 +4,7 @@ import { type Slot, slotsOf } from "./composition.js";
 import {
   isResourcePackPathContained,
   type ResourcePack,
+  type ResourceResolutionContext,
   resourcePackMetadataPaths,
   resourcePackWatchRoot,
 } from "./content-root.js";
@@ -81,6 +82,7 @@ import type {
 export type ResourceResolveOptions = Readonly<{
   /** Existing facet read seam, also used by package metadata reads. */
   readonly beforeRead?: (path: string) => void;
+  readonly resourceContext?: ResourceResolutionContext;
 }>;
 
 export type ResolveInstanceRequest = ResourceResolveOptions & {
@@ -845,6 +847,7 @@ function runResourceRequest<T extends ResourceRequest, Result>(
 
 class ResourceResolver {
   private readonly beforeRead: ResourceResolveOptions["beforeRead"];
+  private readonly resourceContext: ResourceResolveOptions["resourceContext"];
   private readonly packageCache = createPackageResolutionCache();
   private readonly graph: ResourceGraphState = createResourceGraphState();
   private readonly dependencies = new Set<string>();
@@ -863,6 +866,15 @@ class ResourceResolver {
     options: ResourceResolveOptions,
   ) {
     this.beforeRead = options.beforeRead;
+    this.resourceContext = options.resourceContext;
+  }
+
+  private locatorOptions(): ResourceLocatorOptions {
+    return {
+      packageCache: this.packageCache,
+      beforeRead: this.beforeRead,
+      resourceContext: this.resourceContext,
+    };
   }
 
   run<T>(action: () => T): T {
@@ -946,14 +958,12 @@ class ResourceResolver {
     authoringFile: string,
   ): LoadedFacet<TemplateFacet> {
     const target = requireTarget(pack, locator, authoringFile, {
-      packageCache: this.packageCache,
-      beforeRead: this.beforeRead,
+      ...this.locatorOptions(),
     });
     this.collectPack(target.pack);
     return this.cachedFacet(target, "template", () =>
       loadTemplateFacet(pack, locator, authoringFile, {
-        packageCache: this.packageCache,
-        beforeRead: this.beforeRead,
+        ...this.locatorOptions(),
       }),
     );
   }
@@ -964,14 +974,12 @@ class ResourceResolver {
     authoringFile: string,
   ): LoadedFacet<InstanceFacet> {
     const target = requireTarget(pack, locator, authoringFile, {
-      packageCache: this.packageCache,
-      beforeRead: this.beforeRead,
+      ...this.locatorOptions(),
     });
     this.collectPack(target.pack);
     return this.cachedFacet(target, "instance", () =>
       loadInstanceFacet(pack, locator, authoringFile, {
-        packageCache: this.packageCache,
-        beforeRead: this.beforeRead,
+        ...this.locatorOptions(),
       }),
     );
   }
@@ -982,14 +990,12 @@ class ResourceResolver {
     authoringFile: string,
   ): LoadedFacet<Preset> {
     const target = requireTarget(pack, locator, authoringFile, {
-      packageCache: this.packageCache,
-      beforeRead: this.beforeRead,
+      ...this.locatorOptions(),
     });
     this.collectPack(target.pack);
     return this.cachedFacet(target, "preset", () =>
       loadPresetFacet(pack, locator, authoringFile, {
-        packageCache: this.packageCache,
-        beforeRead: this.beforeRead,
+        ...this.locatorOptions(),
       }),
     );
   }
