@@ -4,15 +4,15 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-// All six manifests stay synchronized and version-bumped together; the four
-// internal packages are private and never published. Publishing is the
-// separate scripts/publish-packages.ts step, which covers exactly
-// @atlante/cli and @atlante/opencode-plugin.
+// All seven manifests stay synchronized and version-bumped together; the four
+// internal packages plus the static pack are covered by the release graph.
+// Publishing is the separate scripts/publish-packages.ts step.
 const PACKAGES = [
   "schema",
   "resources",
   "validator",
   "builder",
+  "pack",
   "opencode-plugin",
   "cli",
 ] as const;

@@ -1,6 +1,5 @@
 node_modules/
 dist/
-packages/cli/bundled/
 *.tsbuildinfo
 .DS_Store
 .fallow/

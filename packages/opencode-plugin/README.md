@@ -48,8 +48,8 @@ Markdown: the adapter does not execute it.
 
 During initialization, the plugin reads only `.atlante/artifacts/manifest.json`
 and verifies every declared path, payload encoding, and SHA-256 digest before
-materialization. It does not load `atlante.jsonc`, local resources, bundled
-resources, or any resolver/loader. If artifacts are absent, malformed,
+materialization. It does not load `atlante.jsonc`, local resources, installed
+packs, or any resolver/loader. If artifacts are absent, malformed,
 unsupported, or changed, the `atlante_skill` tool is omitted and the host config
 is unchanged. After the staged result is materialized, the tool is active; a
 failure after materialization, including a runtime failure, moves it to the

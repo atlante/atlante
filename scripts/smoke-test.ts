@@ -1,29 +1,56 @@
 #!/usr/bin/env bun
 import { createHash } from "node:crypto";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const ROOT = join(import.meta.dir, "..");
-const CLI = join(ROOT, "packages", "cli", "dist", "bin", "atlante.js");
+const CLI_PACKAGE = join(ROOT, "packages", "cli");
+const PACK_PACKAGE = join(ROOT, "packages", "pack");
 
 function assert(condition: boolean, message: string) {
   if (!condition) throw new Error(message);
 }
 
-const project = await mkdtemp(join(tmpdir(), "atlante-smoke-"));
+const sandbox = await mkdtemp(join(tmpdir(), "atlante-smoke-"));
+const project = join(sandbox, "project");
+const globalRoot = join(sandbox, "global");
+const installedCli = join(globalRoot, "node_modules", "@atlante", "cli");
+const installedPack = join(globalRoot, "node_modules", "@atlante", "pack");
+const CLI = join(installedCli, "dist", "bin", "atlante.js");
 
 try {
+  // Reproduce a global-style install: the launcher and its runtime static pack
+  // are siblings under one node_modules tree, away from the project cwd.
+  await mkdir(project, { recursive: true });
+  await mkdir(installedCli, { recursive: true });
+  await cp(join(CLI_PACKAGE, "dist"), join(installedCli, "dist"), {
+    recursive: true,
+  });
+  await cp(
+    join(CLI_PACKAGE, "package.json"),
+    join(installedCli, "package.json"),
+  );
+  await cp(PACK_PACKAGE, installedPack, { recursive: true });
+  await cp(
+    join(ROOT, "node_modules", "jsonc-parser"),
+    join(globalRoot, "node_modules", "jsonc-parser"),
+    { recursive: true },
+  );
+
   const version = (await Bun.$`node ${CLI} --version`.cwd(ROOT).text()).trim();
-  const pkg = await Bun.file(
-    join(ROOT, "packages", "cli", "package.json"),
-  ).json();
+  const pkg = await Bun.file(join(installedCli, "package.json")).json();
   assert(version === pkg.version, `unexpected CLI version: ${version}`);
 
-  await Bun.$`node ${CLI} init ${project}`.cwd(ROOT);
+  await Bun.$`node ${CLI} init ${project}`.cwd(project);
   assert(
     await Bun.file(join(project, "atlante.jsonc")).exists(),
     "init did not write atlante.jsonc",
+  );
+  const config = await Bun.file(join(project, "atlante.jsonc")).text();
+  assert(
+    config.includes('"extends": "@atlante/pack"'),
+    "init did not use the installed @atlante/pack preset",
   );
   const opencode = await Bun.file(join(project, "opencode.jsonc")).text();
   assert(
@@ -31,7 +58,8 @@ try {
     "missing @atlante/opencode-plugin in opencode.jsonc",
   );
 
-  await Bun.$`node ${CLI} validate ${project}`.cwd(ROOT);
+  await Bun.$`node ${CLI} validate ${project}`.cwd(project);
+  await Bun.$`node ${CLI} build ${project}`.cwd(project);
 
   const artifacts = join(project, ".atlante", "artifacts");
   const manifest = (await Bun.file(
@@ -95,9 +123,24 @@ try {
   const rootManifest = (await Bun.file(
     join(ROOT, ".atlante", "artifacts", "manifest.json"),
   ).json()) as {
-    agents: { id: string; description: string; path: string }[];
-    skills: { id: string; description: string; path: string }[];
+    format: string;
+    version: number;
+    agents: { id: string; description: string; path: string; sha256: string }[];
+    skills: { id: string; description: string; path: string; sha256: string }[];
   };
+  assert(
+    rootManifest.format === "atlante-artifacts" && rootManifest.version === 1,
+    "root artifact format changed",
+  );
+  const rootManifestBefore = JSON.stringify(rootManifest);
+  await Bun.$`node ${CLI} build ${ROOT}`.cwd(ROOT);
+  const rootManifestAfter = await Bun.file(
+    join(ROOT, ".atlante", "artifacts", "manifest.json"),
+  ).json();
+  assert(
+    JSON.stringify(rootManifestAfter) === rootManifestBefore,
+    "root artifact manifest or hashes changed",
+  );
   assert(
     rootManifest.agents.map(({ id }) => id).join(",") === "architect",
     "root architect artifact ID changed",
@@ -163,5 +206,5 @@ try {
 
   console.log("Smoke test passed");
 } finally {
-  await rm(project, { recursive: true, force: true });
+  await rm(sandbox, { recursive: true, force: true });
 }

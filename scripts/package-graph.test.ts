@@ -8,6 +8,7 @@ const PACKAGES = [
   "resources",
   "validator",
   "builder",
+  "pack",
   "opencode-plugin",
   "cli",
 ] as const;
@@ -66,7 +67,7 @@ test("removes old workspace entries, manifests, imports, scripts, and lock entri
   }
 });
 
-test("keeps resources private and synchronizes exactly six workspaces", () => {
+test("keeps resources private and synchronizes exactly seven workspaces", () => {
   const resources = readJson(
     join(ROOT, "packages", "resources", "package.json"),
   );
@@ -77,26 +78,71 @@ test("keeps resources private and synchronizes exactly six workspaces", () => {
     join(ROOT, "packages", name, "package.json"),
   );
   expect(manifestPaths.every((path) => existsSync(path))).toBe(true);
+  const versions = manifestPaths.map((path) => readJson(path).version);
+  expect(new Set(versions).size).toBe(1);
 
   const release = readFileSync(join(ROOT, "scripts", "release.ts"), "utf8");
   for (const name of PACKAGES) expect(release).toContain(`"${name}"`);
   expect(release).toContain("const PACKAGES = [");
 });
 
-test("keeps only CLI and OpenCode publishable", () => {
+test("keeps only pack, CLI, and OpenCode publishable", () => {
   const publishable = new Set<string>();
   for (const name of PACKAGES) {
     const manifest = readJson(join(ROOT, "packages", name, "package.json"));
     if (manifest.publishConfig) publishable.add(name);
   }
-  expect([...publishable].sort()).toEqual(["cli", "opencode-plugin"]);
+  expect([...publishable].sort()).toEqual(["cli", "opencode-plugin", "pack"]);
 
   const publish = readFileSync(
     join(ROOT, "scripts", "publish-packages.ts"),
     "utf8",
   );
-  expect(publish).toContain('const PACKAGES = ["cli", "opencode-plugin"]');
-  expect(publish).toContain("bundled/resources");
-  expect(publish).not.toContain("bundled/templates");
-  expect(publish).not.toContain("bundled/presets");
+  expect(publish).toContain(
+    'const PACKAGES = ["pack", "cli", "opencode-plugin"]',
+  );
+  expect(publish).not.toContain("bundled");
+});
+
+test("publishes a static first-party pack with no executable API", async () => {
+  const pack = readJson(join(ROOT, "packages", "pack", "package.json"));
+  expect(pack.main).toBeUndefined();
+  expect(pack.module).toBeUndefined();
+  expect(pack.exports).toBeUndefined();
+  expect(pack.bin).toBeUndefined();
+  expect(pack.atlante).toEqual({ format: 1 });
+
+  const result = await Bun.$`npm pack --dry-run --json`
+    .cwd(join(ROOT, "packages", "pack"))
+    .quiet()
+    .nothrow();
+  expect(result.exitCode).toBe(0);
+
+  const report = JSON.parse(result.stdout.toString()) as Array<{
+    files: Array<{ path: string }>;
+  }>;
+  const files = report[0]?.files.map(({ path }) => path) ?? [];
+  expect(files).toContain("package.json");
+  expect(files).toContain("atlante.jsonc");
+  expect(files).toContain("agent/template.jsonc");
+  expect(files).toContain("agent/template.md");
+  expect(files).toContain("architect/instance.jsonc");
+  expect(files.some((file) => /\.(?:c|m)?js$|\.ts$/.test(file))).toBe(false);
+});
+
+test("keeps the first-party pack as a CLI runtime dependency in source", () => {
+  const cli = readJson(join(ROOT, "packages", "cli", "package.json"));
+  const dependencies = cli.dependencies as Record<string, unknown>;
+  expect(dependencies["@atlante/pack"]).toBe("workspace:*");
+});
+
+test("orders release packages pack, CLI, then OpenCode plugin", () => {
+  const publish = readFileSync(
+    join(ROOT, "scripts", "publish-packages.ts"),
+    "utf8",
+  );
+  expect(publish.indexOf('"pack"')).toBeLessThan(publish.indexOf('"cli"'));
+  expect(publish.indexOf('"cli"')).toBeLessThan(
+    publish.indexOf('"opencode-plugin"'),
+  );
 });

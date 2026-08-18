@@ -1,13 +1,13 @@
 #!/usr/bin/env bun
 import { existsSync } from "node:fs";
-import { readdir, readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
+import { withStagedPublishManifest } from "./publish-manifest.js";
 
 const ROOT = join(import.meta.dir, "..");
-// Only the two public packages are published. The other four (schema,
-// resources, validator, builder) are private workspaces: they are
-// versioned and synchronized by scripts/release.ts, but never published.
-const PACKAGES = ["cli", "opencode-plugin"] as const;
+// The static pack must be published before the CLI that depends on it. The
+// OpenCode plugin remains the final public package and consumes artifacts only.
+const PACKAGES = ["pack", "cli", "opencode-plugin"] as const;
 
 function parseArgs() {
   let version: string | undefined;
@@ -37,7 +37,14 @@ function parseArgs() {
 
 // Files that must exist verbatim in each public package (relative to the
 // package dir) before anything else happens.
-const REQUIRED_FILES: Record<string, string[]> = {
+const REQUIRED_FILES: Record<(typeof PACKAGES)[number], string[]> = {
+  pack: [
+    "package.json",
+    "atlante.jsonc",
+    "agent/template.jsonc",
+    "agent/template.md",
+    "architect/instance.jsonc",
+  ],
   cli: ["dist/bin/atlante.js"],
   "opencode-plugin": [
     "dist/index.js",
@@ -119,10 +126,6 @@ async function preflightArtifacts(): Promise<string[]> {
         if (!head.startsWith("#!/usr/bin/env node"))
           missing.push(`${name}: dist/bin/atlante.js shebang is not node`);
       }
-      const asset = "bundled/resources";
-      const assetDir = join(dir, asset);
-      if (!existsSync(assetDir) || (await readdir(assetDir)).length === 0)
-        missing.push(`${name}: ${asset} is missing or empty`);
     } else if (pkg === "opencode-plugin") {
       missing.push(...(await pluginImportIssues(dir, name)));
     }
@@ -131,58 +134,67 @@ async function preflightArtifacts(): Promise<string[]> {
   return missing;
 }
 
+function throwOnCommandFailure(
+  exitCode: number,
+  stderr: string,
+  stdout: string,
+  fallback: string,
+  name: string,
+) {
+  if (exitCode === 0) return;
+  const error = stderr || stdout || fallback;
+  throw new Error(`${name}: ${error.trim()}`);
+}
+
+async function validatePackage(dir: string, name: string) {
+  const pack = await Bun.$`npm pack --dry-run`.cwd(dir).quiet().nothrow();
+  throwOnCommandFailure(
+    pack.exitCode,
+    pack.stderr.toString(),
+    pack.stdout.toString(),
+    "npm pack failed",
+    name,
+  );
+  console.log(`Validated ${name}`);
+}
+
+async function publishPackageContents(
+  dir: string,
+  name: string,
+  version: string,
+  otp?: string,
+) {
+  const publishArgs = otp ? ["publish", "--otp", otp] : ["publish"];
+  const published = await Bun.$`npm ${publishArgs}`.cwd(dir).nothrow();
+  throwOnCommandFailure(
+    published.exitCode,
+    published.stderr.toString(),
+    published.stdout.toString(),
+    "npm publish failed",
+    name,
+  );
+  console.log(`Published ${name}@${version}`);
+}
+
 async function publishPackage(pkg: string, version: string, otp?: string) {
   const dir = join(ROOT, "packages", pkg);
   const manifestPath = join(dir, "package.json");
-  const original = await readFile(manifestPath, "utf8");
-  const manifest = JSON.parse(original);
-
-  // npm does not strip devDependencies from the packed/published manifest, so
-  // repo-only dev tooling (e.g. the plugin's `@atlante/builder:
-  // workspace:*`) would ship verbatim. Drop the field for the pack/publish
-  // cycle and restore the byte-exact original in `finally` below.
-  delete manifest.devDependencies;
-
-  await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
 
   const name = `@atlante/${pkg}`;
 
-  try {
-    // Validate
-    const pack = await Bun.$`npm pack --dry-run`.cwd(dir).quiet().nothrow();
-    if (pack.exitCode !== 0) {
-      const err =
-        pack.stderr.toString() || pack.stdout.toString() || "npm pack failed";
-      throw new Error(`${name}: ${err.trim()}`);
-    }
-    console.log(`Validated ${name}`);
-
-    // Publish
-    const publishArgs = ["publish"];
-    if (otp) {
-      publishArgs.push("--otp", otp);
-    }
-
-    const pub = await Bun.$`npm ${publishArgs}`.cwd(dir).nothrow();
-    if (pub.exitCode !== 0) {
-      const err =
-        pub.stderr.toString() || pub.stdout.toString() || "npm publish failed";
-      throw new Error(`${name}: ${err.trim()}`);
-    }
-    console.log(`Published ${name}@${version}`);
-  } finally {
-    await writeFile(manifestPath, original);
-  }
+  await withStagedPublishManifest(manifestPath, version, async () => {
+    await validatePackage(dir, name);
+    await publishPackageContents(dir, name, version, otp);
+  });
 }
 
 async function main() {
   const { version, otp } = parseArgs();
 
-  // Two-phase, all-or-nothing preflight: every required artifact of BOTH
+  // Two-phase, all-or-nothing preflight: every required artifact of ALL
   // public packages must exist before any manifest mutation, npm pack, or
   // npm publish, so a missing artifact can never leave a partial release
-  // (dist/ and cli bundled/ are gitignored generated output; a fresh
-  // checkout must build first).
+  // (dist/ is gitignored generated output; a fresh checkout must build first).
   const missing = await preflightArtifacts();
   if (missing.length > 0) {
     throw new Error(`${missing.join("\n")}\nrun \`bun run build\` first`);

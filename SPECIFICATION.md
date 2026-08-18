@@ -407,6 +407,45 @@ enumerate `node_modules`, load JavaScript, or consult a registry. A CLI MAY
 provide a trusted first-party `@atlante/pack` root from the CLI installation;
 that context MUST NOT be inferred from the project current working directory.
 
+### Pack author and consumer workflow
+
+A pack author publishes ordinary static package content, not an executable
+extension. The minimum package contract is:
+
+```json
+{
+  "name": "@acme/review-pack",
+  "version": "1.2.0",
+  "atlante": { "format": 1 }
+}
+```
+
+The package MAY contain a root `atlante.jsonc` or `atlante.json` default preset,
+contained named preset directories, template facets, and instance facets. It
+MUST NOT require a `main`, `exports`, `bin`, registration hook, or JavaScript
+import for Atlante to consume it. A consumer installs and declares the package
+through its package manager, then references the default or named preset:
+
+```sh
+npm install --save-dev @acme/review-pack
+atlante init --preset @acme/review-pack
+atlante init --preset @acme/review-pack/strict
+```
+
+Pack-authored package references are allowed only through declared runtime
+`dependencies` or `optionalDependencies` in that pack. For example,
+`@acme/review-pack` MAY declare `@acme/base-pack: ^2.0.0` and then reference
+`@acme/base-pack/shared` from a selected preset or facet. `devDependencies` and
+unrelated hoisted packages MUST NOT authorize pack composition. Atlante never
+installs packages, edits package manifests, scans package directories, or
+loads executable code.
+
+Build watch tracks the selected package manifest, selected facet files,
+transitive dependencies, trusted package roots, and safe unresolved parent
+directories. It does not watch or parse unrelated malformed siblings. When
+watch mode is not active, a source or pack change takes effect after
+`atlante build`.
+
 `extends` targets a directory containing exactly one `atlante.jsonc` or
 `atlante.json`. `$instance` targets a directory containing `instance.jsonc`.
 `$template` targets a directory containing both `template.jsonc` and
