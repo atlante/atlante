@@ -11,7 +11,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { SCHEMA_URI } from "@atlante/schema";
 import { runBuild } from "../src/commands/build.js";
@@ -64,6 +64,7 @@ function writeExternalPackage(
 function externalPackageProject(): {
   dir: string;
   packageRoot: string;
+  installedPackage: string;
   files: { manifest: string; template: string; source: string };
 } {
   const dir = tempProject(`{
@@ -77,17 +78,25 @@ function externalPackageProject(): {
       }
     }
   }`);
-  const packageRoot = join(dir, "node_modules", "review-pack");
+  const workspace = tempProject();
+  const packageRoot = join(workspace, "review-pack");
+  const installedPackage = join(dir, "node_modules", "review-pack");
   mkdirSync(join(dir, "node_modules"), { recursive: true });
+  symlinkSync(packageRoot, installedPackage, "dir");
   writeFileSync(
     join(dir, "package.json"),
     `${JSON.stringify({
       name: "atlante-watch-fixture",
       version: "1.0.0",
-      dependencies: { "review-pack": "1.2.3" },
+      dependencies: { "review-pack": "file:workspace" },
     })}\n`,
   );
-  return { dir, packageRoot, files: writeExternalPackage(packageRoot) };
+  return {
+    dir,
+    packageRoot,
+    installedPackage,
+    files: writeExternalPackage(packageRoot),
+  };
 }
 
 function canonical(path: string): string {
@@ -571,7 +580,8 @@ describe("runBuildWatchWithDependencies", () => {
   });
 
   test("reconciles external metadata and facets while retaining failed inputs and artifacts", async () => {
-    const { dir, packageRoot, files } = externalPackageProject();
+    const { dir, packageRoot, installedPackage, files } =
+      externalPackageProject();
     const watcher = fakeWatcher();
     let builds = 0;
 
@@ -587,6 +597,13 @@ describe("runBuildWatchWithDependencies", () => {
       });
       try {
         expect(builds).toBe(1);
+        const projectRoot = canonical(dir);
+        const packageCanonical = canonical(packageRoot);
+        const packageRelative = relative(projectRoot, packageCanonical);
+        expect(
+          packageRelative === ".." || packageRelative.startsWith(`..${sep}`),
+        ).toBe(true);
+        expect(canonical(installedPackage)).toBe(packageCanonical);
         const manifestPath = join(
           dir,
           ".atlante",
@@ -609,6 +626,7 @@ describe("runBuildWatchWithDependencies", () => {
         watcher.callbacks.get(canonical(files.source))?.();
         await waitFor(() => builds === 3, "failed rebuild after facet change");
         expect(readFileSync(manifestPath, "utf8")).toBe(before);
+        expect(watcher.callbacks.has(canonical(files.manifest))).toBe(true);
         expect(watcher.callbacks.has(canonical(files.template))).toBe(true);
         expect(watcher.callbacks.has(canonical(files.source))).toBe(true);
 

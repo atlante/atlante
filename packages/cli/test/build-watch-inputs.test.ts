@@ -281,15 +281,20 @@ describe("resolveWatchFiles", () => {
     const dir = tempDir();
     const trusted = tempDir();
     const outside = tempDir();
+    writeFileSync(join(dir, "atlante.jsonc"), valid);
+    const trustedFile = join(trusted, "trusted.jsonc");
     const outsideFile = join(outside, "failure.jsonc");
+    writeFileSync(trustedFile, "{}\n");
     writeFileSync(outsideFile, "{}\n");
 
     const result = resolveWatchFiles(dir, {
-      dependencies: [outsideFile],
-      unresolvedParents: [outside],
+      dependencies: [trustedFile, outsideFile],
+      unresolvedParents: [trusted, outside],
       trustedRoots: [{ canonical: trusted, lexical: trusted }],
     });
 
+    expect(result.resourcePaths).toContain(trustedFile);
+    expect(result.unresolvedParents).toContain(trusted);
     expect(result.resourcePaths).not.toContain(outsideFile);
     expect(result.unresolvedParents).not.toContain(outside);
   });
