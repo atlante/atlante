@@ -277,6 +277,84 @@ describe("resolveWatchFiles", () => {
     });
   });
 
+  test("retains a canonical workspace ancestor for missing pack dependencies", () => {
+    for (const packageName of ["missing-pack", "@scope/missing-pack"]) {
+      const dir = tempDir();
+      const workspace = tempDir();
+      const packageRoot = join(workspace, "author-pack");
+      const installed = join(dir, "node_modules", "author-pack");
+      const workspaceNodeModules = join(workspace, "node_modules");
+      mkdirSync(packageRoot, { recursive: true });
+      mkdirSync(join(dir, "node_modules"), { recursive: true });
+      mkdirSync(workspaceNodeModules);
+      const localNodeModules = join(packageRoot, "node_modules");
+      mkdirSync(localNodeModules);
+      symlinkSync(packageRoot, installed, "dir");
+      writeFileSync(
+        join(dir, "package.json"),
+        `${JSON.stringify({
+          name: "atlante-watch-fixture",
+          version: "1.0.0",
+          dependencies: { "author-pack": "file:workspace" },
+        })}\n`,
+      );
+      writeFileSync(
+        join(dir, "atlante.jsonc"),
+        `${JSON.stringify({ $schema: SCHEMA_URI, extends: "author-pack" })}\n`,
+      );
+      writeFileSync(
+        join(packageRoot, "package.json"),
+        `${JSON.stringify({
+          name: "author-pack",
+          version: "1.0.0",
+          atlante: { format: 1 },
+          dependencies: { [packageName]: "1.0.0" },
+        })}\n`,
+      );
+      writeFileSync(
+        join(packageRoot, "atlante.jsonc"),
+        `${JSON.stringify({ extends: packageName })}\n`,
+      );
+
+      const result = resolveWatchFiles(dir);
+      const expectedRoot = {
+        canonical: canonical(workspaceNodeModules),
+        lexical: workspaceNodeModules,
+      };
+
+      expect(result.resourceResolutionSucceeded).toBe(false);
+      expect(result.resourcePaths).toEqual(
+        expect.arrayContaining([
+          canonical(join(dir, "package.json")),
+          canonical(join(packageRoot, "package.json")),
+          join(installed, "package.json"),
+        ]),
+      );
+      expect(result.unresolvedParents).toEqual(
+        expect.arrayContaining([
+          canonical(localNodeModules),
+          expectedRoot.canonical,
+        ]),
+      );
+      expect(result.trustedRoots).toContainEqual(expectedRoot);
+      expect(result.trustedRoots).not.toContainEqual({
+        canonical: canonical(localNodeModules),
+        lexical: localNodeModules,
+      });
+
+      const outside = tempDir();
+      const outsideFile = join(outside, "outside.jsonc");
+      writeFileSync(outsideFile, "{}\n");
+      const filtered = resolveWatchFiles(dir, {
+        dependencies: [...result.resourcePaths, outsideFile],
+        unresolvedParents: [...result.unresolvedParents, outside],
+        trustedRoots: result.trustedRoots,
+      });
+      expect(filtered.resourcePaths).not.toContain(outsideFile);
+      expect(filtered.unresolvedParents).not.toContain(outside);
+    }
+  });
+
   test("rejects absolute failure paths outside project and trusted pack roots", () => {
     const dir = tempDir();
     const trusted = tempDir();

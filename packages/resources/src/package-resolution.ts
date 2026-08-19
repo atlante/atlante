@@ -15,6 +15,7 @@ import {
   isResourcePackPathContained,
   type ResourcePack,
   type ResourceResolutionContext,
+  resourcePackLexicalPathForCanonical,
   resourcePackLexicalRootSymlinkPaths,
   resourcePackMetadataPaths,
   resourcePackWatchRoot,
@@ -75,6 +76,8 @@ export type PackageResolutionOptions = Readonly<{
   readonly cache?: PackageResolutionCache;
   /** Existing facet read seam, also used for selected package metadata. */
   readonly beforeRead?: (path: string) => void;
+  /** Deterministic seam for testing package-root reconstruction races. */
+  readonly beforePackageRootReconstruction?: (path: string) => void;
   readonly resourceContext?: ResourceResolutionContext;
 }>;
 
@@ -177,6 +180,8 @@ function enrichPackageFailure(
   error: unknown,
   authoringPack: ResourcePack,
   declarationDependencies: readonly string[],
+  lookupTrustedRoots: readonly ResourceWatchRoot[] = [],
+  lookupRetryParents: readonly string[] = [],
 ): never {
   if (!(error instanceof ResourceResolutionError)) throw error;
   throw new ResourceResolutionError(error.failure, {
@@ -185,14 +190,39 @@ function enrichPackageFailure(
       declarationDependencies,
       error.dependencies,
     ),
-    unresolvedParents: [authoringPack.root, ...error.unresolvedParents],
+    unresolvedParents: [
+      ...lookupRetryParents,
+      authoringPack.root,
+      ...error.unresolvedParents,
+    ],
     trustedRoots: [
       ...error.trustedRoots,
+      ...lookupTrustedRoots,
       ...(authoringPack.kind === "package"
         ? [resourcePackWatchRoot(authoringPack)]
         : []),
     ],
   });
+}
+
+function withPackageFailureContext<T>(
+  action: () => T,
+  authoringPack: ResourcePack,
+  declarationDependencies: readonly string[],
+  lookupTrustedRoots: readonly ResourceWatchRoot[],
+  lookupRetryParents: readonly string[],
+): T {
+  try {
+    return action();
+  } catch (error) {
+    return enrichPackageFailure(
+      error,
+      authoringPack,
+      declarationDependencies,
+      lookupTrustedRoots,
+      lookupRetryParents,
+    );
+  }
 }
 
 type ManifestFile = Readonly<{
@@ -536,28 +566,62 @@ function authoringLexicalPath(
   return lexical;
 }
 
+type PackageLookupScope = Readonly<{
+  readonly root: string;
+  readonly lexicalRoot: string;
+  readonly external: boolean;
+}>;
+
+type PackageLookup = PackageLookupScope & {
+  readonly searchCanonicalAncestors: boolean;
+};
+
 function packageLookupRoot(
   pack: ResourcePack,
   authoringFile: AuthoringFileContext,
-): string {
+): PackageLookup {
   const normalized =
     pack.kind === "package" ? authoringFile.canonical : authoringFile.lexical;
   const root = pathWithin(pack.lexicalRoot, normalized)
     ? pack.lexicalRoot
     : pack.root;
-  if (pack.kind !== "package") return root;
+  if (pack.kind !== "package")
+    return {
+      root,
+      lexicalRoot: root,
+      external: false,
+      searchCanonicalAncestors: false,
+    };
 
   const packageParent = dirname(pack.root);
-  if (basename(packageParent) === "node_modules") return packageParent;
+  if (basename(packageParent) === "node_modules")
+    return {
+      root: packageParent,
+      lexicalRoot: packageParent,
+      external: false,
+      searchCanonicalAncestors: false,
+    };
   const scopedPackageParent = dirname(packageParent);
   if (basename(scopedPackageParent) === "node_modules")
-    return scopedPackageParent;
-  return pack.root;
+    return {
+      root: scopedPackageParent,
+      lexicalRoot: scopedPackageParent,
+      external: false,
+      searchCanonicalAncestors: false,
+    };
+  return {
+    root: pack.root,
+    lexicalRoot: pack.root,
+    external: false,
+    searchCanonicalAncestors: true,
+  };
 }
 
 type SafeNodeModulesDirectory = Readonly<{
   readonly canonical: string;
+  readonly lexical: string;
   readonly retrySafe: boolean;
+  readonly trustedRoot?: ResourceWatchRoot;
 }>;
 
 type NodeModulesProbe =
@@ -565,75 +629,164 @@ type NodeModulesProbe =
   | { readonly unsafe: true }
   | undefined;
 
+function nodeModulesLexicalPath(
+  candidate: string,
+  scope: PackageLookupScope,
+): string {
+  return scope.external
+    ? resolve(scope.lexicalRoot, relative(scope.root, resolve(candidate)))
+    : resolve(candidate);
+}
+
+function isSafeNodeModulesCandidate(
+  pack: ResourcePack,
+  candidate: string,
+  scope: PackageLookupScope,
+): boolean {
+  return (
+    isResourcePackLexicalRootStable(pack) &&
+    (scope.external ||
+      resolve(candidate) === resolve(scope.root) ||
+      isResourcePackLexicalPathSafe(pack, candidate))
+  );
+}
+
+function inspectNodeModulesDirectory(
+  lexical: string,
+  scope: PackageLookupScope,
+  pack: ResourcePack,
+): NodeModulesProbe {
+  const lexicalStat = lstatSync(lexical);
+  if (lexicalStat.isSymbolicLink()) return { unsafe: true };
+  if (!lexicalStat.isDirectory()) return undefined;
+  const canonical = realpathSync(lexical);
+  const canonicalLookupRoot = realpathSync(scope.root);
+  if (!pathWithin(canonicalLookupRoot, canonical)) return { unsafe: true };
+  if (!lstatSync(canonical).isDirectory()) return undefined;
+  return {
+    canonical,
+    lexical,
+    retrySafe: scope.external || isResourcePackPathContained(pack, canonical),
+    ...(scope.external
+      ? {
+          trustedRoot: Object.freeze({ canonical, lexical }),
+        }
+      : {}),
+  };
+}
+
 function safeNodeModulesDirectory(
   pack: ResourcePack,
   candidate: string,
-  lookupRoot: string,
+  scope: PackageLookupScope,
 ): NodeModulesProbe {
-  if (
-    !isResourcePackLexicalRootStable(pack) ||
-    (resolve(candidate) !== resolve(lookupRoot) &&
-      !isResourcePackLexicalPathSafe(pack, candidate))
-  )
+  if (!isSafeNodeModulesCandidate(pack, candidate, scope))
     return { unsafe: true };
   try {
-    const lexicalStat = lstatSync(candidate);
-    if (lexicalStat.isSymbolicLink()) return { unsafe: true };
-    if (!lexicalStat.isDirectory()) return undefined;
-    const canonical = realpathSync(candidate);
-    const canonicalLookupRoot = realpathSync(lookupRoot);
-    if (!pathWithin(canonicalLookupRoot, canonical)) return undefined;
-    if (!lstatSync(canonical).isDirectory()) return undefined;
-    return {
-      canonical,
-      retrySafe: isResourcePackPathContained(pack, canonical),
-    };
+    return inspectNodeModulesDirectory(
+      nodeModulesLexicalPath(candidate, scope),
+      scope,
+      pack,
+    );
   } catch {
     return undefined;
   }
 }
 
-function packageParentSafe(
+type PackageParentSafety = "safe" | "missing" | "unsafe";
+
+function packageParentStatSafety(parent: string): PackageParentSafety {
+  try {
+    const stat = lstatSync(parent);
+    return stat.isDirectory() && !stat.isSymbolicLink() ? "safe" : "unsafe";
+  } catch (error) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      ((error as { readonly code?: unknown }).code === "ENOENT" ||
+        (error as { readonly code?: unknown }).code === "ENOTDIR")
+    )
+      return "missing";
+    return "unsafe";
+  }
+}
+
+function packageParentSafety(
   pack: ResourcePack,
   candidate: string,
   packageName: string,
   nodeModules: string,
-): boolean {
-  if (!packageName.startsWith("@")) return true;
+): PackageParentSafety {
+  if (!packageName.startsWith("@")) return "safe";
   const parent = dirname(candidate);
-  if (isResourcePackLexicalPathSafe(pack, parent)) return true;
-  if (resolve(dirname(parent)) !== resolve(nodeModules)) return false;
-  try {
-    const stat = lstatSync(parent);
-    return stat.isDirectory() && !stat.isSymbolicLink();
-  } catch {
-    return false;
-  }
+  if (isResourcePackLexicalPathSafe(pack, parent)) return "safe";
+  if (resolve(dirname(parent)) !== resolve(nodeModules)) return "unsafe";
+  return packageParentStatSafety(parent);
 }
 
 function probePackageEntry(
   pack: ResourcePack,
   nodeModules: string,
   packageName: string,
-): { readonly candidate?: string; readonly unsafe: boolean } {
+  canonicalNodeModules: string,
+): {
+  readonly candidate?: string;
+  readonly retryParent?: string;
+  readonly unsafe: boolean;
+} {
   const candidate = packageEntry(nodeModules, packageName);
-  if (!packageParentSafe(pack, candidate, packageName, nodeModules))
-    return { unsafe: true };
+  const parentSafety = packageParentSafety(
+    pack,
+    candidate,
+    packageName,
+    nodeModules,
+  );
+  if (parentSafety === "unsafe") return { unsafe: true };
+  if (parentSafety === "missing") return { unsafe: false };
+  const retryParent = scopedPackageRetryParent(
+    candidate,
+    packageName,
+    canonicalNodeModules,
+  );
   try {
     const stat = lstatSync(candidate);
     if (stat.isDirectory() || stat.isSymbolicLink())
-      return { candidate, unsafe: false };
+      return {
+        candidate,
+        unsafe: false,
+        ...(retryParent ? { retryParent } : {}),
+      };
   } catch {
     // Continue through normal node_modules parent lookup locations.
   }
-  return { unsafe: false };
+  return { unsafe: false, ...(retryParent ? { retryParent } : {}) };
+}
+
+function scopedPackageRetryParent(
+  candidate: string,
+  packageName: string,
+  canonicalNodeModules: string,
+): string | undefined {
+  if (!packageName.startsWith("@")) return undefined;
+  const parent = dirname(candidate);
+  try {
+    const stat = lstatSync(parent);
+    if (!stat.isDirectory() || stat.isSymbolicLink()) return undefined;
+    const canonical = realpathSync(parent);
+    return pathWithin(canonicalNodeModules, canonical) ? canonical : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 type PackageDirectory = Readonly<{
   readonly candidate?: string;
-  readonly retryParent: string;
+  readonly retryParents: readonly string[];
+  readonly trustedRoots: readonly ResourceWatchRoot[];
   readonly unsafe: boolean;
 }>;
+
+type PackageDirectoryState = Omit<PackageDirectory, "candidate">;
 
 type PackageDeclaration = Readonly<{
   readonly dependencies: readonly string[];
@@ -717,77 +870,197 @@ function packageDirectory(
   authoringFile: AuthoringFileContext,
   packageName: string,
 ): PackageDirectory {
-  const root = packageLookupRoot(pack, authoringFile);
-  let current = dirname(
-    pack.kind === "package" ? authoringFile.canonical : authoringFile.lexical,
+  const lookup = packageLookupRoot(pack, authoringFile);
+  const local = searchPackageDirectory(
+    pack,
+    lookup,
+    dirname(
+      pack.kind === "package" ? authoringFile.canonical : authoringFile.lexical,
+    ),
+    packageName,
+    { retryParents: [pack.root], trustedRoots: [], unsafe: false },
   );
-  let retryParent = pack.root;
-  let unsafe = false;
+  if (local.candidate || !lookup.searchCanonicalAncestors) return local;
+  return searchCanonicalAncestors(pack, packageName, local);
+}
 
-  while (pathWithin(root, current)) {
-    const step = packageDirectoryStep(
-      pack,
-      root,
-      current,
-      packageName,
-      retryParent,
-      unsafe,
-    );
+function searchPackageDirectory(
+  pack: ResourcePack,
+  scope: PackageLookupScope,
+  startingDirectory: string,
+  packageName: string,
+  initialState: PackageDirectoryState,
+): PackageDirectory {
+  let current = startingDirectory;
+  let state = initialState;
+
+  while (pathWithin(scope.root, current)) {
+    const step = packageDirectoryStep(pack, scope, current, packageName, state);
     if (step.candidate) return step;
-    retryParent = step.retryParent;
-    unsafe = step.unsafe;
+    state = packageDirectoryState(step);
     if (!step.next) break;
     current = step.next;
   }
-  return { retryParent, unsafe };
+  return state;
+}
+
+function searchCanonicalAncestors(
+  pack: ResourcePack,
+  packageName: string,
+  initialState: PackageDirectoryState,
+): PackageDirectory {
+  let current = dirname(pack.root);
+  let state = initialState;
+
+  while (true) {
+    const scope: PackageLookupScope = {
+      root: current,
+      lexicalRoot:
+        resourcePackLexicalPathForCanonical(pack, current) ?? current,
+      external: true,
+    };
+    const step = packageDirectoryStep(pack, scope, current, packageName, state);
+    if (step.candidate) return step;
+    state = packageDirectoryState(step);
+    if (current === dirname(current)) break;
+    current = dirname(current);
+  }
+  return state;
+}
+
+function packageDirectoryState(
+  step: PackageDirectoryStep,
+): PackageDirectoryState {
+  return {
+    retryParents: step.retryParents,
+    trustedRoots: step.trustedRoots,
+    unsafe: step.unsafe,
+  };
+}
+
+function verifiedRetryParents(
+  pack: ResourcePack,
+  retryParents: readonly string[],
+  canonical: string,
+): readonly string[] {
+  if (retryParents.includes(canonical)) return retryParents;
+  if (retryParents.length === 1 && retryParents[0] === pack.root)
+    return [canonical];
+  return [...retryParents, canonical];
+}
+
+function packageDirectoryStep(
+  pack: ResourcePack,
+  scope: PackageLookupScope,
+  current: string,
+  packageName: string,
+  state: PackageDirectoryState,
+): PackageDirectoryStep {
+  const nodeModules =
+    basename(current) === "node_modules"
+      ? current
+      : join(current, "node_modules");
+  const safeNodeModules = safeNodeModulesDirectory(pack, nodeModules, scope);
+  if (safeNodeModules && "unsafe" in safeNodeModules)
+    return nextPackageDirectory(
+      scope.root,
+      current,
+      state.retryParents,
+      true,
+      state.trustedRoots,
+    );
+  if (!safeNodeModules)
+    return nextPackageDirectory(
+      scope.root,
+      current,
+      state.retryParents,
+      state.unsafe,
+      state.trustedRoots,
+    );
+  return packageDirectoryStepForSafeNodeModules(
+    pack,
+    scope,
+    current,
+    packageName,
+    state,
+    safeNodeModules,
+  );
 }
 
 type PackageDirectoryStep = PackageDirectory & {
   readonly next?: string;
 };
 
-function packageDirectoryStep(
+function replaceRetryParent(
+  retryParents: readonly string[],
+  current: string,
+  replacement: string | undefined,
+): readonly string[] {
+  if (!replacement) return retryParents;
+  return retryParents.map((parent) =>
+    parent === current ? replacement : parent,
+  );
+}
+
+function packageDirectoryStepForSafeNodeModules(
   pack: ResourcePack,
-  root: string,
+  scope: PackageLookupScope,
   current: string,
   packageName: string,
-  retryParent: string,
-  unsafe: boolean,
+  state: PackageDirectoryState,
+  safeNodeModules: SafeNodeModulesDirectory,
 ): PackageDirectoryStep {
-  const nodeModules =
-    basename(current) === "node_modules"
-      ? current
-      : join(current, "node_modules");
-  const safeNodeModules = safeNodeModulesDirectory(pack, nodeModules, root);
-  if (safeNodeModules && "unsafe" in safeNodeModules)
-    return nextPackageDirectory(root, current, retryParent, true);
-  if (safeNodeModules) {
-    const nextRetryParent =
-      safeNodeModules.retrySafe && retryParent === pack.root
-        ? safeNodeModules.canonical
-        : retryParent;
-    const probe = probePackageEntry(pack, nodeModules, packageName);
-    if (probe.unsafe)
-      return nextPackageDirectory(root, current, nextRetryParent, true);
-    if (probe.candidate)
-      return {
-        candidate: probe.candidate,
-        retryParent: nextRetryParent,
-        unsafe,
-      };
-    retryParent = nextRetryParent;
-  }
-  return nextPackageDirectory(root, current, retryParent, unsafe);
+  const retryParents = safeNodeModules.retrySafe
+    ? verifiedRetryParents(pack, state.retryParents, safeNodeModules.canonical)
+    : state.retryParents;
+  const trustedRoots = safeNodeModules.trustedRoot
+    ? [...state.trustedRoots, safeNodeModules.trustedRoot]
+    : state.trustedRoots;
+  const probe = probePackageEntry(
+    pack,
+    safeNodeModules.lexical,
+    packageName,
+    safeNodeModules.canonical,
+  );
+  const retryParentsForProbe = replaceRetryParent(
+    retryParents,
+    safeNodeModules.canonical,
+    probe.retryParent,
+  );
+  if (probe.unsafe)
+    return nextPackageDirectory(
+      scope.root,
+      current,
+      retryParentsForProbe,
+      true,
+      trustedRoots,
+    );
+  if (probe.candidate)
+    return {
+      candidate: probe.candidate,
+      retryParents: retryParentsForProbe,
+      trustedRoots,
+      unsafe: state.unsafe,
+    };
+  return nextPackageDirectory(
+    scope.root,
+    current,
+    retryParentsForProbe,
+    state.unsafe,
+    trustedRoots,
+  );
 }
 
 function nextPackageDirectory(
   root: string,
   current: string,
-  retryParent: string,
+  retryParents: readonly string[],
   unsafe: boolean,
+  trustedRoots: readonly ResourceWatchRoot[],
 ): PackageDirectoryStep {
   return {
-    retryParent,
+    retryParents,
+    trustedRoots,
     unsafe,
     ...(current === root ? {} : { next: dirname(current) }),
   };
@@ -809,10 +1082,13 @@ function packageNotInstalled(
           authoringPack,
           declarationDependencies,
         ),
-        unresolvedParents: [lookup.retryParent],
-        ...(authoringPack.kind === "package"
-          ? { trustedRoots: [resourcePackWatchRoot(authoringPack)] }
-          : {}),
+        unresolvedParents: lookup.retryParents,
+        trustedRoots: [
+          ...lookup.trustedRoots,
+          ...(authoringPack.kind === "package"
+            ? [resourcePackWatchRoot(authoringPack)]
+            : []),
+        ],
       },
     );
   return failResource(
@@ -824,8 +1100,13 @@ function packageNotInstalled(
         authoringPack,
         declarationDependencies,
       ),
-      unresolvedParents: [lookup.retryParent],
-      ...packageTrustContext(authoringPack),
+      unresolvedParents: lookup.retryParents,
+      trustedRoots: [
+        ...lookup.trustedRoots,
+        ...(authoringPack.kind === "package"
+          ? [resourcePackWatchRoot(authoringPack)]
+          : []),
+      ],
     },
   );
 }
@@ -836,6 +1117,13 @@ function candidatePackage(
   declarationDependencies: readonly string[],
   lookup: PackageDirectory,
 ): ResourcePack {
+  if (lookup.unsafe)
+    return packageNotInstalled(
+      authoringPack,
+      locator,
+      declarationDependencies,
+      lookup,
+    );
   if (!lookup.candidate)
     return packageNotInstalled(
       authoringPack,
@@ -854,6 +1142,8 @@ function candidatePackage(
         error,
         authoringPack,
         declarationDependencies,
+        lookup.trustedRoots,
+        lookup.retryParents,
       );
     return failResource(
       "package-not-installed",
@@ -864,11 +1154,135 @@ function candidatePackage(
           authoringPack,
           declarationDependencies,
         ),
-        unresolvedParents: [lookup.retryParent],
-        ...packageTrustContext(authoringPack),
+        unresolvedParents: lookup.retryParents,
+        trustedRoots: [
+          ...lookup.trustedRoots,
+          ...(authoringPack.kind === "package"
+            ? [resourcePackWatchRoot(authoringPack)]
+            : []),
+        ],
       },
     );
   }
+}
+
+function sameDependencyMap(
+  left: Readonly<Record<string, string>>,
+  right: Readonly<Record<string, string>>,
+): boolean {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  return (
+    leftKeys.length === rightKeys.length &&
+    leftKeys.every((key) => left[key] === right[key])
+  );
+}
+
+function samePackageIdentity(
+  left: ResourcePackageIdentity,
+  right: ResourcePackageIdentity,
+): boolean {
+  return (
+    left.name === right.name &&
+    left.version === right.version &&
+    left.manifestPath === right.manifestPath &&
+    left.lexicalManifestPath === right.lexicalManifestPath &&
+    sameDependencyMap(left.dependencies, right.dependencies) &&
+    sameDependencyMap(left.optionalDependencies, right.optionalDependencies) &&
+    sameDependencyMap(left.devDependencies, right.devDependencies)
+  );
+}
+
+function packageRootReconstructionStable(
+  candidatePack: ResourcePack,
+  candidatePath: string,
+  manifestPath: string,
+): boolean {
+  const lexicalManifestPath = join(candidatePack.lexicalRoot, "package.json");
+  try {
+    return (
+      realpathSync(candidatePath) === candidatePack.root &&
+      isResourcePackLexicalRootStable(candidatePack) &&
+      isResourcePackLexicalPathSafe(candidatePack, lexicalManifestPath) &&
+      realpathSync(lexicalManifestPath) === manifestPath
+    );
+  } catch {
+    return false;
+  }
+}
+
+function packageRootReconstructionFailure(
+  candidatePack: ResourcePack,
+  locator: RawResourceLocator,
+  manifestPath: string,
+  message: string,
+): never {
+  return failResource(
+    "unsafe-path",
+    message,
+    { locator },
+    {
+      dependencies: metadataPaths(candidatePack, manifestPath),
+      unresolvedParents: [candidatePack.root],
+      ...packageTrustContext(candidatePack),
+    },
+  );
+}
+
+function reconstructSelectedPackage(
+  candidatePack: ResourcePack,
+  candidatePath: string,
+  locator: RawResourceLocator,
+  identity: ResourcePackageIdentity,
+  options: PackageResolutionOptions,
+): ResourcePack {
+  if (
+    !packageRootReconstructionStable(
+      candidatePack,
+      candidatePath,
+      identity.manifestPath,
+    )
+  )
+    return packageRootReconstructionFailure(
+      candidatePack,
+      locator,
+      identity.manifestPath,
+      "package root changed during resolution",
+    );
+
+  const currentIdentity = validatePackManifest(
+    candidatePack,
+    locator,
+    identity.name,
+    {
+      ...options,
+      beforeRead: undefined,
+    },
+  );
+  if (!samePackageIdentity(currentIdentity, identity))
+    return packageRootReconstructionFailure(
+      candidatePack,
+      locator,
+      identity.manifestPath,
+      "package metadata identity changed during resolution",
+    );
+
+  const pack = createResourcePack(candidatePath, "package", identity);
+  if (
+    pack.root === candidatePack.root &&
+    packageRootReconstructionStable(
+      candidatePack,
+      candidatePath,
+      identity.manifestPath,
+    )
+  )
+    return pack;
+  return packageRootReconstructionFailure(
+    candidatePack,
+    locator,
+    identity.manifestPath,
+    "package root changed during resolution",
+  );
 }
 
 function selectedPackageManifest(
@@ -878,29 +1292,31 @@ function selectedPackageManifest(
   packageName: string,
   declaration: PackageDeclaration,
   candidatePath: string,
+  lookupTrustedRoots: readonly ResourceWatchRoot[],
+  lookupRetryParents: readonly string[],
   options: PackageResolutionOptions,
 ): ResolvedPackage {
-  let manifest: ManifestFile;
-  try {
-    manifest = manifestFile(
-      candidatePack,
-      locator,
-      "package-metadata-unreadable",
-    );
-  } catch (error) {
-    return enrichPackageFailure(error, authoringPack, declaration.dependencies);
-  }
-  try {
-    assertManifestStable(candidatePack, locator, manifest);
-  } catch (error) {
-    return enrichPackageFailure(error, authoringPack, declaration.dependencies);
-  }
+  const manifest = withPackageFailureContext(
+    () => manifestFile(candidatePack, locator, "package-metadata-unreadable"),
+    authoringPack,
+    declaration.dependencies,
+    lookupTrustedRoots,
+    lookupRetryParents,
+  );
+  withPackageFailureContext(
+    () => assertManifestStable(candidatePack, locator, manifest),
+    authoringPack,
+    declaration.dependencies,
+    lookupTrustedRoots,
+    lookupRetryParents,
+  );
   const cached = options.cache?.packageMetadata.get(candidatePack.root);
   if (
     cached &&
     cached.manifestPath === manifest.manifestPath &&
     cached.name === packageName
   ) {
+    options.beforePackageRootReconstruction?.(candidatePath);
     return cachedSelectedPackage(
       authoringPack,
       candidatePack,
@@ -909,26 +1325,35 @@ function selectedPackageManifest(
       declaration,
       manifest,
       cached,
+      lookupTrustedRoots,
+      lookupRetryParents,
+      options,
     );
   }
 
-  let identity: ResourcePackageIdentity;
-  try {
-    identity = validatePackManifest(
-      candidatePack,
-      locator,
-      packageName,
-      options,
-    );
-  } catch (error) {
-    return enrichPackageFailure(error, authoringPack, declaration.dependencies);
-  }
-  let pack: ResourcePack;
-  try {
-    pack = createResourcePack(candidatePath, "package", identity);
-  } catch (error) {
-    return enrichPackageFailure(error, authoringPack, declaration.dependencies);
-  }
+  const identity = withPackageFailureContext(
+    () => validatePackManifest(candidatePack, locator, packageName, options),
+    authoringPack,
+    declaration.dependencies,
+    lookupTrustedRoots,
+    lookupRetryParents,
+  );
+  const pack = withPackageFailureContext(
+    () => {
+      options.beforePackageRootReconstruction?.(candidatePath);
+      return reconstructSelectedPackage(
+        candidatePack,
+        candidatePath,
+        locator,
+        identity,
+        options,
+      );
+    },
+    authoringPack,
+    declaration.dependencies,
+    lookupTrustedRoots,
+    lookupRetryParents,
+  );
   options.cache?.packageMetadata.set(
     pack.root,
     canonicalPackageMetadata(identity),
@@ -944,41 +1369,29 @@ function cachedSelectedPackage(
   declaration: PackageDeclaration,
   manifest: ManifestFile,
   cached: CanonicalPackageMetadata,
+  lookupTrustedRoots: readonly ResourceWatchRoot[],
+  lookupRetryParents: readonly string[],
+  options: PackageResolutionOptions,
 ): ResolvedPackage {
-  if (
-    !isResourcePackLexicalRootStable(candidatePack) ||
-    !isResourcePackLexicalPathSafe(candidatePack, manifest.lexicalManifestPath)
-  )
-    return enrichPackageFailure(
-      new ResourceResolutionError(
-        {
-          code: "unsafe-path",
-          message: "package metadata path leaves the resource root",
-          locator,
-        },
-        {
-          dependencies: metadataPaths(
-            candidatePack,
-            manifest.lexicalManifestPath,
-          ),
-          unresolvedParents: [candidatePack.root],
-          ...packageTrustContext(candidatePack),
-        },
-      ),
-      authoringPack,
-      declaration.dependencies,
-    );
   try {
     return {
-      pack: createResourcePack(
+      pack: reconstructSelectedPackage(
+        candidatePack,
         candidatePath,
-        "package",
+        locator,
         packageIdentityForReference(cached, manifest.lexicalManifestPath),
+        options,
       ),
       dependencies: declaration.dependencies,
     };
   } catch (error) {
-    return enrichPackageFailure(error, authoringPack, declaration.dependencies);
+    return enrichPackageFailure(
+      error,
+      authoringPack,
+      declaration.dependencies,
+      lookupTrustedRoots,
+      lookupRetryParents,
+    );
   }
 }
 
@@ -1191,6 +1604,8 @@ export function resolvePackageResourcePack(
     packageName,
     declaration,
     candidatePath,
+    lookup.trustedRoots,
+    lookup.retryParents,
     options,
   );
 }

@@ -376,6 +376,70 @@ export function isResourcePackPathContained(
   return isWithin(pack.root, resolve(candidate));
 }
 
+function lexicalAliasForLink(
+  pack: ResourcePack,
+  link: CapturedSymlink,
+): string | undefined {
+  const linkPath = resolve(link.path);
+  if (!isWithin(linkPath, pack.lexicalRoot)) return undefined;
+
+  const captured = capturedTarget(link);
+  if (!captured) return undefined;
+  try {
+    if (!isWithin(realpathSync(captured), pack.root)) return undefined;
+  } catch {
+    return undefined;
+  }
+
+  const lexicalTarget = isAbsolute(link.target)
+    ? resolve(link.target)
+    : resolve(dirname(link.path), link.target);
+  const alias = resolve(lexicalTarget, relative(linkPath, pack.lexicalRoot));
+  try {
+    return realpathSync(alias) === pack.root ? alias : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function lexicalRootAlias(pack: ResourcePack): string | undefined {
+  const links = lexicalRootChains.get(pack) ?? [];
+  for (let index = links.length - 1; index >= 0; index -= 1) {
+    const link = links[index];
+    const alias = link ? lexicalAliasForLink(pack, link) : undefined;
+    if (alias) return alias;
+  }
+
+  try {
+    if (realpathSync(pack.lexicalRoot) === pack.root) return pack.lexicalRoot;
+  } catch {
+    // The caller will fail closed when the captured root is no longer stable.
+  }
+  return undefined;
+}
+
+/** Maps a canonical package path to the captured lexical root route. */
+export function resourcePackLexicalPathForCanonical(
+  pack: ResourcePack,
+  candidate: string,
+): string | undefined {
+  if (pack.kind !== "package" || !isResourcePackLexicalRootStable(pack))
+    return undefined;
+
+  const alias = lexicalRootAlias(pack);
+  if (!alias) return undefined;
+
+  const normalized = resolve(candidate);
+  if (isWithin(pack.root, normalized))
+    return resolve(alias, relative(pack.root, normalized));
+  if (!isWithin(normalized, pack.root)) return undefined;
+
+  let result = alias;
+  for (const _ of relative(normalized, pack.root).split(sep).filter(Boolean))
+    result = dirname(result);
+  return result;
+}
+
 /** Returns package metadata and captured lexical-root paths for watch inputs. */
 export function resourcePackMetadataPaths(
   pack: ResourcePack,

@@ -601,6 +601,7 @@ describe("package resource loading", () => {
     );
 
     expect(failure.unresolvedParents).toEqual([
+      join(pack.root, "node_modules"),
       join(pack.root, "source", "node_modules"),
     ]);
     expect(failure.unresolvedParents).not.toContain(join(pack.root, ".."));
@@ -958,6 +959,56 @@ describe("package resource loading", () => {
     expect(failure.unresolvedParents).not.toContain(outside);
   });
 
+  test("fails closed for a bridged canonical ancestor node_modules probe", () => {
+    const fixture = projectRoot({ "author-pack": "file:workspace" });
+    const workspace = mkdtempSync(join(tmpdir(), "atlante-package-workspace-"));
+    created.push(workspace);
+    const packageRoot = join(workspace, "author-pack");
+    mkdirSync(packageRoot, { recursive: true });
+    writePackManifest(packageRoot, "author-pack", {
+      dependencies: { "missing-pack": "1.0.0" },
+    });
+    writeJson(join(packageRoot, "atlante.jsonc"), {
+      extends: "missing-pack",
+    });
+
+    const outside = mkdtempSync(join(tmpdir(), "atlante-package-ancestor-"));
+    created.push(outside);
+    const outsideNodeModules = join(outside, "node_modules");
+    const decoy = installedPackage(outside, "missing-pack");
+    writeJson(join(decoy, "atlante.jsonc"), {
+      values: { from: "outside" },
+    });
+    const workspaceNodeModules = join(workspace, "node_modules");
+    symlinkSync(outsideNodeModules, workspaceNodeModules, "dir");
+
+    const installed = join(fixture.root, "node_modules", "author-pack");
+    mkdirSync(join(installed, ".."), { recursive: true });
+    symlinkSync(packageRoot, installed, "dir");
+    writeJson(join(fixture.config), { extends: "author-pack" });
+
+    const failure = expectFailure(
+      () =>
+        resolveResourceDocument({
+          pack: createProjectResourcePack(fixture.root),
+          rootFile: fixture.config,
+        }),
+      "unsafe-path",
+    );
+
+    expect(failure.failure.message).toBe(
+      "package lookup leaves the resource root",
+    );
+    expect(failure.dependencies).not.toContain(outside);
+    expect(failure.dependencies).not.toContain(decoy);
+    expect(failure.unresolvedParents).not.toContain(outside);
+    expect(failure.trustedRoots).not.toContainEqual({
+      canonical: realpathSync(outsideNodeModules),
+      lexical: workspaceNodeModules,
+    });
+    expect(JSON.stringify(failure.failure)).not.toContain(outside);
+  });
+
   test("rejects a bridged scoped parent while retaining the direct final package alias", () => {
     const fixture = projectRoot({ "@scope/pack": "file:workspace" });
     const workspace = mkdtempSync(join(tmpdir(), "atlante-package-workspace-"));
@@ -1071,7 +1122,94 @@ describe("package resource loading", () => {
     );
 
     rmSync(canonicalDependency, { recursive: true, force: true });
-    const missingCanonicalDependency = expectFailure(
+    const ancestorResult = resolveResourceDocument({
+      pack: createProjectResourcePack(fixture.root),
+      rootFile: fixture.config,
+    });
+    expect(ancestorResult.normalized.values).toEqual({
+      from: "workspace ancestor decoy",
+    });
+    expect(ancestorResult.dependencies).toContain(
+      realpathSync(join(workspaceAncestorDecoy, "package.json")),
+    );
+    expect(ancestorResult.dependencies).not.toContain(
+      join(hoistedDecoy, "package.json"),
+    );
+    expect(ancestorResult.trustedRoots).toContainEqual({
+      canonical: realpathSync(workspaceAncestorDecoy),
+      lexical: workspaceAncestorDecoy,
+    });
+    expect(ancestorResult.unresolvedParents).not.toContain(
+      join(workspace, "node_modules"),
+    );
+  });
+
+  test("resolves a symlinked pack dependency from a canonical workspace ancestor", () => {
+    const fixture = projectRoot({ "author-pack": "file:workspace" });
+    const workspace = mkdtempSync(join(tmpdir(), "atlante-package-workspace-"));
+    created.push(workspace);
+    const packageRoot = join(workspace, "author-pack");
+    mkdirSync(packageRoot, { recursive: true });
+    writePackManifest(packageRoot, "author-pack", {
+      dependencies: { "dependency-pack": "1.0.0" },
+    });
+    writeJson(join(packageRoot, "atlante.jsonc"), {
+      extends: "dependency-pack",
+    });
+
+    const workspaceDependency = installedPackage(workspace, "dependency-pack");
+    writeJson(join(workspaceDependency, "atlante.jsonc"), {
+      values: { from: "workspace ancestor dependency" },
+    });
+    const projectDecoy = installedPackage(fixture.root, "dependency-pack");
+    writeJson(join(projectDecoy, "atlante.jsonc"), {
+      values: { from: "project decoy" },
+    });
+
+    const installed = join(fixture.root, "node_modules", "author-pack");
+    mkdirSync(join(installed, ".."), { recursive: true });
+    symlinkSync(packageRoot, installed, "dir");
+    writeJson(join(fixture.config), { extends: "author-pack" });
+
+    const result = resolveResourceDocument({
+      pack: createProjectResourcePack(fixture.root),
+      rootFile: fixture.config,
+    });
+
+    expect(result.normalized.values).toEqual({
+      from: "workspace ancestor dependency",
+    });
+    expect(result.dependencies).toContain(
+      realpathSync(join(workspaceDependency, "package.json")),
+    );
+    expect(result.dependencies).not.toContain(
+      join(projectDecoy, "package.json"),
+    );
+  });
+
+  test("reports the canonical workspace ancestor for a missing symlinked pack dependency", () => {
+    const fixture = projectRoot({ "author-pack": "file:workspace" });
+    const workspace = mkdtempSync(join(tmpdir(), "atlante-package-workspace-"));
+    created.push(workspace);
+    const packageRoot = join(workspace, "author-pack");
+    mkdirSync(packageRoot, { recursive: true });
+    writePackManifest(packageRoot, "author-pack", {
+      dependencies: { "missing-pack": "1.0.0" },
+    });
+    writeJson(join(packageRoot, "atlante.jsonc"), {
+      extends: "missing-pack",
+    });
+    const workspaceNodeModules = join(workspace, "node_modules");
+    mkdirSync(workspaceNodeModules);
+    const localNodeModules = join(packageRoot, "node_modules");
+    mkdirSync(localNodeModules);
+
+    const installed = join(fixture.root, "node_modules", "author-pack");
+    mkdirSync(join(installed, ".."), { recursive: true });
+    symlinkSync(packageRoot, installed, "dir");
+    writeJson(join(fixture.config), { extends: "author-pack" });
+
+    const failure = expectFailure(
       () =>
         resolveResourceDocument({
           pack: createProjectResourcePack(fixture.root),
@@ -1079,12 +1217,293 @@ describe("package resource loading", () => {
         }),
       "package-not-installed",
     );
-    expect(missingCanonicalDependency.unresolvedParents).not.toContain(
-      join(workspace, "node_modules"),
+    const expectedRoot = {
+      canonical: realpathSync(workspaceNodeModules),
+      lexical: workspaceNodeModules,
+    };
+
+    expect(failure.unresolvedParents).toEqual(
+      expect.arrayContaining([
+        realpathSync(localNodeModules),
+        expectedRoot.canonical,
+      ]),
     );
-    expect(missingCanonicalDependency.dependencies).not.toContain(
-      join(workspaceAncestorDecoy, "package.json"),
+    expect(failure.unresolvedParents).not.toContain(workspace);
+    expect(failure.trustedRoots).toContainEqual(expectedRoot);
+    expect(failure.trustedRoots).not.toContainEqual({
+      canonical: realpathSync(localNodeModules),
+      lexical: localNodeModules,
+    });
+    expect(failure.trustedRoots).not.toContainEqual({
+      canonical: workspace,
+      lexical: workspace,
+    });
+  });
+
+  test("fails closed when the selected package root is retargeted before reconstruction", () => {
+    const fixture = projectRoot({ "author-pack": "file:workspace" });
+    const workspace = mkdtempSync(join(tmpdir(), "atlante-package-workspace-"));
+    created.push(workspace);
+    const packageRoot = join(workspace, "author-pack");
+    mkdirSync(packageRoot, { recursive: true });
+    writePackManifest(packageRoot, "author-pack", {
+      dependencies: { "dependency-pack": "1.0.0" },
+    });
+    writeJson(join(packageRoot, "atlante.jsonc"), {});
+    const localNodeModules = join(packageRoot, "node_modules");
+    mkdirSync(localNodeModules);
+    const workspaceNodeModules = join(workspace, "node_modules");
+    const dependencyRoot = installedPackage(workspace, "dependency-pack");
+    writeJson(join(dependencyRoot, "atlante.jsonc"), {});
+
+    const installed = join(fixture.root, "node_modules", "author-pack");
+    mkdirSync(join(installed, ".."), { recursive: true });
+    symlinkSync(packageRoot, installed, "dir");
+    writeJson(join(fixture.config), { extends: "author-pack" });
+
+    const authoringPack = resolvePackageResourcePack(
+      createProjectResourcePack(fixture.root),
+      packageLocator("author-pack"),
+      fixture.config,
+    ).pack;
+    const outside = mkdtempSync(
+      join(tmpdir(), "atlante-package-reconstruction-"),
     );
+    created.push(outside);
+    const replacement = join(outside, "replacement-pack");
+    mkdirSync(replacement, { recursive: true });
+    writePackManifest(replacement, "dependency-pack", { version: "9.9.9" });
+    writeJson(join(replacement, "atlante.jsonc"), {});
+    let retargeted = false;
+    const options = {
+      beforePackageRootReconstruction: (path: string) => {
+        retargeted = true;
+        rmSync(path, { recursive: true, force: true });
+        symlinkSync(replacement, path, "dir");
+      },
+    };
+
+    const failure = expectFailure(
+      () =>
+        resolvePackageResourcePack(
+          authoringPack,
+          packageLocator("dependency-pack"),
+          join(installed, "atlante.jsonc"),
+          options,
+        ),
+      "unsafe-path",
+    );
+
+    expect(retargeted).toBe(true);
+    expect(failure.failure.message).toBe(
+      "package root changed during resolution",
+    );
+    expect(failure.unresolvedParents).toEqual(
+      expect.arrayContaining([
+        authoringPack.root,
+        realpathSync(localNodeModules),
+        realpathSync(workspaceNodeModules),
+      ]),
+    );
+    expect(failure.trustedRoots).toContainEqual({
+      canonical: realpathSync(workspaceNodeModules),
+      lexical: workspaceNodeModules,
+    });
+    expect(failure.trustedRoots).not.toContainEqual({
+      canonical: realpathSync(localNodeModules),
+      lexical: localNodeModules,
+    });
+    expect(failure.dependencies).not.toContain(outside);
+    expect(failure.unresolvedParents).not.toContain(outside);
+    expect(JSON.stringify(failure.failure)).not.toContain(outside);
+  });
+
+  test("fails closed when a cached package root is retargeted to an existing replacement", () => {
+    const fixture = projectRoot({ "author-pack": "file:workspace" });
+    const workspace = mkdtempSync(join(tmpdir(), "atlante-package-workspace-"));
+    created.push(workspace);
+    const packageRoot = join(workspace, "author-pack");
+    mkdirSync(packageRoot, { recursive: true });
+    writePackManifest(packageRoot, "author-pack", {
+      dependencies: { "dependency-pack": "1.0.0" },
+    });
+    writeJson(join(packageRoot, "atlante.jsonc"), {});
+    const dependencyRoot = installedPackage(workspace, "dependency-pack");
+    writeJson(join(dependencyRoot, "atlante.jsonc"), {});
+
+    const installed = join(fixture.root, "node_modules", "author-pack");
+    mkdirSync(join(installed, ".."), { recursive: true });
+    symlinkSync(packageRoot, installed, "dir");
+
+    const cache = createPackageResolutionCache();
+    const projectPack = createProjectResourcePack(fixture.root);
+    const authoringPack = resolvePackageResourcePack(
+      projectPack,
+      packageLocator("author-pack"),
+      fixture.config,
+      { cache },
+    ).pack;
+    const authoringFile = join(installed, "atlante.jsonc");
+    const dependency = packageLocator("dependency-pack");
+    const first = resolvePackageResourcePack(
+      authoringPack,
+      dependency,
+      authoringFile,
+      { cache },
+    );
+    expect(first.pack.root).toBe(realpathSync(dependencyRoot));
+
+    const outside = mkdtempSync(join(tmpdir(), "atlante-package-cache-race-"));
+    created.push(outside);
+    const replacement = join(outside, "replacement-pack");
+    mkdirSync(replacement, { recursive: true });
+    writePackManifest(replacement, "dependency-pack", { version: "9.9.9" });
+    writeJson(join(replacement, "atlante.jsonc"), {});
+    let retargeted = false;
+
+    const failure = expectFailure(
+      () =>
+        resolvePackageResourcePack(authoringPack, dependency, authoringFile, {
+          cache,
+          beforePackageRootReconstruction: (path: string) => {
+            retargeted = true;
+            rmSync(path, { recursive: true, force: true });
+            symlinkSync(replacement, path, "dir");
+          },
+        }),
+      "unsafe-path",
+    );
+
+    expect(retargeted).toBe(true);
+    expect(failure.failure.message).toBe(
+      "package root changed during resolution",
+    );
+    expect(failure.dependencies).not.toContain(outside);
+    expect(failure.unresolvedParents).not.toContain(outside);
+    expect(JSON.stringify(failure.failure)).not.toContain(outside);
+  });
+
+  test("treats an absent scoped parent as a missing external dependency", () => {
+    const fixture = projectRoot({ "author-pack": "file:workspace" });
+    const workspace = mkdtempSync(join(tmpdir(), "atlante-package-workspace-"));
+    created.push(workspace);
+    const packageRoot = join(workspace, "author-pack");
+    mkdirSync(packageRoot, { recursive: true });
+    writePackManifest(packageRoot, "author-pack", {
+      dependencies: { "@scope/missing-pack": "1.0.0" },
+    });
+    writeJson(join(packageRoot, "atlante.jsonc"), {
+      extends: "@scope/missing-pack",
+    });
+    const localNodeModules = join(packageRoot, "node_modules");
+    mkdirSync(localNodeModules);
+    const workspaceNodeModules = join(workspace, "node_modules");
+    mkdirSync(workspaceNodeModules);
+
+    const installed = join(fixture.root, "node_modules", "author-pack");
+    mkdirSync(join(installed, ".."), { recursive: true });
+    symlinkSync(packageRoot, installed, "dir");
+    writeJson(join(fixture.config), { extends: "author-pack" });
+
+    const authoringPack = resolvePackageResourcePack(
+      createProjectResourcePack(fixture.root),
+      packageLocator("author-pack"),
+      fixture.config,
+    ).pack;
+    const failure = expectFailure(
+      () =>
+        resolvePackageResourcePack(
+          authoringPack,
+          packageLocator("@scope/missing-pack"),
+          join(installed, "atlante.jsonc"),
+        ),
+      "package-not-installed",
+    );
+    const expectedRoot = {
+      canonical: realpathSync(workspaceNodeModules),
+      lexical: workspaceNodeModules,
+    };
+
+    expect(failure.unresolvedParents).toEqual(
+      expect.arrayContaining([
+        realpathSync(localNodeModules),
+        expectedRoot.canonical,
+      ]),
+    );
+    expect(failure.unresolvedParents).not.toContain(workspace);
+    expect(failure.trustedRoots).toContainEqual(expectedRoot);
+    expect(failure.trustedRoots).not.toContainEqual({
+      canonical: realpathSync(localNodeModules),
+      lexical: localNodeModules,
+    });
+    expect(failure.trustedRoots).not.toContainEqual({
+      canonical: workspace,
+      lexical: workspace,
+    });
+
+    const dependencyRoot = installedPackage(workspace, "@scope/missing-pack");
+    writeJson(join(dependencyRoot, "atlante.jsonc"), {
+      values: { from: "scoped workspace dependency" },
+    });
+    const resolved = resolveResourceDocument({
+      pack: createProjectResourcePack(fixture.root),
+      rootFile: fixture.config,
+    });
+    expect(resolved.normalized.values).toEqual({
+      from: "scoped workspace dependency",
+    });
+  });
+
+  test("reports an existing external scoped parent as the nearest retry path", () => {
+    const fixture = projectRoot({ "author-pack": "file:workspace" });
+    const workspace = mkdtempSync(join(tmpdir(), "atlante-package-workspace-"));
+    created.push(workspace);
+    const packageRoot = join(workspace, "author-pack");
+    mkdirSync(packageRoot, { recursive: true });
+    writePackManifest(packageRoot, "author-pack", {
+      dependencies: { "@scope/missing-pack": "1.0.0" },
+    });
+    writeJson(join(packageRoot, "atlante.jsonc"), {
+      extends: "@scope/missing-pack",
+    });
+    const localNodeModules = join(packageRoot, "node_modules");
+    mkdirSync(localNodeModules);
+    const workspaceNodeModules = join(workspace, "node_modules");
+    const scopeRoot = join(workspaceNodeModules, "@scope");
+    mkdirSync(scopeRoot, { recursive: true });
+
+    const installed = join(fixture.root, "node_modules", "author-pack");
+    mkdirSync(join(installed, ".."), { recursive: true });
+    symlinkSync(packageRoot, installed, "dir");
+    writeJson(join(fixture.config), { extends: "author-pack" });
+
+    const failure = expectFailure(
+      () =>
+        resolveResourceDocument({
+          pack: createProjectResourcePack(fixture.root),
+          rootFile: fixture.config,
+        }),
+      "package-not-installed",
+    );
+    const expectedRoot = {
+      canonical: realpathSync(workspaceNodeModules),
+      lexical: workspaceNodeModules,
+    };
+
+    expect(failure.unresolvedParents).toEqual(
+      expect.arrayContaining([
+        realpathSync(localNodeModules),
+        realpathSync(scopeRoot),
+      ]),
+    );
+    expect(failure.unresolvedParents).not.toContain(
+      realpathSync(workspaceNodeModules),
+    );
+    expect(failure.trustedRoots).toContainEqual(expectedRoot);
+    expect(failure.trustedRoots).not.toContainEqual({
+      canonical: realpathSync(scopeRoot),
+      lexical: scopeRoot,
+    });
   });
 
   test("validates resolvePackageResourcePack authoring files before lookup", () => {
