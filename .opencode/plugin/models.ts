@@ -30,6 +30,49 @@ const isMissingFile = (error: unknown) =>
 const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
 
+const parseModel = (name: Role, value: unknown): string => {
+  if (typeof value !== "string") {
+    throw new Error(
+      `Invalid ${MODEL_FILE}: model for role "${name}" must be a string`,
+    );
+  }
+  if (!MODEL_ID.test(value)) {
+    throw new Error(
+      `Invalid ${MODEL_FILE}: model for role "${name}" must be a provider/model reference`,
+    );
+  }
+  return value;
+};
+
+const parseReasoningEffort = (name: Role, value: unknown): string => {
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new Error(
+      `Invalid ${MODEL_FILE}: reasoningEffort for role "${name}" must be a non-empty string`,
+    );
+  }
+  return value.trim();
+};
+
+const parseRole = (name: Role, value: unknown): RoleOverrides => {
+  if (!isRecord(value)) {
+    throw new Error(`Invalid ${MODEL_FILE}: role "${name}" must be an object`);
+  }
+
+  const entry: RoleOverrides = {};
+  for (const [field, fieldValue] of Object.entries(value)) {
+    if (field === "model") {
+      entry.model = parseModel(name, fieldValue);
+    } else if (field === "reasoningEffort") {
+      entry.reasoningEffort = parseReasoningEffort(name, fieldValue);
+    } else {
+      throw new Error(
+        `Invalid ${MODEL_FILE}: unknown field "${field}" for role "${name}"`,
+      );
+    }
+  }
+  return entry;
+};
+
 const parseOverrides = (contents: string): Overrides => {
   let value: unknown;
   try {
@@ -47,40 +90,7 @@ const parseOverrides = (contents: string): Overrides => {
     if (!isRole(name)) {
       throw new Error(`Invalid ${MODEL_FILE}: unknown role "${name}"`);
     }
-    if (!isRecord(roleValue)) {
-      throw new Error(
-        `Invalid ${MODEL_FILE}: role "${name}" must be an object`,
-      );
-    }
-
-    const entry: RoleOverrides = {};
-    for (const [field, fieldValue] of Object.entries(roleValue)) {
-      if (field === "model") {
-        if (typeof fieldValue !== "string") {
-          throw new Error(
-            `Invalid ${MODEL_FILE}: model for role "${name}" must be a string`,
-          );
-        }
-        if (!MODEL_ID.test(fieldValue)) {
-          throw new Error(
-            `Invalid ${MODEL_FILE}: model for role "${name}" must be a provider/model reference`,
-          );
-        }
-        entry.model = fieldValue;
-      } else if (field === "reasoningEffort") {
-        if (typeof fieldValue !== "string" || fieldValue.trim() === "") {
-          throw new Error(
-            `Invalid ${MODEL_FILE}: reasoningEffort for role "${name}" must be a non-empty string`,
-          );
-        }
-        entry.reasoningEffort = fieldValue.trim();
-      } else {
-        throw new Error(
-          `Invalid ${MODEL_FILE}: unknown field "${field}" for role "${name}"`,
-        );
-      }
-    }
-    overrides[name] = entry;
+    overrides[name] = parseRole(name, roleValue);
   }
   return overrides;
 };
