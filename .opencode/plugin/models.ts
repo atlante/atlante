@@ -5,16 +5,18 @@ import type { Plugin } from "@opencode-ai/plugin";
 const MODEL_FILE = ".opencode/models.json";
 const DEFAULT_MODEL = "opencode/deepseek-v4-flash-free";
 const ROLES = ["architect", "general", "explore"] as const;
-const DEFAULTS = {
-  architect: DEFAULT_MODEL,
-  general: DEFAULT_MODEL,
-  explore: DEFAULT_MODEL,
-};
-const DEFAULT_FILE = `${JSON.stringify(DEFAULTS, null, 2)}\n`;
-const MODEL_ID = /^[^/\s]+\/\S+$/;
 
 type Role = (typeof ROLES)[number];
-type Overrides = Partial<Record<Role, string>>;
+type RoleOverrides = { model?: string; reasoningEffort?: string };
+type Overrides = Partial<Record<Role, RoleOverrides>>;
+
+const STARTER_DEFAULTS: Record<Role, RoleOverrides> = {
+  architect: { model: DEFAULT_MODEL, reasoningEffort: "xhigh" },
+  general: { model: DEFAULT_MODEL, reasoningEffort: "max" },
+  explore: { model: DEFAULT_MODEL, reasoningEffort: "max" },
+};
+const DEFAULT_FILE = `${JSON.stringify(STARTER_DEFAULTS, null, 2)}\n`;
+const MODEL_ID = /^[^/\s]+\/\S+$/;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -41,21 +43,44 @@ const parseOverrides = (contents: string): Overrides => {
   }
 
   const overrides: Overrides = {};
-  for (const [name, model] of Object.entries(value)) {
+  for (const [name, roleValue] of Object.entries(value)) {
     if (!isRole(name)) {
       throw new Error(`Invalid ${MODEL_FILE}: unknown role "${name}"`);
     }
-    if (typeof model !== "string") {
+    if (!isRecord(roleValue)) {
       throw new Error(
-        `Invalid ${MODEL_FILE}: model for role "${name}" must be a string`,
+        `Invalid ${MODEL_FILE}: role "${name}" must be an object`,
       );
     }
-    if (!MODEL_ID.test(model)) {
-      throw new Error(
-        `Invalid ${MODEL_FILE}: model for role "${name}" must be a provider/model reference`,
-      );
+
+    const entry: RoleOverrides = {};
+    for (const [field, fieldValue] of Object.entries(roleValue)) {
+      if (field === "model") {
+        if (typeof fieldValue !== "string") {
+          throw new Error(
+            `Invalid ${MODEL_FILE}: model for role "${name}" must be a string`,
+          );
+        }
+        if (!MODEL_ID.test(fieldValue)) {
+          throw new Error(
+            `Invalid ${MODEL_FILE}: model for role "${name}" must be a provider/model reference`,
+          );
+        }
+        entry.model = fieldValue;
+      } else if (field === "reasoningEffort") {
+        if (typeof fieldValue !== "string" || fieldValue.trim() === "") {
+          throw new Error(
+            `Invalid ${MODEL_FILE}: reasoningEffort for role "${name}" must be a non-empty string`,
+          );
+        }
+        entry.reasoningEffort = fieldValue.trim();
+      } else {
+        throw new Error(
+          `Invalid ${MODEL_FILE}: unknown field "${field}" for role "${name}"`,
+        );
+      }
     }
-    overrides[name] = model;
+    overrides[name] = entry;
   }
   return overrides;
 };
@@ -77,7 +102,7 @@ const loadOverrides = async (filePath: string): Promise<Overrides> => {
         `Unable to create ${MODEL_FILE}: ${errorMessage(createError)}`,
       );
     }
-    return { ...DEFAULTS };
+    return { ...STARTER_DEFAULTS };
   }
 
   return parseOverrides(contents);
@@ -91,9 +116,16 @@ export default (async ({ directory, worktree }) => {
     config: async (config) => {
       const agents = { ...(config.agent ?? {}) };
       for (const role of ROLES) {
-        const model = overrides[role];
-        if (model === undefined) continue;
-        agents[role] = { ...(agents[role] ?? {}), model };
+        const override = overrides[role];
+        if (override === undefined) continue;
+        const entry = { ...(agents[role] ?? {}) };
+        if (override.model !== undefined) {
+          entry.model = override.model;
+        }
+        if (override.reasoningEffort !== undefined) {
+          entry.reasoningEffort = override.reasoningEffort;
+        }
+        agents[role] = entry;
       }
       config.agent = agents;
     },
