@@ -46,17 +46,20 @@ const DIST_API = fileURLToPath(new URL("../dist/api.js", import.meta.url));
 const DIST_INDEX_URL = new URL("../dist/index.js", import.meta.url).href;
 const DIST_API_URL = new URL("../dist/api.js", import.meta.url).href;
 
-beforeAll(async () => {
-  await Bun.$`bun run build`.cwd(ROOT);
-  const missing = [DIST_INDEX, DIST_API].filter((path) => !existsSync(path));
-  if (missing.length > 0) {
-    throw new Error(
-      `@atlante/opencode-plugin: build completed without ${missing
-        .map((path) => relative(ROOT, path))
-        .join(", ")}`,
-    );
-  }
-});
+beforeAll(
+  async () => {
+    await Bun.$`bun run build`.cwd(ROOT);
+    const missing = [DIST_INDEX, DIST_API].filter((path) => !existsSync(path));
+    if (missing.length > 0) {
+      throw new Error(
+        `@atlante/opencode-plugin: build completed without ${missing
+          .map((path) => relative(ROOT, path))
+          .join(", ")}`,
+      );
+    }
+  },
+  { timeout: 30_000 },
+);
 
 afterEach(() => {
   for (const directory of created.splice(0))
