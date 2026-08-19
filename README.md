@@ -174,36 +174,6 @@ mismatch before materialization. The artifact format version is separate from
 the document `$schema` version. Rendered values may contain sensitive data, so
 keep `.atlante/` local and do not publish artifacts.
 
-### OpenCode model overrides
-
-OpenCode merges its normal configuration first. User-global configuration has
-lower precedence than repository `.opencode` configuration, and the local
-OpenCode plugin then applies the ignored `.opencode/models.json`, giving that
-file the final say on the three supported model fields at startup. This
-documents the normal configuration order only; it does not promise that a
-repository plugin can override administrator-managed policy.
-
-The file is strict JSON, not JSONC. It accepts only the `architect`, `general`,
-and `explore` keys, with `provider/model` string values:
-
-```json
-{
-  "architect": "opencode/deepseek-v4-flash-free",
-  "general": "opencode/deepseek-v4-flash-free",
-  "explore": "opencode/deepseek-v4-flash-free"
-}
-```
-
-If the ignored file is missing, the plugin creates it with
-`opencode/deepseek-v4-flash-free` for all three roles. A partial file overrides
-only the roles it lists; omitted roles preserve their model from the merged
-OpenCode configuration. Malformed JSON, unknown keys, or malformed
-`provider/model` syntax fail plugin loading before any partial model mutation.
-Only model fields change: shared role settings, permissions, tools, reasoning
-settings, prompts, and descriptions remain intact. Validation does not check
-live provider or catalog availability. Restart OpenCode after changing this
-file or the plugin.
-
 ## Packs And Presets
 
 A pack is an installed npm, workspace, or `file:` package containing static
