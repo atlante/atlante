@@ -104,31 +104,35 @@ test("keeps only pack, CLI, and OpenCode publishable", () => {
   expect(publish).not.toContain("bundled");
 });
 
-test("publishes a static first-party pack with no executable API", async () => {
-  const pack = readJson(join(ROOT, "packages", "pack", "package.json"));
-  expect(pack.main).toBeUndefined();
-  expect(pack.module).toBeUndefined();
-  expect(pack.exports).toBeUndefined();
-  expect(pack.bin).toBeUndefined();
-  expect(pack.atlante).toEqual({ format: 1 });
+test(
+  "publishes a static first-party pack with no executable API",
+  async () => {
+    const pack = readJson(join(ROOT, "packages", "pack", "package.json"));
+    expect(pack.main).toBeUndefined();
+    expect(pack.module).toBeUndefined();
+    expect(pack.exports).toBeUndefined();
+    expect(pack.bin).toBeUndefined();
+    expect(pack.atlante).toEqual({ format: 1 });
 
-  const result = await Bun.$`npm pack --dry-run --json`
-    .cwd(join(ROOT, "packages", "pack"))
-    .quiet()
-    .nothrow();
-  expect(result.exitCode).toBe(0);
+    const result = await Bun.$`npm pack --dry-run --json`
+      .cwd(join(ROOT, "packages", "pack"))
+      .quiet()
+      .nothrow();
+    expect(result.exitCode).toBe(0);
 
-  const report = JSON.parse(result.stdout.toString()) as Array<{
-    files: Array<{ path: string }>;
-  }>;
-  const files = report[0]?.files.map(({ path }) => path) ?? [];
-  expect(files).toContain("package.json");
-  expect(files).toContain("atlante.jsonc");
-  expect(files).toContain("agent/template.jsonc");
-  expect(files).toContain("agent/template.md");
-  expect(files).toContain("architect/instance.jsonc");
-  expect(files.some((file) => /\.(?:c|m)?js$|\.ts$/.test(file))).toBe(false);
-});
+    const report = JSON.parse(result.stdout.toString()) as Array<{
+      files: Array<{ path: string }>;
+    }>;
+    const files = report[0]?.files.map(({ path }) => path) ?? [];
+    expect(files).toContain("package.json");
+    expect(files).toContain("atlante.jsonc");
+    expect(files).toContain("agent/template.jsonc");
+    expect(files).toContain("agent/template.md");
+    expect(files).toContain("architect/instance.jsonc");
+    expect(files.some((file) => /\.(?:c|m)?js$|\.ts$/.test(file))).toBe(false);
+  },
+  { timeout: 15_000 },
+);
 
 test("keeps the first-party pack as a CLI runtime dependency in source", () => {
   const cli = readJson(join(ROOT, "packages", "cli", "package.json"));

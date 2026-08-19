@@ -233,6 +233,20 @@ function fakeWatcher(): WatcherFake {
   };
 }
 
+function callbackForPath(
+  watcher: WatcherFake,
+  path: string,
+): WatchCallback | undefined {
+  const expected = canonical(path);
+  return [...watcher.callbacks.entries()].find(([watched]) => {
+    try {
+      return canonical(watched) === expected;
+    } catch {
+      return false;
+    }
+  })?.[1];
+}
+
 describe("runBuildWatchWithDependencies", () => {
   test("revalidates a captured first-party pack for every request and recovers facets", async () => {
     const fixture = firstPartyContextFixture();
@@ -830,11 +844,11 @@ describe("runBuildWatchWithDependencies", () => {
           "manifest.json",
         );
         const before = readFileSync(manifestPath, "utf8");
-        expect(watcher.callbacks.has(canonical(files.manifest))).toBe(true);
-        expect(watcher.callbacks.has(canonical(files.source))).toBe(true);
+        expect(callbackForPath(watcher, files.manifest)).toBeDefined();
+        expect(callbackForPath(watcher, files.source)).toBeDefined();
 
         writeExternalPackage(packageRoot, "1.2.4");
-        watcher.callbacks.get(canonical(files.manifest))?.();
+        callbackForPath(watcher, files.manifest)?.();
         await waitFor(
           () => builds === 2,
           "rebuild after package metadata change",
@@ -842,15 +856,15 @@ describe("runBuildWatchWithDependencies", () => {
         expect(readFileSync(manifestPath, "utf8")).toBe(before);
 
         writeFileSync(files.source, "{{#if\n");
-        watcher.callbacks.get(canonical(files.source))?.();
+        callbackForPath(watcher, files.source)?.();
         await waitFor(() => builds === 3, "failed rebuild after facet change");
         expect(readFileSync(manifestPath, "utf8")).toBe(before);
-        expect(watcher.callbacks.has(canonical(files.manifest))).toBe(true);
-        expect(watcher.callbacks.has(canonical(files.template))).toBe(true);
-        expect(watcher.callbacks.has(canonical(files.source))).toBe(true);
+        expect(callbackForPath(watcher, files.manifest)).toBeDefined();
+        expect(callbackForPath(watcher, files.template)).toBeDefined();
+        expect(callbackForPath(watcher, files.source)).toBeDefined();
 
         writeFileSync(files.source, "{{identity}}\n");
-        watcher.callbacks.get(canonical(files.source))?.();
+        callbackForPath(watcher, files.source)?.();
         await waitFor(() => builds === 4, "rebuild after facet recovery");
       } finally {
         await handle.stop();
