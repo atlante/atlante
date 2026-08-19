@@ -7,3 +7,4 @@ website/schema/
 docs/
 .worktrees/
 .atlante/
+.opencode/models.json
