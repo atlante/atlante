@@ -36,6 +36,11 @@ export function buildDocumentJsonSchema(): Record<string, unknown> {
     ],
   };
   const sourceStringSchema = { type: "string", minLength: 1 };
+  const extendsArraySchema = {
+    type: "array",
+    items: sourceStringSchema,
+    minItems: 1,
+  };
   const sourceVariants = [sourceStringSchema, sourceObjectSchema];
   const bindingVariants = [...sourceVariants, { type: "null" }];
   const bindingProperties = {
@@ -43,7 +48,9 @@ export function buildDocumentJsonSchema(): Record<string, unknown> {
     propertyNames: { type: "string", minLength: 1 },
     additionalProperties: { oneOf: bindingVariants },
   };
-  documentProperties.extends = sourceStringSchema;
+  documentProperties.extends = {
+    oneOf: [sourceStringSchema, extendsArraySchema],
+  };
   documentProperties.values = valuesSchema;
   documentProperties.agents = bindingProperties;
   documentProperties.skills = bindingProperties;

@@ -19,12 +19,13 @@ prompts into host agent definitions and exposes built skills through the
 
 Version 0.1 includes:
 
-- a minimal document structure (`$schema` plus optional `agents`, `values`, and
-  `skills`);
-- local resource locators and the temporary first-party `atlante/*` resource
-  namespace;
+- a minimal document structure (`$schema` plus optional `extends`, `agents`,
+  `values`, and `skills`);
+- local and installed static-package resource locators;
+- installed static package packs identified by `package.json#atlante.format`;
 - composable template facets with Markdown rendering and variable resolution;
 - configured instance facets that select or derive an effective template;
+- ordered preset inheritance with deterministic left-to-right merging;
 - a template protocol for prompt rendering and validation;
 - binding descriptions and global values with per-agent overrides, resolved into
   agent metadata and prompt definitions via
@@ -34,18 +35,23 @@ Version 0.1 includes:
 - two-level validation (document structure + template input schema);
 - deterministic prompt building;
 - OpenCode prompt materialization and the `atlante_skill` lookup tool;
-- the bundled `starter` preset (`atlante init`), addressed as
-  `atlante/starter`, with its agent, skill, template, and instance facets in
-  one temporary `atlante/*` namespace;
+- the first-party static pack and its default preset, addressed through the
+  installed `@atlante/pack` package;
 - deterministic resource overlays and fail-closed resource diagnostics.
 
 Version 0.1 does not include:
 
 - model selection, effort, permissions, or other host-agent configuration;
-- package or plugin resource resolution;
+- JavaScript imports, executable pack hooks, or arbitrary project-code
+  execution while loading a pack;
+- package installation, registry lookup, URL loading, or a remote resource
+  registry;
+- Yarn Plug'n'Play resolution, pack signing, or an integrity layer beyond the
+  package manager and lockfile;
+- exhaustive `node_modules` scanning or a pack-author validation command;
 - LLM inference or direct agent execution;
 - skill execution, skill runtime state, and remote skill loading;
-- preset export, sharing, or remote registry.
+- preset export or sharing.
 
 The excluded runtime capabilities remain possible future extensions of the
 design and must not be implied by the version 0.1 schema.
@@ -86,6 +92,12 @@ code is not part of the configuration format.
   delegation instructions and may coordinate other agents through host
   capabilities. Orchestration is a template-defined role; version 0.1 does not
   require an orchestrator, reserve a host-agent ID, or define a dedicated field.
+- **Resource pack**: a static, trusted content root containing an optional preset
+  root and addressable resource directories. A project, package, or first-party
+  pack supplies one resource-pack root.
+- **Package pack**: an installed package whose `package.json` contains the
+  numeric `atlante.format` value `1`. The package directory is its immutable
+  content root; a package MUST NOT configure a separate resource sub-root.
 - **Resource**: an addressable directory beneath a trusted resource-pack
   content root. A resource MAY provide a template facet, an instance facet, or
   both.
@@ -98,22 +110,24 @@ code is not part of the configuration format.
 - **Template**: the effective renderer and input schema supplied by a template
   facet. Template semantics remain independent of the document schema.
 - **Resource locator**: either a containing-file-relative path beginning with
-  `./` or `../`, or a temporary built-in locator in the `atlante/*` namespace.
-  A local locator has no global ID.
+  `./` or `../`, or a valid package name with an optional contained POSIX
+  subpath. Raw document validation checks only that an authored locator is a
+  non-empty string; locator grammar and filesystem semantics are validated by
+  resource resolution.
 - **Template slot**: a location in a composable template's input schema declared
   as `{ "template": "..." }`, indicating that the slot expects the rendering
   of another template. This is a template-composition marker, not a root
   resource binding selector.
-- **Preset**: a pre-configured root-level Atlante configuration bundled as a
-  starting point for new projects. A preset is the optional `atlante.jsonc` or
-  `atlante.json` root of a resource pack, not a renderer. The bundled starter
-  root is selected by `atlante/starter`.
+- **Preset**: a pre-configured root-level Atlante configuration distributed as
+  a starting point for new projects. A preset is the optional `atlante.jsonc` or
+  `atlante.json` root of a resource pack, not a renderer. A package root may
+  supply the package's default preset.
 - **Extends**: an optional field at the document level that references
-  a preset by a local resource locator or the temporary `atlante/*` namespace.
-  When present, the referenced preset's configuration is loaded, expanded
-  recursively, and merged with the local configuration using the resource
-  merge contract. The local layer always takes precedence. `extends` is
-  consumed during expansion and never reaches the resolved document or
+  one preset locator or a non-empty ordered array of preset locators. When
+  present, each referenced preset's configuration is loaded and expanded
+  recursively before the selected preset layers are merged left-to-right with
+  the local configuration. The local layer always takes precedence. `extends`
+  is consumed during expansion and never reaches the resolved document or
   rendered prompt.
 - **Values**: a flat dictionary of project-wide string values (`project`,
   `language`) in the document root, referenced from a prompt definition via
@@ -153,13 +167,17 @@ When no explicit configuration path is provided, the CLI MUST discover either
 root-level filename. If both files exist, the CLI MUST report an ambiguous
 configuration and require an explicit path rather than choosing silently.
 
-The document MUST contain `$schema` and MAY contain `values`, `agents`, and
-`skills` maps. Missing `agents` and `skills` maps normalize to empty
-collections. Its top-level shape is:
+The document MUST contain `$schema` and MAY contain `extends`, `values`,
+`agents`, and `skills` maps. `extends`, when present, MUST be either one
+non-empty string or a non-empty ordered array containing only non-empty strings.
+This raw structural rule MUST NOT attempt to classify locator grammar; resource
+resolution performs that semantic check. Missing `agents` and `skills` maps
+normalize to empty collections. Its top-level shape is:
 
 ```jsonc
 {
   "$schema": "https://atlante.sh/schema/v0.1/schema.json",
+  "extends": "@atlante/pack",
 
   // Global values — resolved into prompt definitions before rendering
   "values": {
@@ -169,7 +187,7 @@ collections. Its top-level shape is:
 
   // Agent bindings — host-agent-ID → a source and optional local overlay
   "agents": {
-    "architect": "atlante/architect",
+    "architect": "@atlante/pack/architect",
     "reviewer": {
       "$instance": "./resources/architect",
       "description": "Coordinates the project workflow.",
@@ -185,19 +203,20 @@ collections. Its top-level shape is:
   "skills": {
     "testing": {
       "description": "Testing guidance for {{values.project}}.",
-      "$template": "./resources/skill",
+      "$template": "@atlante/pack/skill",
       // Remaining fields are defined by the selected template.
     },
   },
 }
 ```
 
-The document MUST NOT contain fields other than `$schema`, `values`, and
-optional `agents` and `skills`. Unknown top-level fields MUST be rejected.
+The document MUST NOT contain fields other than `$schema`, `extends`, `values`,
+and optional `agents` and `skills`. Unknown top-level fields MUST be rejected.
 When present, `skills` is an object whose non-empty keys are `skillId` values.
 Each skill binding MUST contain a non-empty string `description`; an omitted
-source defaults to the bundled `atlante/skill` template facet. `$template` and
-`$instance` are mutually exclusive source selectors. `description`,
+source defaults to the first-party `@atlante/pack/skill` template facet.
+`$template` and `$instance` are mutually exclusive source selectors.
+`description`,
 `$template`, `$instance`, and `values` are reserved binding metadata. Every
 other skill field is template-owned input and MUST be validated against the
 selected template's input schema. A bare resource locator is `$instance`
@@ -262,14 +281,15 @@ The Atlante JSONC document is a declarative language for agent prompts. Its
 contract is divided across four layers:
 
 1. `@atlante/schema` defines the serializable document shape (`$schema`,
-   optional `agents`, `values`, and `skills`) and publishes the versioned JSON
-   Schema and corresponding TypeScript types; it does not define prompt or
-   skill semantics;
-2. `@atlante/resources` owns resource packs, locators, facets, overlays,
+   optional `extends`, `agents`, `values`, and `skills`) and publishes the
+   versioned JSON Schema and corresponding TypeScript types; it does not define
+   locator grammar, prompt semantics, or skill semantics;
+2. `@atlante/resources` owns resource packs, package metadata and dependency
+   resolution, locators, facets, containment, lazy loading, overlays,
    composition, interpolation, and Markdown rendering;
 3. `@atlante/validator` applies the raw document structural checks and the
-   resolved canonical, semantic, and template-input checks, including
-   reference validity and schema validation;
+   resolved canonical, semantic, and template-input checks, including reference
+   validity and schema validation;
 4. `@atlante/builder` prepares and publishes host-independent artifact
    descriptors.
 
@@ -281,9 +301,28 @@ The public v1 language is the JSONC document itself.
 ### 5.1 Resource pack and facet layout
 
 A resource pack MUST have one trusted content root. A project pack is rooted at
-the directory containing the discovered `atlante.jsonc` or `atlante.json`; a
-bundled pack supplies its own trusted root. All resources in a pack MUST remain
-within that root.
+the directory containing the discovered `atlante.jsonc` or `atlante.json`. A
+package pack is rooted at the package directory containing its selected
+`package.json`; the package directory itself is the content root. A first-party
+pack is supplied from its installed package context. All resources in a pack
+MUST remain within that root.
+
+A package pack MUST contain a readable `package.json` with this static marker:
+
+```json
+{
+  "name": "@acme/review-pack",
+  "version": "1.2.0",
+  "atlante": {
+    "format": 1
+  }
+}
+```
+
+`package.json#atlante.format` MUST be the number `1`. A pack MUST NOT require
+an executable registration entry point, an import, or a configurable content
+sub-root. Package name and version are retained for stable resource identity;
+the package version is not authored in a resource locator.
 
 Resources are directories beneath the selected root. A resource MAY contain
 either facet or both facets:
@@ -296,9 +335,9 @@ resource-directory/
 ```
 
 An `atlante.jsonc` or `atlante.json` at a pack root is an optional preset root.
-The bundled pack MUST provide `atlante.jsonc` for the starter preset.
-`atlante/starter` is the explicit temporary locator for that root file; bundled
-child resources are addressable as `atlante/<resource>`.
+The first-party `@atlante/pack` package MUST provide the default preset root.
+A package root locator selects that optional default preset; a package subpath
+selects a normal contained resource target.
 
 Resources do not acquire agent or skill IDs. Consuming `agents` and `skills`
 map keys remain the host-facing IDs.
@@ -326,13 +365,86 @@ ordinary child input and MUST be retained.
 
 ### 5.3 Locator grammar, roots, and security
 
-General authored resource references MUST:
+General authored resource references MUST be either containing-file-relative
+locators or package locators. Raw document validation only checks the non-empty
+string or non-empty string-array shape; the rules in this section are semantic
+resource validation.
+
+A relative locator MUST:
 
 - begin with `./` or `../`;
 - resolve relative to the file containing the reference, never the process
   current working directory;
 - identify a directory rather than a facet file; and
-- remain inside the selected pack's canonical content root.
+- remain inside the authoring pack's canonical content root.
+
+A package locator has the form `<package-name>` or
+`<package-name>/<subpath>`. `<package-name>` MUST be a valid scoped or unscoped
+npm package name with no empty package segments. An optional `<subpath>` uses
+POSIX `/` separators and MUST contain no empty segments. Package locators MUST
+not be absolute paths, home-directory paths, URLs, NUL-containing strings, or
+backslash-separated paths. Duplicate separators, direct facet filenames, and
+traversal that is not contained after lexical normalization and canonical
+realpath resolution MUST be rejected.
+
+Direct facet filenames are invalid targets for both relative and package
+locators; a locator selects the containing resource directory.
+
+Project-authored package locators MUST resolve using normal Node/Bun package
+resolution anchored to the project authoring context and MUST refer to a
+package declared in `dependencies`, `devDependencies`, or
+`optionalDependencies`. Pack-authored package locators MUST resolve from the
+authoring pack and MUST refer to a package declared in that pack's
+`dependencies` or `optionalDependencies`; `devDependencies` and implicit
+transitive availability MUST NOT authorize pack composition. A pack MAY refer
+to itself by its declared package name. Workspace links and `file:` dependencies
+MUST use the same resolution and containment checks. Yarn Plug'n'Play is not
+supported.
+
+Package resolution MUST read only the selected package metadata and selected
+facets plus their transitive dependencies. It MUST NOT install packages,
+enumerate `node_modules`, load JavaScript, or consult a registry. A CLI MAY
+provide a trusted first-party `@atlante/pack` root from the CLI installation;
+that context MUST NOT be inferred from the project current working directory.
+
+### Pack author and consumer workflow
+
+A pack author publishes ordinary static package content, not an executable
+extension. The minimum package contract is:
+
+```json
+{
+  "name": "@acme/review-pack",
+  "version": "1.2.0",
+  "atlante": { "format": 1 }
+}
+```
+
+The package MAY contain a root `atlante.jsonc` or `atlante.json` default preset,
+contained named preset directories, template facets, and instance facets. It
+MUST NOT require a `main`, `exports`, `bin`, registration hook, or JavaScript
+import for Atlante to consume it. A consumer installs and declares the package
+through its package manager, then references the default or named preset:
+
+```sh
+npm install --save-dev @acme/review-pack
+atlante init --preset @acme/review-pack
+atlante init --preset @acme/review-pack/strict
+```
+
+Pack-authored package references are allowed only through declared runtime
+`dependencies` or `optionalDependencies` in that pack. For example,
+`@acme/review-pack` MAY declare `@acme/base-pack: ^2.0.0` and then reference
+`@acme/base-pack/shared` from a selected preset or facet. `devDependencies` and
+unrelated hoisted packages MUST NOT authorize pack composition. Atlante never
+installs packages, edits package manifests, scans package directories, or
+loads executable code.
+
+Build watch tracks the selected package manifest, selected facet files,
+transitive dependencies, trusted package roots, and safe unresolved parent
+directories. It does not watch or parse unrelated malformed siblings. When
+watch mode is not active, a source or pack change takes effect after
+`atlante build`.
 
 `extends` targets a directory containing exactly one `atlante.jsonc` or
 `atlante.json`. `$instance` targets a directory containing `instance.jsonc`.
@@ -340,20 +452,18 @@ General authored resource references MUST:
 `template.md`. Missing or ambiguous target files are errors.
 
 Authored `../` segments are allowed when the normalized target remains inside
-the selected root. Traversal MUST be rejected when normalization or symlink
-resolution would escape that root. Absolute paths, home-directory paths, URLs,
-and backslash separators MUST be rejected. Symlinks resolving within the
-selected root MAY be used; a symlink to an external target MUST be rejected.
-Resource resolution MUST NOT use package or plugin lookup. A future external
-pack MUST establish its own trusted content root rather than weakening this
-containment rule.
+the selected root. Symlinks resolving within the selected root MAY be used; a
+symlink to an external target MUST be rejected. The package directory is the
+immutable content root, and package subpaths MUST remain contained by that
+root.
 
 ### 5.4 Lazy loading
 
-Resolution MUST load only the selected facet and its transitive dependencies.
-It MUST NOT enumerate or parse unrelated resource siblings as a prerequisite
-for selecting a resource. A malformed unrelated sibling therefore MUST NOT
-affect a valid configuration.
+Resolution MUST load only selected package metadata, the selected facet, and
+their transitive dependencies. It MUST NOT enumerate or parse unrelated
+resource siblings or unreferenced package siblings as a prerequisite for
+selecting a resource. A malformed unrelated sibling therefore MUST NOT affect a
+valid configuration.
 
 ### 5.5 Resolution order
 
@@ -361,7 +471,8 @@ Resolution MUST be deterministic. For each selected source, it proceeds as
 follows:
 
 1. parse the selected source as JSONC;
-2. resolve `$instance`, `$template`, or the context-supplied template;
+2. resolve the selected preset's own `extends` entries, then resolve
+   `$instance`, `$template`, or the context-supplied template;
 3. merge inherited and local fields;
 4. resolve nested references relative to the source containing each reference;
 5. validate effective-template compatibility; and
@@ -370,7 +481,13 @@ follows:
 
 ### 5.6 Merge contract
 
-Root `extends`, instance derivation, and source overlays use one merge contract:
+Root `extends`, instance derivation, and source overlays use one merge contract.
+An `extends` string is normalized to a one-element ordered list. An `extends`
+array MUST be non-empty and its entries MUST remain in authored order. Each
+selected preset resolves its own inheritance first; the resulting preset layers
+are then merged left-to-right, followed by the local document layer.
+
+Every layer uses these rules:
 
 - objects merge recursively;
 - arrays replace inherited arrays;
@@ -379,14 +496,20 @@ Root `extends`, instance derivation, and source overlays use one merge contract:
 - local fields always win.
 
 Tombstones are consumed during resolution and MUST NOT reach canonical
-template input or rendered output. Repeated resolution of the same sources
-MUST produce isolated, deterministic normalized data.
+template input or rendered output. Reusing a preset in more than one `extends`
+array position is valid composition and MUST NOT produce a duplicate-
+contribution error. Source provenance, authoring context, and traversal context
+MUST follow the same winning-value rules as the merged data. Repeated
+resolution of the same sources MUST produce isolated, deterministic normalized
+data.
 
 ### 5.7 Reference chains and template compatibility
 
-Resolution MUST detect cycles across preset, instance, and template references.
-Cycle, excessive-depth, and incompatible-template diagnostics MUST identify the
-complete reference chain in deterministic order.
+Resolution MUST detect cycles across local and package preset, instance, and
+template references. The 32-hop limit applies to each graph path; independent
+entries in one `extends` array MUST NOT consume one another's hop budget. Cycle,
+excessive-depth, and incompatible-template diagnostics MUST identify the
+complete typed reference chain in deterministic order.
 
 A nested configured instance is compatible with a template slot only when its
 effective template has the exact same canonical template locator required by
@@ -396,12 +519,27 @@ remain template-owned input and are validated by the selected slot template.
 ### 5.8 Resource diagnostics and failure behavior
 
 Resource failures MUST identify the relevant source with a stable
-project-relative or bundled locator when available, and MUST include a stable
-error code, JSON Pointer, and one-based authoring location. Error families cover
-invalid locator grammar, missing or wrong target types, missing or ambiguous
-facets, malformed JSONC, invalid template schemas, conflicting selectors, absent
-effective templates, unsafe paths, cycles, excessive depth, incompatible nested
-templates, and invalid resolved instance input.
+project-relative or package-qualified locator when available, and MUST include
+the authored locator, a stable error code, JSON Pointer, one-based authoring
+location, and the complete typed graph chain when applicable. Package lookup,
+package metadata, pack format, and package subpath failures MUST have stable
+package-specific error codes. Existing `missing-target`, `wrong-target-type`,
+and `ambiguous-facet` codes remain the facet-selection codes when their meanings
+apply. Error families also cover invalid locator grammar, malformed JSONC,
+invalid template schemas, conflicting selectors, absent effective templates,
+unsafe paths, cycles, excessive depth, incompatible nested templates, and
+invalid resolved instance input.
+
+Package-qualified origins MUST use a stable form such as
+`@acme/review-pack@1.2.0/agent/template.jsonc`; project origins remain
+project-root-relative. Machine-specific absolute paths MUST be confined to
+trusted watch context, never normal diagnostic serialization. Resource
+dependencies MUST include each selected package manifest, selected facet
+candidates and files, transitive package metadata, and relevant lexical symlink
+paths. Watch filtering MUST accept external paths only beneath the project root
+or roots explicitly reported as trusted by resource resolution; unresolved
+package or dependency parents are watch inputs only when they are inside a known
+project or authoring-pack root.
 
 Diagnostics MUST sort deterministically by source, JSON Pointer, location, and
 code and MUST NOT expose machine-specific absolute paths in normal formatting.
@@ -429,25 +567,26 @@ Each template facet consists of:
 - `template.md` — the Markdown renderer that produces prompt text from validated
   inputs.
 
-The containing resource directory supplies the local identity. A bundled
-resource is addressable through the temporary `atlante/*` namespace. A template
-facet does not serialize a second ID.
+The containing resource directory supplies the local identity. A project
+resource is addressed by a containing-file-relative locator, and a package
+resource is addressed by its package locator. A template facet does not
+serialize a second ID.
 
 ### 6.2 Template naming
 
-Bundled resource locators follow the `atlante/<resource>` convention:
+Resource locators follow these conventions:
 
-- `atlante/` — bundled resources shipped with Atlante;
-- local resources use containing-file-relative paths; and
-- other package or plugin namespaces are out of scope for version 0.1.
+- local resources use containing-file-relative paths;
+- package resources use `<package-name>/<resource>` locators; and
+- the first-party resources use the installed `@atlante/pack` package.
 
-Here, `atlante/` is only a namespace prefix. A concrete built-in resource
-locator requires a non-empty direct-child resource name, such as
-`atlante/starter`.
+The package name is resolved from the authoring context and the resource target
+MUST remain within that package's content root. Package versions are identity
+metadata, not part of the authored locator.
 
-The specification does not enumerate bundled templates or prescribe their prompt
-content. The bundled resource pack and its facet files are authoritative for
-the first-party resources it provides.
+The specification does not enumerate first-party templates or prescribe their
+prompt content. The installed first-party static pack and its facet files are
+authoritative for the resources it provides.
 
 ### 6.3 Template composition
 
@@ -507,8 +646,8 @@ agent to serve as an orchestrator. The role is determined by the selected
 template and its inputs, not by a reserved host-agent ID or schema field. The
 specification does not require every configuration to define an orchestrator.
 
-The bundled `atlante/workflow` template defines a sequential workflow. It has a
-`phases` array; each phase requires a non-empty `instructions` array of
+The first-party `@atlante/pack/workflow` template defines a sequential workflow.
+It has a `phases` array; each phase requires a non-empty `instructions` array of
 non-empty strings and a non-empty `name` unless it declares a `plan`, `build`,
 or `review` `kind`, which then serves as the phase name. A phase may include a
 non-empty `description`, `subagent`, phase `policies`, `output`, or inline
@@ -528,7 +667,8 @@ is its final quality gate.
 
 Phase instructions execute sequentially in their containing phase as an ordered
 Markdown list. They are inline strings rather than task objects, and the
-workflow template does not compose the reusable `atlante/instructions` template
+workflow template does not compose the reusable
+`@atlante/pack/instructions` template
 inside a phase.
 
 Host agent files MUST NOT contain an independent prompt that competes with the
@@ -536,8 +676,9 @@ Atlante prompt; the Atlante configuration is the prompt source of truth.
 
 ### 6.6 Skill content rendering
 
-The bundled `atlante/skill` template accepts structured, template-owned input
-and renders it as Markdown without executing it. A skill's `description` is
+The first-party `@atlante/pack/skill` template accepts structured,
+template-owned input and renders it as Markdown without executing it. A skill's
+`description` is
 resolved separately as binding metadata and listed in the tool description for
 discovery; successful `atlante_skill` execution returns only rendered Markdown
 content. The description is not template input. Skill content and skill
@@ -573,7 +714,8 @@ When present, `skills` MUST be an object keyed by non-empty `skillId` strings.
 Each skill binding MUST contain a non-empty `description`; the description is
 metadata for lookup and is not passed to the template. `$template` selects the
 skill content renderer, `$instance` selects a configured instance, and an
-omitted source defaults to the bundled `atlante/skill` template. `values`
+omitted source defaults to the first-party `@atlante/pack/skill` template.
+`values`
 contains local value overrides. Every other field is template-owned input.
 Skills are not associated with a host-agent ID.
 
@@ -587,13 +729,16 @@ entry point that accepts source configuration MUST execute these stages in this
 order:
 
 1. **Raw document structural validation** parses the JSON or JSONC overlay and
-   checks its document shape, supported schema URI, container types, and the
-   shape of authored source selectors. It does not require a referenced
-   resource, inspect a template schema, or validate template-owned input.
-2. **Resource resolution** resolves the selected preset, instance, and template
-   references, loads only selected facets, merges the source layers, and
-   produces a canonical candidate. Resource failures fail this stage and retain
-   their reference chain.
+   checks its document shape, supported schema URI, container types, the
+   string-or-non-empty-array shape of `extends`, and the shape of authored source
+   selectors. It does not validate locator grammar, require a referenced
+   package or resource, inspect a template schema, or validate template-owned
+   input.
+2. **Resource resolution** resolves the selected preset, package metadata,
+   instance, and template references from each authoring context, loads only
+   selected facets, merges the source layers, and produces a canonical
+   candidate. Resource failures fail this stage and retain their reference
+   chain.
 3. **Resolved canonical, semantic, and template validation** validates the
    canonical candidate, value references, effective-template compatibility,
    composition semantics, and template-owned input against the resolved
@@ -664,7 +809,8 @@ runtime feature would consume them.
 
 ### 8.3 Template distribution
 
-The bundled resource pack MAY distribute first-party templates and instances. A
+The first-party static package MAY distribute first-party templates and
+instances. A
 validator MUST validate configurations against the input schemas of selected
 template facets. Required resources MUST be available without network access
 during validation and resolution.
@@ -686,7 +832,7 @@ The builder MUST:
 For skills, the builder MUST:
 
 1. render the resolved explicit `$template` or `$instance` source, or the
-   default bundled `atlante/skill` template facet;
+   default first-party `@atlante/pack/skill` template facet;
 2. produce one resolved descriptor per binding containing `skillId`, the
    effective template identity, `description`, and rendered Markdown `content`.
 
@@ -773,25 +919,30 @@ tree when possible.
 
 The version 0.1 implementation MUST preserve these package responsibilities:
 
-- `@atlante/schema`: document structure contract (`$schema`, `values`, binding
-  descriptions, and optional `agents` and `skills`), versioned JSON Schema, and
-  TypeScript types;
+- `@atlante/schema`: document structure contract (`$schema`, `extends`,
+  `values`, binding descriptions, and optional `agents` and `skills`), versioned
+  JSON Schema, and TypeScript types;
   no prompt or skill-content semantics, no template logic, no host or rendering
   logic;
-- `@atlante/resources`: resource packs, locators, template and instance facets,
-  preset roots, lazy loading, overlays, composition, variable interpolation,
-  Markdown rendering, and bundled source content;
-- `@atlante/validator`: document structural validation (references, required
-  fields, types) and template-level validation (input schema compliance and
-  composition acyclicity);
+- `@atlante/resources`: project and package resource packs, package metadata and
+  author-relative dependency resolution, locators, containment, template and
+  instance facets, preset roots, lazy loading, overlays, composition, variable
+  interpolation, and Markdown rendering;
+- `@atlante/validator`: raw document structural validation, resolved resource
+  and reference validation, required fields and types, and template-level
+  validation (input schema compliance and composition acyclicity);
 - `@atlante/builder`: preparation and host-independent artifact publication;
 - `@atlante/opencode-plugin`: OpenCode prompt materialization and skill lookup;
 - `@atlante/cli`: validation, artifact building, and the `atlante init` entry
   point.
+- `@atlante/pack`: a static first-party resource package with
+  `package.json#atlante.format: 1`; it has no executable registration API.
 
 `@atlante/resources` is a private workspace package and MUST NOT be published
-as an npm package in version 0.1. Package and plugin resource resolution are not
-part of this version's public boundary.
+as an npm package in version 0.1. Its package-resolution capability is an
+implementation detail of document validation and building, not a public plugin
+API. The OpenCode plugin MUST remain artifact-only and MUST NOT resolve package
+or project source resources.
 
 An adapter MUST consume verified artifact descriptors and MUST NOT contain a
 separate execution branch for each renderer.
@@ -823,9 +974,9 @@ Skill content is returned as data and is not executed.
 
 ### 11.2 Preset inheritance
 
-`atlante init` scaffolds a project configuration that extends a bundled preset
-via the `extends` field and builds the initial artifact tree before reporting
-success. The generated configuration carries only the document
+`atlante init` scaffolds a project configuration that extends a first-party
+static package preset via the `extends` field and builds the initial artifact
+tree before reporting success. The generated configuration carries only the document
 `$schema` and the `extends` reference; values are left to the preset's system
 value defaults (e.g. `project` resolves to the basename of `process.cwd()` at
 runtime). Users add per-project overrides as needed.
@@ -833,7 +984,7 @@ runtime). Users add per-project overrides as needed.
 ```jsonc
 {
   "$schema": "https://atlante.sh/schema/v0.1/schema.json",
-  "extends": "atlante/starter"
+  "extends": "@atlante/pack"
 }
 ```
 
@@ -842,7 +993,7 @@ To override a value, add a `values` object:
 ```jsonc
 {
   "$schema": "https://atlante.sh/schema/v0.1/schema.json",
-  "extends": "atlante/starter",
+  "extends": "@atlante/pack",
   "values": {
     "project": "my-project"
   }
@@ -851,12 +1002,16 @@ To override a value, add a `values` object:
 
 `atlante init --preset <name>` generates a configuration extending the named
 preset locator. The `extends` field accepts a local resource locator or a
-temporary `atlante/*` locator such as `atlante/starter`.
+package locator such as `@acme/review-pack` or
+`@acme/review-pack/strict`.
 
 #### Override semantics
 
 Preset inheritance uses JSON Merge Patch semantics with the local layer always
-taking precedence:
+taking precedence. A string `extends` value is normalized to one entry. An
+array MUST be non-empty and preserves authored order. Each selected preset
+first resolves its own inheritance; selected layers then merge left-to-right,
+followed by the local document:
 
 - An absent property preserves the inherited value.
 - Scalars replace inherited values.
@@ -874,6 +1029,8 @@ taking precedence:
 - `null` also removes an inherited skill binding or skill property. Tombstones
   are consumed during expansion and MUST NOT reach the canonical resolved
   document.
+- Reusing a preset in multiple array positions is valid composition and does not
+  produce a duplicate-contribution error.
 - `extends`, `$template`, and `$instance` are consumed during expansion and
   MUST NOT be passed to a prompt template.
 
@@ -886,15 +1043,17 @@ configuration. Diagnostics MUST identify the local JSON Pointer and complete,
 deterministic resource chain for at least:
 
 - missing or invalid resource locators;
+- package lookup, package metadata, pack format, and package subpath failures;
 - mixed resource cycles; and
 - depth limits exceeded.
 
-The validator MUST NOT weaken the pack containment rules. Package and plugin
-resource locators are not supported by this version.
+The validator MUST NOT weaken the pack containment rules. Package references
+MUST be resolved from the project or authoring pack that contains the reference,
+and package dependencies MUST satisfy the declaration rules in §5.3.
 
-Version 0.1 MUST include the `atlante/starter` preset as the default
-initialization target. The starter preset MUST provide the bundled `architect`
-agent and the `brainstorming` and `workflow` skills.
+Version 0.1 MUST include the `@atlante/pack` preset as the default initialization
+target. The first-party pack MUST provide the `architect` agent and the
+`brainstorming` and `workflow` skills.
 
 After changing the source configuration, users MUST run `atlante build` before
 the host adapter can observe the change. The adapter consumes the published
@@ -912,8 +1071,9 @@ Atlante uses separate version domains for separate contracts:
   2020-12 and MUST declare that dialect with its own `$schema` property. This
   identifies the schema language, not a template release.
 - **Resource content**: local facets are selected by containing-file-relative
-  locators and bundled facets by the temporary `atlante/*` namespace. Package
-  versions MUST NOT become serialized resource locators.
+  locators and package facets by package locators. Package versions MUST NOT
+  become serialized resource locators, but MAY appear in stable package-qualified
+  origins and diagnostics.
 - **Artifact format**: the `format` and numeric `version` in
   `.atlante/artifacts/manifest.json` identify the host-neutral build-output
   contract. Artifact format versions are independent of document schema
@@ -926,11 +1086,15 @@ digest mechanism for changes to template schemas or rendered output. Version
 effect on the next build and does not require a new document schema URI unless
 the document contract itself changes.
 
-Local resources MUST NOT acquire global IDs. Bundled resources MUST use the
-temporary `atlante/<resource>` locator convention.
+Local resources MUST NOT acquire global IDs. Package resources use the package
+name and contained subpath as their locator identity; package versions remain
+installation metadata.
 
 An implementation MUST reject a document whose `$schema` URI it does not
-support. Version 0.1 does not define migrations.
+support. For issue #3, the canonical schema URI remains
+`https://atlante.sh/schema/v0.1/schema.json`. The `atlante.dev` example domain
+does not replace it, and no document-domain or schema-version migration is
+introduced. Version 0.1 does not define migrations.
 
 Future versions MAY add:
 
@@ -957,10 +1121,11 @@ Version 0.1 is complete when a conforming implementation can:
 7. replace an existing agent prompt and description while preserving host-owned
    fields;
 8. report a warning when a non-empty host prompt is replaced;
-9. scaffold a project from the bundled `starter` preset via `atlante init`,
-   automatically build its artifact tree, and rebuild it via `atlante build`;
-10. validate a skill with required description, default `atlante/skill`, and
-     template-owned input;
+9. scaffold a project from the first-party `@atlante/pack` preset via
+   `atlante init`, automatically build its artifact tree, and rebuild it via
+   `atlante build`;
+10. validate a skill with required description, default
+      `@atlante/pack/skill`, and template-owned input;
 11. interpolate skill descriptions and input with global and local values;
 12. resolve skill template composition and reject missing references, cycles,
     invalid input, missing values, and other template failures;

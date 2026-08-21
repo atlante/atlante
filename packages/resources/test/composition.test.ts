@@ -6,9 +6,9 @@ describe("resource template composition", () => {
     expect(
       slotsOf({
         type: "object",
-        properties: { child: { template: "atlante/markdown" } },
+        properties: { child: { template: "@atlante/pack/markdown" } },
       }),
-    ).toEqual([{ property: "child", templateId: "atlante/markdown" }]);
+    ).toEqual([{ property: "child", templateId: "@atlante/pack/markdown" }]);
   });
 
   test("finds nested object, array, and composition-branch slots", () => {
@@ -18,21 +18,24 @@ describe("resource template composition", () => {
         properties: {
           outer: {
             type: "object",
-            properties: { inner: { template: "atlante/markdown" } },
+            properties: { inner: { template: "@atlante/pack/markdown" } },
           },
-          sections: { type: "array", items: { template: "atlante/markdown" } },
+          sections: {
+            type: "array",
+            items: { template: "@atlante/pack/markdown" },
+          },
           choice: {
             oneOf: [
               {
                 type: "object",
                 properties: {
-                  markdown: { template: "atlante/markdown" },
+                  markdown: { template: "@atlante/pack/markdown" },
                 },
               },
               {
                 type: "object",
                 properties: {
-                  instructions: { template: "atlante/instructions" },
+                  instructions: { template: "@atlante/pack/instructions" },
                 },
               },
             ],
@@ -42,26 +45,26 @@ describe("resource template composition", () => {
     ).toEqual([
       {
         property: "inner",
-        templateId: "atlante/markdown",
+        templateId: "@atlante/pack/markdown",
         path: ["outer", "inner"],
         dataPath: ["outer", "inner"],
       },
       {
         property: "sections",
-        templateId: "atlante/markdown",
+        templateId: "@atlante/pack/markdown",
         path: ["sections", "items"],
         dataPath: ["sections"],
         arrayItems: true,
       },
       {
         property: "markdown",
-        templateId: "atlante/markdown",
+        templateId: "@atlante/pack/markdown",
         path: ["choice", "oneOf", "0", "markdown"],
         dataPath: ["choice", "markdown"],
       },
       {
         property: "instructions",
-        templateId: "atlante/instructions",
+        templateId: "@atlante/pack/instructions",
         path: ["choice", "oneOf", "1", "instructions"],
         dataPath: ["choice", "instructions"],
       },
@@ -82,7 +85,7 @@ describe("resource template composition", () => {
                 items: {
                   type: "object",
                   properties: {
-                    detail: { template: "atlante/markdown" },
+                    detail: { template: "@atlante/pack/markdown" },
                   },
                 },
               },
@@ -95,7 +98,7 @@ describe("resource template composition", () => {
     expect(slots).toEqual([
       {
         property: "detail",
-        templateId: "atlante/markdown",
+        templateId: "@atlante/pack/markdown",
         path: ["groups", "items", "rows", "items", "detail"],
         dataPath: ["groups", "rows", "detail"],
         arrayItems: true,
@@ -104,14 +107,19 @@ describe("resource template composition", () => {
   });
 
   test("recognizes only an exact template marker object", () => {
-    expect(isCompositionMarker({ template: "atlante/markdown" })).toBe(true);
+    expect(isCompositionMarker({ template: "@atlante/pack/markdown" })).toBe(
+      true,
+    );
     expect(
-      isCompositionMarker({ template: "atlante/markdown", description: "x" }),
+      isCompositionMarker({
+        template: "@atlante/pack/markdown",
+        description: "x",
+      }),
     ).toBe(false);
     expect(isCompositionMarker({ template: "" })).toBe(true);
-    expect(isCompositionMarker({ type: "string", template: "atlante/x" })).toBe(
-      false,
-    );
+    expect(
+      isCompositionMarker({ type: "string", template: "@atlante/pack/x" }),
+    ).toBe(false);
     expect(isCompositionMarker(["template"])).toBe(false);
   });
 
@@ -134,13 +142,13 @@ describe("resource template composition", () => {
     expect(slotsOf(schema)).toEqual([]);
   });
 
-  test("accepts local and bundled locators but ignores malformed markers", () => {
+  test("accepts local and package locators but ignores malformed markers", () => {
     expect(
       slotsOf({
         type: "object",
         properties: {
           local: { template: "../shared" },
-          bundled: { template: "atlante/markdown" },
+          bundled: { template: "@atlante/pack/markdown" },
           empty: { template: "" },
           unnamespaced: { template: "markdown" },
           nonString: { template: 42 },
@@ -148,7 +156,33 @@ describe("resource template composition", () => {
       }),
     ).toEqual([
       { property: "local", templateId: "../shared" },
-      { property: "bundled", templateId: "atlante/markdown" },
+      { property: "bundled", templateId: "@atlante/pack/markdown" },
+    ]);
+  });
+
+  test("rejects legacy built-in ids and accepts locator-backed markers", () => {
+    expect(
+      slotsOf({
+        type: "object",
+        properties: {
+          agent: { template: "atlante/agent" },
+          skill: { template: "atlante/skill" },
+          starter: { template: "atlante/starter" },
+          local: { template: "../shared" },
+          unscoped: { template: "acme-review-pack/reviewer" },
+          scoped: { template: "@acme/review-pack/strict/base" },
+        },
+      }),
+    ).toEqual([
+      { property: "local", templateId: "../shared" },
+      {
+        property: "unscoped",
+        templateId: "acme-review-pack/reviewer",
+      },
+      {
+        property: "scoped",
+        templateId: "@acme/review-pack/strict/base",
+      },
     ]);
   });
 });

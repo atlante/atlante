@@ -1,0 +1,15 @@
+import { expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+const ROOT = join(import.meta.dir, "..");
+
+test("smoke test exercises the installed static pack and global-style CLI", () => {
+  const smoke = readFileSync(join(ROOT, "scripts", "smoke-test.ts"), "utf8");
+
+  expect(smoke).toContain("@atlante/pack");
+  expect(smoke).toContain("node_modules");
+  expect(smoke).toContain("manifest.format");
+  expect(smoke).toContain("sha256");
+  expect(smoke).toContain("rootManifest");
+});

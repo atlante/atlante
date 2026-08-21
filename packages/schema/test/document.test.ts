@@ -248,7 +248,7 @@ describe("atlanteDocumentOverlaySchema", () => {
     const result = atlanteDocumentOverlaySchema.safeParse({
       $schema: SCHEMA_URI,
       agents: { architect: "./resources/architect" },
-      skills: { testing: "atlante/skill" },
+      skills: { testing: "@atlante/pack/skill" },
     });
 
     expect(result.success).toBe(true);
@@ -277,7 +277,7 @@ describe("atlanteDocumentOverlaySchema", () => {
   });
 
   test("accepts local and built-in root extends locators", () => {
-    for (const extendsValue of ["./base", "atlante/starter"]) {
+    for (const extendsValue of ["./base", "@atlante/pack"]) {
       const result = atlanteDocumentOverlaySchema.safeParse({
         $schema: SCHEMA_URI,
         extends: extendsValue,
@@ -285,6 +285,41 @@ describe("atlanteDocumentOverlaySchema", () => {
 
       expect(result.success).toBe(true);
     }
+  });
+
+  test("accepts a non-empty ordered extends locator array", () => {
+    const extendsValue: [string, ...string[]] = [
+      "@acme/review-pack/strict",
+      "./local",
+    ];
+    const result = atlanteDocumentOverlaySchema.safeParse({
+      $schema: SCHEMA_URI,
+      extends: extendsValue,
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.extends).toEqual(extendsValue);
+  });
+
+  test("rejects empty and non-string extends arrays at the authored shape", () => {
+    for (const extendsValue of [[], ["./base", 42], [null]]) {
+      const result = atlanteDocumentOverlaySchema.safeParse({
+        $schema: SCHEMA_URI,
+        extends: extendsValue,
+      });
+
+      expect(result.success).toBe(false);
+    }
+  });
+
+  test("leaves locator grammar to semantic resource validation", () => {
+    const result = atlanteDocumentOverlaySchema.safeParse({
+      $schema: SCHEMA_URI,
+      extends: "https://example.com/review-pack",
+    });
+
+    expect(result.success).toBe(true);
   });
 
   test("keeps extends, values tombstones, and binding tombstones in raw overlays", () => {
@@ -349,7 +384,7 @@ describe("atlanteDocumentOverlaySchema", () => {
       $schema: SCHEMA_URI,
       agents: {
         reviewer: {
-          template: "atlante/agent",
+          template: "@atlante/pack/agent",
           description: "Review changes.",
         },
       },
@@ -358,7 +393,7 @@ describe("atlanteDocumentOverlaySchema", () => {
       $schema: SCHEMA_URI,
       agents: {
         reviewer: {
-          template: "atlante/agent",
+          template: "@atlante/pack/agent",
           description: "Review changes.",
         },
       },
@@ -374,7 +409,9 @@ describe("atlanteDocumentOverlaySchema", () => {
       skills: {
         workflow: {
           description: "Workflow guidance.",
-          sections: [{ template: "atlante/section", content: "Run tests." }],
+          sections: [
+            { template: "@atlante/pack/section", content: "Run tests." },
+          ],
         },
       },
     });
@@ -383,7 +420,9 @@ describe("atlanteDocumentOverlaySchema", () => {
       skills: {
         workflow: {
           description: "Workflow guidance.",
-          sections: [{ template: "atlante/section", content: "Run tests." }],
+          sections: [
+            { template: "@atlante/pack/section", content: "Run tests." },
+          ],
         },
       },
     });

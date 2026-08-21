@@ -13,7 +13,7 @@ host tool, not the agent itself, but the declarative layer in between.
 ## Why
 
 - **Reusable** — share agent configurations across projects via presets
-- **Composable** — build prompts from bundled or local template facets instead of monolithic
+- **Composable** — build prompts from installed pack or local template facets instead of monolithic
   strings
 - **Customizable** — override values per-agent or per-project without touching
   templates
@@ -57,7 +57,7 @@ An `atlante.jsonc` with two agents:
 
   "agents": {
     "implementer": {
-      "$template": "atlante/agent",
+      "$template": "@atlante/pack/agent",
       "description": "Implements requested changes in the project.",
       "identity": "You are a senior implementer on {{values.project}}.",
       "mission": "Write clean, tested, production-ready code.",
@@ -69,7 +69,7 @@ An `atlante.jsonc` with two agents:
     },
 
     "reviewer": {
-      "$template": "atlante/agent",
+      "$template": "@atlante/pack/agent",
       "description": "Reviews changes for defects and design issues.",
       "identity": "You are a thorough code reviewer on {{values.project}}.",
       "mission": "Ensure code quality and adherence to standards.",
@@ -174,41 +174,70 @@ mismatch before materialization. The artifact format version is separate from
 the document `$schema` version. Rendered values may contain sensitive data, so
 keep `.atlante/` local and do not publish artifacts.
 
-## Presets
+## Packs And Presets
+
+A pack is an installed npm, workspace, or `file:` package containing static
+Atlante content. Its `package.json` declares `"atlante": { "format": 1 }` and
+the package directory is the immutable content root. Packs contain optional
+default or named presets, template facets, and instance facets. They have no
+JavaScript entry point, registration hook, or executable API. Atlante reads
+only a referenced facet and its transitive dependencies, never scans installed
+packages or installs dependencies.
+
+Package locators use a valid scoped or unscoped package name with an optional
+contained POSIX subpath, for example `@acme/review-pack` or
+`@acme/review-pack/strict`. `extends` selects a preset, `$template` selects a
+template facet, and `$instance` or a bare locator selects an instance facet.
+Project-authored package references require a declared dependency. Pack-authored
+references require a declared runtime dependency in the authoring pack.
 
 A preset is a pre-filled `atlante.jsonc` to start from. A preset is a
 *document*; a template is a *renderer*. Presets are raw documents: the
 consuming validator expands and validates them through the same path used for
-user-authored overlays, so a broken preset is rejected when consumed.
+user-authored overlays, so a broken referenced preset is rejected before build.
 
-- **`starter`** — the bundled `architect` agent plus `brainstorming` and
-  `workflow` skills, the default for `init`
+- **`@atlante/pack`** — the first-party default preset with the `architect` agent
+  plus `brainstorming` and `workflow` skills
 
 Presets use `{{sys.cwd.basename}}` for their `project` value so you get a
 sensible default without writing a `values` block. Add your own
 `"values": { "project": "my-app" }` when you want to override it.
 
-Run `atlante init` to scaffold from the `starter` preset. `init` writes the
-containing project configuration, registers the OpenCode plugin while
-preserving existing host settings, builds the initial artifact tree, and rolls
-back source/config changes if initialization or the build fails.
+Run `atlante init` to scaffold from the `@atlante/pack` preset. `init` writes
+`"extends": "@atlante/pack"`, registers the OpenCode plugin while preserving
+existing host settings, builds the initial artifact tree, and rolls back
+source/config changes if initialization or the build fails. Install a third-party
+pack first, then select its default or named preset without mutating the project:
+
+```bash
+npm install --save-dev @acme/review-pack
+atlante init --preset @acme/review-pack
+atlante init --preset @acme/review-pack/strict
+```
+
+For multiple preset layers, author an ordered `extends` array. Each selected
+preset resolves its own inheritance first; layers merge left-to-right and the
+local document wins. Arrays replace, objects merge recursively, and `null`
+removes inherited values.
 
 ## Packages
 
-Two packages are published to npm:
+Three packages are published to npm in dependency order: `@atlante/pack`, then
+`@atlante/cli`, then `@atlante/opencode-plugin`.
 
 | Package | Responsibility |
 | --- | --- |
-| `@atlante/cli` | `init`, `validate`, `build` |
+| `@atlante/pack` | First-party static presets, templates, and instances; `atlante.format: 1` |
+| `@atlante/cli` | `init`, `validate`, `build`; resolves the installed first-party pack from the CLI installation |
 | `@atlante/opencode-plugin` | In-memory agent injection and `atlante_skill` through OpenCode's `config` hook |
 
-The other four packages are private internal workspaces. They are not published
-to npm:
+The remaining four packages are private internal workspaces. They are not
+published to npm:
 
 | Package | Responsibility |
 | --- | --- |
 | `@atlante/schema` | Document structure and the generated, versioned JSON Schema |
-| `@atlante/resources` | Local/bundled resource packs, facets, resolution, composition, rendering, and bundled source content |
+| `@atlante/resources` | Local/package resource packs, facets, resolution, composition, rendering, and lazy static loading |
 | `@atlante/validator` | Discovery, parsing, and two-level validation |
 | `@atlante/builder` | Project preparation, value merging, rendering, and artifact publication |
 
@@ -222,15 +251,16 @@ to npm:
 - Two-level validation: document structure, then template input schemas
 - Deterministic prompt resolution
 - OpenCode adapter for in-memory prompt and skill materialization
-- Bundled `starter` preset via `atlante init`
+- First-party static `@atlante/pack` preset via `atlante init`
 - Local resource authoring with local template and instance facets
+- Installed static npm/workspace/`file:` packs with package-to-pack runtime dependencies
 
 **Does not include:**
 
 - Model selection, effort, permissions, or host-agent configuration
 - Skill execution, runtime skill state, and remote skill loading
 - LLM inference or direct agent execution
-- Package/plugin resource resolution and remote resource registries
+- Executable pack code, package installation, node-module scanning, and remote resource registries
 
 ## Development
 
@@ -253,9 +283,36 @@ bun link --cwd packages/cli
 ```
 
 The linked `atlante` runs `packages/cli/dist/bin/atlante.js`, which is
-gitignored build output. A fresh checkout has neither `packages/cli/dist/`
-nor the generated `packages/cli/bundled/` resource pack copied at build time;
-`bun run build` produces both, so re-run it after any CLI source changes.
+gitignored build output. The CLI does not copy a resource tree into its package;
+the runtime `@atlante/pack` dependency supplies the first-party static content.
+Run `bun run build` after CLI source changes.
+
+## Watch And OpenCode Boundary
+
+Build watch follows the selected pack manifest, facet files, transitive
+dependencies, and trusted lexical symlink paths. It retries safe missing package
+parents when they become available and ignores unrelated malformed siblings.
+Run `atlante build` after source changes when watch mode is not active.
+
+The OpenCode plugin never reads source configuration or pack files. It consumes
+only the verified `.atlante/artifacts/` tree. The artifact format marker remains
+`"format": "atlante-artifacts"` with numeric `"version": 1`, and every payload
+is protected by its manifest SHA-256 hash. The artifact boundary is unchanged by
+pack loading.
+
+## Migration From The Temporary Namespace
+
+This is an alpha breaking migration. Replace the old built-in locators as follows:
+
+| Before | After |
+| --- | --- |
+| `atlante/starter` | `@atlante/pack` |
+| `atlante/<resource>` | `@atlante/pack/<resource>` |
+
+Do not add `@atlante/resources` as a project dependency. Install third-party
+packs with the package manager and declare them in `dependencies`,
+`devDependencies`, or `optionalDependencies`; Atlante never edits
+`package.json` or installs packages.
 
 ## Status
 

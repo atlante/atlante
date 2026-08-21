@@ -1,11 +1,12 @@
 import { readFileSync, statSync } from "node:fs";
-import { basename, dirname, isAbsolute, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, resolve } from "node:path";
 import {
-  BUNDLED_RESOURCE_PACK,
   createProjectResourcePack,
   type JsonObject,
   type ResourcePack,
+  type ResourceResolutionContext,
   ResourceResolutionError,
+  type ResourceWatchRoot,
   resolveResourceDocument,
 } from "@atlante/resources";
 import type { AtlanteDocument, AtlanteDocumentOverlay } from "@atlante/schema";
@@ -33,26 +34,35 @@ import {
 } from "./templates.js";
 
 export type DocumentLoadOptions = {
-  bundledPack?: ResourcePack;
   statSync?: (
     path: string,
     options: { throwIfNoEntry: false },
   ) => { isDirectory(): boolean } | undefined;
+  resourceContext?: ResourceResolutionContext;
 };
 
 /** Files and parents needed to retry the same resource resolution. */
 export type ResourceWatchContext = Readonly<{
   readonly dependencies: readonly string[];
   readonly unresolvedParents: readonly string[];
+  /** Explicit resource roots authorized for external watch paths. */
+  readonly trustedRoots?: readonly ResourceWatchRoot[];
 }>;
 
 function resourceWatchContext(value: {
   readonly dependencies: readonly string[];
   readonly unresolvedParents: readonly string[];
+  readonly trustedRoots?: readonly ResourceWatchRoot[];
 }): ResourceWatchContext {
+  const trustedRoots = (value.trustedRoots ?? []).map((root) =>
+    Object.freeze({ ...root }),
+  );
   return Object.freeze({
     dependencies: Object.freeze([...value.dependencies]),
     unresolvedParents: Object.freeze([...value.unresolvedParents]),
+    ...(trustedRoots.length
+      ? { trustedRoots: Object.freeze(trustedRoots) }
+      : {}),
   });
 }
 
@@ -312,18 +322,6 @@ function unsupportedSchemaDiagnostic(
   );
 }
 
-function validationSourcePath(
-  sourcePath: string,
-  options: DocumentLoadOptions,
-): string {
-  if (sourcePath !== "atlante/starter/atlante.jsonc")
-    return resolve(sourcePath);
-  return join(
-    (options.bundledPack ?? BUNDLED_RESOURCE_PACK).root,
-    "atlante.jsonc",
-  );
-}
-
 export function validateDocumentText(
   text: string,
   sourcePath: string,
@@ -335,13 +333,13 @@ export function validateDocumentText(
   if (!parsed.overlay)
     return { diagnostics: sortDiagnostics(parsed.diagnostics) };
 
-  const path = validationSourcePath(sourcePath, options);
+  const path = resolve(sourcePath);
   const result = resolveResourceBackedDocument(
     path,
     text,
-    options,
     { path, projectRoot: dirname(path) },
     parsed.overlay as unknown as JsonObject,
+    options.resourceContext,
   );
   return {
     ...(result.document ? { document: result.document } : {}),
@@ -399,12 +397,21 @@ function parseOverlay(
 
 type DocumentLocation = { path: string; projectRoot: string };
 
+export type LoadResult = {
+  document?: AtlanteDocument;
+  path?: string;
+  projectRoot?: string;
+  resources?: ReturnType<typeof resolveResourceDocument>;
+  resourceWatch?: ResourceWatchContext;
+  diagnostics: Diagnostic[];
+};
+
 function resolveResourceBackedDocument(
   path: string,
   text: string,
-  options: DocumentLoadOptions,
   location: DocumentLocation,
   rootDocument?: JsonObject,
+  resourceContext?: ResourceResolutionContext,
 ): {
   document?: AtlanteDocument;
   path: string;
@@ -434,7 +441,7 @@ function resolveResourceBackedDocument(
       pack: projectPack,
       rootFile: path,
       ...(rootDocument ? { rootDocument } : {}),
-      ...(options.bundledPack ? { bundledPack: options.bundledPack } : {}),
+      ...(resourceContext ? { resourceContext } : {}),
     });
   } catch (cause) {
     return {
@@ -466,14 +473,7 @@ function resolveResourceBackedDocument(
 export function loadDocument(
   pathOrDirectory: string,
   options: DocumentLoadOptions = {},
-): {
-  document?: AtlanteDocument;
-  path?: string;
-  projectRoot?: string;
-  resources?: ReturnType<typeof resolveResourceDocument>;
-  resourceWatch?: ResourceWatchContext;
-  diagnostics: Diagnostic[];
-} {
+): LoadResult {
   const target = resolve(pathOrDirectory);
   let path = target;
   let isDirectory = false;
@@ -533,5 +533,11 @@ export function loadDocument(
   const location = { path, projectRoot: dirname(path) };
   if (!parsed.overlay)
     return { ...location, diagnostics: sortDiagnostics(parsed.diagnostics) };
-  return resolveResourceBackedDocument(path, text, options, location);
+  return resolveResourceBackedDocument(
+    path,
+    text,
+    location,
+    undefined,
+    options.resourceContext,
+  );
 }

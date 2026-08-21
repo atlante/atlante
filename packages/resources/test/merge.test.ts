@@ -7,8 +7,8 @@ import {
 import { resolvedSelectionFixture } from "./selection-fixture.js";
 
 const inheritedOrigin = {
-  kind: "bundled",
-  path: "atlante/starter/atlante.jsonc",
+  kind: "package",
+  path: "@atlante/pack@0.1.6/atlante.jsonc",
 } as unknown as ResourceOrigin;
 const localOrigin = {
   kind: "project",

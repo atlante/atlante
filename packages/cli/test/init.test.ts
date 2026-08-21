@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import {
+  cpSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -10,6 +12,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { BuildResult } from "@atlante/builder";
 import { buildProject } from "@atlante/builder";
 import { readArtifacts } from "@atlante/builder/artifacts";
@@ -21,11 +24,85 @@ import {
 import { runInit, runValidate } from "../src/main.js";
 
 const created: string[] = [];
+const firstPartyPackRoot = fileURLToPath(
+  new URL("../../pack/", import.meta.url),
+);
 
 function tempDir(): string {
   const dir = mkdtempSync(join(tmpdir(), "atlante-init-"));
   created.push(dir);
+  cpSync(firstPartyPackRoot, join(dir, "node_modules", "@atlante", "pack"), {
+    recursive: true,
+  });
+  writeFileSync(
+    join(dir, "package.json"),
+    `${JSON.stringify({
+      name: "atlante-init-fixture",
+      version: "1.0.0",
+      devDependencies: { "@atlante/pack": "workspace:0.1.6" },
+    })}\n`,
+  );
   return dir;
+}
+
+function tempDirWithoutUserPack(): string {
+  const dir = mkdtempSync(join(tmpdir(), "atlante-init-no-pack-"));
+  created.push(dir);
+  writeFileSync(
+    join(dir, "package.json"),
+    `${JSON.stringify({
+      name: "atlante-init-no-pack-fixture",
+      version: "1.0.0",
+    })}\n`,
+  );
+  return dir;
+}
+
+function installExternalPreset(
+  directory: string,
+  options: {
+    declared?: boolean;
+    manifest?: string;
+    format?: number;
+    named?: boolean;
+    wrongFacet?: boolean;
+  } = {},
+): string {
+  const packageRoot = join(directory, "node_modules", "@acme", "review-pack");
+  mkdirSync(packageRoot, { recursive: true });
+  writeFileSync(
+    join(directory, "package.json"),
+    `${JSON.stringify({
+      name: "atlante-init-external-fixture",
+      version: "1.0.0",
+      ...(options.declared === false
+        ? {}
+        : { devDependencies: { "@acme/review-pack": "1.2.3" } }),
+    })}\n`,
+  );
+  writeFileSync(
+    join(packageRoot, "package.json"),
+    options.manifest ??
+      `${JSON.stringify({
+        name: "@acme/review-pack",
+        version: "1.2.3",
+        atlante: { format: options.format ?? 1 },
+      })}\n`,
+  );
+  if (options.wrongFacet) {
+    const facet = join(packageRoot, "agent");
+    mkdirSync(facet);
+    writeFileSync(join(facet, "template.jsonc"), '{ "$schema": "x" }\n');
+    writeFileSync(join(facet, "template.md"), "Review.\n");
+  } else {
+    writeFileSync(join(packageRoot, "atlante.jsonc"), "{}\n");
+    if (options.named) {
+      const named = join(packageRoot, "strict");
+      mkdirSync(named);
+      writeFileSync(join(named, "atlante.jsonc"), "{}\n");
+    }
+  }
+  return packageRoot;
 }
 
 async function captureErrors<T>(callback: () => Promise<T>): Promise<{
@@ -49,11 +126,15 @@ afterEach(() => {
 
 describe("runInit", () => {
   test("writes a bare config that validates", async () => {
-    const dir = tempDir();
+    const dir = tempDirWithoutUserPack();
+    writeFileSync(
+      join(dir, "opencode.jsonc"),
+      '{ "model": "anthropic/claude-sonnet-5" }',
+    );
     expect(await runInit(dir, {})).toBe(0);
     expect(existsSync(join(dir, "atlante.jsonc"))).toBe(true);
     const config = readFileSync(join(dir, "atlante.jsonc"), "utf8");
-    expect(config).toContain('"extends": "atlante/starter"');
+    expect(config).toContain('"extends": "@atlante/pack"');
     expect(config).not.toContain("node_modules");
     expect(config).not.toContain("package.json");
     expect(existsSync(join(dir, "resources"))).toBe(false);
@@ -63,6 +144,11 @@ describe("runInit", () => {
       existsSync(join(dir, ".atlante", "artifacts", "manifest.json")),
     ).toBe(true);
     expect(await runValidate(dir)).toBe(0);
+    const opencode = JSON.parse(
+      readFileSync(join(dir, "opencode.jsonc"), "utf8"),
+    );
+    expect(opencode.model).toBe("anthropic/claude-sonnet-5");
+    expect(opencode.plugin).toContain("@atlante/opencode-plugin");
   });
 
   test("rejects a symlinked project root before changing init targets", async () => {
@@ -369,13 +455,109 @@ describe("runInit", () => {
     expect(text).not.toContain("workflow");
   });
 
-  test("--preset starter is an alias for the default", async () => {
-    const dir = tempDir();
-    expect(await runInit(dir, { preset: "starter" })).toBe(0);
-    const text = readFileSync(join(dir, "atlante.jsonc"), "utf8");
-    expect(text).toContain("atlante/starter");
-    expect(text).toContain("extends");
+  test("--preset uses an exact singular external package locator without mutating dependencies", async () => {
+    const dir = tempDirWithoutUserPack();
+    const before = readFileSync(join(dir, "package.json"), "utf8");
+    installExternalPreset(dir, { named: true });
+    const declared = readFileSync(join(dir, "package.json"), "utf8");
+
+    expect(await runInit(dir, { preset: "@acme/review-pack" })).toBe(0);
+    expect(readFileSync(join(dir, "atlante.jsonc"), "utf8")).toContain(
+      '"extends": "@acme/review-pack"',
+    );
+    expect(readFileSync(join(dir, "package.json"), "utf8")).toBe(declared);
+    expect(readFileSync(join(dir, "package.json"), "utf8")).not.toBe(before);
+    expect(
+      existsSync(join(dir, ".atlante", "artifacts", "manifest.json")),
+    ).toBe(true);
+  });
+
+  test("--preset supports a named external package locator without composing an array", async () => {
+    const dir = tempDirWithoutUserPack();
+    installExternalPreset(dir, { named: true });
+
+    expect(await runInit(dir, { preset: "@acme/review-pack/strict" })).toBe(0);
+    expect(readFileSync(join(dir, "atlante.jsonc"), "utf8")).toContain(
+      '"extends": "@acme/review-pack/strict"',
+    );
     expect(await runValidate(dir)).toBe(0);
+  });
+
+  test.each([
+    ["missing", "@acme/missing-pack", undefined],
+    ["malformed locator", "@acme//review-pack", undefined],
+    ["undeclared", "@acme/review-pack", { declared: false }],
+    ["malformed", "@acme/review-pack", { manifest: "{ malformed" }],
+    ["unsupported", "@acme/review-pack", { format: 2 }],
+    ["wrong facet", "@acme/review-pack/agent", { wrongFacet: true }],
+  ] as const)(
+    "rejects %s presets before mutating init state",
+    async (_name, preset, options) => {
+      const dir = tempDirWithoutUserPack();
+      if (preset !== "@acme/missing-pack")
+        installExternalPreset(dir, options ?? {});
+      const opencodePath = join(dir, "opencode.jsonc");
+      const originalOpenCode = '{ "model": "demo" }';
+      writeFileSync(opencodePath, originalOpenCode);
+
+      const result = await captureErrors(() => runInit(dir, { preset }));
+
+      expect(result.result).toBe(1);
+      expect(existsSync(join(dir, "atlante.jsonc"))).toBe(false);
+      expect(readFileSync(opencodePath, "utf8")).toBe(originalOpenCode);
+      expect(existsSync(join(dir, ".atlante", "artifacts"))).toBe(false);
+    },
+  );
+
+  test("treats starter as a normal package locator instead of an alias", async () => {
+    const dir = tempDirWithoutUserPack();
+
+    expect(await runInit(dir, { preset: "starter" })).toBe(1);
+    expect(existsSync(join(dir, "atlante.jsonc"))).toBe(false);
+  });
+
+  test("rolls back external preset init after a build failure and preserves artifacts", async () => {
+    const dir = tempDirWithoutUserPack();
+    installExternalPreset(dir);
+    const target = join(dir, "atlante.jsonc");
+    const opencode = join(dir, "opencode.jsonc");
+    const originalConfig = `{ "$schema": "${SCHEMA_URI}", "values": { "old": "yes" } }`;
+    const originalOpenCode = '{ "model": "demo" }';
+    writeFileSync(target, originalConfig);
+    writeFileSync(opencode, originalOpenCode);
+    buildProject(dir);
+    const manifest = readFileSync(
+      join(dir, ".atlante", "artifacts", "manifest.json"),
+      "utf8",
+    );
+
+    const result = await captureErrors(() =>
+      runInitWithDependencies(
+        dir,
+        { force: true, preset: "@acme/review-pack" },
+        {
+          buildProject: () => ({
+            projectRoot: dir,
+            artifactsPath: join(dir, ".atlante", "artifacts"),
+            diagnostics: [
+              {
+                severity: "error",
+                code: "injected-build-failure",
+                message: "build failed",
+              },
+            ],
+            warnings: [],
+          }),
+        },
+      ),
+    );
+
+    expect(result.result).toBe(1);
+    expect(readFileSync(target, "utf8")).toBe(originalConfig);
+    expect(readFileSync(opencode, "utf8")).toBe(originalOpenCode);
+    expect(
+      readFileSync(join(dir, ".atlante", "artifacts", "manifest.json"), "utf8"),
+    ).toBe(manifest);
   });
 
   test("registers the plugin in opencode.jsonc", async () => {

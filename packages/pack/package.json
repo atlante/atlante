@@ -1,0 +1,40 @@
+{
+  "name": "@atlante/pack",
+  "version": "0.1.6",
+  "type": "module",
+  "description": "Atlante's first-party static resource pack",
+  "license": "MIT",
+  "contributors": [
+    {
+      "name": "cedoor",
+      "email": "me@cedoor.dev",
+      "url": "https://github.com/cedoor"
+    },
+    {
+      "name": "0xjei",
+      "email": "hello@0xjei.dev",
+      "url": "https://github.com/0xjei"
+    }
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/atlante/atlante.git",
+    "directory": "packages/pack"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "**/*.json",
+    "**/*.jsonc",
+    "**/*.md",
+    "README.md",
+    "LICENSE"
+  ],
+  "atlante": {
+    "format": 1
+  }
+}

@@ -15,6 +15,12 @@
     "indentWidth": 2,
     "lineWidth": 80
   },
+  "overrides": [
+    {
+      "includes": ["packages/pack/**/*.jsonc"],
+      "formatter": { "enabled": false }
+    }
+  ],
   "linter": { "enabled": true, "rules": { "preset": "recommended" } },
   "assist": { "actions": { "source": { "organizeImports": "on" } } }
 }

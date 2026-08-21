@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import {
+  cpSync,
   mkdirSync,
   mkdtempSync,
   realpathSync,
@@ -8,15 +9,15 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-  createBundledResourcePack,
-  type ResourcePack,
-} from "@atlante/resources";
+import { fileURLToPath } from "node:url";
 import { SCHEMA_URI } from "@atlante/schema";
 import { loadDocument } from "../src/index.js";
 
 const DRAFT_URI = "https://json-schema.org/draft/2020-12/schema";
 const created: string[] = [];
+const firstPartyPackRoot = fileURLToPath(
+  new URL("../../pack/", import.meta.url),
+);
 
 type LoadedResourceDocument = ReturnType<typeof loadDocument> & {
   resources?: {
@@ -35,6 +36,16 @@ function project(config: unknown, name = "atlante-validator-") {
   created.push(root);
   const configPath = join(root, "atlante.jsonc");
   writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
+  const firstPartyPackage = join(root, "node_modules", "@atlante", "pack");
+  cpSync(firstPartyPackRoot, firstPartyPackage, { recursive: true });
+  writeFileSync(
+    join(root, "package.json"),
+    `${JSON.stringify({
+      name: "atlante-validator-fixture",
+      version: "1.0.0",
+      devDependencies: { "@atlante/pack": "workspace:0.1.6" },
+    })}\n`,
+  );
   return { root, configPath };
 }
 
@@ -79,14 +90,8 @@ function writeInstance(
   return directory;
 }
 
-function load(
-  configPath: string,
-  bundledPack?: ResourcePack,
-): LoadedResourceDocument {
-  return loadDocument(
-    configPath,
-    bundledPack ? ({ bundledPack } as never) : {},
-  ) as LoadedResourceDocument;
+function load(configPath: string): LoadedResourceDocument {
+  return loadDocument(configPath) as LoadedResourceDocument;
 }
 
 function expectFailure(
@@ -133,7 +138,7 @@ function writeInvalidValueKeyLayer(
 ): void {
   if (layer === "instance") {
     writeInstance(root, "base", {
-      $template: "atlante/agent",
+      $template: "@atlante/pack/agent",
       values: { "bad.key": "invalid" },
     });
     writeInstance(root, "derived", { $instance: "../base" });
@@ -148,7 +153,7 @@ function writeInvalidValueKeyLayer(
       : {
           [layer === "agent" ? "agents" : "skills"]: {
             inherited: {
-              $template: `atlante/${layer}`,
+              $template: `@atlante/pack/${layer}`,
               description: "Inherited",
               values: { "bad.key": "invalid" },
             },
@@ -187,6 +192,40 @@ describe("resource-backed document validation", () => {
     });
     expect(diagnostic?.location?.column).toBeGreaterThan(0);
     expect(JSON.stringify(diagnostic)).not.toContain(configPath);
+  });
+
+  test("anchors an invalid inherited extends array entry at its source location", () => {
+    const { root, configPath } = project({
+      $schema: SCHEMA_URI,
+      extends: "./base",
+    });
+    const base = join(root, "base");
+    mkdirSync(base);
+    mkdirSync(join(root, "valid"));
+    writeFileSync(join(root, "valid", "atlante.jsonc"), "{}\n");
+    writeFileSync(
+      join(base, "atlante.jsonc"),
+      `${JSON.stringify({ extends: ["./valid", 42] }, null, 2)}\n`,
+    );
+
+    const result = load(configPath);
+    const diagnostic = result.diagnostics.find(
+      ({ code }) => code === "invalid-resolved-input",
+    );
+
+    expect(result.document).toBeUndefined();
+    expect(diagnostic).toMatchObject({
+      code: "invalid-resolved-input",
+      path: "/extends/1",
+      pointer: "/extends/1",
+      source: "base/atlante.jsonc",
+      location: { line: 4, column: 5 },
+      chain: [
+        { kind: "preset", locator: "./", source: "atlante.jsonc" },
+        { kind: "preset", locator: "./base", source: "base/atlante.jsonc" },
+      ],
+    });
+    expect(JSON.stringify(diagnostic)).not.toContain(root);
   });
 
   test("preserves facet parser coordinates and the authored selector pointer", () => {
@@ -485,7 +524,7 @@ describe("resource-backed document validation", () => {
           $schema: SCHEMA_URI,
           agents: {
             inherited: {
-              $template: "atlante/agent",
+              $template: "@atlante/pack/agent",
               description: "Inherited",
               values: "not-an-object",
             },
@@ -869,7 +908,7 @@ describe("resource-backed document validation", () => {
         $schema: SCHEMA_URI,
         agents: {
           reviewer: {
-            $template: "atlante/agent",
+            $template: "@atlante/pack/agent",
             description: "Review",
             values: { system: `{{sys.${key}}}` },
             identity: "{{values.system}}",
@@ -897,7 +936,7 @@ describe("resource-backed document validation", () => {
       values: { project: "{{sys.unknown}}" },
       agents: {
         reviewer: {
-          $template: "atlante/agent",
+          $template: "@atlante/pack/agent",
           description: "Review",
           identity: "Review",
         },
@@ -981,7 +1020,7 @@ describe("resource-backed document validation", () => {
       join(outer, "instance.jsonc"),
       `{
   "$template": "../parent",
-  "child": { "$template": "not-a-locator" }
+  "child": { "$template": "https://example.com/template" }
 }
 `,
     );
@@ -1092,6 +1131,40 @@ describe("resource-backed document validation", () => {
     ).toBe(true);
   });
 
+  test("rejects legacy built-in ids as semantic composition markers", () => {
+    const { root, configPath } = project({
+      $schema: SCHEMA_URI,
+      agents: {
+        reviewer: {
+          $template: "./legacy-markers",
+          description: "Review",
+        },
+      },
+    });
+    writeTemplate(root, "legacy-markers", {
+      type: "object",
+      properties: {
+        agent: { template: "atlante/agent" },
+        skill: { template: "atlante/skill" },
+        starter: { template: "atlante/starter" },
+      },
+    });
+
+    const result = load(configPath);
+
+    expect(result.document).toBeUndefined();
+    expect(result.diagnostics.map(({ code }) => code)).toEqual([
+      "invalid-input-schema",
+      "invalid-input-schema",
+      "invalid-input-schema",
+    ]);
+    expect(result.diagnostics.map(({ path }) => path)).toEqual([
+      "/agents/reviewer/agent",
+      "/agents/reviewer/skill",
+      "/agents/reviewer/starter",
+    ]);
+  });
+
   test("sanitizes an absolute invalid composition marker from every diagnostic field", () => {
     const { root, configPath } = project({
       $schema: SCHEMA_URI,
@@ -1168,7 +1241,7 @@ describe("resource-backed document validation", () => {
       values: { project: "atlante" },
       agents: {
         reviewer: {
-          $template: "atlante/agent",
+          $template: "@atlante/pack/agent",
           description: "Reviews the change.",
           identity: "You review.",
           mission: "Find defects.",
@@ -1195,7 +1268,7 @@ describe("resource-backed document validation", () => {
       values: { empty: "" },
       agents: {
         reviewer: {
-          $template: "atlante/agent",
+          $template: "@atlante/pack/agent",
           description: "{{values.empty}}",
           identity: "You review.",
           mission: "Find defects.",
@@ -1219,7 +1292,7 @@ describe("resource-backed document validation", () => {
       $schema: SCHEMA_URI,
       agents: {
         reviewer: {
-          $template: "atlante/agent",
+          $template: "@atlante/pack/agent",
           description: null,
           identity: "You review.",
           mission: "Find defects.",
@@ -1246,7 +1319,7 @@ describe("resource-backed document validation", () => {
       $schema: SCHEMA_URI,
       agents: {
         reviewer: {
-          $template: "atlante/agent",
+          $template: "@atlante/pack/agent",
           description: "Reviews the change.",
           identity: "{{values.missing}}",
           mission: "Find defects.",
@@ -1265,7 +1338,7 @@ describe("resource-backed document validation", () => {
       values: { project: "{{sys.notAResolver}}" },
       agents: {
         reviewer: {
-          $template: "atlante/agent",
+          $template: "@atlante/pack/agent",
           description: "Reviews the change.",
           identity: "You review.",
           mission: "Find defects.",
@@ -1305,7 +1378,7 @@ describe("resource-backed document validation", () => {
       $schema: SCHEMA_URI,
       skills: {
         testing: {
-          $template: "atlante/skill",
+          $template: "@atlante/pack/skill",
           description: "Testing guidance",
           title: "Testing",
           overview: "Run tests.",
@@ -1323,13 +1396,40 @@ describe("resource-backed document validation", () => {
     );
   });
 
-  test("uses the injectable bundled resource pack seam without loading unrelated siblings", () => {
-    const bundledRoot = mkdtempSync(
-      join(tmpdir(), "atlante-validator-bundled-"),
+  test("uses a declared package resource without loading unrelated siblings", () => {
+    const { root, configPath } = project({
+      $schema: SCHEMA_URI,
+      agents: {
+        reviewer: {
+          $template: "custom-pack/agent",
+          description: "Reviews the change.",
+          identity: "Review it.",
+        },
+      },
+    });
+    const packageRoot = join(root, "node_modules", "custom-pack");
+    writeFileSync(
+      join(root, "package.json"),
+      `${JSON.stringify({
+        name: "atlante-validator-fixture",
+        version: "1.0.0",
+        dependencies: {
+          "@atlante/pack": "workspace:0.1.6",
+          "custom-pack": "1.0.0",
+        },
+      })}\n`,
     );
-    created.push(bundledRoot);
+    mkdirSync(packageRoot, { recursive: true });
+    writeFileSync(
+      join(packageRoot, "package.json"),
+      `${JSON.stringify({
+        name: "custom-pack",
+        version: "1.0.0",
+        atlante: { format: 1 },
+      })}\n`,
+    );
     writeTemplate(
-      bundledRoot,
+      packageRoot,
       "agent",
       {
         type: "object",
@@ -1339,22 +1439,12 @@ describe("resource-backed document validation", () => {
       },
       "{{#if",
     );
-    const unrelated = join(bundledRoot, "broken");
+    const unrelated = join(packageRoot, "broken");
     mkdirSync(unrelated);
     writeFileSync(join(unrelated, "template.jsonc"), "{ not JSONC");
     writeFileSync(join(unrelated, "template.md"), "unrelated");
 
-    const { configPath } = project({
-      $schema: SCHEMA_URI,
-      agents: {
-        reviewer: {
-          $template: "atlante/agent",
-          description: "Reviews the change.",
-          identity: "Review it.",
-        },
-      },
-    });
-    const result = load(configPath, createBundledResourcePack(bundledRoot));
+    const result = load(configPath);
 
     expect(result.diagnostics).toEqual([]);
     expect(result.document).toBeDefined();
@@ -1363,7 +1453,7 @@ describe("resource-backed document validation", () => {
     ).toBe(false);
   });
 
-  test("resolves local and built-in root extends through the same resource path", () => {
+  test("resolves local and first-party package root extends through the same resource path", () => {
     const local = project({
       $schema: SCHEMA_URI,
       extends: "./base",
@@ -1410,7 +1500,7 @@ describe("resource-backed document validation", () => {
 
     const builtin = project({
       $schema: SCHEMA_URI,
-      extends: "atlante/starter",
+      extends: "@atlante/pack",
     });
     const builtinResult = load(builtin.configPath);
     expect(builtinResult.diagnostics).toEqual([]);
@@ -1937,6 +2027,151 @@ describe("resource-backed document validation", () => {
     expect(diagnostic?.location?.line).toBeGreaterThan(0);
     expect(JSON.stringify(diagnostic)).not.toContain(root);
   });
+
+  type ExternalPackageFailureKind =
+    | "lookup"
+    | "metadata"
+    | "missing format"
+    | "unsupported format"
+    | "subpath"
+    | "facet";
+
+  type ExternalPackageFixture = {
+    root: string;
+    configPath: string;
+    packageRoot: string;
+  };
+
+  function externalPackageDocument(
+    failureKind: ExternalPackageFailureKind,
+  ): Record<string, unknown> {
+    return {
+      $schema: SCHEMA_URI,
+      extends:
+        failureKind === "subpath" ? "review-pack/missing" : "review-pack",
+      ...(failureKind === "facet"
+        ? {
+            agents: {
+              broken: {
+                $template: "review-pack/agent",
+                description: "Broken",
+              },
+            },
+          }
+        : {}),
+    };
+  }
+
+  function externalPackageManifest(
+    failureKind: ExternalPackageFailureKind,
+  ): string {
+    if (failureKind === "metadata") return "{ broken\n";
+    const manifest = {
+      name: "review-pack",
+      version: "1.2.3",
+      ...(failureKind === "missing format"
+        ? {}
+        : {
+            atlante: {
+              format: failureKind === "unsupported format" ? 2 : 1,
+            },
+          }),
+    };
+    return `${JSON.stringify(manifest)}\n`;
+  }
+
+  function externalPackageFixture(
+    failureKind: ExternalPackageFailureKind,
+  ): ExternalPackageFixture {
+    const { root, configPath } = project(externalPackageDocument(failureKind));
+    const packageRoot = join(root, "node_modules", "review-pack");
+    if (failureKind !== "lookup") {
+      mkdirSync(packageRoot, { recursive: true });
+      writeFileSync(
+        join(packageRoot, "package.json"),
+        externalPackageManifest(failureKind),
+      );
+      writeFileSync(join(packageRoot, "atlante.jsonc"), "{}\n");
+    }
+    if (failureKind === "facet") {
+      const agent = join(packageRoot, "agent");
+      mkdirSync(agent);
+      writeFileSync(join(agent, "template.jsonc"), "{ broken\n");
+      writeFileSync(join(agent, "template.md"), "broken\n");
+    }
+    writeFileSync(
+      join(root, "package.json"),
+      `${JSON.stringify({
+        name: "atlante-validator-fixture",
+        version: "1.0.0",
+        ...(failureKind === "lookup"
+          ? {}
+          : { dependencies: { "review-pack": "1.2.3" } }),
+      })}\n`,
+    );
+    return { root, configPath, packageRoot };
+  }
+
+  function expectExternalPackageFailure(
+    fixture: ExternalPackageFixture,
+    failureKind: ExternalPackageFailureKind,
+    expectedCode: string,
+  ): void {
+    const result = load(fixture.configPath);
+    const diagnostic = result.diagnostics.find(
+      ({ code }) => code === expectedCode,
+    );
+    const facetPath = "/agents/broken/$template";
+    const path = failureKind === "facet" ? facetPath : "/extends";
+
+    expect(result.document).toBeUndefined();
+    expect(result.resources).toBeUndefined();
+    expect(diagnostic).toMatchObject({
+      code: expectedCode,
+      source:
+        failureKind === "facet"
+          ? "review-pack@1.2.3/agent/template.jsonc"
+          : "atlante.jsonc",
+      pointer: path,
+      path,
+    });
+    expect(diagnostic?.location?.line).toBeGreaterThan(0);
+    expect(diagnostic?.chain?.[0]).toMatchObject({
+      kind: "preset",
+      locator: "./",
+    });
+    if (failureKind === "facet")
+      expect(diagnostic?.chain).toContainEqual(
+        expect.objectContaining({
+          kind: "template",
+          locator: "review-pack/agent",
+          source: "review-pack@1.2.3/agent/template.jsonc",
+        }),
+      );
+    expect(JSON.stringify(result.diagnostics)).not.toContain(fixture.root);
+    if (failureKind !== "lookup")
+      expect(result.resourceWatch?.trustedRoots).toContainEqual({
+        canonical: realpathSync(fixture.packageRoot),
+        lexical: fixture.packageRoot,
+      });
+  }
+
+  test.each([
+    ["lookup", "package-not-declared"],
+    ["metadata", "package-metadata-unreadable"],
+    ["missing format", "missing-pack-format"],
+    ["unsupported format", "unsupported-pack-format"],
+    ["subpath", "missing-package-subpath"],
+    ["facet", "malformed-jsonc"],
+  ] as const)(
+    "translates external package %s failures into stable source diagnostics",
+    (failureKind, expectedCode) =>
+      expectExternalPackageFailure(
+        externalPackageFixture(failureKind),
+        failureKind,
+        expectedCode,
+      ),
+  );
 
   test.each(["global", "agent", "skill", "instance"] as const)(
     "rejects invalid authored value keys in a %s layer",

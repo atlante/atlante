@@ -18,20 +18,20 @@
   "agent": {
     "architect": {
       "mode": "primary",
-      "model": "openai/gpt-5.6-sol",
-      "reasoningEffort": "xhigh",
+      "model": "openai/gpt-5.6-sol-fast",
+      "reasoningEffort": "low",
       "permission": {
         "*": "allow",
         "edit": "deny"
       }
     },
     "general": {
-      "model": "openai/gpt-5.6-luna",
+      "model": "openai/gpt-5.6-luna-fast",
       "reasoningEffort": "max"
     },
     "explore": {
-      "model": "openai/gpt-5.6-luna",
-      "reasoningEffort": "max"
+      "model": "openai/gpt-5.6-luna-fast",
+      "reasoningEffort": "high"
     },
     "build": { "disable": true },
     "plan": { "disable": true }

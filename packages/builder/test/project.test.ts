@@ -1,11 +1,15 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { SCHEMA_URI } from "@atlante/schema";
 import { loadProject, prepareProject, validateProject } from "../src/index.js";
 
 const created: string[] = [];
+const firstPartyPackRoot = fileURLToPath(
+  new URL("../../pack/", import.meta.url),
+);
 
 const valid = `{
   "$schema": "${SCHEMA_URI}",
@@ -29,6 +33,19 @@ function project(contents: string): { directory: string; config: string } {
   created.push(directory);
   const config = join(directory, "atlante.jsonc");
   writeFileSync(config, contents);
+  cpSync(
+    firstPartyPackRoot,
+    join(directory, "node_modules", "@atlante", "pack"),
+    { recursive: true },
+  );
+  writeFileSync(
+    join(directory, "package.json"),
+    `${JSON.stringify({
+      name: "atlante-builder-fixture",
+      version: "1.0.0",
+      devDependencies: { "@atlante/pack": "workspace:0.1.6" },
+    })}\n`,
+  );
   return { directory, config };
 }
 
@@ -68,10 +85,10 @@ describe("loadProject", () => {
     expect(loaded.diagnostics[0]?.code).toBe("ambiguous-config");
   });
 
-  test("reports preset expansion failures", () => {
+  test("reports package preset expansion failures", () => {
     const { directory } = project(`{
       "$schema": "${SCHEMA_URI}",
-      "extends": "atlante/missing",
+      "extends": "@atlante/pack/missing",
       "agents": {}
     }`);
 
@@ -80,7 +97,7 @@ describe("loadProject", () => {
     expect(loaded.document).toBeUndefined();
     expect(loaded.diagnostics).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ code: "missing-target" }),
+        expect.objectContaining({ code: "missing-package-subpath" }),
       ]),
     );
   });
@@ -139,7 +156,7 @@ describe("prepareProject", () => {
     expect(prepared.diagnostics).toEqual([]);
     expect(prepared.agents).toHaveLength(1);
     expect(prepared.agents[0]?.hostAgentId).toBe("reviewer");
-    expect(prepared.agents[0]?.templateId).toBe("atlante/agent");
+    expect(prepared.agents[0]?.templateId).toBe("@atlante/pack/agent");
   });
 
   test("returns no descriptors when preparation fails", () => {

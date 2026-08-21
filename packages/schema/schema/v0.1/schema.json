@@ -9,8 +9,20 @@
       "const": "https://atlante.sh/schema/v0.1/schema.json"
     },
     "extends": {
-      "type": "string",
-      "minLength": 1
+      "oneOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        }
+      ]
     },
     "values": {
       "type": "object",

@@ -54,7 +54,7 @@
             },
             "additionalProperties": false
           },
-          "output": { "template": "atlante/artifact" },
+          "output": { "template": "@atlante/pack/artifact" },
           "instructions": {
             "type": "array",
             "items": { "type": "string", "minLength": 1 },

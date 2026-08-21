@@ -10,7 +10,7 @@ export type Diagnostic = {
   message: string;
   /** JSON pointer into the document, when the diagnostic has one. */
   path?: string;
-  /** Stable resource identity, relative to the project or bundled pack. */
+  /** Stable resource identity, relative to the project or package root. */
   source?: string;
   /** Explicit JSON Pointer alias used by source/resource diagnostics. */
   pointer?: string;

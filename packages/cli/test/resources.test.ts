@@ -1,44 +1,65 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { loadProject, prepareProject } from "@atlante/builder";
-import { BUNDLED_RESOURCE_PACK, loadPresetFacet } from "@atlante/resources";
+import { createProjectResourcePack, loadPresetFacet } from "@atlante/resources";
 import { SCHEMA_URI } from "@atlante/schema";
 import { validateDocumentText } from "@atlante/validator";
 
 const created: string[] = [];
+const firstPartyPackRoot = fileURLToPath(
+  new URL("../../pack/", import.meta.url),
+);
+
+function projectRoot(): string {
+  const root = mkdtempSync(join(tmpdir(), "atlante-cli-pack-"));
+  created.push(root);
+  cpSync(firstPartyPackRoot, join(root, "node_modules", "@atlante", "pack"), {
+    recursive: true,
+  });
+  writeFileSync(
+    join(root, "package.json"),
+    `${JSON.stringify({
+      name: "atlante-cli-pack-fixture",
+      version: "1.0.0",
+      devDependencies: { "@atlante/pack": "workspace:0.1.6" },
+    })}\n`,
+  );
+  return root;
+}
 
 afterEach(() => {
   for (const dir of created.splice(0))
     rmSync(dir, { recursive: true, force: true });
 });
 
-describe("bundled resources as user configurations", () => {
-  test("the bundled starter validates against the user configuration schema", () => {
+describe("first-party package resources as user configurations", () => {
+  test("the first-party default preset validates against the user configuration schema", () => {
+    const root = projectRoot();
+    const configPath = join(root, "atlante.jsonc");
     const source = loadPresetFacet(
-      BUNDLED_RESOURCE_PACK,
-      "atlante/starter",
-      join(BUNDLED_RESOURCE_PACK.root, "atlante.jsonc"),
+      createProjectResourcePack(root),
+      "@atlante/pack",
+      configPath,
     );
     const result = validateDocumentText(
       JSON.stringify(source.facet.document),
-      "atlante/starter/atlante.jsonc",
-      { bundledPack: BUNDLED_RESOURCE_PACK },
+      configPath,
     );
 
     expect(result.diagnostics).toEqual([]);
     expect(result.document).toBeDefined();
   });
 
-  test("starter prepares explicit mode selection and adaptive workflow policies", () => {
-    const dir = mkdtempSync(join(tmpdir(), "atlante-cli-starter-"));
-    created.push(dir);
+  test("the first-party preset prepares explicit mode selection and adaptive workflow policies", () => {
+    const dir = projectRoot();
     writeFileSync(
       join(dir, "atlante.jsonc"),
       `{
         "$schema": "${SCHEMA_URI}",
-        "extends": "atlante/starter"
+        "extends": "@atlante/pack"
       }`,
     );
 
@@ -84,7 +105,7 @@ describe("bundled resources as user configurations", () => {
     expect(architect).toBeDefined();
     expect(workflow).toBeDefined();
     if (!architect || !workflow)
-      throw new Error("expected prepared starter prompts");
+      throw new Error("expected prepared first-party prompts");
 
     expect({
       omitsSupersededRoleBoundary: !workflow.includes(
@@ -177,9 +198,8 @@ describe("bundled resources as user configurations", () => {
     );
   });
 
-  test("CLI loading returns a canonical document and bundled skill template", () => {
-    const dir = mkdtempSync(join(tmpdir(), "atlante-cli-preset-"));
-    created.push(dir);
+  test("CLI loading returns a canonical document and first-party skill template", () => {
+    const dir = projectRoot();
     writeFileSync(
       join(dir, "atlante.jsonc"),
       `{

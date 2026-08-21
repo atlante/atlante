@@ -1,6 +1,6 @@
 {
   "$schema": "https://atlante.sh/schema/v0.1/schema.json",
-  "extends": "atlante/starter",
+  "extends": "@atlante/pack",
   "values": {
     "project": "Atlante",
     "quick-check": "`bun run quick:check`",

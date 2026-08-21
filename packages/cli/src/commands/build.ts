@@ -1,5 +1,7 @@
+import type { ProjectContext } from "@atlante/builder";
 import { buildProject } from "@atlante/builder";
 import { hasErrors, type ResourceWatchContext } from "@atlante/validator";
+import { firstPartyProjectContext } from "../first-party-pack.js";
 import { printDiagnostics } from "../report.js";
 
 export type BuildOutcome = Readonly<{
@@ -7,9 +9,12 @@ export type BuildOutcome = Readonly<{
   readonly resourceWatch?: ResourceWatchContext;
 }>;
 
-export function runBuildWithContext(target: string): BuildOutcome {
+export function runBuildWithContext(
+  target: string,
+  context: ProjectContext = firstPartyProjectContext(),
+): BuildOutcome {
   try {
-    const built = buildProject(target);
+    const built = buildProject(target, context);
     printDiagnostics(built.diagnostics);
     if (hasErrors(built.diagnostics))
       return { code: 1, resourceWatch: built.resourceWatch };

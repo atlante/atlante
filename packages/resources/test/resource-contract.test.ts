@@ -12,12 +12,12 @@ import { fileURLToPath } from "node:url";
 import packageJson from "../package.json" with { type: "json" };
 import type {
   AuthoredResourceLocator,
-  BundledResourceOrigin,
   InstanceFacet,
+  PackageResourceOrigin,
   Preset,
   PresetResourceGraphNode,
   ProjectResourceOrigin,
-  RawBundledResourceOrigin,
+  RawPackageResourceOrigin,
   RawProjectResourceOrigin,
   RawResourceLocator,
   RawResourceOrigin,
@@ -69,23 +69,23 @@ function compileTimeLocatorContracts(): void {
   const trustedLocators = [trustedLocator] satisfies ResourceLocator[];
   void trustedLocators;
 
-  const rawEmptyBuiltin: RawResourceLocator = "atlante/";
-  const rawNestedBuiltin: RawResourceLocator = "atlante/group/child";
+  const rawEmptyPackage: RawResourceLocator = "@atlante/pack/";
+  const rawNestedLegacy: RawResourceLocator = "atlante/group/child";
   const rawFacetFile: RawResourceLocator = "./resources/agent/template.md";
   const rawMalformed: RawResourceLocator = "resources/agent";
   const rawAbsolute: RawResourceLocator = "/tmp/agent";
   // @ts-expect-error Raw authored values are not validated identities.
-  const emptyBuiltin: ResourceLocator = rawEmptyBuiltin;
+  const emptyPackage: ResourceLocator = rawEmptyPackage;
   // @ts-expect-error Raw authored values are not validated identities.
-  const nestedBuiltin: ResourceLocator = rawNestedBuiltin;
+  const nestedLegacy: ResourceLocator = rawNestedLegacy;
   // @ts-expect-error Raw authored values are not validated identities.
   const facetFile: ResourceLocator = rawFacetFile;
   // @ts-expect-error Raw authored values are not validated identities.
   const malformed: ResourceLocator = rawMalformed;
   // @ts-expect-error Raw authored values are not validated identities.
   const absolute: ResourceLocator = rawAbsolute;
-  void emptyBuiltin;
-  void nestedBuiltin;
+  void emptyPackage;
+  void nestedLegacy;
   void facetFile;
   void malformed;
   void absolute;
@@ -100,19 +100,19 @@ function compileTimeOriginContracts(): void {
     kind: "project",
     path: "/absolute",
   };
-  const rawEmptyBuiltin: RawBundledResourceOrigin = {
-    kind: "bundled",
-    path: "atlante/",
+  const rawPackage: RawPackageResourceOrigin = {
+    kind: "package",
+    path: "@atlante/pack@0.1.6/agent/template.jsonc",
   };
   // @ts-expect-error Raw authored origins are not validated identities.
   const traversal: ProjectResourceOrigin = rawTraversal;
   // @ts-expect-error Raw authored origins are not validated identities.
   const absolute: ProjectResourceOrigin = rawAbsolute;
   // @ts-expect-error Raw authored origins are not validated identities.
-  const emptyBuiltin: BundledResourceOrigin = rawEmptyBuiltin;
+  const packageOrigin: PackageResourceOrigin = rawPackage;
   void traversal;
   void absolute;
-  void emptyBuiltin;
+  void packageOrigin;
 }
 
 function compileTimeFailureContracts(): void {
@@ -143,21 +143,21 @@ describe("resource contract", () => {
     };
     const instance: InstanceFacet = {
       kind: "instance",
-      locator: trusted<ResourceLocator>("atlante/architect"),
+      locator: trusted<ResourceLocator>("@atlante/pack/architect"),
       origin: trusted<ResourceOrigin>({
-        kind: "bundled",
-        path: "atlante/architect/instance.jsonc",
+        kind: "package",
+        path: "@atlante/pack@0.1.6/architect/instance.jsonc",
       }),
       input: { identity: "You are an architect." },
     };
     const preset: Preset = {
       kind: "preset",
-      locator: trusted<ResourceLocator>("atlante/starter"),
+      locator: trusted<ResourceLocator>("@atlante/pack"),
       origin: trusted<ResourceOrigin>({
-        kind: "bundled",
-        path: "atlante/starter/atlante.jsonc",
+        kind: "package",
+        path: "@atlante/pack@0.1.6/atlante.jsonc",
       }),
-      document: { extends: "atlante/starter" },
+      document: { extends: "@atlante/pack" },
     };
     const failure: ResourceFailure = {
       code: "unsafe-path",
@@ -178,16 +178,16 @@ describe("resource contract", () => {
     const locators = [
       "./resources/agent",
       "../shared/agent",
-      "atlante/agent",
-      "atlante/starter",
+      "@atlante/pack/agent",
+      "@atlante/pack",
     ] satisfies RawResourceLocator[];
     const authored: AuthoredResourceLocator = "atlante/";
 
     expect(locators).toEqual([
       "./resources/agent",
       "../shared/agent",
-      "atlante/agent",
-      "atlante/starter",
+      "@atlante/pack/agent",
+      "@atlante/pack",
     ]);
     expect(authored).toBe("atlante/");
   });
@@ -195,10 +195,10 @@ describe("resource contract", () => {
   test("requires complete typed graph chains for graph failures", () => {
     const presetNode: PresetResourceGraphNode = {
       kind: "preset",
-      locator: trusted<ResourceLocator>("atlante/starter"),
+      locator: trusted<ResourceLocator>("@atlante/pack"),
       origin: trusted<ResourceOrigin>({
-        kind: "bundled",
-        path: "atlante/starter/atlante.jsonc",
+        kind: "package",
+        path: "@atlante/pack@0.1.6/atlante.jsonc",
       }),
     };
     const chain = [
@@ -298,12 +298,12 @@ describe("resources package boundary", () => {
       kind: "project",
       path: "../outside",
     };
-    const rawBundledOrigin: RawResourceOrigin = {
-      kind: "bundled",
-      path: "atlante/",
+    const rawPackageOrigin: RawResourceOrigin = {
+      kind: "package",
+      path: "@atlante/pack@0.1.6/",
     };
 
     expect(rawOrigin.path).toBe("../outside");
-    expect(rawBundledOrigin.path).toBe("atlante/");
+    expect(rawPackageOrigin.path).toBe("@atlante/pack@0.1.6/");
   });
 });

@@ -1,8 +1,8 @@
 import { lstatSync, realpathSync, statSync } from "node:fs";
 import * as nodePath from "node:path";
 import { basename, dirname, resolve } from "node:path";
-import { loadProject } from "@atlante/builder";
-import { BUNDLED_RESOURCE_PACK } from "@atlante/resources";
+import { loadProject, type ProjectContext } from "@atlante/builder";
+import type { ResourceWatchRoot } from "@atlante/resources";
 import type { ResourceWatchContext } from "@atlante/validator";
 import { CONFIG_FILENAMES, findConfigFile } from "@atlante/validator";
 
@@ -16,6 +16,8 @@ export type WatchFiles = {
   unresolvedParents: string[];
   /** Whether the current config/resource graph resolved without errors. */
   resourceResolutionSucceeded: boolean;
+  /** Explicit roots that authorize external resource paths. */
+  trustedRoots: ResourceWatchRoot[];
 };
 
 type PathImplementation = Pick<
@@ -50,9 +52,17 @@ function rootsFor(projectDir: string): readonly string[] {
   } catch {
     // The project root may be created after the first failed build.
   }
-  roots.add(BUNDLED_RESOURCE_PACK.root);
-  roots.add(BUNDLED_RESOURCE_PACK.lexicalRoot);
   return [...roots];
+}
+
+function watchRoots(
+  projectDir: string,
+  trustedRoots: readonly ResourceWatchRoot[] = [],
+): readonly string[] {
+  return [
+    ...rootsFor(projectDir),
+    ...trustedRoots.flatMap(({ canonical, lexical }) => [canonical, lexical]),
+  ];
 }
 
 export function isWithinAnyRoot(
@@ -108,6 +118,7 @@ function safePaths(
 function resourceWatchOf(
   target: string,
   provided?: ResourceWatchContext,
+  context: ProjectContext = {},
 ): { context?: ResourceWatchContext; succeeded: boolean; configPath?: string } {
   const config = findConfigFile(target);
   if (!config) return { succeeded: false };
@@ -115,7 +126,7 @@ function resourceWatchOf(
     return { configPath: config.path, context: provided, succeeded: true };
 
   try {
-    const loaded = loadProject(target);
+    const loaded = loadProject(target, context);
     return {
       configPath: loaded.configPath ?? config.path,
       ...(loaded.resourceWatch ? { context: loaded.resourceWatch } : {}),
@@ -131,11 +142,13 @@ function resourceWatchOf(
 export function resolveWatchFiles(
   target: string,
   providedResourceWatch?: ResourceWatchContext,
+  context: ProjectContext = {},
 ): WatchFiles {
   const projectDir = projectDirOf(target);
-  const resolved = resourceWatchOf(target, providedResourceWatch);
+  const resolved = resourceWatchOf(target, providedResourceWatch, context);
   const configPath = resolved.configPath;
-  const roots = rootsFor(projectDir);
+  const trustedRoots = resolved.context?.trustedRoots ?? [];
+  const roots = watchRoots(projectDir, trustedRoots);
   const configCandidates = [...CONFIG_FILENAMES].map((filename) =>
     resolve(projectDir, filename),
   );
@@ -151,5 +164,6 @@ export function resolveWatchFiles(
       "directory",
     ),
     resourceResolutionSucceeded: resolved.succeeded,
+    trustedRoots: trustedRoots.map((root) => ({ ...root })),
   };
 }

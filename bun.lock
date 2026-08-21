@@ -27,6 +27,7 @@
         "atlante": "./dist/bin/atlante.js",
       },
       "dependencies": {
+        "@atlante/pack": "workspace:*",
         "jsonc-parser": "^3.3.1",
       },
       "devDependencies": {
@@ -43,6 +44,10 @@
       "peerDependencies": {
         "@opencode-ai/plugin": "^1.18.4",
       },
+    },
+    "packages/pack": {
+      "name": "@atlante/pack",
+      "version": "0.1.6",
     },
     "packages/resources": {
       "name": "@atlante/resources",
@@ -78,6 +83,8 @@
     "@atlante/cli": ["@atlante/cli@workspace:packages/cli"],
 
     "@atlante/opencode-plugin": ["@atlante/opencode-plugin@workspace:packages/opencode-plugin"],
+
+    "@atlante/pack": ["@atlante/pack@workspace:packages/pack"],
 
     "@atlante/resources": ["@atlante/resources@workspace:packages/resources"],
 

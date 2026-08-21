@@ -29,13 +29,13 @@
   },
   "files": [
     "dist",
-    "bundled",
     "LICENSE"
   ],
   "bin": {
     "atlante": "./dist/bin/atlante.js"
   },
   "dependencies": {
+    "@atlante/pack": "workspace:*",
     "jsonc-parser": "^3.3.1"
   },
   "devDependencies": {

@@ -1,13 +1,16 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import {
+  cpSync,
   mkdirSync,
   mkdtempSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type {
   ResourceFailureCode,
   ResourceOrigin,
@@ -15,7 +18,6 @@ import type {
 } from "../src/index.js";
 import {
   canonicalGraphKey,
-  createBundledResourcePack,
   createProjectResourcePack,
   resolveResourceDocument,
   resolveResourceInstance,
@@ -25,10 +27,45 @@ import {
 
 const created: string[] = [];
 const schemaUri = "https://json-schema.org/draft/2020-12/schema";
+const repositoryRoot = fileURLToPath(new URL("../../../", import.meta.url));
+const firstPartyPackRoot = join(repositoryRoot, "packages", "pack");
 
 function rootOf(): { root: string; config: string } {
   const root = mkdtempSync(join(tmpdir(), "atlante-resolve-"));
   created.push(root);
+  cpSync(firstPartyPackRoot, join(root, "node_modules", "@atlante", "pack"), {
+    recursive: true,
+  });
+  writeFileSync(
+    join(root, "package.json"),
+    `${JSON.stringify({
+      name: "atlante-resolve-fixture",
+      version: "1.0.0",
+      devDependencies: { "@atlante/pack": "workspace:0.1.6" },
+    })}\n`,
+  );
+  const config = join(root, "atlante.jsonc");
+  writeFileSync(config, "{}\n");
+  return { root, config };
+}
+
+function firstPartyRootOf(): { root: string; config: string } {
+  const root = mkdtempSync(join(repositoryRoot, ".pack-resolve-test-"));
+  created.push(root);
+  mkdirSync(join(root, "node_modules", "@atlante"), { recursive: true });
+  symlinkSync(
+    firstPartyPackRoot,
+    join(root, "node_modules", "@atlante", "pack"),
+    "dir",
+  );
+  writeFileSync(
+    join(root, "package.json"),
+    JSON.stringify({
+      name: "atlante-resolve-first-party-fixture",
+      version: "1.0.0",
+      devDependencies: { "@atlante/pack": "workspace:0.1.6" },
+    }),
+  );
   const config = join(root, "atlante.jsonc");
   writeFileSync(config, "{}\n");
   return { root, config };
@@ -82,6 +119,63 @@ function writePreset(
   return directory;
 }
 
+function writePackageTemplate(root: string): {
+  packageRoot: string;
+  template: string;
+  instance: string;
+} {
+  const packageRoot = join(root, "node_modules", "acme-pack");
+  mkdirSync(packageRoot, { recursive: true });
+  writeFileSync(
+    join(root, "package.json"),
+    `${JSON.stringify({
+      name: "atlante-resolve-fixture",
+      version: "1.0.0",
+      dependencies: { "acme-pack": "1.0.0" },
+    })}\n`,
+  );
+  writeFileSync(
+    join(packageRoot, "package.json"),
+    `${JSON.stringify({
+      name: "acme-pack",
+      version: "1.0.0",
+      atlante: { format: 1 },
+    })}\n`,
+  );
+  const template = writeTemplate(packageRoot, "agent", { type: "object" });
+  const instance = writeInstance(packageRoot, "reviewer", {
+    $template: "../agent",
+    value: "package",
+  });
+  return { packageRoot, template, instance };
+}
+
+function writeMutatingDocument(
+  config: string,
+  source: "$template" | "$instance",
+): void {
+  const locator =
+    source === "$template" ? "acme-pack/agent" : "acme-pack/reviewer";
+  writeFileSync(
+    config,
+    `${JSON.stringify({
+      agents: {
+        "a-first": { [source]: locator, description: "First" },
+        "b-mutator": {
+          $instance: "./mutator-instance",
+          description: "Mutator",
+        },
+        "c-second": { [source]: locator, description: "Second" },
+      },
+    })}\n`,
+  );
+}
+
+function retargetFile(path: string, target: string): void {
+  rmSync(path);
+  symlinkSync(target, path, "file");
+}
+
 function expectFailure(
   action: () => unknown,
   code: ResourceFailureCode,
@@ -112,7 +206,6 @@ function resolveDocument(root: string, config: string) {
   return resolveResourceDocument({
     pack: createProjectResourcePack(root),
     rootFile: config,
-    bundledPack: createBundledResourcePack(),
   });
 }
 
@@ -341,10 +434,10 @@ describe("resource resolution", () => {
     );
   });
 
-  test("resolves local and atlante/starter extends from the containing config", () => {
-    const { root, config } = rootOf();
+  test("resolves local and first-party package extends from the containing config", () => {
+    const { root, config } = firstPartyRootOf();
     writePreset(root, "base", {
-      extends: "atlante/starter",
+      extends: "@atlante/pack",
       values: { inherited: "false", local: "true" },
     });
     writeFileSync(
@@ -354,7 +447,7 @@ describe("resource resolution", () => {
         values: { replaced: "root" },
         agents: {
           local: {
-            $template: "atlante/agent",
+            $template: "@atlante/pack/agent",
             description: "Local agent",
             identity: "Identity",
             mission: "Mission",
@@ -382,7 +475,199 @@ describe("resource resolution", () => {
     );
     expect(
       result.provenance["/agents/architect/description"]?.path as string,
-    ).toBe("atlante/starter/atlante.jsonc");
+    ).toBe("@atlante/pack@0.1.6/atlante.jsonc");
+  });
+
+  test("merges ordered preset layers left-to-right with winning provenance", () => {
+    const { root, config } = rootOf();
+    writePreset(root, "first", {
+      settings: {
+        removed: "first",
+        scalar: "first",
+        array: ["first"],
+        nested: { first: "first", shared: "first" },
+      },
+    });
+    writePreset(root, "second", {
+      settings: {
+        removed: null,
+        scalar: "second",
+        array: ["second"],
+        nested: { second: "second", shared: "second" },
+      },
+    });
+    writeFileSync(
+      config,
+      `${JSON.stringify({
+        extends: ["./first", "./second"],
+        settings: {
+          local: "local",
+          scalar: "local",
+          array: ["local"],
+          nested: { local: "local", shared: "local" },
+        },
+      })}\n`,
+    );
+
+    const result = resolveDocument(root, config);
+
+    expect(result.effectiveRaw.settings).toEqual({
+      array: ["local"],
+      local: "local",
+      nested: {
+        first: "first",
+        local: "local",
+        second: "second",
+        shared: "local",
+      },
+      scalar: "local",
+    });
+    expect(originPath(result.provenance, "/settings/nested/first")).toBe(
+      "first/atlante.jsonc",
+    );
+    expect(originPath(result.provenance, "/settings/nested/second")).toBe(
+      "second/atlante.jsonc",
+    );
+    expect(originPath(result.provenance, "/settings/nested/shared")).toBe(
+      "atlante.jsonc",
+    );
+    expect(originPath(result.provenance, "/settings/scalar")).toBe(
+      "atlante.jsonc",
+    );
+    expect(originPath(result.provenance, "/settings/array/0")).toBe(
+      "atlante.jsonc",
+    );
+    expect(result.provenance["/settings/removed"]).toBeUndefined();
+  });
+
+  test("preserves order through nested inherited extends arrays", () => {
+    const { root, config } = rootOf();
+    writePreset(root, "first", { settings: { order: "first", first: true } });
+    writePreset(root, "second", {
+      settings: { order: "second", second: true },
+    });
+    writePreset(root, "nested", {
+      extends: ["../first", "../second"],
+      settings: { nested: true },
+    });
+    writePreset(root, "third", {
+      settings: { order: "third", third: true },
+    });
+    writeFileSync(
+      config,
+      `${JSON.stringify({
+        extends: ["./nested", "./third"],
+        settings: { local: true },
+      })}\n`,
+    );
+
+    const result = resolveDocument(root, config);
+
+    expect(result.normalized.settings).toEqual({
+      first: true,
+      local: true,
+      nested: true,
+      order: "third",
+      second: true,
+      third: true,
+    });
+    expect(originPath(result.provenance, "/settings/order")).toBe(
+      "third/atlante.jsonc",
+    );
+  });
+
+  test("allows the same preset at multiple authored array positions", () => {
+    const { root, config } = rootOf();
+    writePreset(root, "base", {
+      settings: { base: true, shared: "base" },
+    });
+    writeFileSync(
+      config,
+      `${JSON.stringify({ extends: ["./base", "./base"] })}\n`,
+    );
+
+    expect(resolveDocument(root, config).normalized.settings).toEqual({
+      base: true,
+      shared: "base",
+    });
+  });
+
+  test("does not reread unchanged cached package facet content", () => {
+    const { root, config } = rootOf();
+    const { template } = writePackageTemplate(root);
+    writeFileSync(
+      config,
+      `${JSON.stringify({
+        agents: {
+          first: { $template: "acme-pack/agent", description: "First" },
+          second: { $template: "acme-pack/agent", description: "Second" },
+        },
+      })}\n`,
+    );
+    const reads: string[] = [];
+
+    resolveResourceDocument({
+      pack: createProjectResourcePack(root),
+      rootFile: config,
+      beforeRead: (path) => reads.push(path),
+    });
+
+    expect(
+      reads.filter(
+        (path) => path === realpathSync(join(template, "template.jsonc")),
+      ),
+    ).toHaveLength(1);
+    expect(
+      reads.filter(
+        (path) => path === realpathSync(join(template, "template.md")),
+      ),
+    ).toHaveLength(1);
+    expect(reads).toHaveLength(5);
+  });
+
+  test("fails closed when an absent cached package preset candidate appears", () => {
+    const { root, config } = rootOf();
+    const { packageRoot } = writePackageTemplate(root);
+    writeFileSync(
+      join(packageRoot, "atlante.jsonc"),
+      `${JSON.stringify({ extends: "./bridge" })}\n`,
+    );
+    const bridge = writePreset(packageRoot, "bridge", {
+      extends: "acme-pack",
+    });
+    writeFileSync(config, `${JSON.stringify({ extends: "acme-pack" })}\n`);
+    const alternate = join(packageRoot, "atlante.json");
+    const bridgeFile = join(bridge, "atlante.jsonc");
+    const reads: string[] = [];
+    let created = false;
+
+    const failure = expectFailure(
+      () =>
+        resolveResourceDocument({
+          pack: createProjectResourcePack(root),
+          rootFile: config,
+          beforeRead: (path) => {
+            reads.push(path);
+            if (!created && path === realpathSync(bridgeFile)) {
+              created = true;
+              writeFileSync(alternate, '{ "value": true }\n');
+            }
+          },
+        }),
+      "unsafe-path",
+    );
+
+    expect(created).toBe(true);
+    expect(failure.failure.locator).toBe("acme-pack");
+    expect(failure.failure.message).toBe(
+      "resource file changed outside the resource root",
+    );
+    expect(failure.message).not.toContain(root);
+    expect(JSON.stringify(failure.failure)).not.toContain(root);
+    expect(reads).not.toContain(alternate);
+    expect(failure.dependencies).toContain(alternate);
+    expect(failure.dependencies).toContain(join(packageRoot, "atlante.jsonc"));
+    expect(failure.unresolvedParents).toContain(realpathSync(packageRoot));
   });
 
   test("requires root descriptions but keeps nested descriptions as child input", () => {
@@ -1476,7 +1761,7 @@ describe("resource resolution", () => {
           malformed: {
             $template: "./outer",
             description: "Malformed",
-            child: { $template: "not-a-locator" },
+            child: { $template: "https://example.com/template" },
           },
         },
       })}\n`,
@@ -1713,5 +1998,194 @@ describe("resource resolution", () => {
     expect(JSON.stringify(agent.values)).not.toContain("null");
     expect(JSON.stringify(skill.values)).not.toContain("null");
     expect(JSON.stringify(result.normalized)).not.toContain('"project":null');
+  });
+
+  test("fails closed when a cached package template is retargeted externally", () => {
+    const { root, config } = rootOf();
+    const { packageRoot, template } = writePackageTemplate(root);
+    writeTemplate(root, "mutator-template");
+    const mutator = writeInstance(root, "mutator-instance", {
+      $template: "../mutator-template",
+      value: "mutator",
+    });
+    writeMutatingDocument(config, "$template");
+
+    const outside = mkdtempSync(join(tmpdir(), "atlante-resolve-outside-"));
+    created.push(outside);
+    const outsideSource = join(outside, "template.md");
+    writeFileSync(outsideSource, "outside\n");
+    const schema = realpathSync(join(template, "template.jsonc"));
+    const source = realpathSync(join(template, "template.md"));
+    const markdown = join(template, "template.md");
+    const mutatorFile = join(mutator, "instance.jsonc");
+    const reads: string[] = [];
+    let retargeted = false;
+
+    const failure = expectFailure(
+      () =>
+        resolveResourceDocument({
+          pack: createProjectResourcePack(root),
+          rootFile: config,
+          beforeRead: (path) => {
+            reads.push(path);
+            if (!retargeted && path === realpathSync(mutatorFile)) {
+              retargeted = true;
+              retargetFile(markdown, outsideSource);
+            }
+          },
+        }),
+      "unsafe-path",
+    );
+
+    expect(retargeted).toBe(true);
+    expect(failure.failure.locator).toBe("acme-pack/agent");
+    expect(failure.failure.source).toMatchObject({
+      kind: "project",
+      path: "atlante.jsonc",
+    });
+    expect(failure.failure.message).toBe(
+      "resource file changed outside the resource root",
+    );
+    expect(failure.message).not.toContain(root);
+    expect(JSON.stringify(failure.failure)).not.toContain(root);
+    expect(failure.dependencies).toEqual(
+      expect.arrayContaining([
+        join(root, "package.json"),
+        join(root, "node_modules", "acme-pack", "package.json"),
+        join(template, "template.jsonc"),
+        markdown,
+      ]),
+    );
+    expect(failure.dependencies).not.toContain(outsideSource);
+    expect(reads.filter((path) => path === schema)).toHaveLength(1);
+    expect(reads.filter((path) => path === source)).toHaveLength(1);
+    expect(reads).not.toContain(outsideSource);
+    expect(failure.unresolvedParents).toContain(
+      realpathSync(join(packageRoot, "agent")),
+    );
+  });
+
+  test("fails closed when a cached package template changes canonical identity", () => {
+    const { root, config } = rootOf();
+    const { packageRoot, template } = writePackageTemplate(root);
+    writeTemplate(root, "mutator-template");
+    const mutator = writeInstance(root, "mutator-instance", {
+      $template: "../mutator-template",
+      value: "mutator",
+    });
+    writeMutatingDocument(config, "$template");
+
+    const replacement = join(packageRoot, "replacement.md");
+    writeFileSync(replacement, "replacement\n");
+    const schema = realpathSync(join(template, "template.jsonc"));
+    const source = realpathSync(join(template, "template.md"));
+    const markdown = join(template, "template.md");
+    const mutatorFile = join(mutator, "instance.jsonc");
+    const reads: string[] = [];
+    let retargeted = false;
+
+    const failure = expectFailure(
+      () =>
+        resolveResourceDocument({
+          pack: createProjectResourcePack(root),
+          rootFile: config,
+          beforeRead: (path) => {
+            reads.push(path);
+            if (!retargeted && path === realpathSync(mutatorFile)) {
+              retargeted = true;
+              retargetFile(markdown, replacement);
+            }
+          },
+        }),
+      "unsafe-path",
+    );
+
+    expect(retargeted).toBe(true);
+    expect(failure.failure.locator).toBe("acme-pack/agent");
+    expect(failure.failure.source).toMatchObject({
+      kind: "project",
+      path: "atlante.jsonc",
+    });
+    expect(failure.failure.message).toBe(
+      "resource file changed outside the resource root",
+    );
+    expect(failure.message).not.toContain(root);
+    expect(JSON.stringify(failure.failure)).not.toContain(root);
+    expect(failure.dependencies).toEqual(
+      expect.arrayContaining([
+        join(root, "package.json"),
+        join(root, "node_modules", "acme-pack", "package.json"),
+        join(template, "template.jsonc"),
+        markdown,
+      ]),
+    );
+    expect(reads.filter((path) => path === schema)).toHaveLength(1);
+    expect(reads.filter((path) => path === source)).toHaveLength(1);
+    expect(reads).not.toContain(replacement);
+    expect(failure.unresolvedParents).toContain(
+      realpathSync(join(packageRoot, "agent")),
+    );
+  });
+
+  test("fails closed when a cached package instance changes canonical identity", () => {
+    const { root, config } = rootOf();
+    const { packageRoot, instance } = writePackageTemplate(root);
+    writeTemplate(root, "mutator-template");
+    const mutator = writeInstance(root, "mutator-instance", {
+      $template: "../mutator-template",
+      value: "mutator",
+    });
+    writeMutatingDocument(config, "$instance");
+
+    const replacement = join(packageRoot, "replacement-instance.jsonc");
+    writeFileSync(
+      replacement,
+      `${JSON.stringify({ $template: "../agent", value: "replacement" })}\n`,
+    );
+    const originalInstance = realpathSync(join(instance, "instance.jsonc"));
+    const instanceFile = join(instance, "instance.jsonc");
+    const mutatorFile = join(mutator, "instance.jsonc");
+    const reads: string[] = [];
+    let retargeted = false;
+
+    const failure = expectFailure(
+      () =>
+        resolveResourceDocument({
+          pack: createProjectResourcePack(root),
+          rootFile: config,
+          beforeRead: (path) => {
+            reads.push(path);
+            if (!retargeted && path === realpathSync(mutatorFile)) {
+              retargeted = true;
+              retargetFile(instanceFile, replacement);
+            }
+          },
+        }),
+      "unsafe-path",
+    );
+
+    expect(retargeted).toBe(true);
+    expect(failure.failure.locator).toBe("acme-pack/reviewer");
+    expect(failure.failure.source).toMatchObject({
+      kind: "project",
+      path: "atlante.jsonc",
+    });
+    expect(failure.failure.message).toBe(
+      "resource file changed outside the resource root",
+    );
+    expect(failure.message).not.toContain(root);
+    expect(JSON.stringify(failure.failure)).not.toContain(root);
+    expect(failure.dependencies).toEqual(
+      expect.arrayContaining([
+        join(root, "package.json"),
+        join(root, "node_modules", "acme-pack", "package.json"),
+        instanceFile,
+      ]),
+    );
+    expect(reads.filter((path) => path === originalInstance)).toHaveLength(1);
+    expect(reads).not.toContain(replacement);
+    expect(failure.unresolvedParents).toContain(
+      realpathSync(join(packageRoot, "reviewer")),
+    );
   });
 });

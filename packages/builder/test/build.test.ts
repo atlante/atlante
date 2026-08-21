@@ -1,16 +1,20 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { createHash } from "node:crypto";
 import {
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { resourceTemplateSelection } from "@atlante/resources";
 import { SCHEMA_URI } from "@atlante/schema";
 import { readArtifacts } from "../src/artifacts.js";
@@ -20,8 +24,17 @@ import {
   prepareProject,
   validateProject,
 } from "../src/index.js";
+import {
+  EXTERNAL_AGENT_PROMPT,
+  EXTERNAL_SKILL_CONTENT,
+  writeExternalPack,
+  writeExternalPackContent,
+} from "./external-pack-fixture.js";
 
 const created: string[] = [];
+const firstPartyPackRoot = fileURLToPath(
+  new URL("../../pack/", import.meta.url),
+);
 
 afterEach(() => {
   for (const directory of created.splice(0)) {
@@ -34,6 +47,17 @@ function project(document: string): { root: string; config: string } {
   created.push(root);
   const config = join(root, "atlante.jsonc");
   writeFileSync(config, document);
+  cpSync(firstPartyPackRoot, join(root, "node_modules", "@atlante", "pack"), {
+    recursive: true,
+  });
+  writeFileSync(
+    join(root, "package.json"),
+    `${JSON.stringify({
+      name: "atlante-builder-fixture",
+      version: "1.0.0",
+      devDependencies: { "@atlante/pack": "workspace:0.1.6" },
+    })}\n`,
+  );
   return { root, config };
 }
 
@@ -53,6 +77,59 @@ function writeTemplate(
     }),
   );
   writeFileSync(join(directory, "template.md"), source);
+}
+
+function digest(value: Uint8Array | string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function externalPackProject(): { root: string; packRoot: string } {
+  const { root } = project(
+    JSON.stringify({
+      $schema: SCHEMA_URI,
+      extends: "@acme/review-pack/strict",
+    }),
+  );
+  const packRoot = join(root, "node_modules", "@acme", "review-pack");
+  mkdirSync(packRoot, { recursive: true });
+  writeExternalPack(packRoot);
+  writeFileSync(
+    join(root, "package.json"),
+    `${JSON.stringify({
+      name: "atlante-builder-external-pack-fixture",
+      version: "1.0.0",
+      devDependencies: {
+        "@atlante/pack": "workspace:0.1.6",
+        "@acme/review-pack": "1.2.3",
+      },
+    })}\n`,
+  );
+  return { root, packRoot };
+}
+
+function localEquivalentProject(): string {
+  const { root } = project(
+    JSON.stringify({
+      $schema: SCHEMA_URI,
+      values: { project: "strict-project" },
+      agents: {
+        reviewer: {
+          $instance: "./reviewer",
+          description: "External reviewer for {{values.project}}.",
+          mission: "Review the strict artifact.",
+        },
+      },
+      skills: {
+        testing: {
+          $instance: "./testing",
+          description: "Strict external testing for {{values.project}}.",
+          body: "Strict external body.",
+        },
+      },
+    }),
+  );
+  writeExternalPackContent(root);
+  return root;
 }
 
 type NestedChildCase = Readonly<{
@@ -345,6 +422,68 @@ describe("buildProject", () => {
         prompt: "# Custom\nLEFT localRIGHT right\n",
       }),
     ]);
+  });
+
+  test("builds a declared external pack into the unchanged artifact contract", () => {
+    const external = externalPackProject();
+    const local = localEquivalentProject();
+
+    const externalResult = buildProject(external.root);
+    const localResult = buildProject(local);
+
+    expect(externalResult.diagnostics).toEqual([]);
+    expect(localResult.diagnostics).toEqual([]);
+    expect(externalResult.resourceWatch?.trustedRoots).toContainEqual({
+      canonical: realpathSync(external.packRoot),
+      lexical: external.packRoot,
+    });
+
+    const expectedManifest = {
+      format: "atlante-artifacts",
+      version: 1,
+      agents: [
+        {
+          id: "reviewer",
+          description: "External reviewer for strict-project.",
+          path: `agents/reviewer-${digest("reviewer")}-${digest(EXTERNAL_AGENT_PROMPT)}.md`,
+          sha256: digest(EXTERNAL_AGENT_PROMPT),
+        },
+      ],
+      skills: [
+        {
+          id: "testing",
+          description: "Strict external testing for strict-project.",
+          path: `skills/testing-${digest("testing")}-${digest(EXTERNAL_SKILL_CONTENT)}.md`,
+          sha256: digest(EXTERNAL_SKILL_CONTENT),
+        },
+      ],
+    };
+
+    expect(
+      JSON.parse(
+        readFileSync(
+          join(external.root, ".atlante", "artifacts", "manifest.json"),
+          "utf8",
+        ),
+      ),
+    ).toEqual(expectedManifest);
+    expect(artifactTreeBytes(external.root)).toEqual(artifactTreeBytes(local));
+    expect(artifactTreeBytes(external.root)).toEqual(
+      [
+        {
+          path: expectedManifest.agents[0]?.path ?? "",
+          bytes: Buffer.from(EXTERNAL_AGENT_PROMPT),
+        },
+        {
+          path: expectedManifest.skills[0]?.path ?? "",
+          bytes: Buffer.from(EXTERNAL_SKILL_CONTENT),
+        },
+        {
+          path: "manifest.json",
+          bytes: Buffer.from(`${JSON.stringify(expectedManifest, null, 2)}\n`),
+        },
+      ].sort((left, right) => left.path.localeCompare(right.path)),
+    );
   });
 
   test("does not resurrect a tombstoned global value during build", () => {
@@ -784,6 +923,83 @@ describe("buildProject", () => {
     const result = buildProject(root);
 
     expect(result.diagnostics[0]?.code).toBe("missing-value");
+    expect(artifactTreeBytes(root)).toEqual(before);
+    expect(privateArtifactEntries(root)).toEqual([]);
+  });
+
+  test("keeps the last complete tree when an external package fails", () => {
+    const { root } = project(
+      JSON.stringify({ $schema: SCHEMA_URI, extends: "review-pack" }),
+    );
+    const packageRoot = join(root, "node_modules", "review-pack");
+    mkdirSync(packageRoot, { recursive: true });
+    writeFileSync(
+      join(root, "package.json"),
+      `${JSON.stringify({
+        name: "atlante-builder-fixture",
+        version: "1.0.0",
+        dependencies: { "review-pack": "1.2.3" },
+      })}\n`,
+    );
+    writeFileSync(
+      join(packageRoot, "package.json"),
+      `${JSON.stringify({
+        name: "review-pack",
+        version: "1.2.3",
+        atlante: { format: 1 },
+      })}\n`,
+    );
+    writeFileSync(
+      join(packageRoot, "atlante.jsonc"),
+      `${JSON.stringify({
+        $schema: SCHEMA_URI,
+        agents: {
+          reviewer: {
+            $template: "review-pack/agent",
+            description: "Reviews changes.",
+            identity: "You review.",
+          },
+        },
+      })}\n`,
+    );
+    const agent = join(packageRoot, "agent");
+    mkdirSync(agent);
+    writeFileSync(
+      join(agent, "template.jsonc"),
+      `${JSON.stringify({
+        $schema: "https://json-schema.org/draft/2020-12/schema",
+        type: "object",
+        properties: { identity: { type: "string" } },
+        required: ["identity"],
+        additionalProperties: false,
+      })}\n`,
+    );
+    writeFileSync(join(agent, "template.md"), "{{identity}}\n");
+
+    const first = buildProject(root);
+    expect(first.diagnostics).toEqual([]);
+    const before = artifactTreeBytes(root);
+    expect(first.resourceWatch?.trustedRoots).toContainEqual({
+      canonical: realpathSync(packageRoot),
+      lexical: packageRoot,
+    });
+
+    writeFileSync(
+      join(packageRoot, "package.json"),
+      `${JSON.stringify({
+        name: "review-pack",
+        version: "1.2.3",
+        atlante: { format: 2 },
+      })}\n`,
+    );
+    const failed = buildProject(root);
+
+    expect(failed.diagnostics).toContainEqual(
+      expect.objectContaining({ code: "unsupported-pack-format" }),
+    );
+    const prepared = prepareProject(root);
+    expect(prepared.agents).toEqual([]);
+    expect(prepared.skills).toEqual([]);
     expect(artifactTreeBytes(root)).toEqual(before);
     expect(privateArtifactEntries(root)).toEqual([]);
   });

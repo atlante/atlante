@@ -10,11 +10,9 @@ import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, sep } from "node:path";
 import type { ResourceFailureCode } from "../src/index.js";
 import {
-  createBundledResourcePack,
   createProjectResourcePack,
-  loadInstanceFacet,
-  loadPresetFacet,
   loadTemplateFacet,
+  parseResourceLocator,
   ResourceResolutionError,
   resolveResourceLocator,
 } from "../src/index.js";
@@ -72,41 +70,22 @@ describe("resource locator resolution", () => {
     ).toBe(join(pack.root, "config", "sibling"));
   });
 
-  test("resolves built-in starter, template, and instance locators without package lookup", () => {
-    const pack = createBundledResourcePack();
-    const containing = join(pack.root, "authoring.jsonc");
-
-    expect(
-      String(
-        resolveResourceLocator(pack, "atlante/starter", containing).locator,
-      ),
-    ).toBe("atlante/starter");
-    expect(
-      String(resolveResourceLocator(pack, "atlante/agent", containing).locator),
-    ).toBe("atlante/agent");
-    expect(
-      String(
-        resolveResourceLocator(pack, "atlante/architect", containing).locator,
-      ),
-    ).toBe("atlante/architect");
-
-    expect(
-      loadPresetFacet(pack, "atlante/starter", containing).facet.kind,
-    ).toBe("preset");
-    expect(
-      loadTemplateFacet(pack, "atlante/agent", containing).facet.kind,
-    ).toBe("template");
-    expect(
-      loadInstanceFacet(pack, "atlante/architect", containing).facet.kind,
-    ).toBe("instance");
+  test("rejects the temporary vocabulary and retains package locators", () => {
+    expect(parseResourceLocator("@atlante/pack/agent")).toMatchObject({
+      kind: "package",
+      packageName: "@atlante/pack",
+      subpath: "agent",
+    });
+    for (const locator of ["atlante/starter", "atlante/agent", "atlante/skill"])
+      expectFailure(() => parseResourceLocator(locator), "invalid-locator");
   });
 
-  test("resolves bundled relative references within the bundled root", () => {
+  test("resolves relative references within the project root", () => {
     const root = projectRoot();
     const containing = authoringFile(root, "one/source.jsonc");
     mkdirSync(join(root, "one", "child"), { recursive: true });
     mkdirSync(join(root, "sibling"));
-    const pack = createBundledResourcePack(root);
+    const pack = createProjectResourcePack(root);
 
     expect(resolveResourceLocator(pack, "./child", containing).directory).toBe(
       join(pack.root, "one", "child"),
@@ -114,6 +93,17 @@ describe("resource locator resolution", () => {
     expect(
       resolveResourceLocator(pack, "../sibling", containing).directory,
     ).toBe(join(pack.root, "sibling"));
+  });
+
+  test("allows facet-named packages but rejects facet-file locators", () => {
+    expect(parseResourceLocator("template.md")).toMatchObject({
+      kind: "package",
+      packageName: "template.md",
+      subpath: undefined,
+    });
+
+    for (const locator of ["./resource/template.md", "pkg/template.md"])
+      expectFailure(() => parseResourceLocator(locator), "invalid-locator");
   });
 
   test("rejects absolute, URL, home, backslash, lexical traversal, and symlink escape locators", () => {
@@ -129,7 +119,6 @@ describe("resource locator resolution", () => {
       ".\\resource",
       "./resource\\child",
       "./resource\u0000child",
-      "resource",
       "atlante/",
       "atlante/one/two",
       "./resource/template.jsonc",
@@ -140,6 +129,11 @@ describe("resource locator resolution", () => {
         "invalid-locator",
       );
     }
+
+    expectFailure(
+      () => resolveResourceLocator(pack, "resource", containing),
+      "package-not-declared",
+    );
 
     mkdirSync(join(root, "nested"));
     expectFailure(

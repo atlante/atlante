@@ -4,9 +4,10 @@ import {
   assertRealProjectRoot,
   type BuildResult,
   buildProject as buildProjectDefault,
+  type ProjectContext,
 } from "@atlante/builder";
 import { SCHEMA_URI } from "@atlante/schema";
-import { hasErrors } from "@atlante/validator";
+import { hasErrors, validateDocumentText } from "@atlante/validator";
 import {
   applyEdits,
   modify,
@@ -25,10 +26,11 @@ type InitFileSystem = {
   unlinkSync: (path: string) => void;
 };
 
-type BuildFunction = (target: string) => BuildResult;
+type BuildFunction = (target: string, context: ProjectContext) => BuildResult;
 
 export type InitDependencies = Partial<InitFileSystem> & {
   buildProject?: BuildFunction;
+  context?: ProjectContext;
 };
 
 const defaultFileSystem: InitFileSystem = {
@@ -48,13 +50,13 @@ type PluginPlan = {
   registered: boolean;
 };
 
-function bareConfig(): string {
+function bareConfig(preset = "@atlante/pack"): string {
   return `{
   "$schema": "${SCHEMA_URI}",
 
-  // Extend the bundled starter preset. You can override any value or agent
+  // Extend the first-party package preset. You can override any value or agent
   // below; your local configuration takes precedence over the inherited one.
-  "extends": "atlante/starter",
+  "extends": ${JSON.stringify(preset)},
 }
 `;
 }
@@ -239,10 +241,20 @@ function initPreflightError(
     const wording = existing.length === 1 ? "already exists" : "already exist";
     return `error: ${existing.join(" and ")} ${wording}; pass --force to overwrite`;
   }
-  if (options.preset && options.preset !== "starter") {
-    return `error: unknown preset "${options.preset}"; only "starter" is available`;
-  }
   return undefined;
+}
+
+function preflightPreset(
+  target: string,
+  contents: string,
+  context: ProjectContext,
+): boolean {
+  const validated = validateDocumentText(contents, target, {
+    resourceContext: context,
+  });
+  if (!hasErrors(validated.diagnostics)) return true;
+  printDiagnostics(validated.diagnostics);
+  return false;
 }
 
 function buildAndReport(
@@ -251,10 +263,11 @@ function buildAndReport(
   changes: Array<{ path: string; before: Snapshot }>,
   fileSystem: InitFileSystem,
   buildProject: BuildFunction,
+  context: ProjectContext,
 ): number {
   let built: BuildResult;
   try {
-    built = buildProject(directory);
+    built = buildProject(directory, context);
   } catch (cause) {
     console.error(
       mutationErrorMessage(
@@ -291,6 +304,7 @@ export async function runInitWithDependencies(
     ...defaultFileSystem,
     ...dependencies,
   };
+  const context = dependencies.context ?? {};
   const target = join(directory, "atlante.jsonc");
   const alternate = join(directory, "atlante.json");
   const opencode = join(directory, "opencode.jsonc");
@@ -307,7 +321,8 @@ export async function runInitWithDependencies(
       console.error(preflightError);
       return 1;
     }
-    const contents = bareConfig();
+    const contents = bareConfig(options.preset);
+    if (!preflightPreset(target, contents, context)) return 1;
 
     const before = {
       target: snapshot(target, fileSystem),
@@ -339,6 +354,7 @@ export async function runInitWithDependencies(
       committed.changes,
       fileSystem,
       dependencies.buildProject ?? buildProjectDefault,
+      context,
     );
     if (result !== 0) return result;
     console.log(

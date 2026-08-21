@@ -11,7 +11,7 @@ export type JsonObject = { readonly [key: string]: JsonValue };
 
 declare const validatedLocatorBrand: unique symbol;
 declare const validatedProjectOriginPathBrand: unique symbol;
-declare const validatedBundledOriginPathBrand: unique symbol;
+declare const validatedPackageOriginPathBrand: unique symbol;
 
 /**
  * Raw authored input is intentionally untrusted. T3 validation constructors
@@ -27,18 +27,18 @@ export type ValidatedLocalResourceLocator = (`./${string}` | `../${string}`) & {
   readonly [validatedLocatorBrand]: "local";
 };
 
-/** A validated direct child of the temporary first-party namespace. */
-export type ValidatedBuiltinResourceLocator = `atlante/${string}` & {
-  readonly [validatedLocatorBrand]: "builtin";
+/** A validated npm package locator with an optional contained subpath. */
+export type ValidatedPackageResourceLocator = string & {
+  readonly [validatedLocatorBrand]: "package";
 };
 
 export type ValidatedResourceLocator =
   | ValidatedLocalResourceLocator
-  | ValidatedBuiltinResourceLocator;
+  | ValidatedPackageResourceLocator;
 
 /** Trusted aliases retained for resource identities and graph nodes. */
 export type LocalResourceLocator = ValidatedLocalResourceLocator;
-export type BuiltinResourceLocator = ValidatedBuiltinResourceLocator;
+export type PackageResourceLocator = ValidatedPackageResourceLocator;
 export type ResourceLocator = ValidatedResourceLocator;
 
 export type RawProjectResourceOrigin = {
@@ -47,15 +47,15 @@ export type RawProjectResourceOrigin = {
   readonly path: string;
 };
 
-export type RawBundledResourceOrigin = {
-  readonly kind: "bundled";
-  /** Untrusted bundled source identity authored by a loader. */
+export type RawPackageResourceOrigin = {
+  readonly kind: "package";
+  /** Untrusted package-qualified source identity authored by a loader. */
   readonly path: string;
 };
 
 export type RawResourceOrigin =
   | RawProjectResourceOrigin
-  | RawBundledResourceOrigin;
+  | RawPackageResourceOrigin;
 
 export type ProjectResourceOrigin = {
   readonly kind: "project";
@@ -65,15 +65,23 @@ export type ProjectResourceOrigin = {
   };
 };
 
-export type BundledResourceOrigin = {
-  readonly kind: "bundled";
-  /** Validated stable identity such as atlante/agent/template.jsonc. */
-  readonly path: `atlante/${string}` & {
-    readonly [validatedBundledOriginPathBrand]: "bundled";
+export type PackageResourceOrigin = {
+  readonly kind: "package";
+  /** Validated identity such as @acme/pack@1.2.0/agent/template.jsonc. */
+  readonly path: `${string}@${string}/${string}` & {
+    readonly [validatedPackageOriginPathBrand]: "package";
   };
 };
 
-export type ResourceOrigin = ProjectResourceOrigin | BundledResourceOrigin;
+export type ResourceOrigin = ProjectResourceOrigin | PackageResourceOrigin;
+
+/** Authorization data for external resource paths during watch reconciliation. */
+export type ResourceWatchRoot = Readonly<{
+  /** Canonical realpath used for containment checks. */
+  readonly canonical: string;
+  /** Lexical spelling used by package-manager symlink watch inputs. */
+  readonly lexical: string;
+}>;
 
 export type ResourceIdentity = {
   readonly locator: ResourceLocator;
@@ -132,6 +140,12 @@ export type ResourceLocation = {
 
 export type ResourceFailureCode =
   | "invalid-locator"
+  | "package-not-declared"
+  | "package-not-installed"
+  | "package-metadata-unreadable"
+  | "missing-pack-format"
+  | "unsupported-pack-format"
+  | "missing-package-subpath"
   | "missing-target"
   | "wrong-target-type"
   | "ambiguous-facet"
@@ -175,3 +189,14 @@ export type ResourceFailure =
 
 /** Alias used by callers that refer to failures as resource errors. */
 export type ResourceError = ResourceFailure;
+
+/** Package data retained by a trusted package resource root. */
+export type ResourcePackageIdentity = {
+  readonly name: string;
+  readonly version: string;
+  readonly manifestPath: string;
+  readonly lexicalManifestPath: string;
+  readonly dependencies: Readonly<Record<string, string>>;
+  readonly optionalDependencies: Readonly<Record<string, string>>;
+  readonly devDependencies: Readonly<Record<string, string>>;
+};

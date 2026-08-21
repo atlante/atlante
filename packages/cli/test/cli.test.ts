@@ -1,9 +1,11 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeAll, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import {
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -16,11 +18,39 @@ import packageJson from "../package.json" with { type: "json" };
 import { createProgram, runBuild, runValidate } from "../src/main.js";
 
 const created: string[] = [];
+const firstPartyPackRoot = fileURLToPath(
+  new URL("../../pack/", import.meta.url),
+);
 
 function project(config: string): string {
   const dir = mkdtempSync(join(tmpdir(), "atlante-cli-"));
   created.push(dir);
   writeFileSync(join(dir, "atlante.jsonc"), config);
+  cpSync(firstPartyPackRoot, join(dir, "node_modules", "@atlante", "pack"), {
+    recursive: true,
+  });
+  writeFileSync(
+    join(dir, "package.json"),
+    `${JSON.stringify({
+      name: "atlante-cli-fixture",
+      version: "1.0.0",
+      devDependencies: { "@atlante/pack": "workspace:0.1.6" },
+    })}\n`,
+  );
+  return dir;
+}
+
+function projectWithoutUserPack(config: string): string {
+  const dir = mkdtempSync(join(tmpdir(), "atlante-cli-no-pack-"));
+  created.push(dir);
+  writeFileSync(join(dir, "atlante.jsonc"), config);
+  writeFileSync(
+    join(dir, "package.json"),
+    `${JSON.stringify({
+      name: "atlante-cli-no-pack-fixture",
+      version: "1.0.0",
+    })}\n`,
+  );
   return dir;
 }
 
@@ -41,65 +71,86 @@ test("reports the package manifest version", () => {
   expect(createProgram().version()).toBe(packageJson.version);
 });
 
-// These tests execute the real built artifact under real node (run `bun run
-// build` first so dist/bin/atlante.js exists; CI runs full:check which builds
-// before testing). They replace the old launcher simulation, which symlinked
-// bun itself as `node` and never exercised the published bundle.
+// These tests execute a freshly built artifact under real node. They replace
+// the old launcher simulation, which symlinked bun itself as `node` and never
+// exercised the published bundle.
+const CLI_ENTRY = fileURLToPath(new URL("../bin/atlante.ts", import.meta.url));
 const LAUNCHER = fileURLToPath(
   new URL("../dist/bin/atlante.js", import.meta.url),
 );
-const BUNDLED = fileURLToPath(new URL("../bundled", import.meta.url));
 const REAL_NODE = Bun.which("node");
-const launcherIsBuilt = existsSync(LAUNCHER) && REAL_NODE !== null;
-const bundledIsBuilt = existsSync(join(BUNDLED, "resources"));
 
-test.skipIf(!bundledIsBuilt)(
-  "the built CLI ships one unified resource pack",
-  () => {
-    expect(existsSync(join(BUNDLED, "resources"))).toBe(true);
-    expect(existsSync(join(BUNDLED, "templates"))).toBe(false);
-    expect(existsSync(join(BUNDLED, "presets"))).toBe(false);
-  },
-);
+beforeAll(async () => {
+  const built = await Bun.build({
+    entrypoints: [CLI_ENTRY],
+    target: "node",
+    external: ["jsonc-parser"],
+    outdir: fileURLToPath(new URL("../dist/bin/", import.meta.url)),
+  });
+  if (!built.success)
+    throw new Error(`could not build CLI launcher: ${built.logs.join("\n")}`);
+  if (!existsSync(LAUNCHER))
+    throw new Error(
+      "CLI launcher build completed without producing dist/bin/atlante.js",
+    );
+  if (!readFileSync(LAUNCHER, "utf8").startsWith("#!/usr/bin/env node"))
+    throw new Error("built CLI launcher does not have the Node shebang");
+  if (!REAL_NODE) throw new Error("real node not found via Bun.which");
+});
 
-test.skipIf(!launcherIsBuilt)(
-  "the built launcher runs with Node when Bun is unavailable",
-  () => {
-    const dir = mkdtempSync(join(tmpdir(), "atlante-node-launcher-"));
-    created.push(dir);
-    const executableDir = join(dir, "path");
-    mkdirSync(executableDir);
-    if (!REAL_NODE) throw new Error("real node not found via Bun.which");
-    symlinkSync(REAL_NODE, join(executableDir, "node"));
+function nodeExecutable(): string {
+  if (!REAL_NODE) throw new Error("real node not found via Bun.which");
+  return REAL_NODE;
+}
 
-    const result = spawnSync(LAUNCHER, ["--version"], {
-      encoding: "utf8",
-      env: { ...process.env, PATH: executableDir },
-    });
+test("the built launcher runs with Node when Bun is unavailable", () => {
+  const dir = mkdtempSync(join(tmpdir(), "atlante-node-launcher-"));
+  created.push(dir);
+  const executableDir = join(dir, "path");
+  mkdirSync(executableDir);
+  symlinkSync(nodeExecutable(), join(executableDir, "node"));
 
-    expect(result.status).toBe(0);
-    expect(result.stdout.trim()).toBe(packageJson.version);
-  },
-);
+  const result = spawnSync(LAUNCHER, ["--version"], {
+    encoding: "utf8",
+    env: { ...process.env, PATH: executableDir },
+  });
 
-test.skipIf(!launcherIsBuilt)(
-  "the built launcher builds a project under Node",
-  () => {
-    const dir = project(valid);
-    const executableDir = join(dir, "path");
-    mkdirSync(executableDir);
-    if (!REAL_NODE) throw new Error("real node not found via Bun.which");
-    symlinkSync(REAL_NODE, join(executableDir, "node"));
+  expect(result.status).toBe(0);
+  expect(result.stdout.trim()).toBe(packageJson.version);
+});
 
-    const result = spawnSync(LAUNCHER, ["build", dir], {
-      encoding: "utf8",
-      env: { ...process.env, PATH: executableDir },
-    });
+test("the built launcher builds a project under Node", () => {
+  const dir = project(valid);
+  const executableDir = join(dir, "path");
+  mkdirSync(executableDir);
+  symlinkSync(nodeExecutable(), join(executableDir, "node"));
 
-    expect(result.status).toBe(0);
-    expect(existsSync(join(dir, ".atlante", "artifacts"))).toBe(true);
-  },
-);
+  const result = spawnSync(LAUNCHER, ["build", dir], {
+    encoding: "utf8",
+    env: { ...process.env, PATH: executableDir },
+  });
+
+  expect(result.status).toBe(0);
+  expect(existsSync(join(dir, ".atlante", "artifacts"))).toBe(true);
+});
+
+test("the built launcher resolves the first-party pack without a project declaration", () => {
+  const dir = projectWithoutUserPack(`{
+      "$schema": "${SCHEMA_URI}",
+      "extends": "@atlante/pack"
+    }`);
+  const executableDir = join(dir, "path");
+  mkdirSync(executableDir);
+  symlinkSync(nodeExecutable(), join(executableDir, "node"));
+
+  const result = spawnSync(LAUNCHER, ["validate", dir], {
+    cwd: dir,
+    encoding: "utf8",
+    env: { ...process.env, PATH: executableDir },
+  });
+
+  expect(result.status).toBe(0);
+});
 
 test("CLI validates and builds local shorthand, selectors, and local extends", async () => {
   const dir = project(`{
@@ -154,23 +205,36 @@ test("CLI validates and builds local shorthand, selectors, and local extends", a
   );
 });
 
-test("CLI resolves bundled resource facets without package lookup", async () => {
+test("CLI resolves first-party package resource facets", async () => {
   const dir = project(`{
     "$schema": "${SCHEMA_URI}",
     "values": { "project": "demo", "quick-check": "quick", "full-check": "full" },
     "agents": {
-      "architect": { "$instance": "atlante/architect", "description": "Architect" },
-      "agent": { "$template": "atlante/agent", "description": "Agent", "identity": "Identity", "mission": "Mission" }
+      "architect": { "$instance": "@atlante/pack/architect", "description": "Architect" },
+      "agent": { "$template": "@atlante/pack/agent", "description": "Agent", "identity": "Identity", "mission": "Mission" }
     },
     "skills": {
-      "brainstorming": { "$instance": "atlante/brainstorming", "description": "Brainstorming" },
-      "workflow": { "$instance": "atlante/delivery-workflow", "description": "Workflow" },
-      "skill": { "$template": "atlante/skill", "description": "Skill", "title": "Skill", "overview": "Overview", "sections": [{ "markdown": "Body" }] }
+      "brainstorming": { "$instance": "@atlante/pack/brainstorming", "description": "Brainstorming" },
+      "workflow": { "$instance": "@atlante/pack/delivery-workflow", "description": "Workflow" },
+      "skill": { "$template": "@atlante/pack/skill", "description": "Skill", "title": "Skill", "overview": "Overview", "sections": [{ "markdown": "Body" }] }
     }
   }`);
 
   expect(await runValidate(dir)).toBe(0);
   expect(await runBuild(dir)).toBe(0);
+});
+
+test("CLI validate and build trust the installed first-party pack without a user declaration", async () => {
+  const dir = projectWithoutUserPack(`{
+    "$schema": "${SCHEMA_URI}",
+    "extends": "@atlante/pack"
+  }`);
+
+  expect(await runValidate(dir)).toBe(0);
+  expect(runBuild(dir)).toBe(0);
+  expect(existsSync(join(dir, ".atlante", "artifacts", "manifest.json"))).toBe(
+    true,
+  );
 });
 
 describe("runValidate", () => {
@@ -199,7 +263,7 @@ describe("runValidate", () => {
   test("fails validation on preset expansion diagnostics", async () => {
     const dir = project(`{
       "$schema": "${SCHEMA_URI}",
-      "extends": "atlante/missing",
+      "extends": "@atlante/pack/missing",
       "agents": {}
     }`);
     const errors: string[] = [];
@@ -210,7 +274,7 @@ describe("runValidate", () => {
     } finally {
       console.error = original;
     }
-    expect(errors.join("\n")).toContain("missing-target");
+    expect(errors.join("\n")).toContain("missing-package-subpath");
   });
 
   test("accepts config filenames and relative project directories from any cwd", async () => {
@@ -278,4 +342,14 @@ test("the build command exposes a --watch option", () => {
     (command) => command.name() === "build",
   );
   expect(build?.options.map((option) => option.long)).toContain("--watch");
+});
+
+test("init preset help describes a package locator rather than starter", () => {
+  const init = createProgram().commands.find(
+    (command) => command.name() === "init",
+  );
+  const preset = init?.options.find((option) => option.long === "--preset");
+
+  expect(preset?.description).toContain("package locator");
+  expect(preset?.description).not.toContain("starter");
 });

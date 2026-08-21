@@ -1,14 +1,24 @@
 import { basename, join, relative } from "node:path";
 import { authoredValueLayerIssues } from "./authored-values.js";
-import { BUNDLED_RESOURCE_PACK } from "./bundled.js";
 import { type Slot, slotsOf } from "./composition.js";
-import type { ResourcePack } from "./content-root.js";
+import {
+  isResourcePackPathContained,
+  type ResourcePack,
+  type ResourceResolutionContext,
+  resourcePackMetadataPaths,
+  resourcePackWatchRoot,
+} from "./content-root.js";
 import {
   failGraphResource,
   failResource,
+  normalizeResourcePaths,
+  normalizeResourceRoots,
   ResourceResolutionError,
 } from "./errors.js";
 import {
+  type FacetCandidate,
+  facetCandidateNames,
+  inspectFacetCandidates,
   type LoadedResource,
   loadInstanceFacet,
   loadPresetFacet,
@@ -17,7 +27,9 @@ import {
 import {
   inspectResourceFile,
   type ResolvedResourceTarget,
+  type ResourceLocatorOptions,
   resolveResourceLocator,
+  resourceCandidateWatchPaths,
 } from "./filesystem.js";
 import {
   addResourceGraphEdge,
@@ -35,6 +47,7 @@ import { isSafeJsonObject } from "./jsonc.js";
 import { parseResourceLocator } from "./locator.js";
 import { mergeResourceValues } from "./merge.js";
 import { own } from "./object.js";
+import { createPackageResolutionCache } from "./package-resolution.js";
 import {
   childPointer,
   cloneResourceProvenance,
@@ -62,12 +75,14 @@ import type {
   ResourceGraphNode,
   ResourceLocator,
   ResourceOrigin,
+  ResourceWatchRoot,
   TemplateFacet,
 } from "./types.js";
 
 export type ResourceResolveOptions = Readonly<{
-  /** Custom bundled root for tests or an embedded distribution. */
-  readonly bundledPack?: ResourcePack;
+  /** Existing facet read seam, also used by package metadata reads. */
+  readonly beforeRead?: (path: string) => void;
+  readonly resourceContext?: ResourceResolutionContext;
 }>;
 
 export type ResolveInstanceRequest = ResourceResolveOptions & {
@@ -156,6 +171,7 @@ export type ResolvedResourceDocument = Readonly<{
   readonly instances: readonly ResolvedResourceInstance[];
   readonly dependencies: readonly string[];
   readonly unresolvedParents: readonly string[];
+  readonly trustedRoots: readonly ResourceWatchRoot[];
 }>;
 
 type LoadedFacet<T> = Readonly<{
@@ -164,6 +180,107 @@ type LoadedFacet<T> = Readonly<{
   readonly loaded: LoadedResource<T>;
   readonly authoring: AuthoringContext;
 }>;
+
+type FacetCacheKind = "template" | "instance" | "preset";
+
+type CachedFacetCandidate = Readonly<{
+  readonly name: FacetCandidate["name"];
+  readonly path?: string;
+}>;
+
+type CachedFacet = Readonly<{
+  readonly facet: TemplateFacet | InstanceFacet | Preset;
+  readonly canonicalDependencies: readonly string[];
+  readonly candidates: readonly CachedFacetCandidate[];
+  readonly locations?: Readonly<Record<string, JsoncLocation>>;
+}>;
+
+function cachedFacetDependencies(
+  target: ResolvedResourceTarget,
+  facet: CachedFacet["facet"],
+  canonicalDependencies: readonly string[],
+): readonly string[] {
+  return normalizeResourcePaths([
+    ...canonicalDependencies,
+    ...target.resolutionDependencies,
+    ...resourcePackMetadataPaths(target.pack),
+    target.lexicalDirectory,
+    ...facetCandidateNames(facet.kind).flatMap((name) =>
+      resourceCandidateWatchPaths(target, name),
+    ),
+  ]);
+}
+
+function facetCandidateIdentities(
+  candidates: readonly FacetCandidate[],
+): readonly CachedFacetCandidate[] {
+  return Object.freeze(
+    candidates.map(({ name, file }) =>
+      Object.freeze({ name, ...(file ? { path: file.path } : {}) }),
+    ),
+  );
+}
+
+function sameFacetCandidateIdentities(
+  expected: readonly CachedFacetCandidate[],
+  current: readonly FacetCandidate[],
+): boolean {
+  return (
+    expected.length === current.length &&
+    expected.every((candidate, index) => {
+      const observed = current[index];
+      return (
+        observed?.name === candidate.name &&
+        observed.file?.path === candidate.path
+      );
+    })
+  );
+}
+
+function facetCacheFailure(
+  target: ResolvedResourceTarget,
+  facet: FacetCacheKind,
+  locator: RawResourceLocator,
+  dependencies: readonly string[] = [],
+): never {
+  return failResource(
+    "unsafe-path",
+    "resource file changed outside the resource root",
+    { locator },
+    {
+      dependencies: normalizeResourcePaths([
+        ...target.resolutionDependencies,
+        ...resourcePackMetadataPaths(target.pack),
+        target.directory,
+        target.lexicalDirectory,
+        ...facetCandidateNames(facet).flatMap((name) =>
+          resourceCandidateWatchPaths(target, name),
+        ),
+        ...dependencies,
+      ]),
+      unresolvedParents: [target.directory],
+    },
+  );
+}
+
+function inspectFacetCandidatesForCache(
+  target: ResolvedResourceTarget,
+  facet: FacetCacheKind,
+  locator: RawResourceLocator,
+  dependencies: readonly string[] = [],
+): readonly FacetCandidate[] {
+  try {
+    return inspectFacetCandidates(target, facet, locator, dependencies);
+  } catch (error) {
+    if (error instanceof ResourceResolutionError) {
+      return facetCacheFailure(target, facet, locator, [
+        ...dependencies,
+        ...error.dependencies,
+      ]);
+    }
+    throw error;
+  }
+}
 
 type AuthoringContext = Readonly<{
   readonly pack: ResourcePack;
@@ -708,16 +825,6 @@ function graphNode(
   } as ResourceGraphNode;
 }
 
-function normalizeRequest<T extends ResourceResolveOptions>(
-  request: T,
-  fallbackPack: ResourcePack,
-): ResourceResolveOptions & { readonly bundledPack: ResourcePack } {
-  return {
-    ...request,
-    bundledPack: request.bundledPack ?? fallbackPack,
-  };
-}
-
 type ResourceRequest = ResourceResolveOptions & {
   readonly pack: ResourcePack;
 };
@@ -734,30 +841,40 @@ function runResourceRequest<T extends ResourceRequest, Result>(
   request: T,
   action: (resolver: ResourceResolver) => Result,
 ): Result {
-  const resolver = new ResourceResolver(
-    request.pack,
-    normalizeRequest(request, BUNDLED_RESOURCE_PACK),
-  );
+  const resolver = new ResourceResolver(request.pack, request);
   return resolver.run(() => action(resolver));
 }
 
 class ResourceResolver {
-  private readonly bundledPack: ResourcePack;
+  private readonly beforeRead: ResourceResolveOptions["beforeRead"];
+  private readonly resourceContext: ResourceResolveOptions["resourceContext"];
+  private readonly packageCache = createPackageResolutionCache();
   private readonly graph: ResourceGraphState = createResourceGraphState();
   private readonly dependencies = new Set<string>();
   private readonly unresolvedParents = new Set<string>();
+  private readonly trustedRoots = new Map<string, ResourceWatchRoot>();
   /** Output indexes only; traversal never reads these resolved results. */
   private readonly resolvedTemplates = new Map<string, ResolvedTemplate>();
   private readonly resolvedInstances = new Map<
     string,
     ResolvedResourceInstance
   >();
+  private readonly facetCache = new Map<string, CachedFacet>();
 
   constructor(
     private readonly projectPack: ResourcePack,
     options: ResourceResolveOptions,
   ) {
-    this.bundledPack = options.bundledPack ?? BUNDLED_RESOURCE_PACK;
+    this.beforeRead = options.beforeRead;
+    this.resourceContext = options.resourceContext;
+  }
+
+  private locatorOptions(): ResourceLocatorOptions {
+    return {
+      packageCache: this.packageCache,
+      beforeRead: this.beforeRead,
+      resourceContext: this.resourceContext,
+    };
   }
 
   run<T>(action: () => T): T {
@@ -778,7 +895,17 @@ class ResourceResolver {
         ...this.unresolvedParents,
         ...error.unresolvedParents,
       ],
+      trustedRoots: normalizeResourceRoots([
+        ...this.trustedRoots.values(),
+        ...error.trustedRoots,
+      ]),
     });
+  }
+
+  private collectPack(pack: ResourcePack): void {
+    if (pack.kind !== "package") return;
+    const root = resourcePackWatchRoot(pack);
+    this.trustedRoots.set(`${root.canonical}\u0000${root.lexical}`, root);
   }
 
   private collect<T>(loaded: LoadedResource<T>): void {
@@ -788,15 +915,6 @@ class ResourceResolver {
     loaded.unresolvedParents.forEach((path) => {
       this.unresolvedParents.add(path);
     });
-  }
-
-  private packForReference(
-    pack: ResourcePack,
-    locator: RawResourceLocator,
-  ): ResourcePack {
-    return parseResourceLocator(locator).kind === "builtin"
-      ? this.bundledPack
-      : pack;
   }
 
   private enter(
@@ -820,6 +938,7 @@ class ResourceResolver {
     target: ResolvedResourceTarget,
     loaded: LoadedResource<T>,
   ): LoadedFacet<T> {
+    this.collectPack(pack);
     this.collect(loaded);
     return {
       pack,
@@ -838,12 +957,14 @@ class ResourceResolver {
     locator: RawResourceLocator,
     authoringFile: string,
   ): LoadedFacet<TemplateFacet> {
-    const selectedPack = this.packForReference(pack, locator);
-    const target = requireTarget(selectedPack, locator, authoringFile);
-    return this.loadedFile(
-      selectedPack,
-      target,
-      loadTemplateFacet(selectedPack, locator, authoringFile),
+    const target = requireTarget(pack, locator, authoringFile, {
+      ...this.locatorOptions(),
+    });
+    this.collectPack(target.pack);
+    return this.cachedFacet(target, "template", () =>
+      loadTemplateFacet(pack, locator, authoringFile, {
+        ...this.locatorOptions(),
+      }),
     );
   }
 
@@ -852,12 +973,14 @@ class ResourceResolver {
     locator: RawResourceLocator,
     authoringFile: string,
   ): LoadedFacet<InstanceFacet> {
-    const selectedPack = this.packForReference(pack, locator);
-    const target = requireTarget(selectedPack, locator, authoringFile);
-    return this.loadedFile(
-      selectedPack,
-      target,
-      loadInstanceFacet(selectedPack, locator, authoringFile),
+    const target = requireTarget(pack, locator, authoringFile, {
+      ...this.locatorOptions(),
+    });
+    this.collectPack(target.pack);
+    return this.cachedFacet(target, "instance", () =>
+      loadInstanceFacet(pack, locator, authoringFile, {
+        ...this.locatorOptions(),
+      }),
     );
   }
 
@@ -866,13 +989,123 @@ class ResourceResolver {
     locator: RawResourceLocator,
     authoringFile: string,
   ): LoadedFacet<Preset> {
-    const selectedPack = this.packForReference(pack, locator);
-    const target = requireTarget(selectedPack, locator, authoringFile);
-    return this.loadedFile(
-      selectedPack,
-      target,
-      loadPresetFacet(selectedPack, locator, authoringFile),
+    const target = requireTarget(pack, locator, authoringFile, {
+      ...this.locatorOptions(),
+    });
+    this.collectPack(target.pack);
+    return this.cachedFacet(target, "preset", () =>
+      loadPresetFacet(pack, locator, authoringFile, {
+        ...this.locatorOptions(),
+      }),
     );
+  }
+
+  private cachedFacet<T extends TemplateFacet | InstanceFacet | Preset>(
+    target: ResolvedResourceTarget,
+    facet: FacetCacheKind,
+    load: () => LoadedResource<T>,
+  ): LoadedFacet<T> {
+    const cacheKey = `${target.cacheKey}\u0000${facet}`;
+    if (target.pack.kind === "package") {
+      const cached = this.facetCache.get(cacheKey);
+      if (cached) {
+        const candidates = inspectFacetCandidatesForCache(
+          target,
+          facet,
+          target.locator,
+          cached.canonicalDependencies,
+        );
+        if (!sameFacetCandidateIdentities(cached.candidates, candidates)) {
+          return facetCacheFailure(
+            target,
+            facet,
+            target.locator,
+            cached.canonicalDependencies,
+          );
+        }
+        return this.loadedFile(
+          target.pack,
+          target,
+          Object.freeze({
+            facet: Object.freeze({
+              ...cached.facet,
+              locator: target.locator,
+            }) as T,
+            dependencies: Object.freeze(
+              cachedFacetDependencies(
+                target,
+                cached.facet,
+                cached.canonicalDependencies,
+              ),
+            ),
+            unresolvedParents: Object.freeze([]),
+            ...(cached.locations
+              ? { locations: Object.freeze({ ...cached.locations }) }
+              : {}),
+          }),
+        );
+      }
+    }
+    if (target.pack.kind === "package") {
+      const initialCandidates = inspectFacetCandidatesForCache(
+        target,
+        facet,
+        target.locator,
+      );
+      const loaded = load();
+      const finalCandidates = inspectFacetCandidatesForCache(
+        target,
+        facet,
+        target.locator,
+        loaded.dependencies,
+      );
+      if (
+        !sameFacetCandidateIdentities(
+          facetCandidateIdentities(initialCandidates),
+          finalCandidates,
+        )
+      ) {
+        return facetCacheFailure(
+          target,
+          facet,
+          target.locator,
+          loaded.dependencies,
+        );
+      }
+      this.facetCache.set(
+        cacheKey,
+        Object.freeze({
+          facet: loaded.facet,
+          canonicalDependencies: Object.freeze(
+            normalizeResourcePaths(
+              loaded.dependencies.filter((path) =>
+                isResourcePackPathContained(target.pack, path),
+              ),
+            ),
+          ),
+          candidates: facetCandidateIdentities(finalCandidates),
+          ...(loaded.locations ? { locations: loaded.locations } : {}),
+        }),
+      );
+      return this.loadedFile(
+        target.pack,
+        target,
+        Object.freeze({
+          ...loaded,
+          dependencies: Object.freeze(
+            cachedFacetDependencies(
+              target,
+              loaded.facet,
+              loaded.dependencies.filter((path) =>
+                isResourcePackPathContained(target.pack, path),
+              ),
+            ),
+          ),
+        }),
+      );
+    }
+    const loaded = load();
+    return this.loadedFile(target.pack, target, loaded);
   }
 
   private enterLoaded<T extends TemplateFacet | InstanceFacet>(
@@ -1360,6 +1593,7 @@ class ResourceResolver {
   private failureContext(error?: ResourceResolutionError): {
     readonly dependencies: readonly string[];
     readonly unresolvedParents: readonly string[];
+    readonly trustedRoots: readonly ResourceWatchRoot[];
   } {
     return {
       dependencies: [...this.dependencies, ...(error?.dependencies ?? [])],
@@ -1367,6 +1601,10 @@ class ResourceResolver {
         ...this.unresolvedParents,
         ...(error?.unresolvedParents ?? []),
       ],
+      trustedRoots: normalizeResourceRoots([
+        ...this.trustedRoots.values(),
+        ...(error?.trustedRoots ?? []),
+      ]),
     };
   }
 
@@ -2131,7 +2369,9 @@ class ResourceResolver {
 
     const template = this.resolveTemplateAt(
       sourceContext.pack,
-      sourceContext.subject === "skill" ? "atlante/skill" : "atlante/agent",
+      sourceContext.subject === "skill"
+        ? "@atlante/pack/skill"
+        : "@atlante/pack/agent",
       sourceContext.authoringFile,
       sourceContext.path,
       sourceContext.hops,
@@ -2727,6 +2967,9 @@ class ResourceResolver {
       ),
       dependencies: Object.freeze([...this.dependencies].sort()),
       unresolvedParents: Object.freeze([...this.unresolvedParents].sort()),
+      trustedRoots: Object.freeze(
+        normalizeResourceRoots([...this.trustedRoots.values()]),
+      ),
     });
     return result;
   }
@@ -2757,6 +3000,140 @@ class ResourceResolver {
     };
   }
 
+  private presetExtendsLocators(
+    loaded: LoadedFacet<Preset>,
+    extendsValue: JsonValue,
+    path: readonly ResourceGraphNode[],
+    hops: number,
+  ): readonly RawResourceLocator[] {
+    const isArrayExtends = Array.isArray(extendsValue);
+    if (
+      (typeof extendsValue !== "string" || extendsValue.length === 0) &&
+      (!isArrayExtends || extendsValue.length === 0)
+    ) {
+      return this.failAt(
+        "invalid-resolved-input",
+        "preset extends must be a non-empty string or array",
+        traversalContext(path, hops),
+        {
+          source: loaded.loaded.facet.origin,
+          pointer: "/extends",
+          location: loaded.loaded.locations?.["/extends"],
+        },
+      );
+    }
+    if (!isArrayExtends) return [extendsValue as RawResourceLocator];
+
+    return extendsValue.map((locator, index): RawResourceLocator => {
+      if (typeof locator !== "string" || locator.length === 0) {
+        return this.failAt(
+          "invalid-resolved-input",
+          "preset extends entries must be non-empty strings",
+          traversalContext(path, hops),
+          {
+            source: loaded.loaded.facet.origin,
+            pointer: `/extends/${index}`,
+            location: loaded.loaded.locations?.[`/extends/${index}`],
+          },
+        );
+      }
+      return locator;
+    });
+  }
+
+  private resolvePresetChild(
+    loaded: LoadedFacet<Preset>,
+    locator: RawResourceLocator,
+    path: readonly ResourceGraphNode[],
+    hops: number,
+    pointer: string,
+  ): PresetResult {
+    const next = this.delegateResource(
+      () =>
+        this.loadForTraversal(
+          () => this.loadPreset(loaded.pack, locator, loaded.authoring.file),
+          path,
+          "preset",
+          locator,
+        ),
+      path,
+      loaded.loaded.facet.origin,
+      pointer,
+      loaded.loaded.locations?.[pointer],
+    );
+    const child = graphNode(next.loaded.facet);
+    const childPath = this.enter(child, path, hops + 1);
+    return this.resolvePresetLoaded(next, child, childPath, hops + 1);
+  }
+
+  private mergePresetSibling(
+    base: PresetResult | undefined,
+    child: PresetResult,
+    path: readonly ResourceGraphNode[],
+    hops: number,
+  ): PresetResult {
+    const merged = this.mergeValues(base?.effectiveRaw, child.effectiveRaw, {
+      inheritedProvenance: base?.provenance,
+      inheritedAuthoring: base?.authoring,
+      inheritedOrigin: base?.facet.origin,
+      localOrigin: child.facet.origin,
+      localProvenance: child.provenance,
+      localAuthoring: child.authoring,
+    });
+    if (!isSafeJsonObject(merged.value)) {
+      return this.failAt(
+        "invalid-resolved-input",
+        "preset root must resolve to a JSON object",
+        traversalContext(path, hops),
+        { source: child.facet.origin },
+      );
+    }
+    return Object.freeze({
+      ...child,
+      effectiveRaw: cloneObject(merged.value),
+      provenance: cloneResourceProvenance(merged.provenance),
+      authoring: merged.authoring,
+      traversal: mergeContextMap(
+        merged.provenance,
+        child.provenance,
+        child.traversal,
+        base?.traversal,
+      ),
+      effectiveHops: this.maxPresetBranchDepth(base, child),
+    });
+  }
+
+  private maxPresetBranchDepth(
+    base: PresetResult | undefined,
+    child: PresetResult,
+  ): number {
+    return Math.max(base?.effectiveHops ?? 0, child.effectiveHops);
+  }
+
+  private resolvePresetArray(
+    loaded: LoadedFacet<Preset>,
+    locators: readonly RawResourceLocator[],
+    path: readonly ResourceGraphNode[],
+    hops: number,
+  ): PresetResult {
+    let base: PresetResult | undefined;
+    for (const [index, locator] of locators.entries()) {
+      base = this.mergePresetSibling(
+        base,
+        this.resolvePresetChild(
+          loaded,
+          locator,
+          path,
+          hops,
+          `/extends/${index}`,
+        ),
+        path,
+        hops,
+      );
+    }
+    return base as PresetResult;
+  }
+
   private loadPresetBase(
     loaded: LoadedFacet<Preset>,
     raw: JsonObject,
@@ -2764,32 +3141,22 @@ class ResourceResolver {
     hops: number,
   ): PresetResult | undefined {
     if (!Object.hasOwn(raw, "extends")) return undefined;
-    const extendsValue = raw.extends;
-    if (typeof extendsValue !== "string" || extendsValue.length === 0) {
-      return this.failAt(
-        "invalid-resolved-input",
-        "preset extends must be a non-empty string",
-        traversalContext(path, hops),
-        { source: loaded.loaded.facet.origin, pointer: "/extends" },
-      );
-    }
-    const next = this.delegateResource(
-      () =>
-        this.loadForTraversal(
-          () =>
-            this.loadPreset(loaded.pack, extendsValue, loaded.authoring.file),
-          path,
-          "preset",
-          extendsValue,
-        ),
+    const extendsValue = raw.extends as JsonValue;
+    const locators = this.presetExtendsLocators(
+      loaded,
+      extendsValue,
       path,
-      loaded.loaded.facet.origin,
-      "/extends",
-      loaded.loaded.locations?.["/extends"],
+      hops,
     );
-    const child = graphNode(next.loaded.facet);
-    const childPath = this.enter(child, path, hops + 1);
-    return this.resolvePresetLoaded(next, child, childPath, hops + 1);
+    if (!Array.isArray(extendsValue))
+      return this.resolvePresetChild(
+        loaded,
+        locators[0] as RawResourceLocator,
+        path,
+        hops,
+        "/extends",
+      );
+    return this.resolvePresetArray(loaded, locators, path, hops);
   }
 
   private resolvePresetLoaded(
@@ -2881,10 +3248,11 @@ function requireTarget(
   pack: ResourcePack,
   locator: RawResourceLocator,
   authoringFile: string,
+  options: ResourceLocatorOptions = {},
 ): ResolvedResourceTarget {
   // Kept as a small seam so every facet read still goes through the T3
   // locator checks before the selected facet loader opens a file.
-  return resolveResourceLocator(pack, locator, authoringFile);
+  return resolveResourceLocator(pack, locator, authoringFile, options);
 }
 
 function escapePointer(value: string): string {

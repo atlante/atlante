@@ -6,17 +6,37 @@ import type {
   ResourceGraphFailureCode,
   ResourceLocation,
   ResourceOrigin,
+  ResourceWatchRoot,
 } from "./types.js";
 
 export type ResourceFailureContext = {
   readonly dependencies?: readonly string[];
   readonly unresolvedParents?: readonly string[];
+  /** Explicit authorization roots; never inferred from dependency paths. */
+  readonly trustedRoots?: readonly ResourceWatchRoot[];
 };
 
 export function normalizeResourcePaths(
   paths: readonly string[] | undefined,
 ): string[] {
   return [...new Set(paths ?? [])].sort();
+}
+
+export function normalizeResourceRoots(
+  roots: readonly ResourceWatchRoot[] | undefined,
+): ResourceWatchRoot[] {
+  const unique = new Map<string, ResourceWatchRoot>();
+  for (const root of roots ?? []) {
+    const key = `${root.canonical}\u0000${root.lexical}`;
+    if (!unique.has(key)) unique.set(key, root);
+  }
+  return [...unique.values()]
+    .sort(
+      (left, right) =>
+        left.canonical.localeCompare(right.canonical) ||
+        left.lexical.localeCompare(right.lexical),
+    )
+    .map((root) => Object.freeze({ ...root }));
 }
 
 type FailureDetails = {
@@ -37,6 +57,8 @@ export class ResourceResolutionError extends Error {
   /** Current evidence; a watch reconciler may union it with prior inputs. */
   readonly dependencies: readonly string[];
   readonly unresolvedParents: readonly string[];
+  /** Explicit resource roots authorized for watch paths. */
+  readonly trustedRoots: readonly ResourceWatchRoot[];
 
   constructor(failure: ResourceFailure, context: ResourceFailureContext = {}) {
     super(failure.message);
@@ -61,6 +83,9 @@ export class ResourceResolutionError extends Error {
     );
     this.unresolvedParents = Object.freeze(
       normalizeResourcePaths(context.unresolvedParents),
+    );
+    this.trustedRoots = Object.freeze(
+      normalizeResourceRoots(context.trustedRoots),
     );
   }
 }
