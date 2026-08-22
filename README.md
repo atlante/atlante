@@ -268,8 +268,12 @@ published to npm:
 bun install
 bun run lint:check  # biome check .
 bun run type:check   # tsc --build packages/*/tsconfig.json
-bun test
+bun run test        # Vitest on Node.js 22
 ```
+
+The repository uses Bun for package management and build, release, smoke, and
+packaging commands. The test suite runs through Vitest on Node.js 22; tests call
+Bun explicitly only when exercising Bun-specific behavior.
 
 ### Local `atlante` command
 
