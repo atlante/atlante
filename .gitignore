@@ -7,4 +7,6 @@ website/schema/
 docs/
 .worktrees/
 .atlante/
+mutation/
+.stryker-tmp/
 .opencode/models.json

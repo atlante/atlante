@@ -242,7 +242,12 @@ function productionSourceGraph(): SourceGraph {
 }
 
 function absoluteBuildPath(path: string): string {
-  return path.startsWith("/") ? path : resolve(ROOT, path);
+  const absolute = path.startsWith("/") ? path : resolve(ROOT, path);
+  const marker = "/packages/";
+  const packagePath = absolute.lastIndexOf(marker);
+  return packagePath >= 0
+    ? join(ROOT, absolute.slice(packagePath + 1))
+    : absolute;
 }
 
 function absoluteDependencyPath(from: string, path: string): string {

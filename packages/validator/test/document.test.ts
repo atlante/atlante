@@ -450,16 +450,14 @@ describe("loadDocument", () => {
 
   test("normalizes explicit and discovered paths before resource resolution", () => {
     const root = mkdtempSync(join(tmpdir(), "atlante-document-relative-"));
-    const previous = process.cwd();
     installFirstPartyPack(root);
     writeFileSync(
       join(root, "atlante.jsonc"),
       `{ "$schema": "${SCHEMA_URI}" }`,
     );
     try {
-      process.chdir(root);
-      const explicit = loadDocument("atlante.jsonc");
-      const discovered = loadDocument(".");
+      const explicit = loadDocument("atlante.jsonc", { cwd: root });
+      const discovered = loadDocument(".", { cwd: root });
 
       expect(explicit.path).toBeDefined();
       expect(explicit.path && isAbsolute(explicit.path)).toBe(true);
@@ -469,7 +467,6 @@ describe("loadDocument", () => {
       expect(discovered.path).toBe(explicit.path);
       expect(discovered.projectRoot).toBe(explicit.projectRoot);
     } finally {
-      process.chdir(previous);
       rmSync(root, { recursive: true, force: true });
     }
   });

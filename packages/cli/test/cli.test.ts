@@ -10,7 +10,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { SCHEMA_URI } from "@atlante/schema";
 import { afterEach, beforeAll, describe, expect, test } from "vitest";
@@ -285,17 +285,23 @@ describe("runValidate", () => {
 
   test("accepts config filenames and relative project directories from any cwd", async () => {
     const dir = project(valid);
-    const previous = process.cwd();
-    try {
-      process.chdir(dir);
-      expect(await runValidate("atlante.jsonc")).toBe(0);
-      expect(await runValidate(".")).toBe(0);
+    const relativeDir = relative(tmpdir(), dir);
+    const first = spawnSync(LAUNCHER, ["validate", "atlante.jsonc"], {
+      cwd: dir,
+      encoding: "utf8",
+    });
+    const second = spawnSync(LAUNCHER, ["validate", "."], {
+      cwd: dir,
+      encoding: "utf8",
+    });
+    const third = spawnSync(LAUNCHER, ["validate", relativeDir], {
+      cwd: tmpdir(),
+      encoding: "utf8",
+    });
 
-      process.chdir(tmpdir());
-      expect(await runValidate(dir.slice(tmpdir().length + 1))).toBe(0);
-    } finally {
-      process.chdir(previous);
-    }
+    expect(first.status).toBe(0);
+    expect(second.status).toBe(0);
+    expect(third.status).toBe(0);
   });
 });
 
