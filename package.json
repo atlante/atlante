@@ -28,7 +28,8 @@
     "quick:check": "bun scripts/parallel.ts type:check lint:check test",
     "full:check": "bun run build && bun scripts/parallel.ts quick:check smoke:test",
     "prepack": "bun run build",
-    "release": "bun scripts/release.ts"
+    "release": "bun scripts/release.ts",
+    "work": "bun scripts/work.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.0.0",
