@@ -45,6 +45,10 @@ export type VerifiedArtifacts = {
   skills: VerifiedSkillArtifact[];
 };
 
+export type ArtifactReadOptions = {
+  afterPreflight?: (path: string) => void;
+};
+
 type ArtifactReadErrorCode =
   | "invalid-tree"
   | "invalid-manifest"
@@ -570,10 +574,12 @@ function readRegularFile(
   root: string,
   relativePath: string,
   artifactPath = relativePath,
+  options?: ArtifactReadOptions,
 ): Uint8Array {
   const before = inspectRegularPath(root, relativePath, artifactPath);
   let descriptor: number | undefined;
   try {
+    options?.afterPreflight?.(before.path);
     descriptor = openSync(
       before.path,
       constants.O_RDONLY |
@@ -629,11 +635,13 @@ function decodePayload(
 function verifyPayload(
   projectRoot: string,
   entry: ArtifactManifestEntry,
+  options?: ArtifactReadOptions,
 ): string {
   const bytes = readRegularFile(
     projectRoot,
     `.atlante/artifacts/${entry.path}`,
     entry.path,
+    options,
   );
   const actual = sha256(bytes);
   if (actual !== entry.sha256) {
@@ -688,6 +696,7 @@ function manifestBytes(projectRoot: string): string {
  */
 export function readArtifacts(
   projectRoot: string,
+  options?: ArtifactReadOptions,
 ): VerifiedArtifacts | undefined {
   if (typeof projectRoot !== "string" || projectRoot.length === 0) {
     throw new ArtifactReadError("project root must be a non-empty string");
@@ -699,11 +708,11 @@ export function readArtifacts(
   const manifest = parseManifest(manifestBytes(resolvedProjectRoot));
   const verifiedAgents = manifest.agents.map((entry) => ({
     entry,
-    content: verifyPayload(resolvedProjectRoot, entry),
+    content: verifyPayload(resolvedProjectRoot, entry, options),
   }));
   const verifiedSkills = manifest.skills.map((entry) => ({
     entry,
-    content: verifyPayload(resolvedProjectRoot, entry),
+    content: verifyPayload(resolvedProjectRoot, entry, options),
   }));
 
   const agents = verifiedAgents.map(({ entry, content: prompt }) => ({

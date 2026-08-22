@@ -523,25 +523,19 @@ describe("readArtifacts", () => {
       [
         "--eval",
         `import * as realFs from "node:fs";
-import { mock } from "bun:test";
 const target = ${JSON.stringify(target)};
 const fifo = ${JSON.stringify(fifo)};
-const realLstatSync = realFs.lstatSync;
 let swapped = false;
-mock.module("node:fs", () => ({
-  ...realFs,
-  lstatSync(...args) {
-    const stats = realLstatSync(...args);
-    if (!swapped && String(args[0]) === target && stats.isFile()) {
-      swapped = true;
-      realFs.renameSync(fifo, target);
-    }
-    return stats;
-  },
-}));
 const { readArtifacts } = await import("@atlante/builder/artifacts");
 try {
-  readArtifacts(${JSON.stringify(root)});
+  readArtifacts(${JSON.stringify(root)}, {
+    afterPreflight(path) {
+      if (!swapped && path === target) {
+        swapped = true;
+        realFs.renameSync(fifo, target);
+      }
+    },
+  });
   process.exit(swapped ? 2 : 3);
 } catch (error) {
   process.exit(swapped && error?.name === "ArtifactReadError" ? 0 : 4);
@@ -590,28 +584,22 @@ try {
       [
         "--eval",
         `import * as realFs from "node:fs";
-import { mock } from "bun:test";
 const target = ${JSON.stringify(join(artifactDirectory(root), ...payload.split("/")))};
 const agents = ${JSON.stringify(agents)};
 const agentsBackup = ${JSON.stringify(agentsBackup)};
 const outside = ${JSON.stringify(outside)};
-const realLstatSync = realFs.lstatSync;
 let swapped = false;
-mock.module("node:fs", () => ({
-  ...realFs,
-  lstatSync(...args) {
-    const stats = realLstatSync(...args);
-    if (!swapped && String(args[0]) === target && stats.isFile()) {
-      swapped = true;
-      realFs.renameSync(agents, agentsBackup);
-      realFs.symlinkSync(outside, agents);
-    }
-    return stats;
-  },
-}));
 const { readArtifacts } = await import("@atlante/builder/artifacts");
 try {
-  readArtifacts(${JSON.stringify(root)});
+  readArtifacts(${JSON.stringify(root)}, {
+    afterPreflight(path) {
+      if (!swapped && path === target) {
+        swapped = true;
+        realFs.renameSync(agents, agentsBackup);
+        realFs.symlinkSync(outside, agents);
+      }
+    },
+  });
   process.exit(swapped ? 2 : 3);
 } catch (error) {
   process.exit(swapped && error?.name === "ArtifactReadError" ? 0 : 4);
