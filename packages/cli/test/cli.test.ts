@@ -1,4 +1,3 @@
-import { afterEach, beforeAll, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import {
   cpSync,
@@ -14,6 +13,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { SCHEMA_URI } from "@atlante/schema";
+import { afterEach, beforeAll, describe, expect, test } from "vitest";
 import packageJson from "../package.json" with { type: "json" };
 import { createProgram, runBuild, runValidate } from "../src/main.js";
 
@@ -78,28 +78,34 @@ const CLI_ENTRY = fileURLToPath(new URL("../bin/atlante.ts", import.meta.url));
 const LAUNCHER = fileURLToPath(
   new URL("../dist/bin/atlante.js", import.meta.url),
 );
-const REAL_NODE = Bun.which("node");
+const REAL_NODE = process.execPath;
 
 beforeAll(async () => {
-  const built = await Bun.build({
-    entrypoints: [CLI_ENTRY],
-    target: "node",
-    external: ["jsonc-parser"],
-    outdir: fileURLToPath(new URL("../dist/bin/", import.meta.url)),
-  });
-  if (!built.success)
-    throw new Error(`could not build CLI launcher: ${built.logs.join("\n")}`);
+  const outdir = fileURLToPath(new URL("../dist/bin/", import.meta.url));
+  const built = spawnSync(
+    "bun",
+    [
+      "build",
+      CLI_ENTRY,
+      "--target=node",
+      "--external",
+      "jsonc-parser",
+      "--outdir",
+      outdir,
+    ],
+    { encoding: "utf8" },
+  );
+  if (built.status !== 0)
+    throw new Error(`could not build CLI launcher: ${built.stderr}`);
   if (!existsSync(LAUNCHER))
     throw new Error(
       "CLI launcher build completed without producing dist/bin/atlante.js",
     );
   if (!readFileSync(LAUNCHER, "utf8").startsWith("#!/usr/bin/env node"))
     throw new Error("built CLI launcher does not have the Node shebang");
-  if (!REAL_NODE) throw new Error("real node not found via Bun.which");
 });
 
 function nodeExecutable(): string {
-  if (!REAL_NODE) throw new Error("real node not found via Bun.which");
   return REAL_NODE;
 }
 

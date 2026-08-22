@@ -1,4 +1,3 @@
-import { afterEach, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import {
   cpSync,
@@ -17,6 +16,7 @@ import { fileURLToPath } from "node:url";
 import { buildProject } from "@atlante/builder";
 import { SCHEMA_URI } from "@atlante/schema";
 import type { Config, PluginInput } from "@opencode-ai/plugin";
+import { afterEach, describe, expect, test } from "vitest";
 import {
   EXTERNAL_AGENT_PROMPT,
   EXTERNAL_SKILL_CONTENT,

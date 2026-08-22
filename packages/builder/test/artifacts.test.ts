@@ -1,5 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   mkdirSync,
@@ -12,6 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import * as publicArtifacts from "@atlante/builder/artifacts";
+import { afterEach, describe, expect, test } from "vitest";
 import { createArtifacts } from "../src/artifacts.js";
 import type {
   ArtifactManifest,
@@ -518,9 +518,9 @@ describe("readArtifacts", () => {
     const fifo = `${target}.fifo`;
     execFileSync("mkfifo", [fifo]);
 
-    const child = Bun.spawn(
+    const child = spawn(
+      "bun",
       [
-        "bun",
         "--eval",
         `import * as realFs from "node:fs";
 import { mock } from "bun:test";
@@ -547,10 +547,13 @@ try {
   process.exit(swapped && error?.name === "ArtifactReadError" ? 0 : 4);
 }`,
       ],
-      { stdout: "ignore", stderr: "ignore" },
+      { stdio: "ignore" },
+    );
+    const exited = new Promise<number>((resolve) =>
+      child.once("exit", (code) => resolve(code ?? -1)),
     );
     const result = await Promise.race([
-      child.exited.then((code) => ({ code, timedOut: false })),
+      exited.then((code) => ({ code, timedOut: false })),
       new Promise<{ code: number; timedOut: boolean }>((resolve) =>
         setTimeout(() => resolve({ code: -1, timedOut: true }), 1_500),
       ),
@@ -558,7 +561,7 @@ try {
 
     if (result.timedOut) {
       child.kill();
-      await child.exited;
+      await exited;
     }
 
     expect(result.timedOut).toBe(false);
@@ -582,9 +585,9 @@ try {
     mkdirSync(outside, { recursive: true });
     writeFileSync(outsidePayload, readFileSync(target));
 
-    const child = Bun.spawn(
+    const child = spawn(
+      "bun",
       [
-        "bun",
         "--eval",
         `import * as realFs from "node:fs";
 import { mock } from "bun:test";
@@ -614,10 +617,13 @@ try {
   process.exit(swapped && error?.name === "ArtifactReadError" ? 0 : 4);
 }`,
       ],
-      { stdout: "ignore", stderr: "ignore" },
+      { stdio: "ignore" },
+    );
+    const exited = new Promise<number>((resolve) =>
+      child.once("exit", (code) => resolve(code ?? -1)),
     );
     const result = await Promise.race([
-      child.exited.then((code) => ({ code, timedOut: false })),
+      exited.then((code) => ({ code, timedOut: false })),
       new Promise<{ code: number; timedOut: boolean }>((resolve) =>
         setTimeout(() => resolve({ code: -1, timedOut: true }), 1_500),
       ),
@@ -625,7 +631,7 @@ try {
 
     if (result.timedOut) {
       child.kill();
-      await child.exited;
+      await exited;
     }
 
     expect(result.timedOut).toBe(false);

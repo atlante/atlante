@@ -1,4 +1,3 @@
-import { afterEach, describe, expect, test } from "bun:test";
 import {
   mkdirSync,
   mkdtempSync,
@@ -11,6 +10,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { afterEach, describe, expect, test } from "vitest";
 import {
   createPackageResolutionCache,
   createProjectResourcePack,
@@ -1660,7 +1660,7 @@ describe("package resource loading", () => {
       "package-not-declared",
     );
     expect(undeclared.dependencies).toEqual(
-      expect.arrayContaining(metadataPaths),
+      expect.arrayContaining([...metadataPaths]),
     );
     expect(undeclared.unresolvedParents).toEqual([authoringPack.root]);
     expect(undeclared.failure.source).toBeUndefined();
@@ -1677,7 +1677,7 @@ describe("package resource loading", () => {
       "package-not-installed",
     );
     expect(unavailable.dependencies).toEqual(
-      expect.arrayContaining(metadataPaths),
+      expect.arrayContaining([...metadataPaths]),
     );
     expect(unavailable.unresolvedParents).toEqual([
       join(authoringPack.root, "node_modules"),
@@ -1999,7 +1999,7 @@ describe("package resource loading", () => {
     );
     expect(failure.failure.message).toBe("package metadata identity changed");
     expect(failure.dependencies).toEqual(
-      expect.arrayContaining(resourcePackMetadataPaths(authoringPack)),
+      expect.arrayContaining([...resourcePackMetadataPaths(authoringPack)]),
     );
     expect(failure.dependencies).not.toContain(realpathSync(alternateManifest));
     expect(failure.unresolvedParents).toEqual([authoringPack.root]);

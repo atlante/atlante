@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, test } from "vitest";
 import * as entrypoint from "../src/index.js";
 
 test("the package root exposes exactly one plugin factory", () => {

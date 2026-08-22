@@ -1,5 +1,5 @@
-import { describe, expect, test } from "bun:test";
 import type { VerifiedAgentArtifact } from "@atlante/builder/artifacts";
+import { describe, expect, test } from "vitest";
 import type { HostConfig } from "../src/api.js";
 import {
   createSkillTool as apiCreateSkillTool,

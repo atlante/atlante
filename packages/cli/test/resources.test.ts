@@ -1,4 +1,3 @@
-import { afterEach, describe, expect, test } from "bun:test";
 import { cpSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -7,6 +6,7 @@ import { loadProject, prepareProject } from "@atlante/builder";
 import { createProjectResourcePack, loadPresetFacet } from "@atlante/resources";
 import { SCHEMA_URI } from "@atlante/schema";
 import { validateDocumentText } from "@atlante/validator";
+import { afterEach, describe, expect, test } from "vitest";
 
 const created: string[] = [];
 const firstPartyPackRoot = fileURLToPath(

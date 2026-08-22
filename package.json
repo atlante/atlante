@@ -18,7 +18,7 @@
     "packages/*"
   ],
   "scripts": {
-    "test": "bun test",
+    "test": "vitest run",
     "type:check": "tsc --build packages/*/tsconfig.json",
     "lint:check": "biome check .",
     "cli": "bun packages/cli/bin/atlante.ts",

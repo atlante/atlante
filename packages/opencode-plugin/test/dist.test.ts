@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, expect, test } from "bun:test";
+import { execFileSync } from "node:child_process";
 import {
   cpSync,
   existsSync,
@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 import { buildProject } from "@atlante/builder";
 import { SCHEMA_URI } from "@atlante/schema";
 import type { PluginInput } from "@opencode-ai/plugin";
+import { afterEach, beforeAll, expect, test } from "vitest";
 
 type HostConfig = {
   agent?: Record<string, Record<string, unknown>>;
@@ -46,20 +47,17 @@ const DIST_API = fileURLToPath(new URL("../dist/api.js", import.meta.url));
 const DIST_INDEX_URL = new URL("../dist/index.js", import.meta.url).href;
 const DIST_API_URL = new URL("../dist/api.js", import.meta.url).href;
 
-beforeAll(
-  async () => {
-    await Bun.$`bun run build`.cwd(ROOT);
-    const missing = [DIST_INDEX, DIST_API].filter((path) => !existsSync(path));
-    if (missing.length > 0) {
-      throw new Error(
-        `@atlante/opencode-plugin: build completed without ${missing
-          .map((path) => relative(ROOT, path))
-          .join(", ")}`,
-      );
-    }
-  },
-  { timeout: 30_000 },
-);
+beforeAll(async () => {
+  execFileSync("bun", ["run", "build"], { cwd: ROOT, stdio: "inherit" });
+  const missing = [DIST_INDEX, DIST_API].filter((path) => !existsSync(path));
+  if (missing.length > 0) {
+    throw new Error(
+      `@atlante/opencode-plugin: build completed without ${missing
+        .map((path) => relative(ROOT, path))
+        .join(", ")}`,
+    );
+  }
+}, 30_000);
 
 afterEach(() => {
   for (const directory of created.splice(0))
@@ -322,23 +320,22 @@ function bundledInputPaths(metafile: Bun.BuildMetafile): Set<string> {
 
 async function buildBoundaryMetafile(): Promise<Bun.BuildMetafile> {
   const output = mkdtempSync(join(tmpdir(), "atlante-plugin-boundary-"));
+  const metafile = join(output, "metafile.json");
   try {
-    const result = await Bun.build({
-      entrypoints: PRODUCTION_ENTRYPOINTS,
-      target: "bun",
-      external: ["@opencode-ai/plugin"],
-      splitting: true,
-      outdir: output,
-      metafile: true,
-    });
-    if (!result.success || !result.metafile) {
-      throw new Error(
-        `plugin boundary verification build failed: ${JSON.stringify(
-          result.logs,
-        )}`,
-      );
-    }
-    return result.metafile;
+    execFileSync(
+      "bun",
+      [
+        "build",
+        ...PRODUCTION_ENTRYPOINTS,
+        "--target=bun",
+        "--external=@opencode-ai/plugin",
+        "--splitting",
+        `--outdir=${output}`,
+        `--metafile=${metafile}`,
+      ],
+      { encoding: "utf8" },
+    );
+    return JSON.parse(readFileSync(metafile, "utf8")) as Bun.BuildMetafile;
   } finally {
     rmSync(output, { recursive: true, force: true });
   }

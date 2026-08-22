@@ -1,4 +1,3 @@
-import { afterEach, describe, expect, test } from "bun:test";
 import {
   cpSync,
   mkdirSync,
@@ -13,6 +12,7 @@ import * as nodePath from "node:path";
 import { join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { SCHEMA_URI } from "@atlante/schema";
+import { afterEach, describe, expect, test } from "vitest";
 import {
   isWithinAnyRoot,
   resolveWatchFiles,
