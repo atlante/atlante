@@ -26,6 +26,7 @@ export type PAM = import("@atlante/builder/artifacts").ArtifactManifest;
 export type PAME = import("@atlante/builder/artifacts").ArtifactManifestEntry;
 
 const created: string[] = [];
+const builderPackage = join(import.meta.dirname, "..");
 
 type ArtifactInput = Parameters<typeof createArtifacts>[0];
 
@@ -541,7 +542,7 @@ try {
   process.exit(swapped && error?.name === "ArtifactReadError" ? 0 : 4);
 }`,
       ],
-      { stdio: "ignore" },
+      { cwd: builderPackage, stdio: "ignore" },
     );
     const exited = new Promise<number>((resolve) =>
       child.once("exit", (code) => resolve(code ?? -1)),
@@ -605,7 +606,7 @@ try {
   process.exit(swapped && error?.name === "ArtifactReadError" ? 0 : 4);
 }`,
       ],
-      { stdio: "ignore" },
+      { cwd: builderPackage, stdio: "ignore" },
     );
     const exited = new Promise<number>((resolve) =>
       child.once("exit", (code) => resolve(code ?? -1)),
