@@ -6,6 +6,7 @@
       "**/*.json",
       "**/*.jsonc",
       "!**/dist",
+      "!mutation",
       "!!.worktrees"
     ]
   },

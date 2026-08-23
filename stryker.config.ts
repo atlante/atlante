@@ -11,6 +11,12 @@ const config = {
   plugins: ["@stryker-mutator/vitest-runner"],
   testRunner: "vitest",
   concurrency: 1,
+  // 1000 ms accommodates the complete repository Vitest suite;
+  // finite per-test limits keep stalled mutants visible as timeouts.
+  timeoutMS: 1000,
+  // Stryker 10 cannot execute module-initializer mutants after import. Schema
+  // boundary tests still exercise the resulting runtime contracts directly.
+  ignoreStatic: workspace === "schema",
   // Sandboxes keep source restoration independent from signal handling.
   inPlace: false,
   vitest: { configFile: "vitest.config.ts", related: false },

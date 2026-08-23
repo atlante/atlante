@@ -4,6 +4,10 @@ import {
   agentBindingSchema,
   atlanteDocumentOverlaySchema,
   atlanteDocumentSchema,
+  authoredExtendsSchema,
+  bindingDescriptionSchema,
+  rawResourceLocatorSchema,
+  resourceSourceSchema,
   SCHEMA_URI,
   skillBindingSchema,
 } from "../src/index.js";
@@ -241,6 +245,122 @@ describe("atlanteDocumentSchema", () => {
         ?.identity,
     ).toBe("x");
   });
+
+  test("reports canonical binding validation details at the binding path", () => {
+    const result = atlanteDocumentSchema.safeParse({
+      $schema: SCHEMA_URI,
+      agents: {
+        reviewer: { description: "Resolved", $instance: "./agent" },
+      },
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "custom",
+          message:
+            "binding source selectors are not part of the canonical document",
+          path: ["agents", "reviewer", "$instance"],
+        }),
+      ]),
+    );
+  });
+
+  test.each(["$instance", "$template", "template"] as const)(
+    "rejects canonical reserved field %s",
+    (field) => {
+      const result = agentBindingSchema.safeParse({
+        description: "Resolved",
+        [field]: "./resource",
+      });
+
+      expect(result.success).toBe(false);
+      if (result.success) return;
+      expect(result.error.issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            message:
+              "binding source selectors are not part of the canonical document",
+            path: [field],
+          }),
+        ]),
+      );
+    },
+  );
+
+  test("preserves transformed reserved metadata and descriptor semantics", () => {
+    const result = atlanteDocumentSchema.safeParse({
+      $schema: SCHEMA_URI,
+      agents: {
+        reviewer: {
+          description: "Resolved description",
+          values: { scope: "review" },
+          identity: "template-owned",
+        },
+      },
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    const binding = result.data.agents.reviewer;
+    expect(binding?.description).toBe("Resolved description");
+    expect(binding?.values).toEqual({ scope: "review" });
+    expect(Object.keys(binding ?? {})).toEqual(
+      expect.arrayContaining(["description", "values", "identity"]),
+    );
+    expect(Object.keys(binding ?? {})).toHaveLength(3);
+    expect(
+      Object.getOwnPropertyDescriptor(binding, "description"),
+    ).toMatchObject({
+      configurable: true,
+      enumerable: true,
+      writable: true,
+    });
+  });
+});
+
+describe("exported structural schemas", () => {
+  test.each([{ input: "", label: "empty string" }])(
+    "rejects $label locators",
+    ({ input }) => {
+      expect(rawResourceLocatorSchema.safeParse(input).success).toBe(false);
+    },
+  );
+
+  test("accepts non-empty locators and descriptions", () => {
+    expect(rawResourceLocatorSchema.safeParse("./resource").success).toBe(true);
+    expect(
+      bindingDescriptionSchema.safeParse({ description: "" }).success,
+    ).toBe(false);
+    expect(
+      bindingDescriptionSchema.safeParse({ description: "Review" }).success,
+    ).toBe(true);
+  });
+
+  test.each([
+    { input: "", label: "empty string" },
+    { input: [], label: "empty locator array" },
+  ])("rejects $label extends values", ({ input }) => {
+    expect(authoredExtendsSchema.safeParse(input).success).toBe(false);
+  });
+
+  test("accepts a non-empty string or locator array for extends", () => {
+    expect(authoredExtendsSchema.safeParse("./base").success).toBe(true);
+    expect(authoredExtendsSchema.safeParse(["./base"]).success).toBe(true);
+  });
+
+  test("accepts only valid source shorthand or source objects", () => {
+    expect(resourceSourceSchema.safeParse("./resource").success).toBe(true);
+    expect(
+      resourceSourceSchema.safeParse({ $instance: "./resource" }).success,
+    ).toBe(true);
+    expect(resourceSourceSchema.safeParse({ $instance: "" }).success).toBe(
+      false,
+    );
+    expect(resourceSourceSchema.safeParse(42).success).toBe(false);
+  });
 });
 
 describe("atlanteDocumentOverlaySchema", () => {
@@ -362,6 +482,16 @@ describe("atlanteDocumentOverlaySchema", () => {
     });
 
     expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "custom",
+          message: "$instance and $template are mutually exclusive",
+          path: ["agents", "reviewer", "$template"],
+        }),
+      ]),
+    );
   });
 
   test("rejects malformed and non-string selectors", () => {
@@ -401,6 +531,16 @@ describe("atlanteDocumentOverlaySchema", () => {
 
     expect(authored.success).toBe(false);
     expect(canonical.success).toBe(false);
+    if (authored.success || canonical.success) return;
+    expect(authored.error.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "custom",
+          message: "template is reserved; use $template or $instance",
+          path: ["agents", "reviewer", "template"],
+        }),
+      ]),
+    );
   });
 
   test("keeps template-owned fields open, including nested template markers", () => {
@@ -462,6 +602,37 @@ describe("atlanteDocumentOverlaySchema", () => {
 });
 
 describe("canonical binding schemas", () => {
+  test("reports non-object canonical bindings with a stable custom issue", () => {
+    const result = agentBindingSchema.safeParse("not an object");
+
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.issues).toEqual([
+      { code: "custom", message: "expected an object", path: [] },
+    ]);
+
+    const nullResult = agentBindingSchema.safeParse(null);
+    expect(nullResult.success).toBe(false);
+    if (nullResult.success) return;
+    expect(nullResult.error.issues).toEqual([
+      { code: "custom", message: "expected an object", path: [] },
+    ]);
+  });
+
+  test("preserves canonical base-schema issue details", () => {
+    const result = agentBindingSchema.safeParse({ description: "" });
+
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.issues).toEqual([
+      {
+        code: "custom",
+        message: "Too small: expected string to have >=1 characters",
+        path: ["description"],
+      },
+    ]);
+  });
+
   test("keeps the public agent and skill schemas behaviorally symmetric", () => {
     const inputs: unknown[] = [
       {
