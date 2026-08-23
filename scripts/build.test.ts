@@ -1,8 +1,10 @@
-import { expect, test } from "bun:test";
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { expect, test } from "vitest";
 
-const ROOT = join(import.meta.dir, "..");
+const ROOT = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 
 test("CLI build no longer copies the removed bundled resource tree", () => {
   const build = readFileSync(join(ROOT, "scripts", "build.ts"), "utf8");
@@ -19,13 +21,12 @@ test("CLI build no longer copies the removed bundled resource tree", () => {
 });
 
 test("CLI dry-run package contains no bundled resource files", async () => {
-  const result = await Bun.$`npm pack --dry-run --json`
-    .cwd(join(ROOT, "packages", "cli"))
-    .quiet()
-    .nothrow();
-  expect(result.exitCode).toBe(0);
+  const stdout = execFileSync("npm", ["pack", "--dry-run", "--json"], {
+    cwd: join(ROOT, "packages", "cli"),
+    encoding: "utf8",
+  });
 
-  const report = JSON.parse(result.stdout.toString()) as Array<{
+  const report = JSON.parse(stdout) as Array<{
     files: Array<{ path: string }>;
   }>;
   const files = report[0]?.files.map(({ path }) => path) ?? [];

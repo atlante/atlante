@@ -1,5 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   mkdirSync,
@@ -12,6 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import * as publicArtifacts from "@atlante/builder/artifacts";
+import { afterEach, describe, expect, test } from "vitest";
 import { createArtifacts } from "../src/artifacts.js";
 import type {
   ArtifactManifest,
@@ -26,6 +26,7 @@ export type PAM = import("@atlante/builder/artifacts").ArtifactManifest;
 export type PAME = import("@atlante/builder/artifacts").ArtifactManifestEntry;
 
 const created: string[] = [];
+const builderPackage = join(import.meta.dirname, "..");
 
 type ArtifactInput = Parameters<typeof createArtifacts>[0];
 
@@ -518,39 +519,36 @@ describe("readArtifacts", () => {
     const fifo = `${target}.fifo`;
     execFileSync("mkfifo", [fifo]);
 
-    const child = Bun.spawn(
+    const child = spawn(
+      "bun",
       [
-        "bun",
         "--eval",
         `import * as realFs from "node:fs";
-import { mock } from "bun:test";
 const target = ${JSON.stringify(target)};
 const fifo = ${JSON.stringify(fifo)};
-const realLstatSync = realFs.lstatSync;
 let swapped = false;
-mock.module("node:fs", () => ({
-  ...realFs,
-  lstatSync(...args) {
-    const stats = realLstatSync(...args);
-    if (!swapped && String(args[0]) === target && stats.isFile()) {
-      swapped = true;
-      realFs.renameSync(fifo, target);
-    }
-    return stats;
-  },
-}));
 const { readArtifacts } = await import("@atlante/builder/artifacts");
 try {
-  readArtifacts(${JSON.stringify(root)});
+  readArtifacts(${JSON.stringify(root)}, {
+    afterPreflight(path) {
+      if (!swapped && path === target) {
+        swapped = true;
+        realFs.renameSync(fifo, target);
+      }
+    },
+  });
   process.exit(swapped ? 2 : 3);
 } catch (error) {
   process.exit(swapped && error?.name === "ArtifactReadError" ? 0 : 4);
 }`,
       ],
-      { stdout: "ignore", stderr: "ignore" },
+      { cwd: builderPackage, stdio: "ignore" },
+    );
+    const exited = new Promise<number>((resolve) =>
+      child.once("exit", (code) => resolve(code ?? -1)),
     );
     const result = await Promise.race([
-      child.exited.then((code) => ({ code, timedOut: false })),
+      exited.then((code) => ({ code, timedOut: false })),
       new Promise<{ code: number; timedOut: boolean }>((resolve) =>
         setTimeout(() => resolve({ code: -1, timedOut: true }), 1_500),
       ),
@@ -558,7 +556,7 @@ try {
 
     if (result.timedOut) {
       child.kill();
-      await child.exited;
+      await exited;
     }
 
     expect(result.timedOut).toBe(false);
@@ -582,42 +580,39 @@ try {
     mkdirSync(outside, { recursive: true });
     writeFileSync(outsidePayload, readFileSync(target));
 
-    const child = Bun.spawn(
+    const child = spawn(
+      "bun",
       [
-        "bun",
         "--eval",
         `import * as realFs from "node:fs";
-import { mock } from "bun:test";
 const target = ${JSON.stringify(join(artifactDirectory(root), ...payload.split("/")))};
 const agents = ${JSON.stringify(agents)};
 const agentsBackup = ${JSON.stringify(agentsBackup)};
 const outside = ${JSON.stringify(outside)};
-const realLstatSync = realFs.lstatSync;
 let swapped = false;
-mock.module("node:fs", () => ({
-  ...realFs,
-  lstatSync(...args) {
-    const stats = realLstatSync(...args);
-    if (!swapped && String(args[0]) === target && stats.isFile()) {
-      swapped = true;
-      realFs.renameSync(agents, agentsBackup);
-      realFs.symlinkSync(outside, agents);
-    }
-    return stats;
-  },
-}));
 const { readArtifacts } = await import("@atlante/builder/artifacts");
 try {
-  readArtifacts(${JSON.stringify(root)});
+  readArtifacts(${JSON.stringify(root)}, {
+    afterPreflight(path) {
+      if (!swapped && path === target) {
+        swapped = true;
+        realFs.renameSync(agents, agentsBackup);
+        realFs.symlinkSync(outside, agents);
+      }
+    },
+  });
   process.exit(swapped ? 2 : 3);
 } catch (error) {
   process.exit(swapped && error?.name === "ArtifactReadError" ? 0 : 4);
 }`,
       ],
-      { stdout: "ignore", stderr: "ignore" },
+      { cwd: builderPackage, stdio: "ignore" },
+    );
+    const exited = new Promise<number>((resolve) =>
+      child.once("exit", (code) => resolve(code ?? -1)),
     );
     const result = await Promise.race([
-      child.exited.then((code) => ({ code, timedOut: false })),
+      exited.then((code) => ({ code, timedOut: false })),
       new Promise<{ code: number; timedOut: boolean }>((resolve) =>
         setTimeout(() => resolve({ code: -1, timedOut: true }), 1_500),
       ),
@@ -625,7 +620,7 @@ try {
 
     if (result.timedOut) {
       child.kill();
-      await child.exited;
+      await exited;
     }
 
     expect(result.timedOut).toBe(false);

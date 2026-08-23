@@ -1,4 +1,3 @@
-import { afterEach, describe, expect, test } from "bun:test";
 import {
   cpSync,
   mkdirSync,
@@ -11,6 +10,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { afterEach, describe, expect, test } from "vitest";
 import type {
   ResourceFailureCode,
   ResourceOrigin,

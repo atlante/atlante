@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, test } from "vitest";
 import type { SkillToolState } from "../src/skill-tool.js";
 import { createSkillTool } from "../src/skill-tool.js";
 

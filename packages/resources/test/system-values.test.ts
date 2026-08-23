@@ -1,5 +1,5 @@
-import { describe, expect, test } from "bun:test";
 import { basename } from "node:path";
+import { describe, expect, test } from "vitest";
 import {
   resolveSystemValues,
   SYSTEM_RESOLVERS,

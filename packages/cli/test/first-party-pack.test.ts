@@ -1,4 +1,3 @@
-import { afterEach, expect, test } from "bun:test";
 import {
   mkdirSync,
   mkdtempSync,
@@ -9,6 +8,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { afterEach, expect, test } from "vitest";
 import { resolveFirstPartyPack } from "../src/first-party-pack.js";
 
 const created: string[] = [];

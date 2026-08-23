@@ -1,3 +1,4 @@
+import { test } from "vitest";
 import type {
   AgentBinding,
   AgentBindingOverlay,
@@ -5,6 +6,8 @@ import type {
   AtlanteDocumentOverlay,
   SkillBinding,
 } from "../src/index.js";
+
+test("type assertions compile", () => {});
 
 const overlayWithInstance: AgentBindingOverlay = {
   $instance: "./resources/agent",

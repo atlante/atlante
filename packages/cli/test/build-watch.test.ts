@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { spawn } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 import { loadProject, type ProjectContext } from "@atlante/builder";
 import { createPackageResourcePack } from "@atlante/resources";
 import { SCHEMA_URI } from "@atlante/schema";
+import { afterEach, describe, expect, test } from "vitest";
 import { runBuild, runBuildWithContext } from "../src/commands/build.js";
 import {
   runBuildWatchWithDependencies,
@@ -24,6 +25,9 @@ import {
 import { runValidate } from "../src/commands/validate.js";
 
 const created: string[] = [];
+
+const delay = (milliseconds: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
 
 function tempProject(config?: string): string {
   const dir = mkdtempSync(join(tmpdir(), "atlante-build-watch-"));
@@ -198,7 +202,7 @@ async function waitFor(
   while (!check()) {
     if (Date.now() > deadline)
       throw new Error(`timed out waiting for ${description}`);
-    await Bun.sleep(10);
+    await delay(10);
   }
 }
 
@@ -499,7 +503,7 @@ describe("runBuildWatchWithDependencies", () => {
     watcher.callbacks.get(canonical(resources))?.();
 
     await waitFor(() => builds === 2, "rebuild after resource creation");
-    await Bun.sleep(50);
+    await delay(50);
     expect(builds).toBe(2);
     expect(
       watcher.callbacks.has(canonical(join(instance, "instance.jsonc"))),
@@ -607,7 +611,7 @@ describe("runBuildWatchWithDependencies", () => {
     writeFileSync(schemaPath, schema);
     watcher.callbacks.get(canonical(schemaPath))?.();
     await waitFor(() => builds === 3, "rebuild after resource recovery");
-    await Bun.sleep(50);
+    await delay(50);
     expect(builds).toBe(3);
     await handle.stop();
   });
@@ -666,7 +670,7 @@ describe("runBuildWatchWithDependencies", () => {
       mkdirSync(join(dir, ".atlante"), { recursive: true });
       writeFileSync(join(dir, ".atlante", "scratch.txt"), "scratch");
 
-      await Bun.sleep(400);
+      await delay(400);
       expect(builds).toBe(1);
       await handle.stop();
     });
@@ -692,7 +696,7 @@ describe("runBuildWatchWithDependencies", () => {
     for (let i = 0; i < 5; i += 1) callback?.();
 
     await waitFor(() => builds === 2, "single debounced rebuild");
-    await Bun.sleep(80);
+    await delay(80);
     expect(builds).toBe(2);
     await handle.stop();
   });
@@ -727,7 +731,7 @@ describe("runBuildWatchWithDependencies", () => {
     expect(await handle.exited).toBe(0);
 
     callback?.();
-    await Bun.sleep(100);
+    await delay(100);
     expect(builds).toBe(2);
 
     await handle.stop();
@@ -893,7 +897,7 @@ describe("runBuildWatchWithDependencies", () => {
           () => builds === 2,
           "rebuild after hoisted package creation",
         );
-        await Bun.sleep(60);
+        await delay(60);
         expect(builds).toBe(2);
         expect(callbackForPath(watcher, files.manifest)).toBeDefined();
         expect(callbackForPath(watcher, preset)).toBeDefined();
@@ -987,7 +991,7 @@ describe("runBuildWatchWithDependencies", () => {
           () => builds === 2,
           "rebuild after scoped hoisted package creation",
         );
-        await Bun.sleep(60);
+        await delay(60);
         expect(builds).toBe(2);
         expect(callbackForPath(watcher, files.manifest)).toBeDefined();
         expect(callbackForPath(watcher, preset)).toBeDefined();
@@ -1115,7 +1119,7 @@ describe("runBuildWatchWithDependencies", () => {
       () => builds === 4,
       "one rebuild after both recovery inputs repair",
     );
-    await Bun.sleep(60);
+    await delay(60);
     expect(builds).toBe(4);
     await handle.stop();
   });
@@ -1163,7 +1167,7 @@ describe("runBuildWatchWithDependencies", () => {
     rmSync(alternate);
     watcher.callbacks.get(alternate)?.();
     await waitFor(() => builds === 3, "rebuild after local preset recovery");
-    await Bun.sleep(60);
+    await delay(60);
     expect(builds).toBe(3);
     await handle.stop();
   });
@@ -1205,7 +1209,7 @@ describe("runBuildWatchWithDependencies", () => {
     rmSync(alternate);
     watcher.callbacks.get(alternate)?.();
     await waitFor(() => builds === 3, "rebuild after root config recovery");
-    await Bun.sleep(60);
+    await delay(60);
     expect(builds).toBe(3);
     await handle.stop();
   });
@@ -1276,21 +1280,17 @@ describe("runBuildWatch", () => {
       new URL("../bin/atlante.ts", import.meta.url),
     );
 
-    const child = Bun.spawn(["bun", binPath, "build", "--watch", dir], {
-      stdout: "pipe",
-      stderr: "pipe",
+    const child = spawn("bun", [binPath, "build", "--watch", dir], {
+      stdio: ["ignore", "pipe", "pipe"],
     });
 
     const output = { text: "" };
-    const reader = child.stdout.getReader();
-    const decoder = new TextDecoder();
-    void (async () => {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        output.text += decoder.decode(value);
-      }
-    })();
+    child.stdout?.on("data", (value: Buffer) => {
+      output.text += value.toString();
+    });
+    const exited = new Promise<number>((resolve) =>
+      child.once("exit", (code) => resolve(code ?? -1)),
+    );
 
     try {
       await waitFor(
@@ -1302,7 +1302,7 @@ describe("runBuildWatch", () => {
       child.kill("SIGINT");
     }
 
-    const code = await child.exited;
+    const code = await exited;
     expect(code).toBe(0);
   });
 });

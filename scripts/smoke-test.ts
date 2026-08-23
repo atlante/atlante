@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { createHash } from "node:crypto";
-import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -33,7 +33,7 @@ try {
   );
   await cp(PACK_PACKAGE, installedPack, { recursive: true });
   await cp(
-    join(ROOT, "node_modules", "jsonc-parser"),
+    await realpath(join(CLI_PACKAGE, "node_modules", "jsonc-parser")),
     join(globalRoot, "node_modules", "jsonc-parser"),
     { recursive: true },
   );

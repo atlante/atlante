@@ -1,8 +1,9 @@
-import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { expect, test } from "vitest";
 
-const ROOT = join(import.meta.dir, "..");
+const ROOT = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 
 test("smoke test exercises the installed static pack and global-style CLI", () => {
   const smoke = readFileSync(join(ROOT, "scripts", "smoke-test.ts"), "utf8");

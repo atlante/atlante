@@ -1,4 +1,3 @@
-import { afterEach, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import {
   lstatSync,
@@ -12,6 +11,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { afterEach, describe, expect, test } from "vitest";
 import type { ResourceFailureCode } from "../src/index.js";
 import {
   createProjectResourcePack,

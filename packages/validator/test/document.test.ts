@@ -1,10 +1,10 @@
-import { describe, expect, spyOn, test } from "bun:test";
 import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as resources from "@atlante/resources";
 import { SCHEMA_URI } from "@atlante/schema";
+import { describe, expect, test, vi } from "vitest";
 import {
   loadDocument,
   parseDocumentOverlay,
@@ -178,21 +178,20 @@ describe("validateDocumentText", () => {
     writeFileSync(sourcePath, `{ "$schema": "${SCHEMA_URI}" }`);
     const dependency = join(root, "resource", "template.jsonc");
     const unresolvedParent = join(root, "resource");
-    const projectPackSpy = spyOn(
-      resources,
-      "createProjectResourcePack",
-    ).mockImplementation(() => {
-      throw new resources.ResourceResolutionError(
-        {
-          code: "missing-target",
-          message: "resource pack root is unavailable",
-        },
-        {
-          dependencies: [dependency],
-          unresolvedParents: [unresolvedParent],
-        },
-      );
-    });
+    const projectPackSpy = vi
+      .spyOn(resources, "createProjectResourcePack")
+      .mockImplementation(() => {
+        throw new resources.ResourceResolutionError(
+          {
+            code: "missing-target",
+            message: "resource pack root is unavailable",
+          },
+          {
+            dependencies: [dependency],
+            unresolvedParents: [unresolvedParent],
+          },
+        );
+      });
 
     try {
       const result = loadDocument(sourcePath);
