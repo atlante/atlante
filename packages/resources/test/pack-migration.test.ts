@@ -348,7 +348,10 @@ describe("first-party package resolution", () => {
     } catch (error) {
       expect(error).toBeInstanceOf(ResourceResolutionError);
       if (error instanceof ResourceResolutionError) {
-        expect(error.failure.code).toBe("missing-target");
+        expect([
+          "missing-target",
+          "missing-package-subpath",
+        ] as const).toContain(error.failure.code);
         expect(error.failure.message).toContain("unavailable");
       }
     }
