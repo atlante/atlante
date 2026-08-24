@@ -214,6 +214,33 @@ describe("validateDocumentText", () => {
     }
   });
 
+  test("normalizes an unexpected project resource-pack failure", () => {
+    const root = mkdtempSync(
+      join(tmpdir(), "atlante-document-resource-error-"),
+    );
+    const sourcePath = join(root, "atlante.jsonc");
+    writeFileSync(sourcePath, `{ "$schema": "${SCHEMA_URI}" }`);
+    const projectPackSpy = vi
+      .spyOn(resources, "createProjectResourcePack")
+      .mockImplementation(() => {
+        throw new Error("unexpected resource failure");
+      });
+
+    try {
+      expect(loadDocument(sourcePath).diagnostics).toEqual([
+        {
+          severity: "error",
+          code: "resource-load-failed",
+          message: "resource root could not be loaded",
+          source: "atlante.jsonc",
+        },
+      ]);
+    } finally {
+      projectPackSpy.mockRestore();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test("rejects unknown system values instead of accepting structurally valid text", () => {
     const result = validateDocumentText(
       `{ "$schema": "${SCHEMA_URI}", "values": { "unknown": "{{sys.not-real}}" } }`,
@@ -345,6 +372,51 @@ describe("validateDocumentText", () => {
       "@atlante/pack/agent",
     );
   });
+
+  test("reports invalid overlay keys at their escaped authored pointers", () => {
+    const parsed = parseDocumentOverlay(
+      `{
+        "$schema": "${SCHEMA_URI}",
+        "rules": [],
+        "values": { "a/b": 1 }
+      }`,
+      "atlante.jsonc",
+    );
+
+    expect(parsed.overlay).toBeUndefined();
+    expect(parsed.diagnostics).toEqual([
+      expect.objectContaining({
+        code: "invalid-document",
+        path: "/rules",
+        pointer: "/rules",
+        source: "atlante.jsonc",
+        location: { line: 3, column: 18 },
+      }),
+      expect.objectContaining({
+        code: "invalid-document",
+        path: "/values/a~1b",
+        pointer: "/values/a~1b",
+        source: "atlante.jsonc",
+        location: { line: 4, column: 28 },
+      }),
+    ]);
+  });
+
+  test("rejects non-object overlay roots without treating arrays as documents", () => {
+    for (const text of ["null", "[]", "[1]"]) {
+      const parsed = parseDocumentOverlay(text, "atlante.jsonc");
+
+      expect(parsed.overlay).toBeUndefined();
+      expect(parsed.diagnostics).toEqual([
+        expect.objectContaining({
+          code: "invalid-document",
+          path: "/",
+          pointer: "/",
+          source: "atlante.jsonc",
+        }),
+      ]);
+    }
+  });
 });
 
 describe("diagnostic ordering", () => {
@@ -466,6 +538,89 @@ describe("loadDocument", () => {
       );
       expect(discovered.path).toBe(explicit.path);
       expect(discovered.projectRoot).toBe(explicit.projectRoot);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("reports ambiguity when loading a directory with both canonical files", () => {
+    const root = mkdtempSync(join(tmpdir(), "atlante-document-ambiguous-"));
+    writeFileSync(join(root, "atlante.jsonc"), valid);
+    writeFileSync(join(root, "atlante.json"), JSON.stringify({}));
+    try {
+      expect(loadDocument(root)).toEqual({
+        diagnostics: [
+          {
+            severity: "error",
+            code: "ambiguous-config",
+            message:
+              "both atlante.jsonc and atlante.json exist in the project root; pass an explicit path",
+            source: "atlante.jsonc/atlante.json",
+          },
+        ],
+      });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("reports a missing config when loading a directory without one", () => {
+    const root = mkdtempSync(join(tmpdir(), "atlante-document-missing-"));
+    try {
+      expect(loadDocument(root)).toEqual({
+        diagnostics: [
+          {
+            severity: "error",
+            code: "config-not-found",
+            message:
+              "no atlante.jsonc or atlante.json found in the project root",
+            source: "atlante.jsonc/atlante.json",
+          },
+        ],
+      });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("reports an unreadable discovered target", () => {
+    const root = mkdtempSync(join(tmpdir(), "atlante-document-directory-"));
+    mkdirSync(join(root, "atlante.jsonc"));
+    try {
+      const result = loadDocument(root);
+
+      expect(result.document).toBeUndefined();
+      expect(result.diagnostics).toEqual([
+        {
+          severity: "error",
+          code: "config-unreadable",
+          message:
+            "cannot read atlante.jsonc: configuration file is unreadable",
+          source: "atlante.jsonc",
+        },
+      ]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("uses the caller cwd and reports a missing explicit file without leaking its path", () => {
+    const root = mkdtempSync(join(tmpdir(), "atlante-document-cwd-"));
+    try {
+      const result = loadDocument("atlante.jsonc", { cwd: root });
+
+      expect(result).toEqual({
+        diagnostics: [
+          {
+            severity: "error",
+            code: "config-unreadable",
+            message:
+              "cannot read atlante.jsonc: configuration file is unreadable",
+            source: "atlante.jsonc",
+          },
+        ],
+      });
+      expect(JSON.stringify(result)).not.toContain(root);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

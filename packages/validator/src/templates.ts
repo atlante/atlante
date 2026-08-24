@@ -30,6 +30,7 @@ import {
   escapeJsonPointerSegment,
   sortDiagnostics,
 } from "./diagnostic.js";
+import { decorateResourceDiagnostic } from "./diagnostic-decoration.js";
 
 function unescapeJsonPointerSegment(segment: string): string {
   return segment.replaceAll("~1", "/").replaceAll("~0", "~");
@@ -673,6 +674,7 @@ function compositionBranchPath(
   path: readonly string[],
 ): readonly string[] | undefined {
   let branch: readonly string[] | undefined;
+  // Stryker disable next-line UpdateOperator -- exact mutant: index++ -> index--; this scan must advance toward termination.
   for (let index = 0; index + 1 < path.length; index++) {
     const keyword = path[index];
     if (
@@ -1029,41 +1031,14 @@ function bindingDescriptionValidation(
   return [invalidDescriptionDiagnostic(subject, bindingId, templateId, root)];
 }
 
-function originPath(origin: ResourceOrigin | undefined): string | undefined {
-  return origin?.path as string | undefined;
-}
-
 function rootOrigin(
   resources: ResolvedResourceDocument,
 ): ResourceOrigin | undefined {
   return resources.graph.nodes[0]?.origin;
 }
 
-function sourceAt(
-  binding: ResolvedResourceBinding,
-  pointer: string,
-  fallback: ResourceOrigin | undefined,
-): string | undefined {
-  return originPath(binding.provenance[pointer] ?? fallback);
-}
-
-function decorateResourceDiagnostic(
-  diagnostic: Diagnostic,
-  binding: ResolvedResourceBinding,
-  template: ResolvedTemplate,
-  root: "agents" | "skills",
-): Diagnostic {
-  const prefix = `/${root}/${escapeJsonPointerSegment(binding.id)}`;
-  const relative = diagnostic.path?.startsWith(prefix)
-    ? diagnostic.path.slice(prefix.length) || ""
-    : "";
-  const source =
-    diagnostic.source ?? sourceAt(binding, relative, template.origin);
-  return {
-    ...diagnostic,
-    ...(source ? { source } : {}),
-    ...(diagnostic.path ? { pointer: diagnostic.path } : {}),
-  };
+function originPath(origin: ResourceOrigin | undefined): string | undefined {
+  return origin?.path as string | undefined;
 }
 
 function unknownSystemValueDiagnostics(
@@ -1257,6 +1232,81 @@ function interpolatedBindingInput(
   }
 }
 
+type BindingValidationContext = Readonly<{
+  readonly binding: ResolvedResourceBinding;
+  readonly subject: "agent" | "skill";
+  readonly root: "agents" | "skills";
+  readonly templateId: string;
+  readonly values: Record<string, unknown>;
+}>;
+
+function decorateBindingDiagnostics(
+  diagnostics: readonly Diagnostic[],
+  context: BindingValidationContext,
+): Diagnostic[] {
+  return diagnostics.map((diagnostic) =>
+    decorateResourceDiagnostic(
+      diagnostic,
+      context.binding,
+      context.binding.template,
+      context.root,
+    ),
+  );
+}
+
+function bindingReferenceDiagnostics(
+  context: BindingValidationContext,
+): Diagnostic[] {
+  return decorateBindingDiagnostics(
+    [
+      ...bindingDescriptionValidation(
+        context.binding.description,
+        context.values,
+        context.binding.id,
+        context.templateId,
+        context.root,
+        context.subject,
+      ),
+      ...missingValueDiagnostics(
+        context.binding.input,
+        context.values,
+        context.binding.id,
+        context.templateId,
+        context.root,
+        context.subject,
+      ),
+    ],
+    context,
+  );
+}
+
+function hasInputValueReferenceDiagnostics(
+  diagnostics: readonly Diagnostic[],
+): boolean {
+  return diagnostics.some(
+    ({ code }) =>
+      code === "missing-value" || code === "invalid-value-reference",
+  );
+}
+
+function validateBindingInput(
+  context: BindingValidationContext,
+  input: Record<string, unknown>,
+  selectionTarget?: Record<string, unknown>,
+): Diagnostic[] {
+  return decorateBindingDiagnostics(
+    validateResolvedBindingInput(
+      context.binding.template,
+      input,
+      context.binding.id,
+      context.root,
+      context.subject,
+      selectionTarget,
+    ),
+    context,
+  );
+}
+
 function validateResolvedBinding(
   resources: ResolvedResourceDocument,
   root: "agents" | "skills",
@@ -1264,14 +1314,15 @@ function validateResolvedBinding(
   binding: ResolvedResourceBinding,
 ): Diagnostic[] {
   const templateId = binding.template.key;
-  const valueContractDiagnostics = bindingValueDiagnostics(
-    binding.values as Record<string, unknown> | undefined,
-    subject,
-    binding.id,
-    templateId,
-    root,
-  ).map((diagnostic) =>
-    decorateResourceDiagnostic(diagnostic, binding, binding.template, root),
+  const valueContractDiagnostics = decorateBindingDiagnostics(
+    bindingValueDiagnostics(
+      binding.values as Record<string, unknown> | undefined,
+      subject,
+      binding.id,
+      templateId,
+      root,
+    ),
+    { binding, subject, root, templateId, values: {} },
   );
   if (valueContractDiagnostics.length > 0) return valueContractDiagnostics;
 
@@ -1284,50 +1335,21 @@ function validateResolvedBinding(
   );
   if (Array.isArray(resolvedValues)) return resolvedValues;
 
-  const diagnostics = [
-    ...bindingDescriptionValidation(
-      binding.description,
-      resolvedValues,
-      binding.id,
-      templateId,
-      root,
-      subject,
-    ),
-    ...missingValueDiagnostics(
-      binding.input,
-      resolvedValues,
-      binding.id,
-      templateId,
-      root,
-      subject,
-    ),
-  ].map((diagnostic) =>
-    decorateResourceDiagnostic(diagnostic, binding, binding.template, root),
-  );
+  const context: BindingValidationContext = {
+    binding,
+    subject,
+    root,
+    templateId,
+    values: resolvedValues,
+  };
+  const diagnostics = bindingReferenceDiagnostics(context);
 
-  const inputValueDiagnostics = diagnostics.filter(
-    (diagnostic) =>
-      diagnostic.code === "missing-value" ||
-      diagnostic.code === "invalid-value-reference",
-  );
-  if (inputValueDiagnostics.length > 0) {
+  if (hasInputValueReferenceDiagnostics(diagnostics)) {
     diagnostics.push(
-      ...validateResolvedBindingInput(
-        binding.template,
+      ...validateBindingInput(
+        context,
         binding.input as Record<string, unknown>,
-        binding.id,
-        root,
-        subject,
-      )
-        .filter((diagnostic) => diagnostic.code !== "invalid-prompt-input")
-        .map((diagnostic) =>
-          decorateResourceDiagnostic(
-            diagnostic,
-            binding,
-            binding.template,
-            root,
-          ),
-        ),
+      ).filter((diagnostic) => diagnostic.code !== "invalid-prompt-input"),
     );
     return diagnostics;
   }
@@ -1344,15 +1366,10 @@ function validateResolvedBinding(
     return [...diagnostics, ...interpolated.diagnostics];
 
   diagnostics.push(
-    ...validateResolvedBindingInput(
-      binding.template,
+    ...validateBindingInput(
+      context,
       interpolated.input,
-      binding.id,
-      root,
-      subject,
       binding.input as Record<string, unknown>,
-    ).map((diagnostic) =>
-      decorateResourceDiagnostic(diagnostic, binding, binding.template, root),
     ),
   );
   return diagnostics;
