@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "Non-negotiable limits on how an agent or skill may act. Use constraints for prohibitions, approval gates, and invariants, not outcomes.",
+  "description": "Non-negotiable limits on how an agent or skill may act. Use constraints for prohibitions, approval gates, and action limits that bound what may be done, not for continuously preserved properties, ordered steps, owned outcomes, or situational risks. Do not duplicate one requirement across constraints, invariants, instructions, responsibilities, and gotchas by default.",
   "type": "array",
   "items": { "type": "string", "minLength": 1 },
   "minItems": 1

@@ -65,7 +65,7 @@ Useful public locators include:
 | Agent instance | `@atlante/pack/architect` |
 | Skill instances | `@atlante/pack/brainstorming`, `@atlante/pack/delivery-workflow` |
 | Agent and skill templates | `@atlante/pack/agent`, `@atlante/pack/skill` |
-| Supporting templates | `@atlante/pack/workflow`, `@atlante/pack/markdown`, `@atlante/pack/artifact`, `@atlante/pack/gotchas`, `@atlante/pack/instructions`, `@atlante/pack/constraints` |
+| Supporting templates | `@atlante/pack/workflow`, `@atlante/pack/markdown`, `@atlante/pack/artifact`, `@atlante/pack/gotchas`, `@atlante/pack/instructions`, `@atlante/pack/constraints`, `@atlante/pack/invariants` |
 
 The default preset exposes the `architect` agent and the `brainstorming` and
 `workflow` skills. The `workflow` skill is the `delivery-workflow` instance.

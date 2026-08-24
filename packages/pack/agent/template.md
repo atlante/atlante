@@ -18,6 +18,10 @@
 
 {{> slot/sections/constraints constraints}}
 {{/if}}
+{{#if invariants}}
+
+{{> slot/sections/invariants invariants}}
+{{/if}}
 {{#if markdown}}
 
 {{> slot/sections/markdown}}

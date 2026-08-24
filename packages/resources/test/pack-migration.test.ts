@@ -23,6 +23,7 @@ import {
   renderResolvedTemplate,
   resolveResourceDocument,
   resolveResourceInstance,
+  resolveResourceTemplate,
 } from "../src/index.js";
 
 const repositoryRoot = fileURLToPath(new URL("../../../", import.meta.url));
@@ -156,6 +157,8 @@ const expectedPackFiles = [
   "gotchas/template.md",
   "instructions/template.jsonc",
   "instructions/template.md",
+  "invariants/template.jsonc",
+  "invariants/template.md",
   "markdown/template.jsonc",
   "markdown/template.md",
   "skill/template.jsonc",
@@ -307,6 +310,44 @@ describe("first-party package resolution", () => {
     );
   });
 
+  test("resolves @atlante/pack/invariants directly through generic package resolution", () => {
+    const fixture = firstPartyProject({ extends: "@atlante/pack" });
+    const projectPack = createProjectResourcePack(fixture.root);
+    const { facet } = loadTemplateFacet(
+      projectPack,
+      "@atlante/pack/invariants",
+      fixture.configPath,
+    );
+
+    expect({
+      kind: facet.origin.kind,
+      path: String(facet.origin.path),
+    }).toEqual({
+      kind: "package",
+      path: `@atlante/pack@${packVersion}/invariants/template.jsonc`,
+    });
+    expect(facet.source.startsWith("## Invariants")).toBe(true);
+  });
+
+  test("renders @atlante/pack/invariants directly as a heading with a bullet list", () => {
+    const fixture = firstPartyProject({ extends: "@atlante/pack" });
+    const projectPack = createProjectResourcePack(fixture.root);
+    const template = resolveResourceTemplate(
+      projectPack,
+      "@atlante/pack/invariants",
+      fixture.configPath,
+    );
+
+    const rendered = renderResolvedTemplate({
+      template,
+      input: ["First preserved property.", "Second preserved property."],
+    });
+
+    expect(rendered).toBe(
+      `## Invariants\n\nThese are properties that must remain true continuously throughout your work. Check each one still holds as you proceed; if an action would break an invariant, stop and adjust rather than completing the step.\n\n- First preserved property.\n- Second preserved property.\n`,
+    );
+  });
+
   test("preserves first-party rendered prompt and skill bytes", () => {
     const fixture = firstPartyProject({ extends: "@atlante/pack" });
     const projectPack = createProjectResourcePack(fixture.root);
@@ -339,6 +380,152 @@ describe("first-party package resolution", () => {
     expect(rendered).not.toContain("{{values.project}}");
     expect(renderedWorkflow).toBe(expectedWorkflowSkill);
     expect(renderedWorkflow).not.toContain("{{values.");
+  });
+});
+
+describe("first-party ordered invariants sections", () => {
+  function firstPartyTemplate(
+    locator: "@atlante/pack/agent" | "@atlante/pack/skill",
+  ): ReturnType<typeof resolveResourceTemplate> {
+    const fixture = firstPartyProject({ extends: "@atlante/pack" });
+    return resolveResourceTemplate(
+      createProjectResourcePack(fixture.root),
+      locator,
+      fixture.configPath,
+    );
+  }
+
+  test("renders agent sections in deterministic author order with invariants", () => {
+    const template = firstPartyTemplate("@atlante/pack/agent");
+    const sections = [
+      {
+        invariants: [
+          "The public API stays backward compatible.",
+          "Generated files stay untouched.",
+        ],
+      },
+      { constraints: ["Never edit generated files."] },
+    ];
+
+    const rendered = renderResolvedTemplate({
+      template,
+      input: {
+        identity: "You are a guardian.",
+        mission: "Preserve guarantees.",
+        sections,
+      },
+    });
+
+    expect(rendered).toContain("## Invariants");
+    expect(rendered).toContain("- The public API stays backward compatible.");
+    expect(rendered).toContain("## Constraints");
+    expect(rendered.indexOf("## Invariants")).toBeLessThan(
+      rendered.indexOf("## Constraints"),
+    );
+
+    const reversed = renderResolvedTemplate({
+      template,
+      input: {
+        identity: "You are a guardian.",
+        mission: "Preserve guarantees.",
+        sections: [...sections].reverse(),
+      },
+    });
+
+    expect(reversed).toContain("## Invariants");
+    expect(reversed.indexOf("## Constraints")).toBeLessThan(
+      reversed.indexOf("## Invariants"),
+    );
+  });
+
+  test("renders skill sections in deterministic author order with invariants", () => {
+    const template = firstPartyTemplate("@atlante/pack/skill");
+    const sections = [
+      { instructions: ["Check each guarantee after every step."] },
+      { invariants: ["Session state survives reloads."] },
+    ];
+
+    const rendered = renderResolvedTemplate({
+      template,
+      input: {
+        title: "Guarding",
+        overview: "Keep project guarantees intact.",
+        sections,
+      },
+    });
+
+    expect(rendered).toContain("## Instructions");
+    expect(rendered).toContain("## Invariants");
+    expect(rendered).toContain("- Session state survives reloads.");
+    expect(rendered.indexOf("## Instructions")).toBeLessThan(
+      rendered.indexOf("## Invariants"),
+    );
+
+    const reversed = renderResolvedTemplate({
+      template,
+      input: {
+        title: "Guarding",
+        overview: "Keep project guarantees intact.",
+        sections: [...sections].reverse(),
+      },
+    });
+
+    expect(reversed).toContain("## Invariants");
+    expect(reversed.indexOf("## Invariants")).toBeLessThan(
+      reversed.indexOf("## Instructions"),
+    );
+  });
+});
+
+describe("first-party section semantics", () => {
+  function sectionDescription(name: string): string {
+    const description = readJson(
+      join(packRoot, name, "template.jsonc"),
+    ).description;
+    expect(typeof description).toBe("string");
+    return description as string;
+  }
+
+  test("distinguishes invariants from constraints, instructions, responsibilities, and gotchas", () => {
+    const invariants = sectionDescription("invariants");
+
+    expect(invariants).toMatch(/continuously preserved properties/i);
+    expect(invariants).toContain("stable guarantee");
+    for (const category of [
+      "constraint",
+      "instruction",
+      "responsibility",
+      "gotcha",
+    ])
+      expect(invariants).toContain(category);
+  });
+
+  test("keeps constraints from absorbing invariants or duplicating requirements", () => {
+    const constraints = sectionDescription("constraints");
+
+    expect(constraints).toContain("prohibitions, approval gates");
+    expect(constraints).not.toMatch(/use constraints for[^.]*invariants/i);
+    expect(constraints).toContain("not for continuously preserved properties");
+    expect(constraints).toContain("Do not duplicate");
+  });
+
+  test("keeps responsibilities, instructions, and gotchas semantically separate", () => {
+    const agentSchema = readJson(join(packRoot, "agent", "template.jsonc"));
+    const branches = (
+      (agentSchema.properties as Record<string, unknown>).sections as {
+        items: { oneOf: Array<{ properties?: Record<string, unknown> }> };
+      }
+    ).items.oneOf;
+    const responsibilities = branches
+      .map((branch) => branch.properties?.responsibilities)
+      .find((property) => typeof property === "object") as {
+      description?: string;
+    };
+
+    expect(responsibilities.description).toContain("outcomes");
+    expect(responsibilities.description).toContain("not for behavioral limits");
+    expect(sectionDescription("instructions")).toContain("ordered instruction");
+    expect(sectionDescription("gotchas")).toContain("situational");
   });
 });
 

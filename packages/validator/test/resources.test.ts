@@ -1396,6 +1396,185 @@ describe("resource-backed document validation", () => {
     );
   });
 
+  test.each([
+    ["agents", "agent"],
+    ["skills", "skill"],
+  ] as const)("accepts invariants among the ordered %s sections", (kind) => {
+    const sections =
+      kind === "agents"
+        ? [
+            {
+              invariants: [
+                "The public API stays backward compatible.",
+                "Generated files stay untouched.",
+              ],
+            },
+            { constraints: ["Never edit generated files."] },
+          ]
+        : [
+            { instructions: ["Check each guarantee after every step."] },
+            { invariants: ["Session state survives reloads."] },
+          ];
+    const binding =
+      kind === "agents"
+        ? {
+            $template: "@atlante/pack/agent",
+            description: "Guarded reviewer",
+            identity: "You guard invariants.",
+            mission: "Preserve guarantees.",
+            sections,
+          }
+        : {
+            $template: "@atlante/pack/skill",
+            description: "Guarding guidance",
+            title: "Guarding",
+            overview: "Keep project guarantees intact.",
+            sections,
+          };
+    const { configPath } = project({
+      $schema: SCHEMA_URI,
+      [kind]: { guarded: binding },
+    });
+
+    const result = load(configPath);
+
+    expect(result.diagnostics).toEqual([]);
+    expect(result.document?.[kind]?.guarded?.sections).toEqual(sections);
+  });
+
+  test.each([
+    ["agents", "agent"],
+    ["skills", "skill"],
+  ] as const)(
+    "anchors malformed nested %s invariants at the bundled invariants schema",
+    (kind) => {
+      const binding =
+        kind === "agents"
+          ? {
+              $template: "@atlante/pack/agent",
+              description: "Guarded reviewer",
+              identity: "You guard invariants.",
+              mission: "Preserve guarantees.",
+            }
+          : {
+              $template: "@atlante/pack/skill",
+              description: "Guarding guidance",
+              title: "Guarding",
+              overview: "Keep project guarantees intact.",
+            };
+      const cases = [
+        {
+          invariants: [] as unknown,
+          pointer: "/sections/0/invariants",
+          message: "fewer than 1 items",
+        },
+        {
+          invariants: [""],
+          pointer: "/sections/0/invariants/0",
+          message: "fewer than 1 characters",
+        },
+      ] as const;
+
+      for (const testCase of cases) {
+        const { root, configPath } = project({
+          $schema: SCHEMA_URI,
+          [kind]: {
+            guarded: {
+              ...binding,
+              sections: [{ invariants: testCase.invariants }],
+            },
+          },
+        });
+
+        const result = load(configPath);
+        const pointer = `/${kind}/guarded${testCase.pointer}`;
+        const diagnostic = result.diagnostics.find(
+          ({ code, pointer: diagnosticPointer }) =>
+            code === "invalid-prompt-input" && diagnosticPointer === pointer,
+        );
+
+        expect(result.document).toBeUndefined();
+        expect(diagnostic).toMatchObject({
+          code: "invalid-prompt-input",
+          path: pointer,
+          pointer,
+        });
+        expect(diagnostic?.source?.endsWith("invariants/template.jsonc")).toBe(
+          true,
+        );
+        expect(diagnostic?.message).toContain(testCase.message);
+        expect(JSON.stringify(result.diagnostics)).not.toContain(root);
+      }
+    },
+  );
+
+  test("anchors direct invariant slot failures at the first-party invariants template", () => {
+    const { root, configPath } = project({
+      $schema: SCHEMA_URI,
+      agents: {
+        guarded: {
+          $template: "./parent",
+          description: "Direct invariants",
+        },
+      },
+    });
+    writeTemplate(root, "parent", {
+      type: "object",
+      properties: { list: { template: "@atlante/pack/invariants" } },
+    });
+
+    const cases = [
+      {
+        list: [] as unknown,
+        pointer: "/list",
+        message: "fewer than 1 items",
+      },
+      {
+        list: [""],
+        pointer: "/list/0",
+        message: "fewer than 1 characters",
+      },
+      {
+        list: 42,
+        pointer: "/list",
+        message: "must be array",
+      },
+    ] as const;
+
+    for (const testCase of cases) {
+      writeFileSync(
+        configPath,
+        `${JSON.stringify({
+          $schema: SCHEMA_URI,
+          agents: {
+            guarded: {
+              $template: "./parent",
+              description: "Direct invariants",
+              list: testCase.list,
+            },
+          },
+        })}\n`,
+      );
+
+      const result = load(configPath);
+      const diagnostic = result.diagnostics.find(
+        ({ code }) => code === "invalid-prompt-input",
+      );
+
+      expect(result.document).toBeUndefined();
+      expect(diagnostic).toMatchObject({
+        code: "invalid-prompt-input",
+        path: `/agents/guarded${testCase.pointer}`,
+        pointer: `/agents/guarded${testCase.pointer}`,
+      });
+      expect(diagnostic?.source?.endsWith("invariants/template.jsonc")).toBe(
+        true,
+      );
+      expect(diagnostic?.message).toContain(testCase.message);
+      expect(JSON.stringify(result.diagnostics)).not.toContain(root);
+    }
+  });
+
   test("uses a declared package resource without loading unrelated siblings", () => {
     const { root, configPath } = project({
       $schema: SCHEMA_URI,

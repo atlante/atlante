@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Continuously preserved properties that must hold throughout the work. An invariant is a stable guarantee that stays true at every point, unlike a constraint (an action limit, prohibition, or approval gate), an instruction (a single ordered step), a responsibility (an owned outcome), or a gotcha (a situational risk). Use invariants for stable guarantees only, never as step instructions or prohibitions, and do not duplicate requirements across categories by default.",
+  "type": "array",
+  "items": { "type": "string", "minLength": 1 },
+  "minItems": 1
+}

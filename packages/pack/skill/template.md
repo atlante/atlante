@@ -24,4 +24,8 @@
 
 {{> slot/sections/constraints constraints}}
 {{/if}}
+{{#if invariants}}
+
+{{> slot/sections/invariants invariants}}
+{{/if}}
 {{/each}}
