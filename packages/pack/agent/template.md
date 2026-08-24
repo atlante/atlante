@@ -30,4 +30,8 @@
 
 {{> slot/sections/gotchas gotchas}}
 {{/if}}
+{{#if workflow}}
+
+{{> slot/sections/workflow}}
+{{/if}}
 {{/each}}

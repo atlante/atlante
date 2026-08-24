@@ -1396,6 +1396,69 @@ describe("resource-backed document validation", () => {
     );
   });
 
+  test("accepts a canonical workflow section in a bundled agent", () => {
+    const { configPath } = project({
+      $schema: SCHEMA_URI,
+      agents: {
+        reviewer: {
+          $template: "@atlante/pack/agent",
+          description: "Reviews the change.",
+          identity: "You review.",
+          mission: "Find defects.",
+          sections: [
+            {
+              workflow: {
+                title: "Review workflow",
+                phases: [
+                  { kind: "plan", instructions: ["Inspect the change."] },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    });
+
+    const result = load(configPath);
+
+    expect(result.diagnostics).toEqual([]);
+    expect(result.document?.agents?.reviewer).toBeDefined();
+  });
+
+  test("preserves workflow diagnostics for bundled agents", () => {
+    const { configPath } = project({
+      $schema: SCHEMA_URI,
+      agents: {
+        reviewer: {
+          $template: "@atlante/pack/agent",
+          description: "Reviews the change.",
+          identity: "You review.",
+          mission: "Find defects.",
+          sections: [
+            {
+              workflow: {
+                phases: [
+                  { kind: "build", instructions: [{ description: "old" }] },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    });
+
+    const result = load(configPath);
+
+    expect(result.document).toBeUndefined();
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: "invalid-prompt-input",
+        message: expect.stringContaining("must be string"),
+        path: "/agents/reviewer/sections/0/workflow/phases/0/instructions/0",
+      }),
+    );
+  });
+
   test("uses a declared package resource without loading unrelated siblings", () => {
     const { root, configPath } = project({
       $schema: SCHEMA_URI,
