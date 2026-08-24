@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/assets/exports/horizontal/atlante-horizontal-tagline-linen.svg" alt="Atlante wordmark and tagline: Give form to your harness." width="720">
+  <img src="public/assets/exports/horizontal/atlante-horizontal-tagline.svg" alt="Atlante wordmark and tagline: Give form to your harness." width="720">
 </p>
 
 <p align="center"><strong>Give form to your harness.</strong><br>

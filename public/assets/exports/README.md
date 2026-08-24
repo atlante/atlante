@@ -42,19 +42,15 @@ Prussian Blue is `6.71:1` (previously `5.99:1`).
 | `horizontal/atlante-horizontal.svg`, `horizontal/atlante-horizontal-reverse.svg`                 | 1200 x 420 | Horizontal wordmark lockup     |
 | `stacked/atlante-stacked.svg`, `stacked/atlante-stacked-reverse.svg`                             |  683 x 860 | Stacked wordmark lockup        |
 | `horizontal/atlante-horizontal-tagline.svg`, `horizontal/atlante-horizontal-tagline-reverse.svg` | 1200 x 470 | Horizontal tagline lockup      |
-| `horizontal/atlante-horizontal-tagline-linen.svg`                                  | 1200 x 470 | README light-surface lockup    |
 | `stacked/atlante-stacked-tagline.svg`, `stacked/atlante-stacked-tagline-reverse.svg`             |  683 x 930 | Stacked tagline lockup         |
 | `favicons/atlante-favicon.svg`, `favicons/atlante-favicon-reverse.svg`                           |  256 x 256 | Scalable square favicon source |
 | `favicons/atlante-favicon-1024.png`, `favicons/atlante-favicon-reverse-1024.png`                 | 683 x 1024 | High-resolution glyph sources  |
 | `favicons/atlante-favicon.png`, `favicons/atlante-favicon-reverse.png`                           |  256 x 256 | Raster favicon deliveries      |
 | `social/atlante-social.svg`, `social/atlante-social-reverse.svg`                                 | 1200 x 630 | Social preview SVG sources     |
 
-Normal exports use Prussian Blue on Linen (`#112135` on `#F4ECE4`) where a
-surface provides that background. The README Linen variant is an explicit
-light-surface application for renderers that do not provide a light canvas.
-Reverse exports are self-contained
-Linen-on-Prussian-Blue applications with a `#112135` background. Normal SVGs
-retain transparency. Raster favicon PNGs include their intended Linen or
+Normal exports are self-contained Prussian Blue-on-Linen applications
+(`#112135` on `#F4ECE4`). Reverse exports are self-contained
+Linen-on-Prussian-Blue applications with a `#112135` background. Raster favicon PNGs include their intended Linen or
 Prussian Blue surface for standalone display; reverse SVGs include their dark
 background for standalone readability.
 
