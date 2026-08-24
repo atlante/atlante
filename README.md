@@ -61,11 +61,17 @@ An `atlante.jsonc` with two agents:
       "description": "Implements requested changes in the project.",
       "identity": "You are a senior implementer on {{values.project}}.",
       "mission": "Write clean, tested, production-ready code.",
-      "responsibilities": [
-        "Implement features following the spec",
-        "Write unit and integration tests",
+      "sections": [
+        {
+          "responsibilities": [
+            "Implement features following the spec",
+            "Write unit and integration tests",
+          ],
+        },
+        {
+          "invariants": ["{{values.apiRule}}"],
+        },
       ],
-      "constraints": ["{{values.apiRule}}"],
     },
 
     "reviewer": {
@@ -73,11 +79,17 @@ An `atlante.jsonc` with two agents:
       "description": "Reviews changes for defects and design issues.",
       "identity": "You are a thorough code reviewer on {{values.project}}.",
       "mission": "Ensure code quality and adherence to standards.",
-      "responsibilities": [
-        "Review implementations for bugs and design issues",
-        "Check adherence to project constraints",
+      "sections": [
+        {
+          "responsibilities": [
+            "Review implementations for bugs and design issues",
+            "Check adherence to project constraints",
+          ],
+        },
+        {
+          "invariants": ["{{values.apiRule}}"],
+        },
       ],
-      "constraints": ["{{values.apiRule}}"],
     },
   },
 
@@ -95,12 +107,14 @@ You are a senior implementer on my-app.
 
 Write clean, tested, production-ready code.
 
-# Responsibilities
+## Responsibilities
 
 - Implement features following the spec
 - Write unit and integration tests
 
-# Constraints
+## Invariants
+
+These are properties that must remain true continuously throughout your work. Check each one still holds as you proceed; if an action would break an invariant, stop and adjust rather than completing the step.
 
 - All public APIs must have JSDoc.
 ```
