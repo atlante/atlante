@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="683" height="860" viewBox="0 0 683 860">
+  <style>
+    @font-face {
+      font-family: "Bodoni Moda";
+      font-style: normal;
+      font-weight: 400 900;
+      src: url("../../../fonts/bodonimoda/bodoni-moda-latin.woff2") format("woff2");
+    }
+    .wordmark {
+      fill: #112135;
+      font-family: "Bodoni Moda", serif;
+      font-size: 100px;
+      font-weight: 400;
+      letter-spacing: 14px;
+      text-anchor: middle;
+      font-variation-settings: "opsz" 12, "wght" 400;
+    }
+  </style>
+  <image href="../glyph/atlante-glyph.svg" x="105" y="20" width="501" height="751" preserveAspectRatio="xMidYMid meet" />
+  <text class="wordmark" x="341.5" y="760">ATLANTE</text>
+</svg>

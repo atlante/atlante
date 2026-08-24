@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="470" viewBox="0 0 1200 470">
+  <rect width="1200" height="470" fill="#112135" />
+  <style>
+    @font-face {
+      font-family: "Bodoni Moda";
+      font-style: normal;
+      font-weight: 400 900;
+      src: url("../../../fonts/bodonimoda/bodoni-moda-latin.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "JetBrains Mono";
+      font-style: normal;
+      font-weight: 100 800;
+      src: url("../../../fonts/jetbrainsmono/jetbrains-mono-latin.woff2") format("woff2");
+    }
+    .wordmark {
+      fill: #f4ece4;
+      font-family: "Bodoni Moda", serif;
+      font-size: 124px;
+      font-weight: 400;
+      letter-spacing: 20px;
+      font-variation-settings: "opsz" 12, "wght" 400;
+    }
+    .tagline {
+      fill: #f4ece4;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 20px;
+      font-weight: 400;
+      letter-spacing: 7px;
+      text-anchor: middle;
+    }
+  </style>
+  <image href="../glyph/atlante-glyph-reverse.svg" x="40" y="30" width="240" height="360" preserveAspectRatio="xMidYMid meet" />
+  <text class="wordmark" x="350" y="220">ATLANTE</text>
+  <text class="tagline" x="686" y="300">GIVE FORM TO YOUR HARNESS.</text>
+</svg>
