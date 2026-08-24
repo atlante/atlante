@@ -27,6 +27,11 @@ const packVersion = JSON.parse(
   readFileSync(join(packRoot, "package.json"), "utf8"),
 ).version as string;
 const created: string[] = [];
+const firstPartyValues = {
+  project: "Atlante",
+  "quick-check": "`bun run quick:check`",
+  "full-check": "`bun run full:check` and fallow mcp",
+};
 
 function fixture(): { root: string; config: string } {
   const root = mkdtempSync(join(repositoryRoot, ".pack-resource-test-"));
@@ -66,9 +71,9 @@ Turn each approved issue into a tested, reviewable change that meets its accepta
 - Validate and review the result against its acceptance criteria, project conventions, and relevant regression, compatibility, and security concerns.
 - Communicate decisions, validation evidence, blockers, and next steps.
 
-## Constraints
+## Invariants
 
-These are non-negotiable limits on how you may act. Follow every constraint throughout your work; do not treat them as suggested outcomes or trade them off for convenience.
+These are properties that must remain true continuously throughout your work. Check each one still holds as you proceed; if an action would break an invariant, stop and adjust rather than completing the step.
 
 - Introduce abstractions only when they remove real duplication or improve clarity.
 - Treat the approved issue and its acceptance criteria as the scope of work; MUST ask the developer before expanding or materially changing them.
@@ -165,5 +170,72 @@ describe("first-party package resources", () => {
     });
 
     expect(output).toBe(expectedArchitectPrompt);
+  });
+
+  test("migrates all bundled constraint content to invariant sections", () => {
+    const { root, config } = fixture();
+    const pack = createProjectResourcePack(root);
+    const architect = resolveResourceInstance(
+      pack,
+      "@atlante/pack/architect",
+      config,
+    );
+    const brainstorming = resolveResourceInstance(
+      pack,
+      "@atlante/pack/brainstorming",
+      config,
+    );
+    const workflow = resolveResourceInstance(
+      pack,
+      "@atlante/pack/delivery-workflow",
+      config,
+    );
+
+    expect(architect.input.sections).toEqual([
+      {
+        responsibilities: [
+          "Clarify ambiguity with the developer and establish the issue's scope, constraints, and acceptance criteria.",
+          "Make focused, maintainable changes that follow established project conventions and preserve clear responsibility boundaries.",
+          "Validate and review the result against its acceptance criteria, project conventions, and relevant regression, compatibility, and security concerns.",
+          "Communicate decisions, validation evidence, blockers, and next steps.",
+        ],
+      },
+      {
+        invariants: [
+          "Introduce abstractions only when they remove real duplication or improve clarity.",
+          "Treat the approved issue and its acceptance criteria as the scope of work; MUST ask the developer before expanding or materially changing them.",
+          "MUST preserve unrelated user changes.",
+          "MUST NOT claim validation succeeded without reporting the checks run and their results; MUST clearly state any checks that could not run.",
+        ],
+      },
+      expect.objectContaining({ instructions: expect.any(Array) }),
+    ]);
+    expect(brainstorming.input.sections).toEqual([
+      {
+        invariants: [
+          "Do not begin workflow, implementation, or file modifications until the presented design is approved by the developer.",
+          "Apply this gate even to simple work, including work simple enough to skip a full plan; the design may be brief when the work is simple.",
+          "Surface real complexity honestly; never downplay it to appear confident.",
+        ],
+      },
+      expect.objectContaining({ instructions: expect.any(Array) }),
+    ]);
+    expect(workflow.input.sections?.[0]).toEqual({
+      invariants: [
+        "Do not begin implementation until the developer approves the implementation plan when a full plan is warranted.",
+        "For behavior changes, do not make implementation changes before a focused test demonstrates the planned behavior.",
+        "The orchestrator drives all phases but never edits files directly; it delegates every write, including corrections, to sub-agents, tracks progress, and integrates results.",
+        "The orchestrator may recall a previously dispatched sub-agent when context preservation is valuable, most notably recalling the plan sub-agent to update its own plan. Fresh sub-agents remain the default for execution tasks and the reviewer must always be fresh.",
+      ],
+    });
+
+    for (const instance of [architect, brainstorming, workflow]) {
+      const output = renderResolvedTemplate({
+        template: instance.effectiveTemplate,
+        input: interpolateValues(instance.input, firstPartyValues),
+      });
+      expect(output).toContain("## Invariants");
+      expect(output).not.toContain("## Constraints");
+    }
   });
 });

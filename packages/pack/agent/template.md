@@ -14,10 +14,6 @@
 - {{this}}
 {{/each}}
 {{/if}}
-{{#if constraints}}
-
-{{> slot/sections/constraints constraints}}
-{{/if}}
 {{#if invariants}}
 
 {{> slot/sections/invariants invariants}}

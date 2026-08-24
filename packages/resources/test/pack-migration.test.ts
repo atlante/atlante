@@ -42,9 +42,9 @@ const expectedWorkflowSkill = `# Workflow
 
 Provide a disciplined delivery framework that keeps approved work scoped, maintainable, and accountable from handoff through completion, with decisions and outcomes grounded in the issue's acceptance criteria. This workflow is driven by an orchestrator that delegates each task to a focused sub-agent, coordinates their outputs, and enforces the workflow's quality gates.
 
-## Constraints
+## Invariants
 
-These are non-negotiable limits on how you may act. Follow every constraint throughout your work; do not treat them as suggested outcomes or trade them off for convenience.
+These are properties that must remain true continuously throughout your work. Check each one still holds as you proceed; if an action would break an invariant, stop and adjust rather than completing the step.
 
 - Do not begin implementation until the developer approves the implementation plan when a full plan is warranted.
 - For behavior changes, do not make implementation changes before a focused test demonstrates the planned behavior.
@@ -150,8 +150,6 @@ const expectedPackFiles = [
   "artifact/template.md",
   "atlante.jsonc",
   "brainstorming/instance.jsonc",
-  "constraints/template.jsonc",
-  "constraints/template.md",
   "delivery-workflow/instance.jsonc",
   "gotchas/template.jsonc",
   "gotchas/template.md",
@@ -329,6 +327,33 @@ describe("first-party package resolution", () => {
     expect(facet.source.startsWith("## Invariants")).toBe(true);
   });
 
+  test("rejects removed @atlante/pack/constraints as a missing template", () => {
+    const fixture = firstPartyProject({ extends: "@atlante/pack" });
+    const projectPack = createProjectResourcePack(fixture.root);
+
+    expect(() =>
+      loadTemplateFacet(
+        projectPack,
+        "@atlante/pack/constraints",
+        fixture.configPath,
+      ),
+    ).toThrow(ResourceResolutionError);
+
+    try {
+      loadTemplateFacet(
+        projectPack,
+        "@atlante/pack/constraints",
+        fixture.configPath,
+      );
+    } catch (error) {
+      expect(error).toBeInstanceOf(ResourceResolutionError);
+      if (error instanceof ResourceResolutionError) {
+        expect(error.failure.code).toBe("missing-target");
+        expect(error.failure.message).toContain("unavailable");
+      }
+    }
+  });
+
   test("renders @atlante/pack/invariants directly as a heading with a bullet list", () => {
     const fixture = firstPartyProject({ extends: "@atlante/pack" });
     const projectPack = createProjectResourcePack(fixture.root);
@@ -404,7 +429,7 @@ describe("first-party ordered invariants sections", () => {
           "Generated files stay untouched.",
         ],
       },
-      { constraints: ["Never edit generated files."] },
+      { instructions: ["Check each guarantee after every step."] },
     ];
 
     const rendered = renderResolvedTemplate({
@@ -418,9 +443,8 @@ describe("first-party ordered invariants sections", () => {
 
     expect(rendered).toContain("## Invariants");
     expect(rendered).toContain("- The public API stays backward compatible.");
-    expect(rendered).toContain("## Constraints");
     expect(rendered.indexOf("## Invariants")).toBeLessThan(
-      rendered.indexOf("## Constraints"),
+      rendered.indexOf("## Instructions"),
     );
 
     const reversed = renderResolvedTemplate({
@@ -433,7 +457,7 @@ describe("first-party ordered invariants sections", () => {
     });
 
     expect(reversed).toContain("## Invariants");
-    expect(reversed.indexOf("## Constraints")).toBeLessThan(
+    expect(reversed.indexOf("## Instructions")).toBeLessThan(
       reversed.indexOf("## Invariants"),
     );
   });
@@ -486,27 +510,19 @@ describe("first-party section semantics", () => {
     return description as string;
   }
 
-  test("distinguishes invariants from constraints, instructions, responsibilities, and gotchas", () => {
+  test("distinguishes invariants from action limits, instructions, responsibilities, and gotchas", () => {
     const invariants = sectionDescription("invariants");
 
     expect(invariants).toMatch(/continuously preserved properties/i);
     expect(invariants).toContain("stable guarantee");
     for (const category of [
-      "constraint",
+      "action limit",
+      "prohibition",
       "instruction",
       "responsibility",
       "gotcha",
     ])
       expect(invariants).toContain(category);
-  });
-
-  test("keeps constraints from absorbing invariants or duplicating requirements", () => {
-    const constraints = sectionDescription("constraints");
-
-    expect(constraints).toContain("prohibitions, approval gates");
-    expect(constraints).not.toMatch(/use constraints for[^.]*invariants/i);
-    expect(constraints).toContain("not for continuously preserved properties");
-    expect(constraints).toContain("Do not duplicate");
   });
 
   test("keeps responsibilities, instructions, and gotchas semantically separate", () => {

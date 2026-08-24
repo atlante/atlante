@@ -1399,22 +1399,15 @@ describe("resource-backed document validation", () => {
   test.each([
     ["agents", "agent"],
     ["skills", "skill"],
-  ] as const)("accepts invariants among the ordered %s sections", (kind) => {
+  ] as const)("rejects constraints sections in %s prompts", (kind) => {
     const sections =
       kind === "agents"
         ? [
             {
-              invariants: [
-                "The public API stays backward compatible.",
-                "Generated files stay untouched.",
-              ],
+              constraints: ["Never edit generated files."],
             },
-            { constraints: ["Never edit generated files."] },
           ]
-        : [
-            { instructions: ["Check each guarantee after every step."] },
-            { invariants: ["Session state survives reloads."] },
-          ];
+        : [{ constraints: ["Do not skip approval."] }];
     const binding =
       kind === "agents"
         ? {
@@ -1438,8 +1431,13 @@ describe("resource-backed document validation", () => {
 
     const result = load(configPath);
 
-    expect(result.diagnostics).toEqual([]);
-    expect(result.document?.[kind]?.guarded?.sections).toEqual(sections);
+    expect(result.document).toBeUndefined();
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: "invalid-prompt-input",
+        message: expect.stringContaining("constraints"),
+      }),
+    );
   });
 
   test.each([

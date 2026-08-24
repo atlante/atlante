@@ -12,7 +12,7 @@
       ]
     },
     {
-      "constraints": [
+      "invariants": [
         "Introduce abstractions only when they remove real duplication or improve clarity.",
         "Treat the approved issue and its acceptance criteria as the scope of work; MUST ask the developer before expanding or materially changing them.",
         "MUST preserve unrelated user changes.",
