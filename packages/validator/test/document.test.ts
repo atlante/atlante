@@ -6,6 +6,7 @@ import * as resources from "@atlante/resources";
 import { SCHEMA_URI } from "@atlante/schema";
 import { describe, expect, test, vi } from "vitest";
 import {
+  formatDiagnostic,
   loadDocument,
   parseDocumentOverlay,
   sortDiagnostics,
@@ -343,6 +344,30 @@ describe("validateDocumentText", () => {
     expect(parsed.diagnostics).toHaveLength(2);
     expect(JSON.stringify(parsed.diagnostics)).not.toContain(
       "@atlante/pack/agent",
+    );
+  });
+});
+
+describe("diagnostic formatting", () => {
+  test("prints the recovery anatomy in order", () => {
+    expect(
+      formatDiagnostic({
+        severity: "error",
+        code: "invalid-document",
+        message: "the document is invalid",
+        source: "atlante.jsonc",
+        path: "/agents/reviewer",
+        location: { line: 3, column: 5 },
+        expected: "an object",
+        next: "edit the value and run `atlante validate` again",
+        cause: "received a string",
+      }),
+    ).toBe(
+      "error [invalid-document]: the document is invalid\n" +
+        "at: atlante.jsonc:3:5 /agents/reviewer\n" +
+        "expected: an object\n" +
+        "next: edit the value and run `atlante validate` again\n" +
+        "cause: received a string",
     );
   });
 });

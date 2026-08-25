@@ -47,9 +47,9 @@ export function discoverConfigPath(directory: string): {
 }
 
 /**
- * Finds and reads a config file. Accepts either a direct file path or a
+ * Finds and reads a configuration file. Accepts either a direct file path or a
  * directory. Returns the resolved path and raw file contents, or null if
- * no config file could be found or read.
+ * no configuration file could be found or read.
  */
 export function findConfigFile(target: string): {
   path: string;
@@ -72,7 +72,7 @@ export function findConfigFile(target: string): {
     // Fall through to directory discovery.
   }
 
-  // 2. Otherwise, treat it as a directory and discover the config file.
+  // 2. Otherwise, treat it as a directory and discover the configuration file.
   const discovered = discoverConfigPath(resolvedTarget);
   if (!discovered.path) return null;
   try {

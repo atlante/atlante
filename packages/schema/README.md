@@ -9,7 +9,7 @@ The package exports `atlanteDocumentSchema`, `agentBindingSchema`,
 TypeScript types, `SCHEMA_URI`, and `documentJsonSchema`. Every agent and skill
 binding requires a non-empty `description`; each binding reserves
 `description`, `$template`, `$instance`, and `values` while leaving its content
-fields to the selected template facet. A bare resource locator is `$instance`
+fields to the selected template. A bare resource locator is `$instance`
 shorthand, and `$template`/`$instance` are mutually exclusive.
 
 The generated JSON Schema is also available at

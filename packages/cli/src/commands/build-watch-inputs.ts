@@ -14,7 +14,7 @@ export type WatchFiles = {
   resourcePaths: string[];
   /** Existing directories to retry unresolved resource targets from. */
   unresolvedParents: string[];
-  /** Whether the current config/resource graph resolved without errors. */
+  /** Whether the current configuration/resource graph resolved without errors. */
   resourceResolutionSucceeded: boolean;
   /** Explicit roots that authorize external resource paths. */
   trustedRoots: ResourceWatchRoot[];
@@ -39,8 +39,8 @@ function projectDirOf(target: string): string {
   } catch {
     // Fall through to the non-existent-target handling below.
   }
-  // A non-existent target whose basename is a config filename is a would-be
-  // config FILE: candidates resolve to its parent directory.
+  // A non-existent target whose basename is a configuration filename is a would-be
+  // configuration FILE: candidates resolve to its parent directory.
   if (isConfigFilename(absoluteTarget)) return dirname(absoluteTarget);
   return absoluteTarget;
 }

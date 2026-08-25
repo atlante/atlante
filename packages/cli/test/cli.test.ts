@@ -248,6 +248,19 @@ describe("runValidate", () => {
     expect(await runValidate(project(valid))).toBe(0);
   });
 
+  test("prints the validated success grammar", async () => {
+    const dir = project(valid);
+    const written: string[] = [];
+    const original = console.log;
+    console.log = (...args: unknown[]) => written.push(args.join(" "));
+    try {
+      expect(await runValidate(dir)).toBe(0);
+    } finally {
+      console.log = original;
+    }
+    expect(written).toEqual([`validated ${join(dir, "atlante.jsonc")}`]);
+  });
+
   test("exits 1 on an invalid prompt input", async () => {
     const dir = project(
       `{ "$schema": "${SCHEMA_URI}", "agents": { "a": { "identity": "x" } } }`,

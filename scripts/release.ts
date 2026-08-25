@@ -13,7 +13,7 @@ const PACKAGES = [
   "validator",
   "builder",
   "pack",
-  "opencode-plugin",
+  "opencode",
   "cli",
 ] as const;
 

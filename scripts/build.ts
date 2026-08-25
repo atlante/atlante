@@ -6,8 +6,8 @@ import { join } from "node:path";
 const ROOT = join(import.meta.dir, "..");
 const TSC = join(ROOT, "node_modules", ".bin", "tsc");
 
-// 1) Plugin: Bun target=bun bundle + declarations (publishable artifact).
-const plugin = join(ROOT, "packages", "opencode-plugin");
+// 1) OpenCode adapter: Bun target=bun bundle + declarations (publishable artifact).
+const plugin = join(ROOT, "packages", "opencode");
 await rm(join(plugin, "dist"), { force: true, recursive: true });
 const pluginResult = await Bun.build({
   entrypoints: [join(plugin, "src", "index.ts"), join(plugin, "src", "api.ts")],
@@ -26,7 +26,7 @@ if (
   !existsSync(join(plugin, "dist", "api.js"))
 ) {
   throw new Error(
-    "@atlante/opencode-plugin: bundle missing dist/index.js or dist/api.js",
+    "@atlante/opencode: bundle missing dist/index.js or dist/api.js",
   );
 }
 
