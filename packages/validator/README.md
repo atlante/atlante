@@ -5,9 +5,9 @@ Document, resource-resolution, and template-input validation for
 
 The validator discovers and parses `atlante.jsonc` or `atlante.json`, validates
 the raw overlay, resolves local or installed static-package preset and template
-or instance facet references through `@atlante/resources`, validates the resulting canonical
-document, and validates each agent and skill against its effective template
-facet. Agent and skill paths use `/agents/<agentId>` and `/skills/<skillId>`;
+or instance references through `@atlante/resources`, validates the resulting
+canonical document, and validates each agent and skill against its effective
+template. Agent and skill paths use `/agents/<agentId>` and `/skills/<skillId>`;
 `description` is required for both, interpolated with the shared values
 pipeline, and must remain non-empty. `description`, `$template`, `$instance`,
 and `values` are stripped as reserved binding metadata before template input

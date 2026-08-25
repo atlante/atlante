@@ -25,8 +25,8 @@ atlante --help
 
 - `atlante init [path] [--preset <package-locator>] [--force]` — scaffold
   `atlante.jsonc`, register the OpenCode adapter package, and build artifacts
-- `atlante validate [path]` — validate the document, selected template and instance
-  facets, and template inputs without rendering
+- `atlante validate [path]` — validate the document, selected templates and instances, and
+  template inputs without rendering
 - `atlante build [path]` — validate, render, and atomically publish host-neutral
   artifacts under `.atlante/artifacts/`
 
@@ -36,11 +36,11 @@ Validation and building use the same raw-overlay, lazy resource-resolution path
 before checking or rendering the canonical document. Local locators are
 containing-file-relative; installed packs use a scoped or unscoped package name
 with an optional contained POSIX subpath. `extends` selects presets,
-`$template` selects template facets, and `$instance` or a bare locator selects
+`$template` selects templates, and `$instance` or a bare locator selects
 instances. The selected package must already be declared and installed; the CLI
 does not install or mutate dependencies. Watch mode follows selected manifests,
-template and instance facets, transitive files, trusted pack roots, and safe unresolved parent
-directories, not unrelated resource siblings. `init` validates the selected
+templates and instances, transitive files, trusted pack roots, and safe unresolved
+parent directories, not unrelated resource siblings. `init` validates the selected
 preset before mutating files and performs a build automatically. Run `atlante
 build` after changing source configuration or resource directories when watch mode is not
 active.

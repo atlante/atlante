@@ -14,7 +14,7 @@ The builder validates the authored configuration, composes selected templates, i
 
 - **Structure:** define agents, skills, workflows, values, and their relationships in one configuration.
 - **Shared source:** keep the harness with project code and review changes through a versioning system.
-- **Composition:** inherit presets and compose template and instance facets instead of duplicating prompts.
+- **Composition:** inherit presets and compose templates and instances instead of duplicating prompts.
 - **Validation:** check document structure and template inputs before building artifacts.
 - **Deterministic output:** render prompts and skills into verified artifact files.
 - **Clear boundary:** Atlante defines prompt-level orchestration; OpenCode and the prompted model execute it.
@@ -191,7 +191,7 @@ Atlante validates and renders deterministic artifacts; OpenCode consumes only ve
 
 ### Packs and presets
 
-A pack is static Atlante content. It can contain presets, template facets, and instance facets, but it has no JavaScript entry point, registration hook, or executable API.
+A pack is static Atlante content. It can contain presets, templates, and instances, but it has no JavaScript entry point, registration hook, or executable API.
 
 `@atlante/pack` is the first-party pack. `atlante init` uses its default preset unless you provide another preset locator:
 

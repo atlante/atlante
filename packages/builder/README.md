@@ -4,8 +4,8 @@ Project loading, validation, host-neutral preparation, and artifact publication 
 [Atlante](https://github.com/atlante/atlante). Requires Node.js 22 or later.
 
 The package loads a project configuration, resolves local and installed
-static-package template and instance facets, validates template inputs, renders agent and skill
-descriptors, and publishes verified host-independent artifacts. The preparation
+static-package templates and instances, validates template inputs, renders agent
+and skill descriptors, and publishes verified host-independent artifacts. The preparation
 pipeline is deterministic and fail-closed: if validation, interpolation, composition, or
 rendering fails, no partial descriptor set is returned.
 
