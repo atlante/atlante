@@ -44,7 +44,7 @@ Then extend the preset and select a reusable template in `atlante.jsonc`:
       "mission": "Find defects and design risks before changes are merged.",
       "responsibilities": [
         "Review implementations for bugs and design issues",
-        "Check adherence to project constraints",
+        "Check that project invariants remain satisfied.",
       ],
     },
   },

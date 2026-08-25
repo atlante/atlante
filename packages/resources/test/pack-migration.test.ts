@@ -44,7 +44,7 @@ Provide a disciplined delivery framework that keeps approved work scoped, mainta
 
 ## Invariants
 
-These are properties that must remain true continuously throughout your work. Check each one still holds as you proceed; if an action would break an invariant, stop and adjust rather than completing the step.
+The invariants below are binding. Every invariant MUST hold throughout planning, execution, validation, and the final result. You MUST NOT weaken an invariant, invent an exception, or trade temporary violation for progress. If the requested work conflicts with an invariant, you MUST follow a compliant path. If no compliant path can be established, you MUST stop the affected work at the smallest safe point, report the conflict and available evidence, and ask the developer to resolve it. You MUST NOT resume until a compliant path is established.
 
 - Do not begin implementation until the developer approves the implementation plan when a full plan is warranted.
 - For behavior changes, do not make implementation changes before a focused test demonstrates the planned behavior.
@@ -372,7 +372,7 @@ describe("first-party package resolution", () => {
     });
 
     expect(rendered).toBe(
-      `## Invariants\n\nThese are properties that must remain true continuously throughout your work. Check each one still holds as you proceed; if an action would break an invariant, stop and adjust rather than completing the step.\n\n- First preserved property.\n- Second preserved property.\n`,
+      `## Invariants\n\nThe invariants below are binding. Every invariant MUST hold throughout planning, execution, validation, and the final result. You MUST NOT weaken an invariant, invent an exception, or trade temporary violation for progress. If the requested work conflicts with an invariant, you MUST follow a compliant path. If no compliant path can be established, you MUST stop the affected work at the smallest safe point, report the conflict and available evidence, and ask the developer to resolve it. You MUST NOT resume until a compliant path is established.\n\n- First preserved property.\n- Second preserved property.\n`,
     );
   });
 
@@ -516,16 +516,66 @@ describe("first-party section semantics", () => {
   test("distinguishes invariants from action limits, instructions, responsibilities, and gotchas", () => {
     const invariants = sectionDescription("invariants");
 
-    expect(invariants).toMatch(/continuously preserved properties/i);
-    expect(invariants).toContain("stable guarantee");
-    for (const category of [
-      "action limit",
-      "prohibition",
-      "instruction",
-      "responsibility",
-      "gotcha",
+    expect(invariants).toBe(
+      "Conditions that MUST remain true throughout the work. Use invariants for durable guarantees, safety boundaries, and approval gates. State each as one concrete, observable rule and include the compliant path when non-obvious. Back critical invariants with deterministic enforcement when possible. Use instructions for ordered actions, responsibilities for owned outcomes, and gotchas for situational risks. Do not duplicate requirements across sections.",
+    );
+    for (const phrase of [
+      "durable guarantees",
+      "safety boundaries",
+      "approval gates",
+      "one concrete, observable rule",
+      "compliant path",
+      "deterministic enforcement",
+      "instructions for ordered actions",
+      "responsibilities for owned outcomes",
+      "gotchas for situational risks",
+      "Do not duplicate requirements across sections",
     ])
-      expect(invariants).toContain(category);
+      expect(invariants).toContain(phrase);
+  });
+
+  test("renders the invariant intro as a binding lifecycle rule", () => {
+    const fixture = firstPartyProject({ extends: "@atlante/pack" });
+    const template = resolveResourceTemplate(
+      createProjectResourcePack(fixture.root),
+      "@atlante/pack/agent",
+      fixture.configPath,
+    );
+    const rendered = renderResolvedTemplate({
+      template,
+      input: {
+        identity: "You are a guardian.",
+        mission: "Preserve guarantees.",
+        sections: [
+          { invariants: ["The API remains stable."] },
+          { instructions: ["Verify the API."] },
+        ],
+      },
+    });
+    const invariantSection = rendered.slice(
+      rendered.indexOf("## Invariants"),
+      rendered.indexOf("\n\n- The API remains stable."),
+    );
+    const intro = invariantSection.slice(invariantSection.indexOf("\n\n") + 2);
+
+    for (const phrase of [
+      "MUST",
+      "MUST NOT",
+      "planning, execution, validation, and the final result",
+      "compliant path",
+      "smallest safe point",
+      "conflict and available evidence",
+      "ask the developer to resolve it",
+      "invent an exception",
+    ])
+      expect(intro).toContain(phrase);
+    expect(intro).not.toContain("make an exception");
+    expect(rendered).toContain(
+      "Perform them in order unless an invariant or explicit developer direction requires otherwise.",
+    );
+    expect(rendered).not.toContain(
+      "Perform them in order unless a constraint or explicit developer direction requires otherwise.",
+    );
   });
 
   test("keeps responsibilities, instructions, and gotchas semantically separate", () => {

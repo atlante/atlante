@@ -73,7 +73,7 @@ Turn each approved issue into a tested, reviewable change that meets its accepta
 
 ## Invariants
 
-These are properties that must remain true continuously throughout your work. Check each one still holds as you proceed; if an action would break an invariant, stop and adjust rather than completing the step.
+The invariants below are binding. Every invariant MUST hold throughout planning, execution, validation, and the final result. You MUST NOT weaken an invariant, invent an exception, or trade temporary violation for progress. If the requested work conflicts with an invariant, you MUST follow a compliant path. If no compliant path can be established, you MUST stop the affected work at the smallest safe point, report the conflict and available evidence, and ask the developer to resolve it. You MUST NOT resume until a compliant path is established.
 
 - Introduce abstractions only when they remove real duplication or improve clarity.
 - Treat the approved issue and its acceptance criteria as the scope of work; MUST ask the developer before expanding or materially changing them.
@@ -82,7 +82,7 @@ These are properties that must remain true continuously throughout your work. Ch
 
 ## Instructions
 
-These are required actions for completing the work. Perform them in order unless a constraint or explicit developer direction requires otherwise.
+These are required actions for completing the work. Perform them in order unless an invariant or explicit developer direction requires otherwise.
 
 1. Ask the developer to choose whether to start brainstorming or workflow; their choice is the approval to begin, regardless of whether an approved issue or task already exists.
 2. Once chosen, load and follow the selected skill. Workflow requires an approved issue or task as its source of truth; if none exists, clarify the task before loading workflow.
@@ -239,41 +239,57 @@ describe("first-party package resources", () => {
     }
   });
 
-  test("renders an agent workflow in authored section order", () => {
-    const { root, config } = fixture();
-    const template = resolveResourceTemplate(
-      createProjectResourcePack(root),
-      "@atlante/pack/agent",
-      config,
-    );
-    const output = renderResolvedTemplate({
-      template,
-      input: {
-        identity: "Identity",
-        mission: "Mission",
-        sections: [
-          { invariants: ["Before workflow"] },
-          {
-            workflow: {
-              title: "Review workflow",
-              phases: [{ kind: "plan", instructions: ["Plan the review."] }],
-            },
+  test.each([
+    {
+      sections: [
+        { invariants: ["Before workflow"] },
+        {
+          workflow: {
+            title: "Review workflow",
+            phases: [{ kind: "plan", instructions: ["Plan the review."] }],
           },
-          { invariants: ["After workflow"] },
-        ],
-      },
-    });
+        },
+      ],
+      markers: ["Before workflow", "## Review workflow"],
+    },
+    {
+      sections: [
+        {
+          workflow: {
+            title: "Review workflow",
+            phases: [{ kind: "plan", instructions: ["Plan the review."] }],
+          },
+        },
+        { invariants: ["After workflow"] },
+      ],
+      markers: ["## Review workflow", "After workflow"],
+    },
+  ])(
+    "renders an agent workflow in authored section order",
+    ({ sections, markers }) => {
+      const { root, config } = fixture();
+      const template = resolveResourceTemplate(
+        createProjectResourcePack(root),
+        "@atlante/pack/agent",
+        config,
+      );
+      const output = renderResolvedTemplate({
+        template,
+        input: {
+          identity: "Identity",
+          mission: "Mission",
+          sections,
+        },
+      });
 
-    expect(output.indexOf("Before workflow")).toBeLessThan(
-      output.indexOf("## Review workflow"),
-    );
-    expect(output.indexOf("## Review workflow")).toBeLessThan(
-      output.indexOf("After workflow"),
-    );
-    expect(output).toContain(
-      "Execute phases sequentially in the order listed.",
-    );
-  });
+      expect(output.indexOf(markers[0])).toBeLessThan(
+        output.indexOf(markers[1]),
+      );
+      expect(output).toContain(
+        "Execute phases sequentially in the order listed.",
+      );
+    },
+  );
 
   test("renders the canonical workflow identically in agents and skills", () => {
     const { root, config } = fixture();
