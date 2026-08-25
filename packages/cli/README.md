@@ -39,10 +39,10 @@ with an optional contained POSIX subpath. `extends` selects presets,
 `$template` selects template facets, and `$instance` or a bare locator selects
 instances. The selected package must already be declared and installed; the CLI
 does not install or mutate dependencies. Watch mode follows selected manifests,
-facets, transitive files, trusted pack roots, and safe unresolved parent
+template and instance facets, transitive files, trusted pack roots, and safe unresolved parent
 directories, not unrelated resource siblings. `init` validates the selected
 preset before mutating files and performs a build automatically. Run `atlante
-build` after changing source configuration or resources when watch mode is not
+build` after changing source configuration or resource directories when watch mode is not
 active.
 
 The default `init` preset is the static `@atlante/pack` package. The CLI declares

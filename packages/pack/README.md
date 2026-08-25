@@ -2,8 +2,8 @@
 
 Atlante's first-party static pack gives a project a useful default agent and
 skills for deliberate AI-assisted work. It provides the `architect` agent,
-`brainstorming` and `workflow` skills, and reusable facets for composing your
-own agents, skills, workflows, and supporting prompt content.
+`brainstorming` and `workflow` skills, and reusable template and instance facets for
+composing your own agents, skills, workflows, and supporting prompt content.
 
 ## Default usage
 
@@ -76,7 +76,7 @@ are binding guarantees and approval gates, not suggestions.
 ## Pack behavior
 
 This is a static pack with `atlante.format: 1`; it has no runtime
-JavaScript entry point. Atlante loads only the selected facet and its
-transitive dependencies. It does not scan installed packages or install
+JavaScript entry point. Atlante loads only the selected template or instance facet
+and its transitive dependencies. It does not scan installed packages or install
 dependencies, so direct project references must be declared and installed by
 the project's package manager.
