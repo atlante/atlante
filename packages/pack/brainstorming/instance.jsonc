@@ -4,7 +4,7 @@
   "overview": "Create a shared foundation for deliberate, well-scoped work by turning early uncertainty into a coherent direction the developer can carry forward.",
   "sections": [
     {
-      "constraints": [
+      "invariants": [
         "Do not begin workflow, implementation, or file modifications until the presented design is approved by the developer.",
         "Apply this gate even to simple work, including work simple enough to skip a full plan; the design may be brief when the work is simple.",
         "Surface real complexity honestly; never downplay it to appear confident."

@@ -67,20 +67,46 @@ An `atlante.jsonc` can extend the first-party preset and bind an agent template:
   "$schema": "https://atlante.sh/schema/v0.1/schema.json",
   "extends": "@atlante/pack",
   "values": {
-    "project": "my-app"
+    "project": "my-app",
+    "apiRule": "All public APIs must have JSDoc."
   },
   "agents": {
+    "implementer": {
+      "$template": "@atlante/pack/agent",
+      "description": "Implements requested changes in the project.",
+      "identity": "You are a senior implementer on {{values.project}}.",
+      "mission": "Write clean, tested, production-ready code.",
+      "sections": [
+        {
+          "responsibilities": [
+            "Implement features following the spec",
+            "Write unit and integration tests",
+          ],
+        },
+        {
+          "invariants": ["{{values.apiRule}}"],
+        },
+      ],
+    },
+
     "reviewer": {
       "$template": "@atlante/pack/agent",
       "description": "Reviews changes for defects and design issues.",
-      "identity": "You are a reviewer on {{values.project}}.",
-      "mission": "Check the implementation against the project requirements.",
-      "responsibilities": [
-        "Review changes for defects and design issues",
-        "Check adherence to project constraints"
-      ]
-    }
-  }
+      "identity": "You are a thorough code reviewer on {{values.project}}.",
+      "mission": "Ensure code quality and adherence to standards.",
+      "sections": [
+        {
+          "responsibilities": [
+            "Review implementations for bugs and design issues",
+            "Check that project invariants remain satisfied.",
+          ],
+        },
+        {
+          "invariants": ["{{values.apiRule}}"],
+        },
+      ],
+    },
+  },
 }
 ```
 
@@ -88,7 +114,9 @@ The root document supports `$schema`, `extends`, `values`, `agents`, and optiona
 Values are substituted into the prompt definition before rendering; templates do not receive the values dictionary directly.
 The first-party `@atlante/pack/agent` template also accepts ordered `sections`, including workflow sections with phases, delegation, outputs, validation, and correction policies.
 
-Skills are reusable guidance rendered as Markdown. The OpenCode plugin exposes a resolved skill through the `atlante_skill` tool, and Atlante does not execute skill content.
+Skills are structured template input rendered as Markdown, not agents. A
+resolved skill is available to every host agent through the OpenCode plugin
+through the `atlante_skill` tool. Atlante does not execute skill content.
 
 ## How it works
 
