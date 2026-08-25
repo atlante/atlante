@@ -54,8 +54,8 @@ try {
   );
   const opencode = await Bun.file(join(project, "opencode.jsonc")).text();
   assert(
-    opencode.includes("@atlante/opencode-plugin"),
-    "missing @atlante/opencode-plugin in opencode.jsonc",
+    opencode.includes("@atlante/opencode"),
+    "missing @atlante/opencode in opencode.jsonc",
   );
 
   await Bun.$`node ${CLI} validate ${project}`.cwd(project);

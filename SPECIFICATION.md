@@ -932,7 +932,7 @@ The version 0.1 implementation MUST preserve these package responsibilities:
   and reference validation, required fields and types, and template-level
   validation (input schema compliance and composition acyclicity);
 - `@atlante/builder`: preparation and host-independent artifact publication;
-- `@atlante/opencode-plugin`: OpenCode adapter materialization and skill lookup;
+- `@atlante/opencode`: OpenCode adapter materialization and skill lookup;
 - `@atlante/cli`: validation, artifact building, and the `atlante init` entry
   point.
 - `@atlante/pack`: a static first-party resource package with

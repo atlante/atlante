@@ -11,7 +11,7 @@ const PACKAGES = [
   "validator",
   "builder",
   "pack",
-  "opencode-plugin",
+  "opencode",
   "cli",
 ] as const;
 const LEGACY_PACKAGES = ["templates", "presets"] as const;
@@ -94,15 +94,13 @@ test("keeps only pack, CLI, and OpenCode publishable", () => {
     const manifest = readJson(join(ROOT, "packages", name, "package.json"));
     if (manifest.publishConfig) publishable.add(name);
   }
-  expect([...publishable].sort()).toEqual(["cli", "opencode-plugin", "pack"]);
+  expect([...publishable].sort()).toEqual(["cli", "opencode", "pack"]);
 
   const publish = readFileSync(
     join(ROOT, "scripts", "publish-packages.ts"),
     "utf8",
   );
-  expect(publish).toContain(
-    'const PACKAGES = ["pack", "cli", "opencode-plugin"]',
-  );
+  expect(publish).toContain('const PACKAGES = ["pack", "cli", "opencode"]');
   expect(publish).not.toContain("bundled");
 });
 
@@ -137,13 +135,11 @@ test("keeps the first-party pack as a CLI runtime dependency in source", () => {
   expect(dependencies["@atlante/pack"]).toBe("workspace:*");
 });
 
-test("orders release packages pack, CLI, then OpenCode plugin", () => {
+test("orders release packages pack, CLI, then OpenCode adapter", () => {
   const publish = readFileSync(
     join(ROOT, "scripts", "publish-packages.ts"),
     "utf8",
   );
   expect(publish.indexOf('"pack"')).toBeLessThan(publish.indexOf('"cli"'));
-  expect(publish.indexOf('"cli"')).toBeLessThan(
-    publish.indexOf('"opencode-plugin"'),
-  );
+  expect(publish.indexOf('"cli"')).toBeLessThan(publish.indexOf('"opencode"'));
 });

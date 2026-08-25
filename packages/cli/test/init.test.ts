@@ -148,7 +148,7 @@ describe("runInit", () => {
       readFileSync(join(dir, "opencode.jsonc"), "utf8"),
     );
     expect(opencode.model).toBe("anthropic/claude-sonnet-5");
-    expect(opencode.plugin).toContain("@atlante/opencode-plugin");
+    expect(opencode.plugin).toContain("@atlante/opencode");
   });
 
   test("rejects a symlinked project root before changing init targets", async () => {
@@ -566,7 +566,7 @@ describe("runInit", () => {
     const opencode = JSON.parse(
       readFileSync(join(dir, "opencode.jsonc"), "utf8"),
     );
-    expect(opencode.plugin).toContain("@atlante/opencode-plugin");
+    expect(opencode.plugin).toContain("@atlante/opencode");
   });
 
   test("adds the OpenCode schema to a new opencode.jsonc", async () => {
@@ -589,7 +589,7 @@ describe("runInit", () => {
       readFileSync(join(dir, "opencode.jsonc"), "utf8"),
     );
     expect(opencode.model).toBe("anthropic/claude-sonnet-5");
-    expect(opencode.plugin).toContain("@atlante/opencode-plugin");
+    expect(opencode.plugin).toContain("@atlante/opencode");
   });
 
   test("rejects malformed opencode JSONC without modifying it", async () => {
@@ -641,7 +641,7 @@ describe("runInit", () => {
     const opencode = JSON.parse(readFileSync(path, "utf8"));
     expect(opencode.plugin).toEqual([
       ["other-plugin", { enabled: true }],
-      "@atlante/opencode-plugin",
+      "@atlante/opencode",
     ]);
   });
 
@@ -649,7 +649,7 @@ describe("runInit", () => {
     const dir = tempDir();
     const path = join(dir, "opencode.jsonc");
     const original = JSON.stringify({
-      plugin: [["@atlante/opencode-plugin", { enabled: true }]],
+      plugin: [["@atlante/opencode", { enabled: true }]],
     });
     writeFileSync(path, original);
 
@@ -799,7 +799,7 @@ describe("runInit", () => {
     } finally {
       console.log = original;
     }
-    expect(written.join("\n")).toContain("registered @atlante/opencode-plugin");
+    expect(written.join("\n")).toContain("registered @atlante/opencode");
   });
 
   test("reports that the plugin was already registered, rather than claiming a fresh registration", async () => {

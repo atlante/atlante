@@ -54,7 +54,7 @@ Three packages are published to npm:
 | --- | --- |
 | `@atlante/pack` | First-party static presets, templates, and instances |
 | `@atlante/cli` | `init`, `validate`, and `build` |
-| `@atlante/opencode-plugin` | OpenCode host adapter and `atlante_skill` |
+| `@atlante/opencode` | OpenCode host adapter and `atlante_skill` |
 
 The remaining workspaces are private implementation packages for the schema, resource loading, validation, and artifact builder.
 
@@ -89,7 +89,7 @@ npx @atlante/cli validate
 npx @atlante/cli build
 ```
 
-`init` writes `atlante.jsonc`, builds the initial `.atlante/artifacts/` tree, and registers `@atlante/opencode-plugin` in `opencode.jsonc`. This preserves the existing host settings.
+`init` writes `atlante.jsonc`, builds the initial `.atlante/artifacts/` tree, and registers `@atlante/opencode` in `opencode.jsonc`. This preserves the existing host settings.
 
 You can edit the authored configuration and then run `npx @atlante/cli build` again, or use `npx @atlante/cli build --watch` during active editing.
 

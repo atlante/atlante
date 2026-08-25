@@ -1,4 +1,4 @@
-# `@atlante/opencode-plugin`
+# `@atlante/opencode`
 
 OpenCode host adapter for [Atlante](https://github.com/atlante/atlante). It
 reads and verifies the host-neutral artifact tree built by Atlante, atomically
@@ -8,21 +8,21 @@ or later.
 
 ## Published package
 
-The adapter package is published to npm as `@atlante/opencode-plugin`. It ships as a
+The adapter package is published to npm as `@atlante/opencode`. It ships as a
 self-contained Bun-bundled artifact (the `dist/` output of `bun run build` at
 the repository root). `@opencode-ai/plugin` is a peer dependency: the host
 OpenCode installation provides it.
 
 The package exposes two entries:
 
-- `@atlante/opencode-plugin` — the default export (`AtlantePlugin`) registered
+- `@atlante/opencode` — the default export (`AtlantePlugin`) registered
   in `opencode.jsonc`
-- `@atlante/opencode-plugin/api` — the explicit programmatic entry, exporting
+- `@atlante/opencode/api` — the explicit programmatic entry, exporting
   `injectAgents`, `createAtlantePlugin`, `AtlantePlugin`, `createSkillTool`,
   and the adapter's artifact and host configuration types
 
 Import from the `./api` entry with
-`import { injectAgents } from "@atlante/opencode-plugin/api"`.
+`import { injectAgents } from "@atlante/opencode/api"`.
 
 ## Usage
 
@@ -31,7 +31,7 @@ Register the OpenCode adapter package in `opencode.jsonc`:
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["@atlante/opencode-plugin"],
+  "plugin": ["@atlante/opencode"],
 }
 ```
 

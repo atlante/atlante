@@ -186,18 +186,13 @@ function preparePlugin(
 `;
   const entries = parsePluginEntries(path, text);
   if ("error" in entries) return entries;
-  if (entries.some((entry) => pluginId(entry) === "@atlante/opencode-plugin")) {
+  if (entries.some((entry) => pluginId(entry) === "@atlante/opencode")) {
     return { previous, contents: text, registered: false };
   }
 
-  const edits = modify(
-    text,
-    ["plugin"],
-    [...entries, "@atlante/opencode-plugin"],
-    {
-      formattingOptions: { insertSpaces: true, tabSize: 2 },
-    },
-  );
+  const edits = modify(text, ["plugin"], [...entries, "@atlante/opencode"], {
+    formattingOptions: { insertSpaces: true, tabSize: 2 },
+  });
   return { previous, contents: applyEdits(text, edits), registered: true };
 }
 
@@ -428,8 +423,8 @@ export async function runInitWithDependencies(
     if (result !== 0) return result;
     console.log(
       plugin.registered
-        ? `registered @atlante/opencode-plugin in ${opencode}`
-        : `@atlante/opencode-plugin is already registered in ${opencode}`,
+        ? `registered @atlante/opencode in ${opencode}`
+        : `@atlante/opencode is already registered in ${opencode}`,
     );
     return 0;
   } catch (cause) {
