@@ -1,0 +1,126 @@
+@layer reset, atlante.tokens, atlante.base, atlante.components, atlante.utilities;
+
+@layer atlante.tokens {
+  /* Self-hosted fonts. Subsetted latin variable woff2 files vendored from the
+     official Google Fonts repository; one OFL-1.1 notice per family in
+     fonts/<family>/OFL.txt. */
+  @font-face {
+    font-family: "Bodoni Moda";
+    font-style: normal;
+    font-weight: 400 900;
+    font-display: swap;
+    src: url("fonts/bodonimoda/bodoni-moda-latin.woff2") format("woff2");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  }
+  @font-face {
+    font-family: "Source Serif 4";
+    font-style: normal;
+    font-weight: 200 900;
+    font-display: swap;
+    src: url("fonts/sourceserif4/source-serif-4-latin.woff2") format("woff2");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  }
+  @font-face {
+    font-family: "Source Sans 3";
+    font-style: normal;
+    font-weight: 200 900;
+    font-display: swap;
+    src: url("fonts/sourcesans3/source-sans-3-latin.woff2") format("woff2");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  }
+  @font-face {
+    font-family: "JetBrains Mono";
+    font-style: normal;
+    font-weight: 100 800;
+    font-display: swap;
+    src: url("fonts/jetbrainsmono/jetbrains-mono-latin.woff2") format("woff2");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  }
+
+  :root {
+    /* Palette primitives (Phase 3). */
+    --atlante-linen: oklch(94.7% 0.014 67.7); /* #F4ECE4 */
+    --atlante-jet: oklch(24.5% 0.044 254.7); /* Prussian Blue #112135 */
+    --atlante-bronze: oklch(72.9% 0.100 81.7); /* #C7A15A */
+    --atlante-pine: oklch(38.2% 0.041 166.3); /* #2D4A3E */
+    --atlante-brown: oklch(47.5% 0.099 34.1); /* #8B4535 */
+
+    /* Typography roles. */
+    --font-display: "Bodoni Moda", "Bodoni 72", Didot, serif;
+    --font-display-optical-size: 12;
+    --font-body: "Source Serif 4", Georgia, serif;
+    --font-ui: "Source Sans 3", system-ui, sans-serif;
+    --font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+
+    /* Type scale (Phase 3). */
+    --text-display-xl: clamp(72px, 9vw, 144px);
+    --text-display-lg: clamp(52px, 6vw, 96px);
+    --text-heading-1: clamp(40px, 4vw, 64px);
+    --text-heading-2: 32px;
+    --text-heading-3: 24px;
+    --text-lead: 22px;
+    --text-body: 18px;
+    --text-ui: 16px;
+    --text-small: 14px;
+    --text-meta: 11px;
+
+    /* Space: 4px base, core scale (Phase 3). */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-6: 24px;
+    --space-8: 32px;
+    --space-12: 48px;
+    --space-16: 64px;
+    --space-24: 96px;
+    --space-32: 128px;
+
+    /* Layout. */
+    --container-wide: 1480px;
+    --container-content: 72ch;
+    --container-code: 88ch;
+    --control-min: 44px;
+
+    /* Motion. */
+    --duration-utility: 120ms;
+    --duration-editorial: 240ms;
+    --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+    /* Depth: overlays only; ordinary content is flat (Phase 3). */
+    --shadow-overlay: 0 16px 48px rgb(0 0 0 / 0.16);
+
+    /* Light theme semantics. Components consume --ds-* only. */
+    --ds-bg: var(--atlante-linen);
+    --ds-fg: var(--atlante-jet);
+    --ds-muted: oklch(24.5% 0.044 254.7 / 0.68); /* Prussian Blue at 68%, 5.28:1 */
+    --ds-border: var(--atlante-bronze); /* non-text rules and details */
+    --ds-border-subtle: oklch(72.9% 0.100 81.7 / 0.35);
+    --ds-accent: var(--atlante-pine);
+    --ds-accent-fg: var(--atlante-linen); /* 8.31:1 */
+    --ds-code-bg: var(--atlante-jet);
+    --ds-code-fg: var(--atlante-linen); /* 13.90:1 */
+    --ds-code-muted: var(--atlante-bronze); /* 6.71:1 */
+    --ds-success: var(--atlante-pine);
+    --ds-warning: var(--atlante-brown); /* 5.98:1 */
+    --ds-error: var(--atlante-brown);
+    --ds-error-fg: var(--atlante-linen); /* 5.98:1 */
+  }
+
+  [data-theme="dark"] {
+    --ds-bg: var(--atlante-jet);
+    --ds-fg: var(--atlante-linen); /* 13.90:1 */
+    --ds-muted: oklch(94.7% 0.014 67.7 / 0.55); /* 5.11:1 */
+    --ds-border: var(--atlante-bronze); /* 6.71:1 */
+    --ds-border-subtle: oklch(72.9% 0.100 81.7 / 0.35);
+    --ds-accent: var(--atlante-bronze); /* accessible accent on Jet */
+    --ds-accent-fg: var(--atlante-jet); /* 6.71:1 */
+    --ds-code-bg: var(--atlante-jet);
+    --ds-code-fg: var(--atlante-linen);
+    --ds-code-muted: var(--atlante-bronze);
+    --ds-success: oklch(70% 0.05 166.3); /* Pine tint, 6.22:1 */
+    --ds-warning: oklch(68% 0.09 34.1); /* Brown tint, 5.44:1 */
+    --ds-error: oklch(68% 0.09 34.1);
+    --ds-error-fg: var(--atlante-jet); /* 5.44:1 */
+  }
+}
