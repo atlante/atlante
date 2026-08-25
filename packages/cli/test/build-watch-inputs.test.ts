@@ -180,7 +180,19 @@ describe("resolveWatchFiles", () => {
         ),
       ),
     );
-    expect(result.resourcePaths).not.toContain(
+    expect(result.resourcePaths).toContain(
+      canonical(
+        join(
+          dir,
+          "node_modules",
+          "@atlante",
+          "pack",
+          "workflow",
+          "template.jsonc",
+        ),
+      ),
+    );
+    expect(result.resourcePaths).toContain(
       canonical(
         join(
           dir,
@@ -188,6 +200,18 @@ describe("resolveWatchFiles", () => {
           "@atlante",
           "pack",
           "artifact",
+          "template.jsonc",
+        ),
+      ),
+    );
+    expect(result.resourcePaths).not.toContain(
+      canonical(
+        join(
+          dir,
+          "node_modules",
+          "@atlante",
+          "pack",
+          "skill",
           "template.jsonc",
         ),
       ),
