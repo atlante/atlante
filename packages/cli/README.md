@@ -30,7 +30,7 @@ atlante --help
 - `atlante build [path]` — validate, render, and atomically publish host-neutral
   artifacts under `.atlante/artifacts/`
 
-`path` defaults to the current directory and may be a config file or project
+`path` defaults to the current directory and may be a configuration file or project
 directory. Atlante discovers both `atlante.jsonc` and `atlante.json`.
 Validation and building use the same raw-overlay, lazy resource-resolution path
 before checking or rendering the canonical document. Local locators are

@@ -18,7 +18,7 @@ The resource model defines immutable typed identities for:
 - structured source-aware resource failures.
 
 The package is private and is not an npm publication surface. Package loading is
-static and generic; it does not expose a host-adapter API or execute pack code. A
+static and generic; it does not expose a host adapter API or execute pack code. A
 resource pack captures one canonical trusted content root; absolute paths, URLs, unsafe
 traversal, external symlinks, and targets outside that root are rejected. Only
 selected facets and transitive dependencies are read, and unresolved parent

@@ -3,7 +3,7 @@
 OpenCode host adapter for [Atlante](https://github.com/atlante/atlante). It
 reads and verifies the host-neutral artifact tree built by Atlante, atomically
 stages the resulting agent prompts and descriptions in the in-memory host
-config, and exposes skills through the `atlante_skill` tool. Requires Node.js 22
+configuration, and exposes skills through the `atlante_skill` tool. Requires Node.js 22
 or later.
 
 ## Published package
@@ -19,7 +19,7 @@ The package exposes two entries:
   in `opencode.jsonc`
 - `@atlante/opencode-plugin/api` — the explicit programmatic entry, exporting
   `injectAgents`, `createAtlantePlugin`, `AtlantePlugin`, `createSkillTool`,
-  and the adapter's artifact and host-config types
+  and the adapter's artifact and host configuration types
 
 Import from the `./api` entry with
 `import { injectAgents } from "@atlante/opencode-plugin/api"`.
@@ -50,10 +50,10 @@ During initialization, the adapter reads only `.atlante/artifacts/manifest.json`
 and verifies every declared path, payload encoding, and SHA-256 digest before
 materialization. It does not load `atlante.jsonc`, local resources, installed
 packs, or any resolver/loader. If artifacts are absent, malformed,
-unsupported, or changed, the `atlante_skill` tool is omitted and the host config
+unsupported, or changed, the `atlante_skill` tool is omitted and the host configuration
 is unchanged. After the staged result is materialized, the tool is active; a
 failure after materialization, including a runtime failure, moves it to the
 failed lifecycle state. Verification and injection are fail-closed: the host
-config is updated only from a complete verified artifact set, so a failure
+configuration is updated only from a complete verified artifact set, so a failure
 cannot partially mutate the host. The native `skill` tool can coexist with
 `atlante_skill` without either replacing the other.

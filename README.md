@@ -4,7 +4,7 @@
 
 <p align="center">The configuration layer for your coding-agent harness.</p>
 
-Atlante gives software architects, engineers, and developers one versioned source for the agents, skills, and workflows that make up their coding-agent harness. It makes those relationships explicit in the repository so individuals and teams can share, review, and evolve the system through Git.
+Atlante gives software architects, engineers, and developers one versioned source for the agents, skills, and workflows that make up their coding-agent harness. It makes those relationships explicit in the repository so individuals and teams can share, review, and evolve the system through a versioning system (e.g., Git).
 
 The builder validates the authored configuration, composes selected templates, instances, and presets, and publishes deterministic artifacts. A host adapter materializes those artifacts for the host.
 
@@ -13,7 +13,7 @@ The builder validates the authored configuration, composes selected templates, i
 ## Why Atlante
 
 - **Structure:** define agents, skills, workflows, values, and their relationships in one configuration.
-- **Shared source:** keep the harness with project code and review changes through Git.
+- **Shared source:** keep the harness with project code and review changes through a versioning system.
 - **Composition:** inherit presets and compose template and instance facets instead of duplicating prompts.
 - **Validation:** check document structure and template inputs before building artifacts.
 - **Deterministic output:** render prompts and skills into verified artifact files.
@@ -54,7 +54,7 @@ Three packages are published to npm:
 | --- | --- |
 | `@atlante/pack` | First-party static presets, templates, and instances |
 | `@atlante/cli` | `init`, `validate`, and `build` |
-| `@atlante/opencode-plugin` | In-memory agent injection and `atlante_skill` through OpenCode |
+| `@atlante/opencode-plugin` | OpenCode host adapter and `atlante_skill` |
 
 The remaining workspaces are private implementation packages for the schema, resource loading, validation, and artifact builder.
 
@@ -172,7 +172,12 @@ Values are named inputs shared by the document, such as `{{values.project}}`. Du
 
 ### Agent sections
 
-The first-party `@atlante/pack/agent` template accepts an ordered `sections` array. Each section contributes a distinct part of the rendered agent prompt, and the order in the array is preserved. Sections can define responsibilities, or describe workflow behavior such as phases, delegation, expected outputs, validation, and correction policies.
+The first-party `@atlante/pack/agent` and `@atlante/pack/skill` templates
+support an ordered `sections` array. Section variants include `markdown`,
+`instructions`, `responsibilities`, `gotchas`, `workflow`, and `invariants`. Each
+section contributes a distinct part of the rendered output, and the order in the
+array is preserved. Invariants are binding guarantees and approval gates, not
+suggestions; keep them minimal, concrete, and observable.
 
 This lets the same agent template produce different agents without duplicating the template itself.
 
@@ -186,7 +191,7 @@ Atlante validates and renders deterministic artifacts; OpenCode consumes only ve
 
 ### Packs and presets
 
-A pack is a static Atlante content package. It can contain presets, template facets, and instance facets, but it has no JavaScript entry point, registration hook, or executable API.
+A pack is static Atlante content. It can contain presets, template facets, and instance facets, but it has no JavaScript entry point, registration hook, or executable API.
 
 `@atlante/pack` is the first-party pack. `atlante init` uses its default preset unless you provide another preset locator:
 

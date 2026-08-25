@@ -705,7 +705,7 @@ The adapter:
 - SHOULD emit a warning when replacing a non-empty existing host prompt.
 
 The exact warning channel and host-specific file format are adapter concerns.
-The default adapter SHOULD report warnings through builder, CLI, or adapter
+The default adapter SHOULD report warnings through builder, CLI, or host adapter
 diagnostics rather than creating an additional warning file.
 
 ### 7.1 Skill bindings
@@ -932,7 +932,7 @@ The version 0.1 implementation MUST preserve these package responsibilities:
   and reference validation, required fields and types, and template-level
   validation (input schema compliance and composition acyclicity);
 - `@atlante/builder`: preparation and host-independent artifact publication;
-- `@atlante/opencode-plugin`: OpenCode prompt materialization and skill lookup;
+- `@atlante/opencode-plugin`: OpenCode adapter materialization and skill lookup;
 - `@atlante/cli`: validation, artifact building, and the `atlante init` entry
   point.
 - `@atlante/pack`: a static first-party resource package with

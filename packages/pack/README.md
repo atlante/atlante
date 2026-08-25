@@ -68,7 +68,10 @@ Useful public locators include:
 | Supporting templates | `@atlante/pack/workflow`, `@atlante/pack/markdown`, `@atlante/pack/artifact`, `@atlante/pack/gotchas`, `@atlante/pack/instructions`, `@atlante/pack/invariants` |
 
 The default preset exposes the `architect` agent and the `brainstorming` and
-`workflow` skills. The `workflow` skill is the `delivery-workflow` instance.
+`workflow` skills. The `workflow` skill is the `delivery-workflow` instance. The
+agent and skill templates support ordered `markdown`, `instructions`,
+`responsibilities`, `gotchas`, `workflow`, and `invariants` sections. Invariants
+are binding guarantees and approval gates, not suggestions.
 
 ## Pack behavior
 

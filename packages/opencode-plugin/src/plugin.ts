@@ -56,7 +56,7 @@ function commitConfig(
       if (Object.hasOwn(config, key)) {
         if (!Reflect.set(config, key, value, config)) {
           throw new TypeError(
-            `cannot assign host config property ${String(key)}`,
+            `cannot assign host configuration property ${String(key)}`,
           );
         }
       } else {
@@ -79,7 +79,7 @@ function reportFailure(warnings: readonly InjectionWarning[]): void {
   try {
     report(warnings);
   } catch {
-    // Reporting must not turn a failed host-config transaction into a rejected hook.
+    // Reporting must not turn a failed host configuration transaction into a rejected hook.
   }
 }
 
