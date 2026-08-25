@@ -84,7 +84,9 @@ An `atlante.jsonc` can extend the first-party preset and bind an agent template:
 }
 ```
 
-The root document supports `$schema`, `extends`, `values`, `agents`, and optional `skills` fields. Templates define their own input schemas. Values are substituted into the prompt definition before rendering; templates do not receive the values dictionary directly.
+The root document supports `$schema`, `extends`, `values`, `agents`, and optional `skills` fields. Templates define their own input schemas.
+Values are substituted into the prompt definition before rendering; templates do not receive the values dictionary directly.
+The first-party `@atlante/pack/agent` template also accepts ordered `sections`, including workflow sections with phases, delegation, outputs, validation, and correction policies.
 
 Skills are reusable guidance rendered as Markdown. The OpenCode plugin exposes a resolved skill through the `atlante_skill` tool, and Atlante does not execute skill content.
 
