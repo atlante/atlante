@@ -8,7 +8,7 @@ or later.
 
 ## Published package
 
-The plugin is published to npm as `@atlante/opencode-plugin`. It ships as a
+The adapter package is published to npm as `@atlante/opencode-plugin`. It ships as a
 self-contained Bun-bundled artifact (the `dist/` output of `bun run build` at
 the repository root). `@opencode-ai/plugin` is a peer dependency: the host
 OpenCode installation provides it.
@@ -19,14 +19,14 @@ The package exposes two entries:
   in `opencode.jsonc`
 - `@atlante/opencode-plugin/api` — the explicit programmatic entry, exporting
   `injectAgents`, `createAtlantePlugin`, `AtlantePlugin`, `createSkillTool`,
-  and the plugin's artifact and host-config types
+  and the adapter's artifact and host-config types
 
 Import from the `./api` entry with
 `import { injectAgents } from "@atlante/opencode-plugin/api"`.
 
 ## Usage
 
-Register the plugin in `opencode.jsonc`:
+Register the OpenCode adapter package in `opencode.jsonc`:
 
 ```jsonc
 {
@@ -46,7 +46,7 @@ Invalid input, an unknown name, and an inactive, unavailable, or failed tool
 return an error rather than partial content. Skill content is informational
 Markdown: the adapter does not execute it.
 
-During initialization, the plugin reads only `.atlante/artifacts/manifest.json`
+During initialization, the adapter reads only `.atlante/artifacts/manifest.json`
 and verifies every declared path, payload encoding, and SHA-256 digest before
 materialization. It does not load `atlante.jsonc`, local resources, installed
 packs, or any resolver/loader. If artifacts are absent, malformed,

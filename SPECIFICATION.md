@@ -705,7 +705,7 @@ The adapter:
 - SHOULD emit a warning when replacing a non-empty existing host prompt.
 
 The exact warning channel and host-specific file format are adapter concerns.
-The default adapter SHOULD report warnings through builder, CLI, or plugin
+The default adapter SHOULD report warnings through builder, CLI, or adapter
 diagnostics rather than creating an additional warning file.
 
 ### 7.1 Skill bindings
@@ -940,8 +940,8 @@ The version 0.1 implementation MUST preserve these package responsibilities:
 
 `@atlante/resources` is a private workspace package and MUST NOT be published
 as an npm package in version 0.1. Its package-resolution capability is an
-implementation detail of document validation and building, not a public plugin
-API. The OpenCode plugin MUST remain artifact-only and MUST NOT resolve package
+implementation detail of document validation and building, not a public adapter
+API. The OpenCode adapter MUST remain artifact-only and MUST NOT resolve package
 or project source resources.
 
 An adapter MUST consume verified artifact descriptors and MUST NOT contain a

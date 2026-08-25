@@ -4,7 +4,7 @@
 
 <p align="center">The configuration layer for your coding-agent harness.</p>
 
-Atlante gives software architects, engineers, and developers one versioned source for the agents, skills, and workflows that make up their coding-agent harness. It makes those relationships explicit in the repository so individuals and teams can share, review, and evolve the system through a versioning system (e.g., Git).
+Atlante gives software architects, engineers, and developers one versioned source for the agents, skills, and workflows that make up their coding-agent harness. It makes those relationships explicit in the repository so individuals and teams can share, review, and evolve the system through Git.
 
 The builder validates the authored configuration, composes selected templates, instances, and presets, and publishes deterministic artifacts. A host adapter materializes those artifacts for the host.
 
@@ -13,7 +13,7 @@ The builder validates the authored configuration, composes selected templates, i
 ## Why Atlante
 
 - **Structure:** define agents, skills, workflows, values, and their relationships in one configuration.
-- **Shared source:** keep the harness with project code and review changes through a versioning system.
+- **Shared source:** keep the harness with project code and review changes through Git.
 - **Composition:** inherit presets and compose template and instance facets instead of duplicating prompts.
 - **Validation:** check document structure and template inputs before building artifacts.
 - **Deterministic output:** render prompts and skills into verified artifact files.
@@ -89,7 +89,7 @@ npx @atlante/cli validate
 npx @atlante/cli build
 ```
 
-`init` writes `atlante.jsonc` which builds the initial `.atlante/artifacts/` tree, and registers `@atlante/opencode-plugin` in `opencode.jsonc`. Note that these preserves the existing host settings! 
+`init` writes `atlante.jsonc`, builds the initial `.atlante/artifacts/` tree, and registers `@atlante/opencode-plugin` in `opencode.jsonc`. This preserves the existing host settings.
 
 You can edit the authored configuration and then run `npx @atlante/cli build` again, or use `npx @atlante/cli build --watch` during active editing.
 
@@ -178,9 +178,9 @@ This lets the same agent template produce different agents without duplicating t
 
 ### Skills
 
-Skills are reusable guidance, not agents. A skill uses structured template input and is rendered as Markdown. After the artifacts are built, the OpenCode plugin makes a resolved skill available to host agents through the `atlante_skill` tool. Atlante provides the rendered content but does not execute the skill.
+Skills are reusable guidance, not agents. A skill uses structured template input and is rendered as Markdown. After the artifacts are built, the OpenCode adapter makes a resolved skill available to host agents through the `atlante_skill` tool. Atlante provides the rendered content but does not execute the skill.
 
-For OpenCode, the plugin loads only the verified `.atlante/artifacts/` tree. It writes the rendered agent `prompt` and `description` fields during initialization. Models, permissions, tools, and modes remain owned by OpenCode.
+For OpenCode, the adapter loads only the verified `.atlante/artifacts/` tree. It writes the rendered agent `prompt` and `description` fields during initialization. Models, permissions, tools, and modes remain owned by OpenCode.
 
 Atlante validates and renders deterministic artifacts; OpenCode consumes only verified artifacts, while Atlante does not execute agents, skills, or project code.
 
@@ -200,7 +200,7 @@ Use an ordered `extends` array when a configuration needs multiple preset layers
 
 ## Status
 
-The current alpha `v0.1` follows the [`SPECIFICATION.md`](SPECIFICATION.md) as normativ technical contract.
+The current alpha `v0.1` follows the [`SPECIFICATION.md`](SPECIFICATION.md) as the normative technical contract.
 
 ## License
 

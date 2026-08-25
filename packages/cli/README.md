@@ -24,9 +24,9 @@ atlante --help
 ## Commands
 
 - `atlante init [path] [--preset <package-locator>] [--force]` — scaffold
-  `atlante.jsonc`, register `@atlante/opencode-plugin`, and build artifacts
-- `atlante validate [path]` — validate the document, selected resource facets,
-  and template inputs without rendering
+  `atlante.jsonc`, register the OpenCode adapter package, and build artifacts
+- `atlante validate [path]` — validate the document, selected template and instance
+  facets, and template inputs without rendering
 - `atlante build [path]` — validate, render, and atomically publish host-neutral
   artifacts under `.atlante/artifacts/`
 
@@ -52,7 +52,7 @@ The pack has `atlante.format: 1` and no executable API.
 
 `init` creates or updates `opencode.jsonc` while preserving existing settings.
 
-The OpenCode plugin is an artifact-only boundary: it never reads the source
+The OpenCode adapter is an artifact-only boundary: it never reads the source
 configuration or installed packs. The artifact format and its verification rules
 are documented in
 [`SPECIFICATION.md`](../../SPECIFICATION.md) §9.1; the builder's fail-closed

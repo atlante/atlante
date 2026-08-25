@@ -1,6 +1,6 @@
 # `@atlante/pack`
 
-Atlante's first-party resource pack gives a project a useful default agent and
+Atlante's first-party static pack gives a project a useful default agent and
 skills for deliberate AI-assisted work. It provides the `architect` agent,
 `brainstorming` and `workflow` skills, and reusable facets for composing your
 own agents, skills, workflows, and supporting prompt content.
@@ -15,7 +15,7 @@ npx @atlante/cli init
 
 The CLI uses `@atlante/pack` as the default preset and writes
 `"extends": "@atlante/pack"` to `atlante.jsonc`. It also registers the
-OpenCode plugin and builds the initial artifacts. The default initialization
+OpenCode adapter package and builds the initial artifacts. The default initialization
 path resolves the pack from the CLI installation, so it does not require a
 separate `@atlante/pack` installation.
 
@@ -72,7 +72,7 @@ The default preset exposes the `architect` agent and the `brainstorming` and
 
 ## Pack behavior
 
-This is a static resource package with `atlante.format: 1`; it has no runtime
+This is a static pack with `atlante.format: 1`; it has no runtime
 JavaScript entry point. Atlante loads only the selected facet and its
 transitive dependencies. It does not scan installed packages or install
 dependencies, so direct project references must be declared and installed by
