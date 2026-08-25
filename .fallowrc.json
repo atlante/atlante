@@ -1,0 +1,9 @@
+{
+  "dynamicallyLoaded": ["stryker.qualification.config.ts"],
+  "ignoreExports": [
+    {
+      "file": "packages/schema/test/qualification-fixture.ts",
+      "exports": ["isZero"]
+    }
+  ]
+}

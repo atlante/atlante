@@ -15,7 +15,7 @@ export type QualificationResult = {
   timeouts: number;
 };
 
-export class QualificationError extends Error {
+class QualificationError extends Error {
   readonly kind = "infrastructure" as const;
   readonly phase = "dry-run" as const;
   readonly exitCode: number;
