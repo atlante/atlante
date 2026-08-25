@@ -296,7 +296,7 @@ function validateInputSchema(
   try {
     validate = ajv.compile(schema);
   } catch {
-    // A structurally invalid inputSchema (SPECIFICATION.md §8.2) must be
+    // A structurally invalid inputSchema (SPECIFICATION.md, Validation) must be
     // rejected as a diagnostic, not surfaced as Ajv's uncaught compile error.
     return [
       error(
@@ -1157,7 +1157,7 @@ function bindingValueDiagnostics(
       diagnostics.push(
         error(
           "non-string-value",
-          `${subject} "${bindingId}" template "${templateId}": binding value "${key}" must be a string (SPECIFICATION.md §4.2)`,
+          `${subject} "${bindingId}" template "${templateId}": binding value "${key}" must be a string (SPECIFICATION.md, Configuration Document)`,
           { path },
         ),
       );

@@ -74,7 +74,7 @@ function valueLayerIssues(
       issues.push(
         issue(
           "non-string-value",
-          `${label} value "${key}" must be a string or null (SPECIFICATION.md §4.2)`,
+          `${label} value "${key}" must be a string or null (SPECIFICATION.md, Configuration Document)`,
           valuePointer,
           locations,
         ),
