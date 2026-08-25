@@ -1,4 +1,4 @@
-# Atlante Production Logo Exports
+# Atlante production logo exports
 
 This directory contains named production exports organized by asset family and
 derived from the canonical `../final_logo.svg` master. The artwork is not

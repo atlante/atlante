@@ -1,8 +1,8 @@
-# Self-Hosted Fonts
+# Bundled fonts
 
-These are upright, latin-subset variable WOFF2 files used by the Atlante design
-specimens. The files are vendored so rendering does not depend on a third-party
-font request or a changing CDN response.
+These are upright, Latin-subset variable WOFF2 files bundled with Atlante's public logo exports and design
+specimens. The files are vendored so rendering does not depend on a third-party font request or a changing
+CDN response.
 
 | Family         | File                                       | Axes                          | Google Fonts revision |
 | -------------- | ------------------------------------------ | ----------------------------- | --------------------- |

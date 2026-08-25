@@ -5,7 +5,7 @@ skills for deliberate AI-assisted work. It provides the `architect` agent,
 `brainstorming` and `workflow` skills, and reusable facets for composing your
 own agents, skills, workflows, and supporting prompt content.
 
-## Default Usage
+## Default usage
 
 Initialize a project with the first-party pack:
 
@@ -19,7 +19,7 @@ OpenCode plugin and builds the initial artifacts. The default initialization
 path resolves the pack from the CLI installation, so it does not require a
 separate `@atlante/pack` installation.
 
-## Explicit Usage
+## Explicit usage
 
 Install the pack when a project-authored configuration references it directly:
 
@@ -70,7 +70,7 @@ Useful public locators include:
 The default preset exposes the `architect` agent and the `brainstorming` and
 `workflow` skills. The `workflow` skill is the `delivery-workflow` instance.
 
-## Pack Behavior
+## Pack behavior
 
 This is a static resource package with `atlante.format: 1`; it has no runtime
 JavaScript entry point. Atlante loads only the selected facet and its
