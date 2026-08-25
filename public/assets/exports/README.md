@@ -47,6 +47,7 @@ Prussian Blue is `6.71:1` (previously `5.99:1`).
 | `favicons/atlante-favicon-1024.png`, `favicons/atlante-favicon-reverse-1024.png`                 | 683 x 1024 | High-resolution glyph sources  |
 | `favicons/atlante-favicon.png`, `favicons/atlante-favicon-reverse.png`                           |  256 x 256 | Raster favicon deliveries      |
 | `social/atlante-social.svg`, `social/atlante-social-reverse.svg`                                 | 1200 x 630 | Social preview SVG sources     |
+| `social/atlante-social.png`                                                                  | 1200 x 630 | GitHub social preview image    |
 
 Normal exports are self-contained Prussian Blue-on-Linen applications
 (`#112135` on `#F4ECE4`). Reverse exports are self-contained
