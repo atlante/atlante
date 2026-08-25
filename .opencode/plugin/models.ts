@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import type { Plugin } from "@opencode-ai/plugin";
 
 const MODEL_FILE = ".opencode/models.json";
-const DEFAULT_MODEL = "opencode/x-preview-f-free";
+const DEFAULT_MODEL = "opencode/deepseek-v4-flash-free";
 const ROLES = ["architect", "general", "explore"] as const;
 
 type Role = (typeof ROLES)[number];
