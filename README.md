@@ -42,7 +42,7 @@ atlante init
 
 `--force` replaces an existing `atlante.jsonc` and removes the alternate `atlante.json`.
 
-## A quick-start demonstration
+## Flow
 
 ```mermaid
 flowchart LR
