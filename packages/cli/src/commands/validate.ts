@@ -19,6 +19,6 @@ export async function runValidate(
   printDiagnostics(validated.diagnostics);
   if (hasErrors(validated.diagnostics)) return 1;
 
-  console.log(`ok: ${validated.configPath}`);
+  console.log(`validated ${validated.configPath}`);
   return 0;
 }

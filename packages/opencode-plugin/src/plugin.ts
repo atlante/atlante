@@ -11,7 +11,7 @@ import { createSkillTool, type SkillToolState } from "./skill-tool.js";
 function report(warnings: readonly InjectionWarning[]): void {
   for (const warning of warnings) {
     console.error(
-      `[atlante] ${warning.severity}: [${warning.code}] ${warning.message}`,
+      `[atlante] ${warning.severity} [${warning.code}]: ${warning.message}`,
     );
   }
 }

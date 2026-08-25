@@ -562,7 +562,9 @@ describe("AtlantePlugin", () => {
       await hooks.config?.(config as unknown as Config);
     });
 
-    expect(errors).toEqual([expect.stringContaining("[prompt-replaced]")]);
+    expect(errors).toEqual([
+      `[atlante] warning [prompt-replaced]: replaced the existing prompt of host agent "reviewer"`,
+    ]);
     expect(config.agent?.reviewer).toMatchObject({
       model: "host-model",
       mode: "primary",
@@ -619,7 +621,7 @@ describe("AtlantePlugin", () => {
     expect(hooks.tool?.atlante_skill).toBeDefined();
   });
 
-  test("leaves the host config untouched when commit assignment fails", async () => {
+  test("leaves the host configuration untouched when commit assignment fails", async () => {
     const dir = builtProject(validWithSkill);
     const hooks = await AtlantePlugin(pluginInput(dir));
     const config = { first: "old" } as HostConfig;

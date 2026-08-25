@@ -231,7 +231,7 @@ describe("runInit", () => {
 
     expect(result.result).toBe(0);
     expect(result.errors.join("\n")).toContain(
-      "warning: unable to sync published artifact directory: injected publication warning",
+      "warning [post-publication-sync-failed]: unable to sync published artifact directory: injected publication warning",
     );
     expect(
       existsSync(join(dir, ".atlante", "artifacts", "manifest.json")),
@@ -601,7 +601,9 @@ describe("runInit", () => {
     const result = await captureErrors(() => runInit(dir, {}));
 
     expect(result.result).toBe(1);
-    expect(result.errors.join("\n")).toContain("malformed JSONC");
+    expect(result.errors.join("\n")).toContain(
+      "invalid-opencode-configuration",
+    );
     expect(readFileSync(path, "utf8")).toBe(original);
     expect(existsSync(join(dir, "atlante.jsonc"))).toBe(false);
   });
