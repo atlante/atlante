@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 2,
+  "workspace": "validator",
+  "command": "bun run mutation:test validator",
+  "source": {
+    "identity": "packages/validator/src/**/*.ts",
+    "algorithm": "sha256:path\u0000bytes\u0000:v1",
+    "sha256": "28377820ad37412bc51b8c1b795c8f75fd6c609687ea2da80502770ba29b7d91",
+    "files": [
+      "packages/validator/src/diagnostic-decoration.ts",
+      "packages/validator/src/diagnostic.ts",
+      "packages/validator/src/discover.ts",
+      "packages/validator/src/document.ts",
+      "packages/validator/src/index.ts",
+      "packages/validator/src/templates.ts"
+    ],
+    "fileCount": 6
+  },
+  "report": {
+    "identity": "mutation/validator/mutation.json",
+    "sha256": "c80a7712563a72c19f181becd34e3c3d3622b1648ba7c84979383ea0bbe7e9c5"
+  },
+  "versions": {
+    "bun": "1.3.14",
+    "node": "22.20.0",
+    "vitest": "4.1.11",
+    "stryker": "10.0.0"
+  },
+  "runtime": "12m24s",
+  "exitCode": 0,
+  "counts": {
+    "files": 5,
+    "mutants": 1324,
+    "killed": 930,
+    "survived": 308,
+    "noCoverage": 85,
+    "mutationScore": 70.29,
+    "timeouts": 0,
+    "errors": 0,
+    "ignored": 1
+  },
+  "generatedAt": "2026-08-25T16:01:16Z",
+  "commitBase": "d3e232e"
+}

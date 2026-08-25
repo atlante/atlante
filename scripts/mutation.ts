@@ -119,14 +119,15 @@ export async function runMutation(
     process.env.ATLANTE_MUTATION_ROOT,
     process.cwd(),
   );
+  const preflight = await runChild(
+    ["bun", "run", "test"],
+    { shell: false },
+    resolved,
+  );
+  if (preflight !== 0) return preflight;
+
   const release = await acquireMutationCampaign(mutationRoot, workspace);
   try {
-    const preflight = await runChild(
-      ["bun", "run", "test"],
-      { shell: false },
-      resolved,
-    );
-    if (preflight !== 0) return preflight;
     return runChild(
       ["bun", "x", "stryker", "run", "stryker.config.ts"],
       {

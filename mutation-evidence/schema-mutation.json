@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 2,
+  "workspace": "schema",
+  "command": "bun run mutation:test schema",
+  "source": {
+    "identity": "packages/schema/src/**/*.ts",
+    "algorithm": "sha256:path\u0000bytes\u0000:v1",
+    "sha256": "e61590f2947b6cd5979c28e5b6ec03aaa3d511dce881ec42dcee4ef86c87cddb",
+    "files": [
+      "packages/schema/src/document.ts",
+      "packages/schema/src/index.ts",
+      "packages/schema/src/values.ts"
+    ],
+    "fileCount": 3
+  },
+  "report": {
+    "identity": "mutation/schema/mutation.json"
+  },
+  "reproducibility": {
+    "campaigns": 2,
+    "comparison": "source-file-and-mutant-id-plus-status",
+    "exact": true,
+    "manifests": [
+      "mutation-evidence/schema-run1.json",
+      "mutation-evidence/schema-run2.json"
+    ],
+    "verdictEntries": 188,
+    "verdictSha256": "104bf4cccd3b885deba7e7ce4de4b12fdb37ac836cf6fe88589e346cc096c187",
+    "runtimes": ["0m57s", "0m57s"],
+    "exitCodes": [0, 0]
+  },
+  "versions": {
+    "bun": "1.3.14",
+    "node": "22.20.0",
+    "vitest": "4.1.11",
+    "stryker": "10.0.0"
+  },
+  "runtime": "0m57s",
+  "exitCode": 0,
+  "counts": {
+    "files": 2,
+    "mutants": 188,
+    "killed": 130,
+    "survived": 14,
+    "noCoverage": 1,
+    "mutationScore": 89.66,
+    "timeouts": 0,
+    "errors": 0,
+    "ignored": 43
+  },
+  "generatedAt": "2026-08-25T16:01:16Z",
+  "commitBase": "d3e232e"
+}

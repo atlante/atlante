@@ -34,7 +34,11 @@ const config = {
   // Sandboxes keep source restoration independent from signal handling.
   inPlace: false,
   vitest: { configFile: "vitest.config.ts", related: false },
-  testFiles: ["packages/*/test/**/*.test.ts", "scripts/*.test.ts"],
+  testFiles: [
+    "packages/*/test/**/*.test.ts",
+    "scripts/mutation.test.ts",
+    "scripts/mutation-root.test.ts",
+  ],
   mutate: [`packages/${workspace}/src/**/*.ts`],
   reporters: ["clear-text", "html", "json", "progress"],
   htmlReporter: { fileName: reportPath("mutation.html") },

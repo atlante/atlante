@@ -1,0 +1,959 @@
+{
+  "schemaVersion": 1,
+  "workspace": "schema",
+  "run": 1,
+  "algorithm": "sha256:json(sorted-source-mutantId-status):v1",
+  "verdictSha256": "104bf4cccd3b885deba7e7ce4de4b12fdb37ac836cf6fe88589e346cc096c187",
+  "counts": {
+    "entries": 188,
+    "files": 2,
+    "statuses": {
+      "Ignored": 43,
+      "Killed": 130,
+      "Survived": 14,
+      "NoCoverage": 1
+    }
+  },
+  "verdict": [
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "0",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "1",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "2",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "3",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "4",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "5",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "6",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "7",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "8",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "9",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "10",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "11",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "12",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "13",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "14",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "15",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "16",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "17",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "18",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "19",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "20",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "21",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "22",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "23",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "25",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "26",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "27",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "28",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "29",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "30",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "31",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "33",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "34",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "35",
+      "status": "Survived"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "36",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "37",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "38",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "40",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "41",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "42",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "43",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "44",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "45",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "46",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "47",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "48",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "50",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "51",
+      "status": "Survived"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "52",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "53",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "54",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "55",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "56",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "57",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "58",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "60",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "61",
+      "status": "Survived"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "62",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "63",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "64",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "65",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "66",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "67",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "69",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "70",
+      "status": "Survived"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "71",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "72",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "73",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "74",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "75",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "76",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "77",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "78",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "79",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "80",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "81",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "82",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "83",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "84",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "85",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "86",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "87",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "88",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "89",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "90",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "91",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "92",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "93",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "94",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "95",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "96",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "97",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "98",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "99",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "100",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "101",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "mutantId": "102",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "103",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "105",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "106",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "107",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "108",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "109",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "110",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "111",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "112",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "113",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "114",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "115",
+      "status": "Survived"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "116",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "117",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "118",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "119",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "120",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "121",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "122",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "123",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "124",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "125",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "126",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "127",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "128",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "129",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "130",
+      "status": "Survived"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "131",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "132",
+      "status": "Survived"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "133",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "134",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "135",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "136",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "137",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "138",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "139",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "140",
+      "status": "Survived"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "141",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "142",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "143",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "144",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "145",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "146",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "147",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "148",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "149",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "150",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "151",
+      "status": "Survived"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "152",
+      "status": "Survived"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "153",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "154",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "155",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "156",
+      "status": "Survived"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "157",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "158",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "159",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "160",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "161",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "162",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "163",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "164",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "165",
+      "status": "Survived"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "166",
+      "status": "NoCoverage"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "168",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "169",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "170",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "171",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "172",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "173",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "174",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "175",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "176",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "177",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "179",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "180",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "181",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "182",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "183",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "184",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "185",
+      "status": "Survived"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "186",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "187",
+      "status": "Survived"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "188",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "189",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "190",
+      "status": "Killed"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "191",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "192",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "193",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "194",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "195",
+      "status": "Ignored"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "mutantId": "196",
+      "status": "Ignored"
+    }
+  ]
+}
