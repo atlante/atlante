@@ -14,9 +14,9 @@
 - {{this}}
 {{/each}}
 {{/if}}
-{{#if constraints}}
+{{#if invariants}}
 
-{{> slot/sections/constraints constraints}}
+{{> slot/sections/invariants invariants}}
 {{/if}}
 {{#if markdown}}
 

@@ -4,7 +4,7 @@
   "overview": "Provide a disciplined delivery framework that keeps approved work scoped, maintainable, and accountable from handoff through completion, with decisions and outcomes grounded in the issue's acceptance criteria. This workflow is driven by an orchestrator that delegates each task to a focused sub-agent, coordinates their outputs, and enforces the workflow's quality gates.",
   "sections": [
     {
-      "constraints": [
+      "invariants": [
         "Do not begin implementation until the developer approves the implementation plan when a full plan is warranted.",
         "For behavior changes, do not make implementation changes before a focused test demonstrates the planned behavior.",
         "The orchestrator drives all phases but never edits files directly; it delegates every write, including corrections, to sub-agents, tracks progress, and integrates results.",
