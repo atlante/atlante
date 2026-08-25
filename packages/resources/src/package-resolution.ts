@@ -894,11 +894,16 @@ function searchPackageDirectory(
   let current = startingDirectory;
   let state = initialState;
 
-  while (pathWithin(scope.root, current)) {
+  const visited = new Set<string>();
+  for (const _ of resolve(current)) {
+    if (!pathWithin(scope.root, current)) break;
+    if (visited.has(current)) break;
+    visited.add(current);
     const step = packageDirectoryStep(pack, scope, current, packageName, state);
     if (step.candidate) return step;
     state = packageDirectoryState(step);
     if (!step.next) break;
+    if (step.next === current) break;
     current = step.next;
   }
   return state;
@@ -912,7 +917,10 @@ function searchCanonicalAncestors(
   let current = dirname(pack.root);
   let state = initialState;
 
-  while (true) {
+  const visited = new Set<string>();
+  for (const _ of resolve(current)) {
+    if (visited.has(current)) break;
+    visited.add(current);
     const scope: PackageLookupScope = {
       root: current,
       lexicalRoot:
@@ -923,7 +931,9 @@ function searchCanonicalAncestors(
     if (step.candidate) return step;
     state = packageDirectoryState(step);
     if (current === dirname(current)) break;
-    current = dirname(current);
+    const parent = dirname(current);
+    if (parent === current) break;
+    current = parent;
   }
   return state;
 }

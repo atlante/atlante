@@ -2188,4 +2188,104 @@ describe("resource resolution", () => {
       realpathSync(join(packageRoot, "reviewer")),
     );
   });
+
+  test("uses the in-memory root document and resolves both locator references", () => {
+    const { root, config } = rootOf();
+    writeTemplate(root, "agent-template", { type: "object" });
+    writeInstance(root, "agent-instance", {
+      $template: "../agent-template",
+      value: "from-instance",
+    });
+    const document = {
+      agents: {
+        fromLocator: { $instance: "./agent-instance", description: "Locator" },
+        fromObject: {
+          $template: "./agent-template",
+          description: "Object",
+          value: "from-object",
+        },
+      },
+    };
+
+    const result = resolveResourceDocument({
+      pack: createProjectResourcePack(root),
+      rootFile: config,
+      rootDocument: document,
+    });
+
+    expect(result.raw).toEqual(document);
+    expect(result.bindings.agents.fromLocator?.input).toEqual({
+      value: "from-instance",
+    });
+    expect(result.bindings.agents.fromObject?.input).toEqual({
+      value: "from-object",
+    });
+  });
+
+  test("applies preset precedence and tombstones across every branch", () => {
+    const { root, config } = rootOf();
+    writePreset(root, "first", {
+      settings: { keep: "first", replace: "first", remove: "present" },
+    });
+    writePreset(root, "second", {
+      settings: { replace: "second", remove: null },
+    });
+    writePreset(root, "third", {
+      settings: { replace: "third" },
+    });
+    writeFileSync(
+      config,
+      `${JSON.stringify({
+        extends: ["./first", "./second", "./third"],
+        settings: { replace: "local", remove: "restored", local: true },
+      })}\n`,
+    );
+
+    const result = resolveDocument(root, config);
+
+    expect(result.effectiveRaw.settings).toEqual({
+      keep: "first",
+      local: true,
+      remove: "restored",
+      replace: "local",
+    });
+    expect(originPath(result.provenance, "/settings/replace")).toBe(
+      "atlante.jsonc",
+    );
+  });
+
+  test.each([
+    ["empty", { $template: "" }],
+    ["number", { $instance: 1 }],
+    ["both", { $template: "./a", $instance: "./b" }],
+  ])("rejects malformed instance input: %s", (_name, input) => {
+    const { root, config } = rootOf();
+    writeTemplate(root, "a");
+    writeInstance(root, "b", { $template: "../a" });
+    writeInstance(root, "bad", input);
+
+    expectFailure(
+      () =>
+        resolveResourceInstance({
+          pack: createProjectResourcePack(root),
+          locator: "./bad",
+          authoringFile: config,
+        }),
+      _name === "both" ? "conflicting-selectors" : "invalid-resolved-input",
+    );
+  });
+
+  test("reports cycles and malformed preset extends without escaping as generic errors", () => {
+    const { root, config } = rootOf();
+    writePreset(root, "cycle-a", { extends: "../cycle-b" });
+    writePreset(root, "cycle-b", { extends: "../cycle-a" });
+    writeFileSync(config, `${JSON.stringify({ extends: "./cycle-a" })}\n`);
+    expectFailure(() => resolveDocument(root, config), "resource-cycle");
+
+    writeFileSync(config, `${JSON.stringify({ extends: ["./cycle-a", 4] })}\n`);
+    expectFailure(
+      () => resolveDocument(root, config),
+      "invalid-resolved-input",
+    );
+  });
 });

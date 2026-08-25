@@ -55,6 +55,31 @@ afterEach(() => {
 });
 
 describe("resource locator resolution", () => {
+  test.each([
+    ["", "invalid-locator"],
+    ["./", "local"],
+    ["../parent", "local"],
+    ["package", "package"],
+    ["@scope/package", "package"],
+    ["@scope/package/subpath", "package"],
+  ] as const)("classifies authored locator %j", (raw, expected) => {
+    if (expected === "invalid-locator") {
+      expectFailure(() => parseResourceLocator(raw), expected);
+      return;
+    }
+    expect(parseResourceLocator(raw).kind).toBe(expected);
+  });
+
+  test.each([
+    "./resource//child",
+    "@/package",
+    "@scope/",
+    "@scope/package/..",
+    "pkg/child\\file",
+  ])("rejects malformed locator %j", (raw) => {
+    expectFailure(() => parseResourceLocator(raw), "invalid-locator");
+  });
+
   test("resolves ./child and ../sibling from the containing file, not cwd", () => {
     const root = projectRoot();
     const containing = authoringFile(root, "config/nested/source.jsonc");

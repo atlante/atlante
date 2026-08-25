@@ -47,28 +47,54 @@ test("loads a workspace-specific Stryker temp directory with unconditional clean
 
   expect(config).toEqual(
     expect.objectContaining({
-      tempDirName: expect.stringMatching(/^mutation\/schema\/temp-/),
+      tempDirName: expect.stringContaining(
+        join(
+          process.env.ATLANTE_MUTATION_ROOT ?? "mutation",
+          "schema",
+          "temp-",
+        ),
+      ),
       cleanTempDir: "always",
     }),
   );
   expect(config).not.toHaveProperty("tempDir");
 });
 
-test("uses a process pool for Stryker's Vitest run", async () => {
+test("uses the official Vitest runner without a custom fork pool", async () => {
   vi.stubEnv("ATLANTE_MUTATION_WORKSPACE", "schema");
 
   const { default: config } = await import("../vitest.config.ts");
 
-  expect(config.test?.pool).toBe("forks");
+  expect(config.test?.pool).toBeUndefined();
 });
 
-test("runs the complete suite in one Stryker worker", async () => {
+test("runs the complete suite in one Stryker worker with bounded reuse", async () => {
   vi.stubEnv("ATLANTE_MUTATION_WORKSPACE", "schema");
 
   const { default: config } = await import("../stryker.config.ts");
 
   expect(config.concurrency).toBe(1);
+  expect(config.timeoutMS).toBe(5_000);
+  expect(config.maxTestRunnerReuse).toBe(50);
   expect(config.inPlace).toBe(false);
+});
+
+test("keeps mutation sandboxes out of recursive test discovery", async () => {
+  vi.stubEnv("ATLANTE_MUTATION_WORKSPACE", "schema");
+
+  const { default: config } = await import("../stryker.config.ts");
+
+  // Regression guard for the prior recursive sandbox scan that observed
+  // roughly 445k generated files and exhausted the Node heap.
+  expect(config.ignorePatterns).toContain("mutation/**");
+  expect(config.ignorePatterns).not.toContain("/mutation/**");
+});
+
+test("keeps Vitest's complete recursive suite out of mutation artifacts", async () => {
+  const { default: config } = await import("../vitest.config.ts");
+
+  expect(config.test?.include).toContain("**/*.test.ts");
+  expect(config.test?.exclude).toContain("**/mutation/**");
 });
 
 test.each([[], ["schema", "resources"], ["unknown"]])(

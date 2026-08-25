@@ -15,4 +15,20 @@ describe("JSON path traversal", () => {
     expect(jsonValueAtPath(value, ["array", "not-an-index"])).toBeUndefined();
     expect(jsonValueAtPath(value, ["missing"])).toBeUndefined();
   });
+
+  test.each([
+    [null, ["value"]],
+    ["text", ["value"]],
+    [42, ["value"]],
+    [[], ["0"]],
+  ] as const)(
+    "returns undefined for non-traversable path %j",
+    (value, path) => {
+      expect(jsonValueAtPath(value, path)).toBeUndefined();
+    },
+  );
+
+  test("preserves an explicitly stored null", () => {
+    expect(jsonValueAtPath({ value: null }, ["value"])).toBeNull();
+  });
 });

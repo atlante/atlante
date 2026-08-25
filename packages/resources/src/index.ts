@@ -18,10 +18,7 @@ export {
 } from "./content-root.js";
 export type { ResourceFailureContext } from "./errors.js";
 export { ResourceResolutionError } from "./errors.js";
-export type {
-  LoadedResource,
-  ResourceLoadOptions,
-} from "./facets.js";
+export type { LoadedResource, ResourceLoadOptions } from "./facets.js";
 export {
   loadInstanceFacet,
   loadPresetFacet,

@@ -1,4 +1,5 @@
 import { spawn as spawnProcess } from "node:child_process";
+import { acquireMutationCampaign, resolveMutationRoot } from "./mutation-root";
 
 export const MUTATION_WORKSPACES = [
   "schema",
@@ -114,20 +115,29 @@ export async function runMutation(
       }),
     escalationMs: dependencies.escalationMs ?? 5_000,
   };
-  const preflight = await runChild(
-    ["bun", "run", "test"],
-    { shell: false },
-    resolved,
+  const mutationRoot = resolveMutationRoot(
+    process.env.ATLANTE_MUTATION_ROOT,
+    process.cwd(),
   );
-  if (preflight !== 0) return preflight;
-  return runChild(
-    ["bun", "x", "stryker", "run", "stryker.config.ts"],
-    {
-      shell: false,
-      env: { ...process.env, ATLANTE_MUTATION_WORKSPACE: workspace },
-    },
-    resolved,
-  );
+  const release = await acquireMutationCampaign(mutationRoot, workspace);
+  try {
+    const preflight = await runChild(
+      ["bun", "run", "test"],
+      { shell: false },
+      resolved,
+    );
+    if (preflight !== 0) return preflight;
+    return runChild(
+      ["bun", "x", "stryker", "run", "stryker.config.ts"],
+      {
+        shell: false,
+        env: { ...process.env, ATLANTE_MUTATION_WORKSPACE: workspace },
+      },
+      resolved,
+    );
+  } finally {
+    await release();
+  }
 }
 
 if (import.meta.main) {

@@ -4,6 +4,7 @@ import {
   parseJsoncWithLocations,
   parseJsonWithLocations,
 } from "../src/index.js";
+import { isSafeJsonObject } from "../src/jsonc.js";
 
 describe("JSONC parsing", () => {
   test("collects root, nested, and array locations", () => {
@@ -77,6 +78,42 @@ describe("JSONC parsing", () => {
       "/nested": { line: 2, column: 13 },
       "/nested/value": { line: 3, column: 14 },
     });
+  });
+
+  test("locates values at the first and last line boundaries", () => {
+    const source = `{
+  "first": 1
+}
+`;
+
+    expect(parseJsoncWithLocations(source).locations).toEqual({
+      "": { line: 1, column: 1 },
+      "/first": { line: 2, column: 12 },
+    });
+  });
+
+  test("escapes JSON pointer property names", () => {
+    const parsed = parseJsoncWithLocations('{"a/b~c": {"value": true}}');
+
+    expect(parsed.locations).toMatchObject({
+      "/a~1b~0c": { line: 1, column: 11 },
+      "/a~1b~0c/value": { line: 1, column: 21 },
+    });
+  });
+
+  test("accepts only JSON-safe object prototypes and finite numbers", () => {
+    const inherited = Object.create({ inherited: true });
+    inherited.value = "safe";
+
+    expect(parseJsoncWithLocations("null").value).toBeNull();
+    expect(parseJsoncWithLocations("[true, 1, null]").value).toEqual([
+      true,
+      1,
+      null,
+    ]);
+    expect(isSafeJsonObject(inherited)).toBe(false);
+    expect(isSafeJsonObject({ value: "safe", nested: [1, false] })).toBe(true);
+    expect(isSafeJsonObject({ value: Number.NaN })).toBe(false);
   });
 
   test("accepts comments and trailing commas in JSONC", () => {

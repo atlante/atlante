@@ -25,7 +25,6 @@
     "smoke:test": "bun scripts/smoke-test.ts",
     "fallow": "fallow",
     "mutation:test": "bun scripts/mutation.ts",
-    "suite:parity": "bun scripts/suite-parity.ts",
     "build": "bun scripts/build.ts",
     "quick:check": "bun scripts/parallel.ts type:check lint:check test",
     "full:check": "bun run build && bun scripts/parallel.ts quick:check smoke:test",

@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 2,
+  "workspace": "resources",
+  "command": "bun run mutation:test resources",
+  "source": {
+    "identity": "packages/resources/src/**/*.ts",
+    "algorithm": "sha256:path\u0000bytes\u0000:v1",
+    "sha256": "41c87882f5a01e40161042ba81a7225569ae3ecad553b048a2f659ef47838e5b",
+    "files": [
+      "packages/resources/src/authored-values.ts",
+      "packages/resources/src/composition.ts",
+      "packages/resources/src/content-root.ts",
+      "packages/resources/src/errors.ts",
+      "packages/resources/src/facets.ts",
+      "packages/resources/src/filesystem.ts",
+      "packages/resources/src/graph.ts",
+      "packages/resources/src/index.ts",
+      "packages/resources/src/json-path.ts",
+      "packages/resources/src/jsonc.ts",
+      "packages/resources/src/locator.ts",
+      "packages/resources/src/merge.ts",
+      "packages/resources/src/object.ts",
+      "packages/resources/src/package-resolution.ts",
+      "packages/resources/src/provenance.ts",
+      "packages/resources/src/renderer.ts",
+      "packages/resources/src/resolution.ts",
+      "packages/resources/src/resolve.ts",
+      "packages/resources/src/schema.ts",
+      "packages/resources/src/system-values.ts",
+      "packages/resources/src/types.ts",
+      "packages/resources/src/values.ts"
+    ],
+    "fileCount": 22
+  },
+  "report": {
+    "identity": "mutation/resources/mutation.json",
+    "sha256": "658a021dbe478908451d09cccb9e984effa7614c3230ab4430ec4d77bcd0bf2c"
+  },
+  "versions": {
+    "bun": "1.3.14",
+    "node": "22.20.0",
+    "vitest": "4.1.11",
+    "stryker": "10.0.0"
+  },
+  "runtime": "122m17s",
+  "exitCode": 0,
+  "counts": {
+    "files": 20,
+    "mutants": 4830,
+    "killed": 3030,
+    "survived": 1362,
+    "noCoverage": 438,
+    "mutationScore": 62.73,
+    "timeouts": 0,
+    "errors": 0,
+    "ignored": 0
+  },
+  "generatedAt": "2026-08-25T12:42:22Z",
+  "commitBase": "ed0120dce9ab51d5f8abfefdd64c85a9235dd456"
+}
