@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/assets/exports/horizontal/atlante-horizontal-tagline-embedded.svg" alt="Atlante wordmark and tagline: Give form to your harness." width="720">
+  <img src="brand/assets/exports/horizontal/atlante-horizontal-tagline-embedded.svg" alt="Atlante wordmark and tagline: Give form to your harness." width="720">
 </p>
 
 <p align="center">The configuration layer for your coding-agent harness.</p>
@@ -8,7 +8,7 @@ Atlante gives software architects, engineers, and developers one versioned sourc
 
 The builder validates the authored configuration, composes selected templates, instances, and presets, and publishes deterministic artifacts. A host adapter materializes those artifacts for the host.
 
-OpenCode is the only supported host adapter today.
+[OpenCode](https://opencode.ai/) is the only supported host adapter today.
 
 ## Why Atlante
 
@@ -21,7 +21,7 @@ OpenCode is the only supported host adapter today.
 
 ## Quick start
 
-The CLI requires Node.js 22 or newer. Run the published package directly with `npx`:
+The CLI requires [Node.js](https://nodejs.org) 22 or newer. Run the published package directly with `npx`:
 
 ```bash
 npx @atlante/cli init
@@ -29,7 +29,9 @@ npx @atlante/cli validate
 npx @atlante/cli build
 ```
 
-`init` writes `atlante.jsonc`, builds the initial `.atlante/artifacts/` tree, and registers `@atlante/opencode-plugin` in `opencode.jsonc` while preserving existing host settings. Edit the authored configuration, then run `npx @atlante/cli build` again, or use `npx @atlante/cli build --watch` during active editing.
+`init` writes `atlante.jsonc` which builds the initial `.atlante/artifacts/` tree, and registers `@atlante/opencode-plugin` in `opencode.jsonc`. Note that these preserves the existing host settings! 
+
+You can edit the authored configuration and then run `npx @atlante/cli build` again, or use `npx @atlante/cli build --watch` during active editing.
 
 To use the bare `atlante` command, install the CLI first:
 
@@ -105,28 +107,35 @@ An `atlante.jsonc` can extend the first-party preset and bind an agent template:
 }
 ```
 
-The root document supports `$schema`, `extends`, `values`, `agents`, and optional `skills` fields. Templates define their own input schemas.
-Values are substituted into the prompt definition before rendering; templates do not receive the values dictionary directly.
-The first-party `@atlante/pack/agent` template also accepts ordered `sections`, including workflow sections with phases, delegation, outputs, validation, and correction policies.
+### Document structure
 
-Skills are structured template input rendered as Markdown, not agents. A
-resolved skill is available to every host agent through the OpenCode plugin
-and the `atlante_skill` tool. Atlante does not execute skill content.
+An `atlante.jsonc` document can contain these top-level fields:
 
-## Safety properties
+- `$schema` identifies the schema used to validate the document.
+- `extends` selects one or more presets to build on.
+- `values` defines named values that can be reused across the document.
+- `agents` declares the agents that Atlante should render.
+- `skills` optionally declares reusable Markdown skills.
 
-- Values are substituted into prompt definitions before template rendering; they are never evaluated as code.
-- Unsupported values-like references are diagnosed, while other brace syntax such as `{{#each}}`, `{{#if}}`, and unbalanced `{{` is preserved verbatim.
-- OpenCode consumes only the verified `.atlante/artifacts/` tree. Each payload is protected by a manifest SHA-256 digest, and adapters reject malformed trees or digest mismatches before materialization.
+The document defines the overall structure. Each selected template defines the input schema for its own binding, so template-specific fields stay separate from the document contract.
 
-## How it works
+### Values and templates
 
-1. You write `atlante.jsonc` with agent and optional skill bindings and values.
-2. Packs provide templates, instances, presets, and their input schemas.
-3. The builder resolves presets and values, validates inputs, renders prompts and skills, and publishes artifacts.
-4. The host adapter verifies the artifacts and delivers the rendered content to the host.
+Values are named inputs shared by the document, such as `{{values.project}}`. During a build, Atlante substitutes those references into the prompt definition before rendering it. A template receives only the inputs declared by its own schema; it does not receive the complete values object. This keeps templates explicit about the data they use.
+
+### Agent sections
+
+The first-party `@atlante/pack/agent` template accepts an ordered `sections` array. Each section contributes a distinct part of the rendered agent prompt, and the order in the array is preserved. Sections can define responsibilities, or describe workflow behavior such as phases, delegation, expected outputs, validation, and correction policies.
+
+This lets the same agent template produce different agents without duplicating the template itself.
+
+### Skills
+
+Skills are reusable guidance, not agents. A skill uses structured template input and is rendered as Markdown. After the artifacts are built, the OpenCode plugin makes a resolved skill available to host agents through the `atlante_skill` tool. Atlante provides the rendered content but does not execute the skill.
 
 For OpenCode, the plugin loads only the verified `.atlante/artifacts/` tree. It writes the rendered agent `prompt` and `description` fields during initialization. Models, permissions, tools, and modes remain owned by OpenCode.
+
+Atlante validates and renders deterministic artifacts; OpenCode consumes only verified artifacts, while Atlante does not execute agents, skills, or project code.
 
 ## Packs and presets
 
@@ -141,20 +150,6 @@ npx @atlante/cli init --preset @acme/review-pack/strict
 ```
 
 Use an ordered `extends` array when a configuration needs multiple preset layers. Local configuration wins after the selected layers are merged.
-
-## Migration from the temporary namespace
-
-This is an alpha breaking migration. Replace the old built-in locators as follows:
-
-| Before | After |
-| --- | --- |
-| `atlante/starter` | `@atlante/pack` |
-| `atlante/<resource>` | `@atlante/pack/<resource>` |
-
-Do not add `@atlante/resources` as a project dependency. Install third-party
-packs with the package manager and declare them in `dependencies`,
-`devDependencies`, or `optionalDependencies`; Atlante never edits
-`package.json` or installs packages.
 
 ## Current scope
 
@@ -182,12 +177,6 @@ Three packages are published to npm:
 
 The remaining workspaces are private implementation packages for the schema, resource loading, validation, and artifact builder.
 
-## Repository assets
-
-The production artwork is derived from `public/assets/final_logo.svg`. The repository includes the named lockups, glyphs, social preview, and favicon exports under [`public/assets/exports`](public/assets/exports). The export package records dimensions, provenance, clear space, reproduction rules, and font references.
-
-The framework-neutral token source is [`public/atlante-design-tokens.css`](public/atlante-design-tokens.css). Bundled font files and their SIL Open Font License notices are documented in [`public/fonts/README.md`](public/fonts/README.md).
-
 ## Development
 
 ```bash
@@ -211,4 +200,4 @@ Run `bun run build` after CLI source changes. The linked `atlante` command uses 
 
 ## Status
 
-v0.1, prompt-first profile. See [`SPECIFICATION.md`](SPECIFICATION.md) for the normative technical contract.
+The current alpha `v0.1` follows the [`SPECIFICATION.md`](SPECIFICATION.md) as normativ technical contract.
