@@ -81,7 +81,7 @@ The source, bundled fonts, and generated raster deliveries used for this package
 these SHA-256 digests:
 
 ```text
-final_logo.svg                         e7f772e4f7fc46eab0624e041f681d066d867b1cada91077e46252644ffb7761
+final_logo.svg                         249bea17e7e55cd2123c35306ced5d63c7d7e17ef182afa6601813b940a690b3
 fonts/bodonimoda/bodoni-moda-latin.woff2 fe710b15e2acd1f30159cec96b10c3455a32d27104c29d4027c5465d81fc11fe
 fonts/jetbrainsmono/jetbrains-mono-latin.woff2 1e06740a02a443fb7f3eeda8fcaa685a0f6c620e3f01e6666e847295469ce3ad
 fonts/sourcesans3/source-sans-3-latin.woff2 ac057a5593cbe3df0d2585da5dd5f33b8efa84aa30550c710fe061b37fc5c54b
