@@ -13,7 +13,7 @@ Initialize a project with the first-party pack:
 npx @atlante/cli init
 ```
 
-The CLI uses `@atlante/pack` as the default preset and writes
+The CLI selects the default preset from `@atlante/pack` and writes
 `"extends": "@atlante/pack"` to `atlante.jsonc`. It also registers the
 OpenCode adapter package and builds the initial artifacts. The default initialization
 path resolves the pack from the CLI installation, so it does not require a

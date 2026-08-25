@@ -8,7 +8,7 @@ Toolchain for structured, versionable prompts across AI coding harnesses. See [S
 packages/
   schema/          — document structure contract, JSON Schema, TypeScript types
   resources/       — private local/package resource engine and static loading
-  pack/            — publishable first-party static resource pack
+  pack/            — publishable first-party static pack
   validator/       — two-level validation (document structure + template semantics)
   builder/         — project preparation, artifact building, and publication
   opencode-plugin/ — OpenCode materialization

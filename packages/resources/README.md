@@ -19,8 +19,8 @@ The resource model defines immutable typed identities for:
 
 The package is private and is not an npm publication surface. Package loading is
 static and generic; it does not expose a host adapter API or execute pack code. A
-resource pack captures one canonical trusted content root; absolute paths, URLs, unsafe
-traversal, external symlinks, and targets outside that root are rejected. Only
+`ResourcePack` captures one canonical trusted pack root; absolute paths, URLs,
+unsafe traversal, external symlinks, and targets outside that pack root are rejected. Only
 selected facets and transitive dependencies are read, and unresolved parent
 directories are returned for watch-mode recovery. The package does not depend
 on Atlante's schema, validator, builder, or host integration.
