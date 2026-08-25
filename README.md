@@ -19,6 +19,66 @@ The builder validates the authored configuration, composes selected templates, i
 - **Deterministic output:** render prompts and skills into verified artifact files.
 - **Clear boundary:** Atlante defines prompt-level orchestration; OpenCode and the prompted model execute it.
 
+## Flow
+
+```mermaid
+flowchart LR
+  source["atlante.jsonc<br/>versioned source"] --> validate["validate"]
+  validate --> build["build"]
+  build --> artifacts[".atlante/artifacts/<br/>verified output"]
+  artifacts --> adapter["OpenCode adapter"]
+  adapter --> host["OpenCode"]
+```
+
+The authored source stays in the project repository. The builder publishes the artifact tree, and the OpenCode adapter verifies it before materializing prompts and skills in memory.
+
+## Features
+
+Atlante v0.1 includes:
+
+- **Configuration:** declarative JSONC or JSON documents with composable templates.
+- **Values:** global values with per-agent overrides.
+- **Skills:** project-global Markdown skills through the `atlante_skill` adapter tool.
+- **Validation:** structural and template-input validation.
+- **Artifacts:** deterministic prompt resolution and artifact publication.
+- **Packs:** local templates and instances, plus installed static packs.
+- **OpenCode:** prompt and skill materialization.
+
+Atlante does not perform LLM inference, execute agents or skills, run arbitrary project code while loading a pack, select host settings, maintain runtime workflow state, or provide another host in v0.1.
+
+## Packages
+
+Three packages are published to npm:
+
+| Package | Responsibility |
+| --- | --- |
+| `@atlante/pack` | First-party static presets, templates, and instances |
+| `@atlante/cli` | `init`, `validate`, and `build` |
+| `@atlante/opencode-plugin` | In-memory agent injection and `atlante_skill` through OpenCode |
+
+The remaining workspaces are private implementation packages for the schema, resource loading, validation, and artifact builder.
+
+## Development
+
+```bash
+bun install
+bun run lint:check
+bun run type:check
+bun run test
+```
+
+The repository uses Bun for package management and build commands. Tests run through Vitest on Node.js 22.
+
+Run the CLI directly from source with `bun run cli <command>`:
+
+```bash
+bun run cli init
+bun run cli validate
+bun run cli build
+```
+
+Run `bun run build` after CLI source changes. The linked `atlante` command uses the built CLI artifact.
+
 ## Quick start
 
 The CLI requires [Node.js](https://nodejs.org) 22 or newer. Run the published package directly with `npx`:
@@ -41,19 +101,6 @@ atlante init
 ```
 
 `--force` replaces an existing `atlante.jsonc` and removes the alternate `atlante.json`.
-
-## Flow
-
-```mermaid
-flowchart LR
-  source["atlante.jsonc<br/>versioned source"] --> validate["validate"]
-  validate --> build["build"]
-  build --> artifacts[".atlante/artifacts/<br/>verified output"]
-  artifacts --> adapter["OpenCode adapter"]
-  adapter --> host["OpenCode"]
-```
-
-The authored source stays in the project repository. The builder publishes the artifact tree, and the OpenCode adapter verifies it before materializing prompts and skills in memory.
 
 ## Configuration
 
@@ -137,7 +184,7 @@ For OpenCode, the plugin loads only the verified `.atlante/artifacts/` tree. It 
 
 Atlante validates and renders deterministic artifacts; OpenCode consumes only verified artifacts, while Atlante does not execute agents, skills, or project code.
 
-## Packs and presets
+### Packs and presets
 
 A pack is a static Atlante content package. It can contain presets, template facets, and instance facets, but it has no JavaScript entry point, registration hook, or executable API.
 
@@ -151,53 +198,10 @@ npx @atlante/cli init --preset @acme/review-pack/strict
 
 Use an ordered `extends` array when a configuration needs multiple preset layers. Local configuration wins after the selected layers are merged.
 
-## Current scope
-
-Atlante v0.1 includes:
-
-- **Configuration:** declarative JSONC or JSON documents with composable templates.
-- **Values:** global values with per-agent overrides.
-- **Skills:** project-global Markdown skills through the `atlante_skill` adapter tool.
-- **Validation:** structural and template-input validation.
-- **Artifacts:** deterministic prompt resolution and artifact publication.
-- **Packs:** local templates and instances, plus installed static packs.
-- **OpenCode:** prompt and skill materialization.
-
-Atlante does not perform LLM inference, execute agents or skills, run arbitrary project code while loading a pack, select host settings, maintain runtime workflow state, or provide another host in v0.1.
-
-## Packages
-
-Three packages are published to npm:
-
-| Package | Responsibility |
-| --- | --- |
-| `@atlante/pack` | First-party static presets, templates, and instances |
-| `@atlante/cli` | `init`, `validate`, and `build` |
-| `@atlante/opencode-plugin` | In-memory agent injection and `atlante_skill` through OpenCode |
-
-The remaining workspaces are private implementation packages for the schema, resource loading, validation, and artifact builder.
-
-## Development
-
-```bash
-bun install
-bun run lint:check
-bun run type:check
-bun run test
-```
-
-The repository uses Bun for package management and build commands. Tests run through Vitest on Node.js 22.
-
-Run the CLI directly from source with `bun run cli <command>`:
-
-```bash
-bun run cli init
-bun run cli validate
-bun run cli build
-```
-
-Run `bun run build` after CLI source changes. The linked `atlante` command uses the built CLI artifact.
-
 ## Status
 
 The current alpha `v0.1` follows the [`SPECIFICATION.md`](SPECIFICATION.md) as normativ technical contract.
+
+## License
+
+See [LICENSE](LICENSE).
