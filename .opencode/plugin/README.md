@@ -25,15 +25,15 @@ rejected:
 ```json
 {
   "architect": {
-    "model": "opencode/deepseek-v4-flash-free",
+    "model": "opencode/x-preview-f-free",
     "reasoningEffort": "xhigh"
   },
   "general": {
-    "model": "opencode/deepseek-v4-flash-free",
+    "model": "opencode/x-preview-f-free",
     "reasoningEffort": "max"
   },
   "explore": {
-    "model": "opencode/deepseek-v4-flash-free",
+    "model": "opencode/x-preview-f-free",
     "reasoningEffort": "max"
   }
 }
@@ -42,7 +42,7 @@ rejected:
 ## Behavior
 
 - **Generated defaults**: if the file is missing, the plugin creates it with the
-  exact starter above — `opencode/deepseek-v4-flash-free` for every role, with
+  exact starter above — `opencode/x-preview-f-free` for every role, with
   `reasoningEffort` `xhigh` for `architect` and `max` for `general`/`explore` —
   and applies it for the current startup.
 - **Partial fallback**: each role and each field is optional; omitted roles and
