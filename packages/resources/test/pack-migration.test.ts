@@ -517,7 +517,7 @@ describe("first-party section semantics", () => {
     const invariants = sectionDescription("invariants");
 
     expect(invariants).toBe(
-      "Conditions that MUST remain true throughout the work. Use invariants for durable guarantees, safety boundaries, and approval gates. State each as one concrete, observable rule and include the compliant path when non-obvious. Back critical invariants with deterministic enforcement when possible. Use instructions for ordered actions, responsibilities for owned outcomes, and gotchas for situational risks. Do not duplicate requirements across sections.",
+      "Conditions that MUST remain true throughout the work. Keep the set minimal and focused; include only consequential rules that must hold continuously. Use invariants for durable guarantees, safety boundaries, and approval gates. State each as one concrete, observable rule and include the compliant path when non-obvious. Back critical invariants with deterministic enforcement when possible. Use instructions for ordered actions, responsibilities for owned outcomes, and gotchas for situational risks. Do not duplicate requirements across sections.",
     );
     for (const phrase of [
       "durable guarantees",

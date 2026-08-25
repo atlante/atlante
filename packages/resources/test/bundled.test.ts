@@ -239,57 +239,39 @@ describe("first-party package resources", () => {
     }
   });
 
-  test.each([
-    {
-      sections: [
-        { invariants: ["Before workflow"] },
-        {
-          workflow: {
-            title: "Review workflow",
-            phases: [{ kind: "plan", instructions: ["Plan the review."] }],
+  test("renders repeated agent invariant sections in authored order", () => {
+    const { root, config } = fixture();
+    const template = resolveResourceTemplate(
+      createProjectResourcePack(root),
+      "@atlante/pack/agent",
+      config,
+    );
+    const output = renderResolvedTemplate({
+      template,
+      input: {
+        identity: "Identity",
+        mission: "Mission",
+        sections: [
+          { invariants: ["Before workflow"] },
+          {
+            workflow: {
+              title: "Review workflow",
+              phases: [{ kind: "plan", instructions: ["Plan the review."] }],
+            },
           },
-        },
-      ],
-      markers: ["Before workflow", "## Review workflow"],
-    },
-    {
-      sections: [
-        {
-          workflow: {
-            title: "Review workflow",
-            phases: [{ kind: "plan", instructions: ["Plan the review."] }],
-          },
-        },
-        { invariants: ["After workflow"] },
-      ],
-      markers: ["## Review workflow", "After workflow"],
-    },
-  ])(
-    "renders an agent workflow in authored section order",
-    ({ sections, markers }) => {
-      const { root, config } = fixture();
-      const template = resolveResourceTemplate(
-        createProjectResourcePack(root),
-        "@atlante/pack/agent",
-        config,
-      );
-      const output = renderResolvedTemplate({
-        template,
-        input: {
-          identity: "Identity",
-          mission: "Mission",
-          sections,
-        },
-      });
+          { invariants: ["After workflow"] },
+        ],
+      },
+    });
 
-      expect(output.indexOf(markers[0])).toBeLessThan(
-        output.indexOf(markers[1]),
-      );
-      expect(output).toContain(
-        "Execute phases sequentially in the order listed.",
-      );
-    },
-  );
+    const markers = ["Before workflow", "## Review workflow", "After workflow"];
+    for (const marker of markers) expect(output).toContain(marker);
+    expect(output.indexOf(markers[0])).toBeLessThan(output.indexOf(markers[1]));
+    expect(output.indexOf(markers[1])).toBeLessThan(output.indexOf(markers[2]));
+    expect(output).toContain(
+      "Execute phases sequentially in the order listed.",
+    );
+  });
 
   test("renders the canonical workflow identically in agents and skills", () => {
     const { root, config } = fixture();
