@@ -1,25 +1,20 @@
 <p align="center">
-  <img src="public/assets/exports/horizontal/atlante-horizontal-tagline.svg" alt="Atlante wordmark and tagline: Give form to your harness." width="720">
+  <img src="public/assets/exports/horizontal/atlante-horizontal-tagline-embedded.svg" alt="Atlante wordmark and tagline: Give form to your harness." width="720">
 </p>
 
-<p align="center"><strong>Give form to your harness.</strong><br>
-The configuration and build layer for your coding-agent harness.</p>
+<p align="center">The configuration layer for your coding-agent harness.</p>
 
-<p align="center">
-  <a href="https://atlante.sh">Website</a> ·
-  <a href="https://github.com/atlante/atlante/issues">Issues</a> ·
-  <a href="https://github.com/atlante/atlante/releases">Releases</a>
-</p>
+Atlante gives software architects, engineers, and developers one versioned source for the agents, skills, and workflows that make up their coding-agent harness. It makes those relationships explicit in the repository so individuals and teams can share, review, and evolve the system through Git.
 
-Atlante gives engineering teams one versioned source for the agents, skills, and workflows that make up their coding-agent harness. It makes those relationships explicit in the repository, so teams can share, review, and evolve the system through Git.
+The builder validates the authored configuration, composes selected templates, instances, and presets, and publishes deterministic artifacts. A host adapter materializes those artifacts for the host.
 
-The builder validates the authored configuration, composes selected resources and presets, and publishes deterministic artifacts. A host adapter materializes those artifacts for the host. OpenCode is supported today.
+OpenCode is the only supported host adapter today.
 
 ## Why Atlante
 
 - **Structure:** define agents, skills, workflows, values, and their relationships in one configuration.
 - **Shared source:** keep the harness with project code and review changes through Git.
-- **Composition:** inherit presets and compose selected resource facets instead of duplicating prompts.
+- **Composition:** inherit presets and compose template and instance facets instead of duplicating prompts.
 - **Validation:** check document structure and template inputs before building artifacts.
 - **Deterministic output:** render prompts and skills into verified artifact files.
 - **Clear boundary:** Atlante defines prompt-level orchestration; OpenCode and the prompted model execute it.
@@ -116,12 +111,18 @@ The first-party `@atlante/pack/agent` template also accepts ordered `sections`, 
 
 Skills are structured template input rendered as Markdown, not agents. A
 resolved skill is available to every host agent through the OpenCode plugin
-through the `atlante_skill` tool. Atlante does not execute skill content.
+and the `atlante_skill` tool. Atlante does not execute skill content.
+
+## Safety properties
+
+- Values are substituted into prompt definitions before template rendering; they are never evaluated as code.
+- Unsupported values-like references are diagnosed, while other brace syntax such as `{{#each}}`, `{{#if}}`, and unbalanced `{{` is preserved verbatim.
+- OpenCode consumes only the verified `.atlante/artifacts/` tree. Each payload is protected by a manifest SHA-256 digest, and adapters reject malformed trees or digest mismatches before materialization.
 
 ## How it works
 
 1. You write `atlante.jsonc` with agent and optional skill bindings and values.
-2. Resources provide templates, instances, and their input schemas.
+2. Packs provide templates, instances, presets, and their input schemas.
 3. The builder resolves presets and values, validates inputs, renders prompts and skills, and publishes artifacts.
 4. The host adapter verifies the artifacts and delivers the rendered content to the host.
 
@@ -141,17 +142,31 @@ npx @atlante/cli init --preset @acme/review-pack/strict
 
 Use an ordered `extends` array when a configuration needs multiple preset layers. Local configuration wins after the selected layers are merged.
 
+## Migration from the temporary namespace
+
+This is an alpha breaking migration. Replace the old built-in locators as follows:
+
+| Before | After |
+| --- | --- |
+| `atlante/starter` | `@atlante/pack` |
+| `atlante/<resource>` | `@atlante/pack/<resource>` |
+
+Do not add `@atlante/resources` as a project dependency. Install third-party
+packs with the package manager and declare them in `dependencies`,
+`devDependencies`, or `optionalDependencies`; Atlante never edits
+`package.json` or installs packages.
+
 ## Current scope
 
 Atlante v0.1 includes:
 
-- Declarative JSONC or JSON configuration with composable templates.
-- Global values with per-agent overrides.
-- Project-global Markdown skills through the `atlante_skill` adapter tool.
-- Structural and template-input validation.
-- Deterministic prompt resolution and artifact publication.
-- Local resource authoring and installed static packs.
-- OpenCode prompt and skill materialization.
+- **Configuration:** declarative JSONC or JSON documents with composable templates.
+- **Values:** global values with per-agent overrides.
+- **Skills:** project-global Markdown skills through the `atlante_skill` adapter tool.
+- **Validation:** structural and template-input validation.
+- **Artifacts:** deterministic prompt resolution and artifact publication.
+- **Packs:** local templates and instances, plus installed static packs.
+- **OpenCode:** prompt and skill materialization.
 
 Atlante does not perform LLM inference, execute agents or skills, run arbitrary project code while loading a pack, select host settings, maintain runtime workflow state, or provide another host in v0.1.
 

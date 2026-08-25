@@ -7,8 +7,7 @@ redrawn or simplified here.
 ## Typography
 
 The lockup SVGs live in family subdirectories and intentionally keep the
-wordmark and tagline as live text. Keep their relative `../../../fonts/` paths
-intact when moving or publishing these files. The bundled fonts are:
+wordmark and tagline as live text for design and print use. The embedded README hero includes the bundled WOFF2 data so GitHub does not depend on relative font loading. The other live-text SVG files retain their relative `../../../fonts/` paths and must move with the bundled fonts. The bundled fonts are:
 
 - Bodoni Moda for `ATLANTE`, from
   `../../../fonts/bodonimoda/bodoni-moda-latin.woff2`.
@@ -20,7 +19,9 @@ Each family is distributed under SIL Open Font License 1.1. Retain the matching
 
 The wordmark uses uppercase `ATLANTE`, optical size `12`, weight `400`, and
 controlled tracking. The tagline uses uppercase JetBrains Mono with wide
-tracking. No outlined wordmark is included.
+tracking. No outlined wordmark is included; the README hero is a self-contained
+live-text SVG with embedded font data, while the other live-text exports retain
+their relative font references.
 
 ## Palette
 
@@ -47,13 +48,15 @@ Prussian Blue is `6.71:1` (previously `5.99:1`).
 | `favicons/atlante-favicon-1024.png`, `favicons/atlante-favicon-reverse-1024.png`                 | 683 x 1024 | High-resolution glyph sources  |
 | `favicons/atlante-favicon.png`, `favicons/atlante-favicon-reverse.png`                           |  256 x 256 | Raster favicon deliveries      |
 | `social/atlante-social.svg`, `social/atlante-social-reverse.svg`                                 | 1200 x 630 | Social preview SVG sources     |
-| `social/atlante-social.png`                                                                  | 1200 x 630 | GitHub social preview image    |
+| `horizontal/atlante-horizontal-tagline-embedded.svg`                                               | 1200 x 470 | Self-contained README hero    |
+| `social/atlante-social.png`                                                                         | 1200 x 630 | GitHub social preview image    |
 
-Normal exports are self-contained Prussian Blue-on-Linen applications
-(`#112135` on `#F4ECE4`). Reverse exports are self-contained
-Linen-on-Prussian-Blue applications with a `#112135` background. Raster favicon PNGs include their intended Linen or
-Prussian Blue surface for standalone display; reverse SVGs include their dark
-background for standalone readability.
+Path-only glyph and favicon SVGs are self-contained Prussian Blue-on-Linen or
+Linen-on-Prussian-Blue applications. The README hero is also self-contained
+with embedded font data; other live-text lockup and social SVGs retain relative
+references to the bundled fonts by design. Raster PNG deliveries are
+self-contained and include their intended Linen or Prussian Blue surface for
+standalone display.
 
 ## Usage Rules
 
@@ -74,13 +77,17 @@ background for standalone readability.
 
 ## Provenance
 
-The source and bundled wordmark fonts used for this package are identified by
+The source, bundled fonts, and generated raster deliveries used for this package are identified by
 these SHA-256 digests:
 
 ```text
 final_logo.svg                         e7f772e4f7fc46eab0624e041f681d066d867b1cada91077e46252644ffb7761
 fonts/bodonimoda/bodoni-moda-latin.woff2 fe710b15e2acd1f30159cec96b10c3455a32d27104c29d4027c5465d81fc11fe
 fonts/jetbrainsmono/jetbrains-mono-latin.woff2 1e06740a02a443fb7f3eeda8fcaa685a0f6c620e3f01e6666e847295469ce3ad
+fonts/sourcesans3/source-sans-3-latin.woff2 ac057a5593cbe3df0d2585da5dd5f33b8efa84aa30550c710fe061b37fc5c54b
+fonts/sourceserif4/source-serif-4-latin.woff2 2a24bad466f09b88b8e9cbc488bf774117c912e66374c57bf4716855849143f8
+exports/horizontal/atlante-horizontal-tagline-embedded.svg 63a61213976f468a33cac5dcf15e4d041160b39527c34e0163e813fcbce0a910
+exports/social/atlante-social.png 0c2c4d8839a10e91706bfcb42fe16c510cbfa6d0723479b442d87de24b366981
 ```
 
 The SVG outputs were raster-checked at their declared dimensions with
