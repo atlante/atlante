@@ -40,6 +40,11 @@
             "additionalProperties": false
           },
           {
+            "properties": { "workflow": { "template": "@atlante/pack/workflow" } },
+            "required": ["workflow"],
+            "additionalProperties": false
+          },
+          {
             "properties": {
               "invariants": { "template": "@atlante/pack/invariants" }
             },

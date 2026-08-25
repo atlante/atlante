@@ -238,4 +238,70 @@ describe("first-party package resources", () => {
       expect(output).not.toContain("## Constraints");
     }
   });
+
+  test("renders an agent workflow in authored section order", () => {
+    const { root, config } = fixture();
+    const template = resolveResourceTemplate(
+      createProjectResourcePack(root),
+      "@atlante/pack/agent",
+      config,
+    );
+    const output = renderResolvedTemplate({
+      template,
+      input: {
+        identity: "Identity",
+        mission: "Mission",
+        sections: [
+          { invariants: ["Before workflow"] },
+          {
+            workflow: {
+              title: "Review workflow",
+              phases: [{ kind: "plan", instructions: ["Plan the review."] }],
+            },
+          },
+          { invariants: ["After workflow"] },
+        ],
+      },
+    });
+
+    expect(output.indexOf("Before workflow")).toBeLessThan(
+      output.indexOf("## Review workflow"),
+    );
+    expect(output.indexOf("## Review workflow")).toBeLessThan(
+      output.indexOf("After workflow"),
+    );
+    expect(output).toContain(
+      "Execute phases sequentially in the order listed.",
+    );
+  });
+
+  test("renders the canonical workflow identically in agents and skills", () => {
+    const { root, config } = fixture();
+    const pack = createProjectResourcePack(root);
+    const workflow = {
+      title: "Review workflow",
+      phases: [{ kind: "plan", instructions: ["Plan the review."] }],
+    };
+    const agentOutput = renderResolvedTemplate({
+      template: resolveResourceTemplate(pack, "@atlante/pack/agent", config),
+      input: {
+        identity: "Identity",
+        mission: "Mission",
+        sections: [{ workflow }],
+      },
+    });
+    const skillOutput = renderResolvedTemplate({
+      template: resolveResourceTemplate(pack, "@atlante/pack/skill", config),
+      input: {
+        title: "Review skill",
+        overview: "Review the change.",
+        sections: [{ workflow }],
+      },
+    });
+    const workflowStart = "## Review workflow";
+
+    expect(agentOutput.slice(agentOutput.indexOf(workflowStart))).toBe(
+      skillOutput.slice(skillOutput.indexOf(workflowStart)),
+    );
+  });
 });
