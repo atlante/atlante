@@ -580,19 +580,22 @@ describe("first-party section semantics", () => {
 
   test("keeps responsibilities, instructions, and gotchas semantically separate", () => {
     const agentSchema = readJson(join(packRoot, "agent", "template.jsonc"));
+    const properties = agentSchema.properties as Record<string, unknown>;
     const branches = (
-      (agentSchema.properties as Record<string, unknown>).sections as {
+      properties.sections as {
         items: { oneOf: Array<{ properties?: Record<string, unknown> }> };
       }
     ).items.oneOf;
-    const responsibilities = branches
-      .map((branch) => branch.properties?.responsibilities)
-      .find((property) => typeof property === "object") as {
+    const responsibilities = properties.responsibilities as {
       description?: string;
     };
 
+    expect(responsibilities).toBeDefined();
     expect(responsibilities.description).toContain("outcomes");
     expect(responsibilities.description).toContain("not for behavioral limits");
+    expect(branches.some((branch) => branch.properties?.responsibilities)).toBe(
+      false,
+    );
     expect(sectionDescription("instructions")).toContain("ordered instruction");
     expect(sectionDescription("gotchas")).toContain("situational");
   });

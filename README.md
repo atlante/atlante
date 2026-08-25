@@ -120,13 +120,11 @@ An `atlante.jsonc` can extend the first-party preset and bind an agent template:
       "description": "Implements requested changes in the project.",
       "identity": "You are a senior implementer on {{values.project}}.",
       "mission": "Write clean, tested, production-ready code.",
+      "responsibilities": [
+        "Implement features following the spec",
+        "Write unit and integration tests",
+      ],
       "sections": [
-        {
-          "responsibilities": [
-            "Implement features following the spec",
-            "Write unit and integration tests",
-          ],
-        },
         {
           "invariants": ["{{values.apiRule}}"],
         },
@@ -138,13 +136,11 @@ An `atlante.jsonc` can extend the first-party preset and bind an agent template:
       "description": "Reviews changes for defects and design issues.",
       "identity": "You are a thorough code reviewer on {{values.project}}.",
       "mission": "Ensure code quality and adherence to standards.",
+      "responsibilities": [
+        "Review implementations for bugs and design issues",
+        "Check that project invariants remain satisfied.",
+      ],
       "sections": [
-        {
-          "responsibilities": [
-            "Review implementations for bugs and design issues",
-            "Check that project invariants remain satisfied.",
-          ],
-        },
         {
           "invariants": ["{{values.apiRule}}"],
         },
@@ -172,9 +168,12 @@ Values are named inputs shared by the document, such as `{{values.project}}`. Du
 
 ### Agent sections
 
+The first-party `@atlante/pack/agent` template accepts optional top-level
+`responsibilities` alongside `identity` and `mission`.
+
 The first-party `@atlante/pack/agent` and `@atlante/pack/skill` templates
 support an ordered `sections` array. Section variants include `markdown`,
-`instructions`, `responsibilities`, `gotchas`, `workflow`, and `invariants`. Each
+`instructions`, `gotchas`, `workflow`, and `invariants`. Each
 section contributes a distinct part of the rendered output, and the order in the
 array is preserved. Invariants are binding guarantees and approval gates, not
 suggestions; keep them minimal, concrete, and observable.
