@@ -4,7 +4,7 @@
 
 <p align="center">The configuration layer for your coding-agent harness.</p>
 
-Atlante gives software architects, engineers, and developers one versioned source for the agents, skills, and workflows that make up their coding-agent harness. It makes those relationships explicit in the repository so individuals and teams can share, review, and evolve the system through Git.
+Atlante gives software architects, engineers, and developers one versioned source for the agents, skills, and workflows that make up their coding-agent harness. It makes those relationships explicit in the repository so individuals and teams can share, review, and evolve the system through a versioning system (e.g., Git).
 
 The builder validates the authored configuration, composes selected templates, instances, and presets, and publishes deterministic artifacts. A host adapter materializes those artifacts for the host.
 
@@ -13,7 +13,7 @@ The builder validates the authored configuration, composes selected templates, i
 ## Why Atlante
 
 - **Structure:** define agents, skills, workflows, values, and their relationships in one configuration.
-- **Shared source:** keep the harness with project code and review changes through Git.
+- **Shared source:** keep the harness with project code and review changes through a versioning system.
 - **Composition:** inherit presets and compose template and instance facets instead of duplicating prompts.
 - **Validation:** check document structure and template inputs before building artifacts.
 - **Deterministic output:** render prompts and skills into verified artifact files.
