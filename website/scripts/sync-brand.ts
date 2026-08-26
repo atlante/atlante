@@ -40,7 +40,6 @@ for (const file of ["atlante-glyph.svg", "atlante-glyph-reverse.svg"]) {
   cpSync(join(exportsDir, "glyph", file), join(srcAssetsDir, file));
 }
 
-
 // Copy the four approved families so each typographic role stays available.
 rmSync(join(publicDir, "fonts"), { recursive: true, force: true });
 for (const family of [
