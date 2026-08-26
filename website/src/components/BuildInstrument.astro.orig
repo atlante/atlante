@@ -75,11 +75,7 @@ const hints: Record<string, string> = {
               <strong data-pane-name>atlante.jsonc</strong>
             </div>
             <div class="pane-actions">
-              <button type="button" data-action="reference" hidden>
-                Reference
-              </button>
               <button type="button" data-action="edit" hidden>Edit</button>
-
               <button type="button" data-action="save" hidden>Save</button>
               <button type="button" data-action="revert" hidden>Revert</button>
               <button type="button" data-copy-text={config} data-pane-copy>
@@ -257,13 +253,10 @@ const hints: Record<string, string> = {
       const edit = action("edit");
       const save = action("save");
       const revert = action("revert");
-      const reference = action("reference");
       if (edit) edit.hidden = !editable || state.editing;
       if (save) save.hidden = !state.editing;
       if (revert) revert.hidden = !state.editing;
-      if (reference) reference.hidden = state.activePath === null;
     };
-
 
 
     const openFile = (path: string): void => {
@@ -273,90 +266,28 @@ const hints: Record<string, string> = {
       renderPane();
     };
 
-    interface TreeNode {
-      name: string;
-      path: string;
-      isFile: boolean;
-      children: Map<string, TreeNode>;
-    }
-
     const renderTree = (): void => {
       if (!fileTree || !treeList) return;
-      const root: Map<string, TreeNode> = new Map();
+      treeList.replaceChildren();
       for (const path of [...state.files.keys()].sort()) {
-        const parts = path.split("/");
-        let level = root;
-        let prefix = "";
-        for (let index = 0; index < parts.length; index++) {
-          const name = parts[index];
-          const full = prefix ? `${prefix}/${name}` : name;
-          let node = level.get(name);
-          if (!node) {
-            node = {
-              name,
-              path: full,
-              isFile: index === parts.length - 1,
-              children: new Map(),
-            };
-            level.set(name, node);
-          }
-          level = node.children;
-          prefix = full;
-        }
+        const segments = path.split("/");
+        const depth = Math.max(0, segments.length - 1);
+        const item = document.createElement("li");
+        const button = document.createElement("button");
+        button.type = "button";
+        button.title = path;
+        button.style.paddingInlineStart = `${depth * 16}px`;
+        const name = document.createElement("span");
+        name.className = "tree-name";
+        name.textContent = segments[segments.length - 1] ?? path;
+        button.append(name);
+        button.addEventListener("click", () => openFile(path));
+        item.append(button);
+        treeList.append(item);
       }
 
-      const rows: HTMLLIElement[] = [];
-      const walk = (nodes: Map<string, TreeNode>, depth: number): void => {
-        const entries = [...nodes.values()].sort((a, b) =>
-          a.isFile === b.isFile
-            ? a.name.localeCompare(b.name)
-            : a.isFile
-              ? 1
-              : -1,
-        );
-        entries.forEach((node, index) => {
-          const glyph = `${"│  ".repeat(depth)}${index === entries.length - 1 ? "└─ " : "├─ "}`;
-          const item = document.createElement("li");
-          if (node.isFile) {
-            const button = document.createElement("button");
-            button.type = "button";
-            button.title = node.path;
-            button.classList.toggle(
-              "tree-active",
-              state.activePath === node.path,
-            );
-            const glyphSpan = document.createElement("span");
-            glyphSpan.className = "tree-glyph";
-            glyphSpan.textContent = glyph;
-            const nameSpan = document.createElement("span");
-            nameSpan.className = "tree-name";
-            nameSpan.textContent = node.name;
-            button.append(glyphSpan, nameSpan);
-            button.addEventListener("click", () => {
-              if (state.activePath === node.path) {
-                state.activePath = null;
-                state.editing = false;
-                renderPane();
-                refreshControls();
-                return;
-              }
-              openFile(node.path);
-            });
-            item.append(button);
-          } else {
-            item.className = "tree-folder";
-            item.textContent = `${glyph}${node.name}/`;
-            walk(node.children, depth + 1);
-          }
-          rows.push(item);
-        });
-      };
-      walk(root, 0);
-
-      treeList.replaceChildren(...rows);
       fileTree.hidden = state.files.size === 0;
     };
-
 
     const showTerminal = (
       command: string,
@@ -448,7 +379,6 @@ const hints: Record<string, string> = {
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
             step,
-            force: step === "init" && state.dirty,
             files: [...state.files]
               .filter(([path]) => EDITABLE.has(path))
               .map(([path, content]) => ({ path, content })),
@@ -518,15 +448,7 @@ const hints: Record<string, string> = {
       copy.dataset.copyText = previous ?? "";
     });
 
-    action("reference")?.addEventListener("click", () => {
-      state.activePath = null;
-      state.editing = false;
-      renderPane();
-      refreshControls();
-    });
-
     action("edit")?.addEventListener("click", () => {
-
       if (!state.activePath || !EDITABLE.has(state.activePath)) return;
       state.editing = true;
       renderPane();
@@ -762,8 +684,6 @@ const hints: Record<string, string> = {
 
   textarea[data-code-editor] {
     display: block;
-    width: 100%;
-    box-sizing: border-box;
     min-height: 480px;
     margin: 0;
     padding: var(--space-8) var(--space-4);
@@ -777,9 +697,8 @@ const hints: Record<string, string> = {
     tab-size: 2;
     overflow: auto;
     white-space: pre;
-    resize: vertical;
+    resize: both;
   }
-
 
 
   textarea[data-code-editor]:focus-visible {
@@ -965,25 +884,6 @@ const hints: Record<string, string> = {
     text-decoration-color: var(--ds-border);
   }
 
-  [data-tree-list] button.tree-active .tree-name {
-    text-decoration-color: var(--ds-border);
-    text-decoration-thickness: 2px;
-  }
-
-  .tree-glyph {
-    color: var(--ds-muted);
-    white-space: pre;
-  }
-
-  .tree-folder {
-    color: var(--ds-muted);
-    font-family: var(--font-mono);
-    font-size: var(--text-small);
-    line-height: 36px;
-    white-space: pre;
-  }
-
-
   .docs-link {
     display: inline-flex;
     align-items: center;
@@ -1149,34 +1049,5 @@ const hints: Record<string, string> = {
       border-block-end: 0;
     }
   }
-
-  @media (max-width: 480px) {
-    .pane-head {
-      min-height: 0;
-    }
-
-    .pane-actions {
-      width: 100%;
-    }
-
-    .pane-actions button {
-      flex: 1 1 auto;
-      padding-inline: var(--space-2);
-      font-size: var(--text-meta);
-    }
-
-    pre[data-code-view],
-    textarea[data-code-editor] {
-      min-height: 320px;
-      padding-block: var(--space-4);
-    }
-
-    [data-tree-list] button,
-    .tree-folder {
-      font-size: var(--text-meta);
-      line-height: 32px;
-    }
-  }
-
 </style>
 

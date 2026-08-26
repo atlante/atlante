@@ -21,7 +21,9 @@ export interface PlaygroundFile {
 export interface PlaygroundRequest {
   step: PlaygroundStep;
   files: PlaygroundFile[];
+  force: boolean;
 }
+
 
 export interface PlaygroundResult {
   ok: boolean;
@@ -79,8 +81,13 @@ export function parsePlaygroundRequest(raw: unknown): PlaygroundRequest {
     }
     files.push({ path, content });
   }
-  return { step, files };
+  const force = body.force === true;
+  if (force && step !== "init") {
+    throw new Error("force is only supported for init");
+  }
+  return { step, files, force };
 }
+
 
 interface ExecResult {
   exitCode: number | null;
@@ -88,9 +95,18 @@ interface ExecResult {
   output: string;
 }
 
-function execStep(dir: string, step: PlaygroundStep): Promise<ExecResult> {
+function execStep(
+  dir: string,
+  step: PlaygroundStep,
+  force: boolean,
+): Promise<ExecResult> {
   return new Promise((resolve) => {
-    const child = spawn(process.execPath, [cliEntry(), step, "."], {
+    const args =
+      step === "init"
+        ? ["init", ".", ...(force ? ["--force"] : [])]
+        : [step, "."];
+    const child = spawn(process.execPath, [cliEntry(), ...args], {
+
       cwd: dir,
       env: { ...process.env, NO_COLOR: "1" },
       stdio: ["ignore", "pipe", "pipe"],
@@ -171,7 +187,8 @@ export async function runPlaygroundStep(
       await writeFile(join(dir, file.path), file.content, "utf8");
     }
     const started = Date.now();
-    const run = await execStep(dir, request.step);
+    const run = await execStep(dir, request.step, request.force);
+
     const files = run.exitCode === 0 ? await collectTree(dir) : [];
     return {
       ok: run.exitCode === 0,
