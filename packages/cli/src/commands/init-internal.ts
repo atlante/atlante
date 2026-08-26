@@ -7,7 +7,11 @@ import {
   type ProjectContext,
 } from "@atlante/builder";
 import { SCHEMA_URI } from "@atlante/schema";
-import { hasErrors, validateDocumentText } from "@atlante/validator";
+import {
+  formatDiagnostic,
+  hasErrors,
+  validateDocumentText,
+} from "@atlante/validator";
 import {
   applyEdits,
   modify,
@@ -15,7 +19,11 @@ import {
   parse,
   printParseErrorCode,
 } from "jsonc-parser";
-import { printDiagnostics } from "../report.js";
+import {
+  diagnosticPath,
+  printDiagnostic,
+  printDiagnostics,
+} from "../report.js";
 
 export type InitOptions = { preset?: string; force?: boolean };
 
@@ -88,6 +96,25 @@ function parseErrorSummary(text: string, errors: ParseError[]): string {
     .join(", ");
 }
 
+function formatInitError(
+  code: string,
+  message: string,
+  extra: {
+    source?: string;
+    expected?: string;
+    next?: string;
+    cause?: string;
+  } = {},
+): string {
+  return formatDiagnostic({
+    severity: "error",
+    code,
+    message,
+    ...extra,
+    source: extra.source ? diagnosticPath(extra.source) : undefined,
+  });
+}
+
 function snapshot(path: string, fileSystem: InitFileSystem): Snapshot {
   if (!fileSystem.existsSync(path)) return { exists: false };
   return { exists: true, contents: fileSystem.readFileSync(path, "utf8") };
@@ -104,10 +131,21 @@ function parsePluginEntries(
   });
 
   if (parseErrors.length > 0 || !isObject(parsed)) {
-    const details = parseErrors.length
-      ? ` (${parseErrorSummary(text, parseErrors)})`
-      : "";
-    return { error: `cannot update ${path}: malformed JSONC${details}` };
+    return {
+      error: formatInitError(
+        "invalid-opencode-configuration",
+        "could not update the OpenCode configuration",
+        {
+          source: path,
+          expected:
+            '"plugin" must be an array of strings or [name, options-object] tuples',
+          next: "fix the configuration and run `atlante init` again",
+          cause: parseErrors.length
+            ? `malformed JSONC: ${parseErrorSummary(text, parseErrors)}`
+            : "the document is not a JSON object",
+        },
+      ),
+    };
   }
 
   const plugin = parsed.plugin;
@@ -116,7 +154,17 @@ function parsePluginEntries(
     (!Array.isArray(plugin) || !plugin.every(isPluginEntry))
   ) {
     return {
-      error: `cannot update ${path}: "plugin" must be an array of strings or [name, options-object] tuples`,
+      error: formatInitError(
+        "invalid-opencode-configuration",
+        "could not update the OpenCode configuration",
+        {
+          source: path,
+          expected:
+            '"plugin" must be an array of strings or [name, options-object] tuples',
+          next: "fix the configuration and run `atlante init` again",
+          cause: 'the "plugin" field has an invalid value',
+        },
+      ),
     };
   }
 
@@ -138,18 +186,13 @@ function preparePlugin(
 `;
   const entries = parsePluginEntries(path, text);
   if ("error" in entries) return entries;
-  if (entries.some((entry) => pluginId(entry) === "@atlante/opencode-plugin")) {
+  if (entries.some((entry) => pluginId(entry) === "@atlante/opencode")) {
     return { previous, contents: text, registered: false };
   }
 
-  const edits = modify(
-    text,
-    ["plugin"],
-    [...entries, "@atlante/opencode-plugin"],
-    {
-      formattingOptions: { insertSpaces: true, tabSize: 2 },
-    },
-  );
+  const edits = modify(text, ["plugin"], [...entries, "@atlante/opencode"], {
+    formattingOptions: { insertSpaces: true, tabSize: 2 },
+  });
   return { previous, contents: applyEdits(text, edits), registered: true };
 }
 
@@ -191,7 +234,10 @@ function mutationErrorMessage(
     rollbackErrors.length > 0
       ? `; rollback failed for ${rollbackErrors.join(", ")}`
       : "";
-  return `error: ${message}: ${String(cause)}${rollbackMessage}`;
+  return formatInitError("initialization-failed", message, {
+    next: "fix the reported error and run `atlante init` again",
+    cause: [String(cause), rollbackMessage].filter(Boolean).join(""),
+  });
 }
 
 function commitInitFiles(
@@ -238,8 +284,15 @@ function initPreflightError(
 ): string | undefined {
   const existing = [target, alternate].filter(fileSystem.existsSync);
   if (existing.length > 0 && !options.force) {
-    const wording = existing.length === 1 ? "already exists" : "already exist";
-    return `error: ${existing.join(" and ")} ${wording}; pass --force to overwrite`;
+    return formatInitError(
+      "configuration-exists",
+      "configuration already exists",
+      {
+        source: existing.join(" and "),
+        expected: "no existing configuration unless --force is provided",
+        next: "pass --force to overwrite the existing configuration",
+      },
+    );
   }
   return undefined;
 }
@@ -283,13 +336,24 @@ function buildAndReport(
     const rollbackErrors = rollback(changes, fileSystem);
     printDiagnostics(built.diagnostics);
     if (rollbackErrors.length > 0) {
-      console.error(`error: rollback failed for ${rollbackErrors.join(", ")}`);
+      printDiagnostic({
+        severity: "error",
+        code: "rollback-failed",
+        message: "could not restore initialization files",
+        next: "restore the listed files manually before retrying `atlante init`",
+        cause: rollbackErrors.join(", "),
+      });
     }
     return 1;
   }
   printDiagnostics(built.diagnostics);
   for (const warning of built.warnings)
-    console.error(`warning: ${warning.message}`);
+    printDiagnostic({
+      severity: "warning",
+      code: warning.code,
+      message: warning.message,
+      source: diagnosticPath(warning.path),
+    });
 
   console.log(`created ${target}`);
   return 0;
@@ -359,12 +423,19 @@ export async function runInitWithDependencies(
     if (result !== 0) return result;
     console.log(
       plugin.registered
-        ? `registered @atlante/opencode-plugin in ${opencode}`
-        : `@atlante/opencode-plugin is already registered in ${opencode}`,
+        ? `registered @atlante/opencode in ${opencode}`
+        : `@atlante/opencode is already registered in ${opencode}`,
     );
     return 0;
   } catch (cause) {
-    console.error(`error: could not initialize ${directory}: ${String(cause)}`);
+    printDiagnostic({
+      severity: "error",
+      code: "initialization-failed",
+      message: "could not initialize the project",
+      source: directory,
+      next: "fix the reported error and run `atlante init` again",
+      cause: cause instanceof Error ? cause.message : String(cause),
+    });
     return 1;
   }
 }

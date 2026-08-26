@@ -469,7 +469,7 @@ function resolveResourceBackedDocument(
   };
 }
 
-/** Accepts either a config file path or a directory to discover one in. */
+/** Accepts either a configuration file path or a directory to discover one in. */
 export function loadDocument(
   pathOrDirectory: string,
   options: DocumentLoadOptions = {},

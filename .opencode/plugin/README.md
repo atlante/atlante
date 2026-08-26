@@ -54,6 +54,11 @@ rejected:
 - **Preserved shared fields**: only `model` and `reasoningEffort` change; role
   mode, permissions, tools, prompts, descriptions, and all other fields remain
   intact.
+- **How reasoningEffort applies**: the value is written both to the agent's
+  `variant` — which drives the model-picker display and the variant recorded on
+  new sessions — and to `options.reasoningEffort`, the request-level fallback
+  used when no variant is resolved. A variant manually selected for the agent
+  in the model picker during a session still takes precedence.
 - **No live availability validation**: validation does not check live provider
   or catalog availability.
 - **Restart requirement**: restart OpenCode after changing this file or the

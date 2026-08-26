@@ -133,7 +133,15 @@ export default (async ({ directory, worktree }) => {
           entry.model = override.model;
         }
         if (override.reasoningEffort !== undefined) {
-          entry.reasoningEffort = override.reasoningEffort;
+          // `variant` is what opencode surfaces in the model picker and records
+          // on the session; `options.reasoningEffort` is the request-level
+          // fallback when no variant is resolved. Keep both aligned.
+          entry.variant = override.reasoningEffort;
+          const options = (entry.options ?? {}) as Record<string, unknown>;
+          entry.options = {
+            ...options,
+            reasoningEffort: override.reasoningEffort,
+          };
         }
         agents[role] = entry;
       }

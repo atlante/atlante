@@ -1,9 +1,9 @@
 # `@atlante/pack`
 
-Atlante's first-party resource pack gives a project a useful default agent and
+Atlante's first-party static pack gives a project a useful default agent and
 skills for deliberate AI-assisted work. It provides the `architect` agent,
-`brainstorming` and `workflow` skills, and reusable facets for composing your
-own agents, skills, workflows, and supporting prompt content.
+`brainstorming` and `workflow` skills, and reusable templates and instances for
+composing your own agents, skills, workflows, and supporting prompt content.
 
 ## Default usage
 
@@ -13,9 +13,9 @@ Initialize a project with the first-party pack:
 npx @atlante/cli init
 ```
 
-The CLI uses `@atlante/pack` as the default preset and writes
+The CLI selects the default preset from `@atlante/pack` and writes
 `"extends": "@atlante/pack"` to `atlante.jsonc`. It also registers the
-OpenCode plugin and builds the initial artifacts. The default initialization
+OpenCode adapter package and builds the initial artifacts. The default initialization
 path resolves the pack from the CLI installation, so it does not require a
 separate `@atlante/pack` installation.
 
@@ -51,7 +51,7 @@ Then extend the preset and select a reusable template in `atlante.jsonc`:
 }
 ```
 
-`extends` selects a preset. `$template` selects a template facet, whose input
+`extends` selects a preset. `$template` selects a template, whose input
 schema defines the remaining fields for that agent or skill. Local
 configuration takes precedence over the inherited preset.
 
@@ -68,12 +68,15 @@ Useful public locators include:
 | Supporting templates | `@atlante/pack/workflow`, `@atlante/pack/markdown`, `@atlante/pack/artifact`, `@atlante/pack/gotchas`, `@atlante/pack/instructions`, `@atlante/pack/invariants` |
 
 The default preset exposes the `architect` agent and the `brainstorming` and
-`workflow` skills. The `workflow` skill is the `delivery-workflow` instance.
+`workflow` skills. The `workflow` skill is the `delivery-workflow` instance. The
+agent and skill templates support ordered `markdown`, `instructions`,
+`responsibilities`, `gotchas`, `workflow`, and `invariants` sections. Invariants
+are binding guarantees and approval gates, not suggestions.
 
 ## Pack behavior
 
-This is a static resource package with `atlante.format: 1`; it has no runtime
-JavaScript entry point. Atlante loads only the selected facet and its
-transitive dependencies. It does not scan installed packages or install
+This is a static pack with `atlante.format: 1`; it has no runtime
+JavaScript entry point. Atlante loads only the selected template or instance
+and its transitive dependencies. It does not scan installed packages or install
 dependencies, so direct project references must be declared and installed by
 the project's package manager.

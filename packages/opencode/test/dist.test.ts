@@ -24,7 +24,7 @@ type HostConfig = {
 
 const created: string[] = [];
 const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
-const PLUGIN_SOURCE_ROOT = join(ROOT, "packages", "opencode-plugin", "src");
+const PLUGIN_SOURCE_ROOT = join(ROOT, "packages", "opencode", "src");
 const BUILDER_SOURCE_ROOT = join(ROOT, "packages", "builder", "src");
 const PRODUCTION_ENTRYPOINTS = [
   join(PLUGIN_SOURCE_ROOT, "index.ts"),
@@ -52,7 +52,7 @@ beforeAll(async () => {
   const missing = [DIST_INDEX, DIST_API].filter((path) => !existsSync(path));
   if (missing.length > 0) {
     throw new Error(
-      `@atlante/opencode-plugin: build completed without ${missing
+      `@atlante/opencode: build completed without ${missing
         .map((path) => relative(ROOT, path))
         .join(", ")}`,
     );

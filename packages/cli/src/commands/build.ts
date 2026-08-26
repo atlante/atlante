@@ -2,7 +2,11 @@ import type { ProjectContext } from "@atlante/builder";
 import { buildProject } from "@atlante/builder";
 import { hasErrors, type ResourceWatchContext } from "@atlante/validator";
 import { firstPartyProjectContext } from "../first-party-pack.js";
-import { printDiagnostics } from "../report.js";
+import {
+  diagnosticPath,
+  printDiagnostic,
+  printDiagnostics,
+} from "../report.js";
 
 export type BuildOutcome = Readonly<{
   readonly code: number;
@@ -21,12 +25,22 @@ export function runBuildWithContext(
 
     console.log(`built ${built.artifactsPath}`);
     for (const warning of built.warnings)
-      console.error(`warning: ${warning.message}`);
+      printDiagnostic({
+        severity: "warning",
+        code: warning.code,
+        message: warning.message,
+        source: diagnosticPath(warning.path),
+      });
     return { code: 0, resourceWatch: built.resourceWatch };
   } catch (cause) {
-    console.error(
-      `error: ${cause instanceof Error ? cause.message : String(cause)}`,
-    );
+    printDiagnostic({
+      severity: "error",
+      code: "build-failed",
+      message: "could not build the project",
+      source: diagnosticPath(target),
+      next: "fix the reported error and run `atlante build` again",
+      cause: cause instanceof Error ? cause.message : String(cause),
+    });
     return { code: 1 };
   }
 }

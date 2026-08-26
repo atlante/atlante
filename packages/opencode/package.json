@@ -1,8 +1,8 @@
 {
-  "name": "@atlante/opencode-plugin",
+  "name": "@atlante/opencode",
   "version": "0.1.6",
   "type": "module",
-  "description": "Atlante OpenCode host adapter plugin",
+  "description": "Atlante OpenCode host adapter",
   "license": "MIT",
   "contributors": [
     {
@@ -19,7 +19,7 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/atlante/atlante.git",
-    "directory": "packages/opencode-plugin"
+    "directory": "packages/opencode"
   },
   "engines": {
     "node": ">=22"
