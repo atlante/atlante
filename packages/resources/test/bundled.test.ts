@@ -368,7 +368,7 @@ describe("first-party package resources", () => {
       ],
     });
 
-    expect(output.match(/^## Adaptive phase protocol$/gm)).toHaveLength(1);
+    expect(output.match(/^### Adaptive phase protocol$/gm)).toHaveLength(1);
     expect(output).toContain("### 1. Plan (adaptive)");
     expect(output).toContain("### 2. review (mandatory)");
     for (const phrase of [
@@ -407,7 +407,7 @@ describe("first-party package resources", () => {
       ],
     });
 
-    expect(output.match(/^## Adaptive phase protocol$/gm)).toHaveLength(1);
+    expect(output.match(/^### Adaptive phase protocol$/gm)).toHaveLength(1);
     expect(output).toContain("### 1. Planning (adaptive)");
     expect(output).toContain("### 2. build (adaptive)");
     expect(output).toContain("### 3. review (mandatory)");
@@ -446,7 +446,7 @@ describe("first-party package resources", () => {
       },
     });
 
-    expect(output.match(/^## Adaptive phase protocol$/gm)).toHaveLength(1);
+    expect(output.match(/^### Adaptive phase protocol$/gm)).toHaveLength(1);
     expect(output).toContain("### 1. Plan (adaptive)");
     expect(output).toContain("### 2. Malformed (mandatory)");
   });
@@ -477,4 +477,113 @@ describe("first-party package resources", () => {
       expect(output).not.toContain("(mandatory)");
     },
   );
+
+  test("renders policy entries with an explicit heading hierarchy", () => {
+    const output = renderWorkflow({
+      title: "Structured policies",
+      policies: { orchestratorReadOnly: true },
+      phases: [
+        {
+          name: "Build",
+          policies: { adaptive: true, commit: true, review: true, maxLoops: 2 },
+          instructions: ["Build the change."],
+        },
+      ],
+    });
+
+    const headings = [
+      "## Policies",
+      "### Adaptive phase protocol",
+      "#### Classification",
+      "#### Decision record",
+      "#### Dispositions",
+    ];
+
+    let previous = -1;
+    for (const heading of headings) {
+      const position = output.indexOf(heading);
+      expect(position, heading).toBeGreaterThan(previous);
+      previous = position;
+    }
+    for (const [heading, body] of [
+      [
+        "### Workflow: read-only orchestration",
+        "The orchestrator is read-only and delegates every file edit.",
+      ],
+      [
+        "### Build: task commits",
+        "Commit task implementation and corrections in separate commits, after the task's focused tests and checks pass; the orchestrator owns all commit authorship and pushing, and never amends or force-pushes.",
+      ],
+      [
+        "### Build: task review",
+        "Apply task review according to this phase's review criteria.",
+      ],
+      ["### Build: correction loops", "Limit correction to 2 loops per task."],
+    ])
+      expect(output).toContain(`${heading}\n\n${body}`);
+    expect(output).not.toContain("\n- Workflow:");
+    expect(output).not.toContain("\n- Build:");
+  });
+
+  test.each([
+    [
+      "workflow-level truthy values",
+      {
+        title: "Workflow policies",
+        policies: { orchestratorReadOnly: true },
+        phases: [{ name: "Plan", instructions: ["Plan the review."] }],
+      },
+      "## Policies\n\nPolicies are binding; follow them in every phase.\n\n### Workflow: read-only orchestration\n\nThe orchestrator is read-only and delegates every file edit.",
+    ],
+    [
+      "phase-level truthy values",
+      {
+        title: "Phase policies",
+        phases: [
+          {
+            name: "Build",
+            policies: { commit: true, review: true, maxLoops: 2 },
+            instructions: ["Build the change."],
+          },
+        ],
+      },
+      "## Policies\n\nPolicies are binding; follow them in every phase.\n\n### Build: task commits\n\nCommit task implementation and corrections in separate commits, after the task's focused tests and checks pass; the orchestrator owns all commit authorship and pushing, and never amends or force-pushes.\n### Build: task review\n\nApply task review according to this phase's review criteria.\n### Build: correction loops\n\nLimit correction to 2 loops per task.",
+    ],
+    [
+      "no truthy values",
+      {
+        title: "No policies",
+        policies: { orchestratorReadOnly: false },
+        phases: [
+          {
+            name: "Plan",
+            policies: { commit: false, review: false },
+            instructions: ["Plan the review."],
+          },
+        ],
+      },
+      "## No policies\n\nExecute phases sequentially in the order listed. A phase with a configured subagent is delegated to that agent. Follow each phase's inline instructions in order.",
+    ],
+  ] as const)(
+    "preserves the policy rendering compatibility matrix",
+    (label, workflow, expected) => {
+      const output = renderWorkflow(workflow);
+
+      expect(output, label).toContain(expected);
+      expect(output.match(/^## Policies$/gm) ?? []).toHaveLength(
+        label === "no truthy values" ? 0 : 1,
+      );
+    },
+  );
+
+  test("preserves complete output when no policy is rendered", () => {
+    expect(
+      renderWorkflow({
+        title: "No policies",
+        phases: [{ name: "Plan", instructions: ["Plan the review."] }],
+      }),
+    ).toBe(
+      "# Adaptive workflow\n\n## Overview\n\nReview the change.\n\n## No policies\n\nExecute phases sequentially in the order listed. A phase with a configured subagent is delegated to that agent. Follow each phase's inline instructions in order.\n\n\n### 1. Plan\n\n1. Plan the review.\n",
+    );
+  });
 });

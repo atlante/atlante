@@ -261,6 +261,87 @@ describe("resource renderer", () => {
   });
 });
 
+describe("generic template predicates", () => {
+  test("matches exact values and safely scans arbitrary paths", () => {
+    const root = project();
+    writeTemplate(
+      root,
+      "root",
+      {
+        type: "object",
+        properties: {
+          record: { type: "object" },
+          entries: { type: "array" },
+          bag: { type: "object" },
+          rows: { type: "array" },
+        },
+      },
+      [
+        '{{#if (isEqual (lookup record "enabled") true)}}E{{else}}N{{/if}}',
+        '{{#if (anyEqual entries "enabled" true)}}M{{else}}N{{/if}}',
+        '{{#if (anyTruthy bag rows "meta")}}C{{else}}N{{/if}}',
+      ].join("|"),
+    );
+
+    const cases = [
+      [
+        "exact values",
+        {
+          record: { enabled: true },
+          entries: [{ enabled: true }],
+          bag: { first: false, second: 0 },
+          rows: [{ meta: { first: false } }, { meta: { second: "present" } }],
+        },
+        "E|M|C",
+      ],
+      [
+        "truthy non-boolean values",
+        {
+          record: { enabled: "true" },
+          entries: [{ enabled: "true" }, { enabled: 1 }],
+          bag: { first: "present" },
+          rows: [{ meta: { first: false } }],
+        },
+        "N|N|C",
+      ],
+      [
+        "falsey values",
+        {
+          record: { enabled: false },
+          entries: [{ enabled: false }, { enabled: 0 }],
+          bag: { first: false, second: 0 },
+          rows: [{ meta: { first: false } }, { meta: { second: 0 } }],
+        },
+        "N|N|N",
+      ],
+      ["missing values", {}, "N|N|N"],
+      [
+        "malformed values",
+        {
+          record: "true",
+          entries: { enabled: true },
+          bag: [],
+          rows: { meta: { enabled: true } },
+        },
+        "N|N|N",
+      ],
+      [
+        "malformed members",
+        {
+          record: { enabled: true },
+          entries: [null, "true", { enabled: "true" }],
+          bag: { first: false },
+          rows: [null, "true", { meta: "present" }],
+        },
+        "E|N|N",
+      ],
+    ] as const;
+
+    for (const [label, input, expected] of cases)
+      expect(render(root, "root", input), label).toBe(expected);
+  });
+});
+
 describe("resource value interpolation", () => {
   test("interpolates nested objects, arrays, and object keys", () => {
     expect(
