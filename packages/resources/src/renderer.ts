@@ -256,7 +256,7 @@ export class ValueReferenceCollisionError extends Error {
 export class NonStringValueError extends Error {
   constructor(path: string, resolved: unknown) {
     super(
-      `{{values.${path}}} resolved to a non-string value (${typeof resolved}); values must be strings (SPECIFICATION.md §4.2)`,
+      `{{values.${path}}} resolved to a non-string value (${typeof resolved}); values must be strings (SPECIFICATION.md, Configuration Document)`,
     );
     this.name = "NonStringValueError";
   }
