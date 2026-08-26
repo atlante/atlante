@@ -34,7 +34,7 @@ test("removes old workspace entries, manifests, imports, scripts, and lock entri
   }
 
   const rootManifest = readJson(join(ROOT, "package.json"));
-  expect(rootManifest.workspaces).toEqual(["packages/*"]);
+  expect(rootManifest.workspaces).toEqual(["packages/*", "website"]);
 
   const lockfile = readFileSync(join(ROOT, "bun.lock"), "utf8");
   for (const name of LEGACY_PACKAGES) {
