@@ -164,10 +164,10 @@ selection remain separate properties.
 ### Edge cases
 
 The terms `family`, `constellation`, `star`, and `PackItem` are metaphor or
-discussion terms only. They originate in the Atlante brand vocabulary and early
-design discussions; [DESIGN.md](brand/DESIGN.md) records their approved meanings
-and allowed use. They MUST NOT become schema fields, package names, or
-implementation types.
+discussion terms only. `star` and `constellation` originate in the Atlante
+brand vocabulary; `family` and `PackItem` are early discussion terms recorded
+as retired by [DESIGN.md](brand/DESIGN.md). They MUST NOT become schema fields,
+package names, or implementation types.
 
 ### Rationale
 

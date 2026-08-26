@@ -1,6 +1,6 @@
 # Atlante Design
 
-This file records the approved brand and design decisions applied across Atlante's public surfaces: positioning, naming, voice, and visual identity. `SPECIFICATION.md` remains the normative implementation contract for the product itself. The detailed upstream contract lives outside the repository at `/workspace/design/brand_specs.md`; the canonical assets it governs are the files under `brand/`.
+This file records the approved brand and design decisions applied across Atlante's public surfaces: positioning, naming, voice, and visual identity. `SPECIFICATION.md` remains the normative implementation contract for the product itself. The detailed upstream contract lives outside this repository in the design workspace as `brand_specs.md`; the canonical assets it governs are the files under `brand/`.
 
 ## Role and Precedence
 
