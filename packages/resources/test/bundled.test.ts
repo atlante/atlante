@@ -376,10 +376,14 @@ describe("first-party package resources", () => {
       "Assign every adaptive phase exactly one of `full`, `reduced`, or `skipped`.",
       "Before acting, record the cycle or task, classification, evidence, disposition, and rationale.",
       "Reclassify when implementation or review evidence changes risk.",
-      "When evidence is missing, signals conflict, or material uncertainty remains, default to `full`.",
+      "Before applying `full` because evidence is missing, signals conflict, or material uncertainty exists, determine whether the uncertainty is decision-relevant and developer-resolvable.",
+      "When it is, ask one focused developer question and classify using the answer.",
+      "Default to `full` only when material uncertainty remains after available evidence and that question, when no appropriate developer question can resolve the material uncertainty, or when asking is not possible.",
+      "Do not make routine or immaterial uncertainty interactive.",
       "Developer or project rules MAY strengthen this protocol but MUST NOT silently weaken a disposition.",
       "Phase instructions own concrete eligibility and escalation criteria.",
       "Material scope changes MUST retain developer approval.",
+      "A focused developer question MUST NOT itself grant approval for a material scope change.",
       "Cost or time pressure MUST NOT be the sole reason to reduce ceremony.",
       "`full` executes the complete phase.",
       "`reduced` executes only the explicitly justified reduced scope.",
@@ -387,6 +391,39 @@ describe("first-party package resources", () => {
       "A non-adaptive phase MUST remain mandatory and MUST NOT be reduced or skipped.",
     ])
       expect(output).toContain(phrase);
+  });
+
+  test("renders bounded developer-question guidance before the full fallback", () => {
+    const output = renderWorkflow({
+      title: "Adaptive review",
+      phases: [
+        {
+          policies: { adaptive: true },
+          instructions: ["Review the change."],
+        },
+      ],
+    });
+    const question =
+      "Before applying `full` because evidence is missing, signals conflict, or material uncertainty exists, determine whether the uncertainty is decision-relevant and developer-resolvable.";
+    const answer =
+      "When it is, ask one focused developer question and classify using the answer.";
+    const fallback =
+      "Default to `full` only when material uncertainty remains after available evidence and that question, when no appropriate developer question can resolve the material uncertainty, or when asking is not possible.";
+
+    expect(output).toContain(question);
+    expect(output).toContain(answer);
+    expect(output).toContain(fallback);
+    expect(output).toContain(
+      "Do not make routine or immaterial uncertainty interactive.",
+    );
+    expect(output).toContain(
+      "Material scope changes MUST retain developer approval.",
+    );
+    expect(output).toContain(
+      "A focused developer question MUST NOT itself grant approval for a material scope change.",
+    );
+    expect(output.indexOf(question)).toBeLessThan(output.indexOf(answer));
+    expect(output.indexOf(answer)).toBeLessThan(output.indexOf(fallback));
   });
 
   test("renders one protocol for multiple adaptive phases with name and kind fallbacks", () => {

@@ -35,7 +35,7 @@ Assign every adaptive phase exactly one of `full`, `reduced`, or `skipped`.
 
 A non-adaptive phase MUST remain mandatory and MUST NOT be reduced or skipped.
 
-When evidence is missing, signals conflict, or material uncertainty remains, default to `full`. Reclassify when implementation or review evidence changes risk. Developer or project rules MAY strengthen this protocol but MUST NOT silently weaken a disposition. Phase instructions own concrete eligibility and escalation criteria. Material scope changes MUST retain developer approval. Cost or time pressure MUST NOT be the sole reason to reduce ceremony.
+Before applying `full` because evidence is missing, signals conflict, or material uncertainty exists, determine whether the uncertainty is decision-relevant and developer-resolvable. When it is, ask one focused developer question and classify using the answer. Default to `full` only when material uncertainty remains after available evidence and that question, when no appropriate developer question can resolve the material uncertainty, or when asking is not possible. Do not make routine or immaterial uncertainty interactive. Reclassify when implementation or review evidence changes risk. Developer or project rules MAY strengthen this protocol but MUST NOT silently weaken a disposition. Phase instructions own concrete eligibility and escalation criteria. Material scope changes MUST retain developer approval. A focused developer question MUST NOT itself grant approval for a material scope change. Cost or time pressure MUST NOT be the sole reason to reduce ceremony.
 
 {{/if}}{{#if policies.orchestratorReadOnly}}### Workflow: read-only orchestration
 

@@ -82,11 +82,19 @@ The protocol assigns every adaptive phase exactly one disposition:
 - `skipped` omits the phase only when its own instructions permit it.
 
 Before acting, the protocol MUST record the classification, evidence,
-disposition, and rationale. Missing or conflicting evidence, or material
-uncertainty, MUST use the conservative `full` fallback. Reclassification MUST
-follow implementation or review evidence that changes risk. Phase instructions
-MUST own concrete eligibility and escalation criteria; developer or project
-rules MAY strengthen the protocol but MUST NOT silently weaken a disposition.
+disposition, and rationale. Before applying `full` because evidence is missing,
+signals conflict, or material uncertainty exists, determine whether the
+uncertainty is decision-relevant and developer-resolvable. When it is, ask one
+focused developer question and classify using the answer. Default to `full` only
+when material uncertainty remains after available evidence and that question,
+when no appropriate developer question can resolve the material
+uncertainty, or when asking is not possible. Do not make routine or immaterial
+uncertainty interactive. Reclassification MUST follow implementation or review
+evidence that changes risk. Phase instructions MUST own concrete eligibility and
+escalation criteria; developer or project rules MAY strengthen the protocol but
+MUST NOT silently weaken a disposition. Material scope changes MUST retain
+developer approval, and a focused developer question MUST NOT itself grant that
+approval.
 
 This is one built-in, prompt-only declarative capability. It does not execute
 phases or maintain runtime state, and it is not a configurable profile,
