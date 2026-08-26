@@ -32,7 +32,11 @@ The build instrument on the landing page runs the published
 Vercel function (Node 22): each request writes the visitor's files into
 an isolated temp directory, executes one CLI command, and returns the
 actual output and generated file tree. Nothing is stored between
-requests, and the CLI never executes project code.
+requests, and the CLI never executes project code. `bun run dev` serves
+the same endpoint in-process through a dev-only Vite middleware, so the
+playground works locally; `astro preview` stays static and shows a
+friendly offline message instead.
+
 
 ## Deployment
 
