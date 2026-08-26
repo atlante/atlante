@@ -1,15 +1,4 @@
 {
-  "cleanUrls": true,
-  "trailingSlash": false,
-  "headers": [
-    {
-      "source": "/(.*\\.json)",
-      "headers": [
-        {
-          "key": "Content-Type",
-          "value": "application/schema+json"
-        }
-      ]
-    }
-  ]
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npx astro build"
 }
