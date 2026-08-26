@@ -164,7 +164,9 @@ selection remain separate properties.
 ### Edge cases
 
 The terms `family`, `constellation`, `star`, and `PackItem` are metaphor or
-discussion terms only. They MUST NOT become schema fields, package names, or
+discussion terms only. They originate in the Atlante brand vocabulary and early
+design discussions; [DESIGN.md](brand/DESIGN.md) records their approved meanings
+and allowed use. They MUST NOT become schema fields, package names, or
 implementation types.
 
 ### Rationale
@@ -208,14 +210,14 @@ effective template.
 ```jsonc
 {
   "$schema": "https://atlante.sh/schema/v0.1/schema.json",
-  "extends": "@atlante/pack",
+  "extends": "@atlante/pack", // first-party Atlante pack
   "values": {
-    "project": "my-project",
+    "project": "Atlante",
     "language": "TypeScript"
   },
   "agents": {
     "reviewer": {
-      "$instance": "./resources/reviewer",
+      "$instance": "./resources/reviewer", // path relative to this document; a local project resource, not part of @atlante/pack
       "description": "Reviews changes for {{values.project}}.",
       "mission": "Check the implementation against repository conventions."
     }
