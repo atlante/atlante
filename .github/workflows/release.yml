@@ -76,9 +76,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: ".bun-version"
+
+      - name: Sync brand assets
+        shell: bash
+        working-directory: website
+        run: |
+          set -euo pipefail
+          bun run sync:brand
+
       - name: Copy schema files
         run: |
           cp -r packages/schema/schema website/
+
       - name: Deploy to Vercel
         uses: amondnet/vercel-action@v42.3.0
         with:

@@ -17,7 +17,7 @@
     },
     "packages/builder": {
       "name": "@atlante/builder",
-      "version": "0.1.8",
+      "version": "0.1.11",
       "dependencies": {
         "@atlante/resources": "workspace:*",
         "@atlante/schema": "workspace:*",
@@ -26,25 +26,26 @@
     },
     "packages/cli": {
       "name": "@atlante/cli",
-      "version": "0.1.8",
+      "version": "0.1.11",
       "bin": {
         "atlante": "./dist/bin/atlante.js",
       },
       "dependencies": {
-        "@atlante/builder": "workspace:*",
         "@atlante/pack": "workspace:*",
-        "@atlante/resources": "workspace:*",
-        "@atlante/schema": "workspace:*",
-        "@atlante/validator": "workspace:*",
+        "ajv": "^8.17.1",
         "jsonc-parser": "^3.3.1",
       },
       "devDependencies": {
+        "@atlante/builder": "workspace:*",
+        "@atlante/resources": "workspace:*",
+        "@atlante/schema": "workspace:*",
+        "@atlante/validator": "workspace:*",
         "commander": "^12.1.0",
       },
     },
     "packages/opencode": {
       "name": "@atlante/opencode",
-      "version": "0.1.8",
+      "version": "0.1.11",
       "devDependencies": {
         "@atlante/builder": "workspace:*",
         "@atlante/schema": "workspace:*",
@@ -56,11 +57,11 @@
     },
     "packages/pack": {
       "name": "@atlante/pack",
-      "version": "0.1.8",
+      "version": "0.1.11",
     },
     "packages/resources": {
       "name": "@atlante/resources",
-      "version": "0.1.8",
+      "version": "0.1.11",
       "dependencies": {
         "handlebars": "^4.7.8",
         "jsonc-parser": "^3.3.1",
@@ -68,14 +69,14 @@
     },
     "packages/schema": {
       "name": "@atlante/schema",
-      "version": "0.1.8",
+      "version": "0.1.11",
       "dependencies": {
         "zod": "^4.0.0",
       },
     },
     "packages/validator": {
       "name": "@atlante/validator",
-      "version": "0.1.8",
+      "version": "0.1.11",
       "dependencies": {
         "@atlante/resources": "workspace:*",
         "@atlante/schema": "workspace:*",
