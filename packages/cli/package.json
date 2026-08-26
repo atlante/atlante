@@ -35,14 +35,15 @@
     "atlante": "./dist/bin/atlante.js"
   },
   "dependencies": {
-    "@atlante/builder": "workspace:*",
     "@atlante/pack": "workspace:*",
-    "@atlante/resources": "workspace:*",
-    "@atlante/schema": "workspace:*",
-    "@atlante/validator": "workspace:*",
+    "ajv": "^8.17.1",
     "jsonc-parser": "^3.3.1"
   },
   "devDependencies": {
+    "@atlante/builder": "workspace:*",
+    "@atlante/resources": "workspace:*",
+    "@atlante/schema": "workspace:*",
+    "@atlante/validator": "workspace:*",
     "commander": "^12.1.0"
   }
 }
