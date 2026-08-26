@@ -52,7 +52,7 @@ type ProjectManifest = Readonly<{
 export type PackageResolutionCache = {
   readonly projectManifests: Map<string, ProjectManifest>;
   readonly packageMetadata: Map<string, CanonicalPackageMetadata>;
-  readonly firstPartyPacks: Map<string, ResourcePack>;
+  readonly providedPacks: Map<string, ResourcePack>;
 };
 
 type CanonicalPackageMetadata = Readonly<{
@@ -90,7 +90,7 @@ export function createPackageResolutionCache(): PackageResolutionCache {
   return {
     projectManifests: new Map(),
     packageMetadata: new Map(),
-    firstPartyPacks: new Map(),
+    providedPacks: new Map(),
   };
 }
 
@@ -1510,13 +1510,13 @@ function packageIdentityForReference(
   };
 }
 
-function firstPartyRootChanged(
+function providedRootChanged(
   pack: ResourcePack,
   locator: RawResourceLocator,
 ): never {
   return failResource(
     "unsafe-path",
-    "first-party package root changed",
+    "provided package root changed",
     { locator },
     {
       dependencies: resourcePackMetadataPaths(pack),
@@ -1526,19 +1526,21 @@ function firstPartyRootChanged(
   );
 }
 
-function refreshFirstPartyPack(
-  pack: ResourcePack,
+function refreshProvidedPack(
+  provided: ResourcePack,
+  packageName: string,
   locator: RawResourceLocator,
 ): ResourcePack {
-  if (!isResourcePackLexicalRootStable(pack))
-    return firstPartyRootChanged(pack, locator);
+  if (!isResourcePackLexicalRootStable(provided))
+    return providedRootChanged(provided, locator);
 
   const refreshed = createPackageResourcePackWithLocator(
-    pack.lexicalRoot,
-    "@atlante/pack",
+    provided.lexicalRoot,
+    packageName,
     locator,
   );
-  if (refreshed.root !== pack.root) return firstPartyRootChanged(pack, locator);
+  if (refreshed.root !== provided.root)
+    return providedRootChanged(provided, locator);
   return refreshed;
 }
 
@@ -1555,19 +1557,16 @@ export function resolvePackageResourcePack(
     locator.value,
     authoringFile,
   );
-  const firstPartyPack =
-    authoringPack.kind === "project" &&
-    packageName === "@atlante/pack" &&
-    options.resourceContext?.firstPartyPack?.kind === "package" &&
-    options.resourceContext.firstPartyPack.package?.name === packageName
-      ? options.resourceContext.firstPartyPack
+  const provided =
+    authoringPack.kind === "project"
+      ? options.resourceContext?.packageProvider?.(packageName)
       : undefined;
-  if (firstPartyPack) {
-    const cacheKey = firstPartyPack.root;
+  if (provided) {
+    const cacheKey = provided.root;
     const refreshed =
-      options.cache?.firstPartyPacks.get(cacheKey) ??
-      refreshFirstPartyPack(firstPartyPack, locator.value);
-    options.cache?.firstPartyPacks.set(cacheKey, refreshed);
+      options.cache?.providedPacks.get(cacheKey) ??
+      refreshProvidedPack(provided, packageName, locator.value);
+    options.cache?.providedPacks.set(cacheKey, refreshed);
     return {
       pack: refreshed,
       dependencies: resourcePackMetadataPaths(refreshed),

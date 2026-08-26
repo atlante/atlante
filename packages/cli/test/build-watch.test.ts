@@ -14,7 +14,10 @@ import { tmpdir } from "node:os";
 import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadProject, type ProjectContext } from "@atlante/builder";
-import { createPackageResourcePack } from "@atlante/resources";
+import {
+  createPackageResourcePack,
+  type ResourcePack,
+} from "@atlante/resources";
 import { SCHEMA_URI } from "@atlante/schema";
 import { afterEach, describe, expect, test } from "vitest";
 import { runBuild, runBuildWithContext } from "../src/commands/build.js";
@@ -56,6 +59,7 @@ function firstPartyContextFixture(): {
   manifest: string;
   template: string;
   context: ProjectContext;
+  capturedFirstPartyPack: ResourcePack;
 } {
   const dir = tempProject(`{
     "$schema": "${SCHEMA_URI}",
@@ -98,12 +102,19 @@ function firstPartyContextFixture(): {
   );
   writeFileSync(template, "{{identity}}\n");
 
+  const capturedFirstPartyPack = createPackageResourcePack(
+    packRoot,
+    "@atlante/pack",
+  );
+
   return {
     dir,
     manifest,
     template,
+    capturedFirstPartyPack,
     context: {
-      firstPartyPack: createPackageResourcePack(packRoot, "@atlante/pack"),
+      packageProvider: (packageName) =>
+        packageName === "@atlante/pack" ? capturedFirstPartyPack : undefined,
     },
   };
 }
@@ -348,7 +359,7 @@ describe("runBuildWatchWithDependencies", () => {
         "watch recovery after package metadata repair",
       );
       expect(outcomes.at(-1)).toBe(0);
-      expect(fixture.context.firstPartyPack?.package?.version).toBe("1.2.3");
+      expect(fixture.capturedFirstPartyPack.package?.version).toBe("1.2.3");
       const loaded = loadProject(fixture.dir, fixture.context);
       expect({
         kind: loaded.resources?.provenance["/values/pack"]?.kind,

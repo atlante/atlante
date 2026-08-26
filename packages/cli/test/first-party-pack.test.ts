@@ -10,7 +10,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, expect, test } from "vitest";
-import { resolveFirstPartyPack } from "../src/first-party-pack.js";
+import {
+  firstPartyProjectContext,
+  resolveFirstPartyPack,
+} from "../src/first-party-pack.js";
 
 const created: string[] = [];
 const expectedPackRoot = fileURLToPath(new URL("../../pack/", import.meta.url));
@@ -47,4 +50,19 @@ test("resolves the first-party pack from the CLI installation, not cwd", () => {
   } finally {
     process.chdir(previous);
   }
+});
+
+test("provides a package provider that resolves only the first-party package", () => {
+  const context = firstPartyProjectContext();
+  const provider = context.packageProvider;
+
+  expect(typeof provider).toBe("function");
+  const firstPartyPack = provider?.("@atlante/pack");
+  expect(firstPartyPack?.kind).toBe("package");
+  expect(firstPartyPack?.package?.name).toBe("@atlante/pack");
+  expect(firstPartyPack?.package?.version).toBe(firstPartyPackVersion);
+  expect(provider?.("@other/pack")).toBeUndefined();
+  expect(provider?.("atlante-pack")).toBeUndefined();
+
+  expect(provider?.("@atlante/pack")).toBe(firstPartyPack);
 });
