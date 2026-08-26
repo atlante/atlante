@@ -8,7 +8,6 @@
       "maxDuration": 30,
       "includeFiles": "node_modules/@atlante/**"
     }
-
   },
   "headers": [
     {
