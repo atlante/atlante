@@ -233,7 +233,10 @@ const hints: Record<string, string> = {
 
       const generated = state.activePath !== null;
       paneLabel.textContent = generated ? "Generated" : "Reference";
-      paneName.textContent = state.activePath ?? "atlante.jsonc";
+      paneName.textContent = state.activePath
+        ? displayName(state.activePath.slice(state.activePath.lastIndexOf("/") + 1))
+        : "atlante.jsonc";
+
       const editable =
         state.activePath !== null && EDITABLE.has(state.activePath);
       if (state.editing && editable) {
