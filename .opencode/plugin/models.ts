@@ -138,7 +138,10 @@ export default (async ({ directory, worktree }) => {
           // fallback when no variant is resolved. Keep both aligned.
           entry.variant = override.reasoningEffort;
           const options = (entry.options ?? {}) as Record<string, unknown>;
-          entry.options = { ...options, reasoningEffort: override.reasoningEffort };
+          entry.options = {
+            ...options,
+            reasoningEffort: override.reasoningEffort,
+          };
         }
         agents[role] = entry;
       }
