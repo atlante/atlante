@@ -51,6 +51,22 @@ function fixture(): { root: string; config: string } {
   return { root, config };
 }
 
+function renderWorkflow(workflow: Record<string, unknown>): string {
+  const { root, config } = fixture();
+  return renderResolvedTemplate({
+    template: resolveResourceTemplate(
+      createProjectResourcePack(root),
+      "@atlante/pack/skill",
+      config,
+    ),
+    input: {
+      title: "Adaptive workflow",
+      overview: "Review the change.",
+      sections: [{ workflow }],
+    },
+  });
+}
+
 afterEach(() => {
   for (const root of created.splice(0))
     rmSync(root, { recursive: true, force: true });
@@ -338,4 +354,89 @@ describe("first-party package resources", () => {
       skillOutput.slice(skillOutput.indexOf(workflowStart)),
     );
   });
+
+  test("renders one shared adaptive protocol and distinguishes mixed phase modes", () => {
+    const output = renderWorkflow({
+      title: "Adaptive review",
+      phases: [
+        {
+          name: "Plan",
+          policies: { adaptive: true },
+          instructions: ["Plan the review."],
+        },
+        { kind: "review", instructions: ["Review the change."] },
+      ],
+    });
+
+    expect(output.match(/^## Adaptive phase protocol$/gm)).toHaveLength(1);
+    expect(output).toContain("### 1. Plan (adaptive)");
+    expect(output).toContain("### 2. review (mandatory)");
+    for (const phrase of [
+      "Classify the overall cycle and each known implementation task by work type, complexity and risk, blast radius, reversibility, and uncertainty.",
+      "Assign every adaptive phase exactly one of `full`, `reduced`, or `skipped`.",
+      "Before acting, record the cycle or task, classification, evidence, disposition, and rationale.",
+      "Reclassify when implementation or review evidence changes risk.",
+      "When evidence is missing, signals conflict, or material uncertainty remains, default to `full`.",
+      "Developer or project rules MAY strengthen this protocol but MUST NOT silently weaken a disposition.",
+      "Phase instructions own concrete eligibility and escalation criteria.",
+      "Material scope changes MUST retain developer approval.",
+      "Cost or time pressure MUST NOT be the sole reason to reduce ceremony.",
+      "`full` executes the complete phase.",
+      "`reduced` executes only the explicitly justified reduced scope.",
+      "`skipped` omits the phase only when its own instructions permit it.",
+      "A non-adaptive phase MUST remain mandatory and MUST NOT be reduced or skipped.",
+    ])
+      expect(output).toContain(phrase);
+  });
+
+  test("renders one protocol for multiple adaptive phases with name and kind fallbacks", () => {
+    const output = renderWorkflow({
+      title: "Adaptive delivery",
+      phases: [
+        {
+          name: "Planning",
+          policies: { adaptive: true },
+          instructions: ["Plan the delivery."],
+        },
+        {
+          kind: "build",
+          policies: { adaptive: true },
+          instructions: ["Build the change."],
+        },
+        { kind: "review", instructions: ["Review the change."] },
+      ],
+    });
+
+    expect(output.match(/^## Adaptive phase protocol$/gm)).toHaveLength(1);
+    expect(output).toContain("### 1. Planning (adaptive)");
+    expect(output).toContain("### 2. build (adaptive)");
+    expect(output).toContain("### 3. review (mandatory)");
+  });
+
+  test.each([
+    ["omitted", undefined],
+    ["false", { adaptive: false }],
+  ])(
+    "keeps %s adaptive phases mandatory without a protocol",
+    (_label, policies) => {
+      const phase = {
+        name: "Plan",
+        ...(policies === undefined ? {} : { policies }),
+        instructions: ["Plan the review."],
+      };
+      const output = renderWorkflow({
+        title: "Mandatory workflow",
+        phases: [
+          phase,
+          { kind: "review", instructions: ["Review the change."] },
+        ],
+      });
+
+      expect(output).not.toContain("## Adaptive phase protocol");
+      expect(output).toContain("### 1. Plan\n");
+      expect(output).toContain("### 2. review\n");
+      expect(output).not.toContain("(adaptive)");
+      expect(output).not.toContain("(mandatory)");
+    },
+  );
 });

@@ -164,6 +164,20 @@ export function renderResolvedTemplate(
       return hasWorkflowPolicy || hasPhasePolicy;
     },
   );
+  handlebars.registerHelper("hasAdaptivePhase", (phases: unknown) => {
+    if (!Array.isArray(phases)) return false;
+    return phases.some((phase) => {
+      if (typeof phase !== "object" || phase === null || Array.isArray(phase))
+        return false;
+      const policies = (phase as Record<string, unknown>).policies;
+      return (
+        typeof policies === "object" &&
+        policies !== null &&
+        !Array.isArray(policies) &&
+        (policies as Record<string, unknown>).adaptive === true
+      );
+    });
+  });
   const nextStack = [...stack, template.key];
   const slots = template.slots;
 
