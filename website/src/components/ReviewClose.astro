@@ -1,0 +1,303 @@
+---
+const guarantees = [
+  {
+    signal: "extends → local",
+    title: "Composition order is explicit",
+    detail:
+      "Presets layer in declaration order, then local configuration wins.",
+  },
+  {
+    signal: "invalid → no publication",
+    title: "Invalid input publishes nothing",
+    detail:
+      "Document or template failures cannot replace the current artifact tree.",
+  },
+  {
+    signal: "same source → same output",
+    title: "Output is reproducible",
+    detail:
+      "The same authored input renders the same host-neutral artifacts.",
+  },
+  {
+    signal: "prompt fields only",
+    title: "OpenCode owns runtime settings",
+    detail:
+      "Models, effort, permissions, tools, and modes remain outside Atlante's output.",
+
+  },
+];
+---
+
+<section class="review-close" id="guarantees">
+  <div class="inner">
+    <header class="intro">
+      <h2>What every Atlante build guarantees</h2>
+
+    </header>
+
+    <div class="guarantees">
+      {
+        guarantees.map((item) => (
+          <article>
+            <code>{item.signal}</code>
+            <h3>{item.title}</h3>
+            <p>{item.detail}</p>
+          </article>
+        ))
+      }
+    </div>
+
+    <div class="next-step">
+      <span class="next-star" aria-hidden="true"></span>
+      <div>
+        <p class="next-label">Next step</p>
+        <p class="statement">Build your harness
+</p>
+        <p class="literal">
+          <code>init</code> creates <code>atlante.jsonc</code>, builds the first
+          artifacts, and registers the OpenCode adapter.
+        </p>
+      </div>
+      <div class="actions">
+        <a class="primary" href="#quick-start">Get started</a>
+        <a class="secondary" href="https://docs.atlante.sh">Documentation</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .review-close {
+    border-block-start: 1px solid var(--ds-border-subtle);
+  }
+
+  .inner {
+    max-width: var(--container-wide);
+    margin-inline: auto;
+    padding: clamp(var(--space-24), 9vw, 168px) var(--space-4) var(--space-24);
+  }
+
+  .intro {
+    margin-block-end: var(--space-16);
+  }
+
+
+  h2 {
+    max-width: 13ch;
+    margin: 0;
+    font-family: var(--font-display);
+    font-optical-sizing: auto;
+    font-size: clamp(52px, 6.4vw, 108px);
+    font-weight: 500;
+    line-height: 0.95;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+  }
+
+
+
+  .guarantees {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    border-block: 1px solid var(--ds-fg);
+  }
+
+  article {
+    min-height: 250px;
+    padding: var(--space-6);
+    border-inline-end: 1px solid var(--ds-border-subtle);
+  }
+
+  article:last-child {
+    border-inline-end: 0;
+  }
+
+  article code {
+    display: block;
+    min-height: 3em;
+    color: var(--ds-accent);
+    font-family: var(--font-mono);
+    font-size: var(--text-small);
+  }
+
+  h3 {
+    max-width: 14ch;
+    margin: var(--space-12) 0 var(--space-4);
+    font-family: var(--font-display);
+    font-size: clamp(28px, 2.5vw, 42px);
+    font-weight: 500;
+    line-height: 1.02;
+  }
+
+  article p {
+    max-width: 34ch;
+    margin: 0;
+    color: var(--ds-muted);
+    font-family: var(--font-body);
+    font-size: var(--text-ui);
+    line-height: 1.6;
+  }
+
+  .next-step {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--space-12);
+    align-items: end;
+    padding-block: clamp(var(--space-24), 10vw, 176px) var(--space-8);
+    overflow: hidden;
+  }
+
+  .next-label {
+    margin: 0 0 var(--space-6);
+    font-family: var(--font-ui);
+    font-size: var(--text-meta);
+    font-weight: 700;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+  }
+
+  .statement {
+    max-width: 11ch;
+    margin: 0 0 var(--space-8);
+    font-family: var(--font-display);
+    font-size: clamp(58px, 8.2vw, 136px);
+    font-weight: 500;
+    line-height: 0.9;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+
+  .literal {
+    max-width: 58ch;
+    margin: 0;
+    color: var(--ds-muted);
+    font-family: var(--font-body);
+    font-size: clamp(18px, 1.35vw, 22px);
+    line-height: 1.65;
+  }
+
+  .literal code {
+    color: var(--ds-fg);
+    font-family: var(--font-mono);
+    font-size: 0.86em;
+  }
+
+  .next-star {
+    position: absolute;
+    inset-block-start: 24%;
+    inset-inline-end: 12%;
+    width: clamp(34px, 5vw, 72px);
+    aspect-ratio: 1;
+    background: var(--ds-border);
+    clip-path: polygon(
+      50% 0,
+      60% 40%,
+      100% 50%,
+      60% 60%,
+      50% 100%,
+      40% 60%,
+      0 50%,
+      40% 40%
+    );
+    opacity: 0.72;
+  }
+
+  .actions {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--space-3);
+  }
+
+  .actions a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--control-min);
+    padding-inline: var(--space-6);
+    border-radius: 999px;
+    font-family: var(--font-ui);
+    font-size: var(--text-small);
+    font-weight: 650;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    text-decoration: none;
+  }
+
+  .primary {
+    border: 1px solid var(--ds-fg);
+    background: var(--ds-fg);
+    color: var(--ds-bg);
+  }
+
+  .secondary {
+    border: 1px solid color-mix(in oklab, var(--ds-fg) 38%, transparent);
+    color: var(--ds-fg);
+  }
+
+  .actions a:hover,
+  .actions a:focus-visible {
+    border-color: var(--ds-border);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .next-star {
+      animation: breathe 4s var(--ease-standard) infinite;
+    }
+
+    @keyframes breathe {
+      50% {
+        scale: 1.08;
+        rotate: 8deg;
+      }
+    }
+  }
+
+  @media (max-width: 980px) {
+    .next-step {
+      grid-template-columns: 1fr;
+    }
+
+
+    .guarantees {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    article:nth-child(2) {
+      border-inline-end: 0;
+    }
+
+    article:nth-child(-n + 2) {
+      border-block-end: 1px solid var(--ds-border-subtle);
+    }
+
+    .actions {
+      justify-content: flex-start;
+    }
+  }
+
+  @media (max-width: 620px) {
+    .guarantees {
+      grid-template-columns: 1fr;
+    }
+
+    article,
+    article:nth-child(2) {
+      min-height: 0;
+      border-inline-end: 0;
+      border-block-end: 1px solid var(--ds-border-subtle);
+    }
+
+    article:last-child {
+      border-block-end: 0;
+    }
+
+    article h3 {
+      margin-block-start: var(--space-8);
+    }
+  }
+</style>
+
