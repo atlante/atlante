@@ -146,6 +146,18 @@ function throwOnCommandFailure(
   throw new Error(`${name}: ${error.trim()}`);
 }
 
+// npm rejects republishing an existing version, which would abort a partial
+// rerun before its remaining packages were reached.
+async function isVersionPublished(
+  name: string,
+  version: string,
+): Promise<boolean> {
+  const probe = await Bun.$`npm view ${name}@${version} version`
+    .quiet()
+    .nothrow();
+  return probe.exitCode === 0;
+}
+
 async function validatePackage(dir: string, name: string) {
   const pack = await Bun.$`npm pack --dry-run`.cwd(dir).quiet().nothrow();
   throwOnCommandFailure(
@@ -181,6 +193,11 @@ async function publishPackage(pkg: string, version: string, otp?: string) {
   const manifestPath = join(dir, "package.json");
 
   const name = `@atlante/${pkg}`;
+
+  if (await isVersionPublished(name, version)) {
+    console.log(`Skipping ${name}@${version} (already published)`);
+    return;
+  }
 
   await withStagedPublishManifest(manifestPath, version, async () => {
     await validatePackage(dir, name);
