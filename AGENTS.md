@@ -15,11 +15,12 @@ packages/
   builder/         — host-neutral preparation, deterministic artifact publication, verified artifact reader
   opencode/        — OpenCode-specific artifact materialization and skill-tool integration
   cli/             — user-facing command orchestration (validate, build, init), initialization defaults, host registration
+website/           — private Astro landing site workspace (@atlante/website, not published)
 ```
 
 The seven workspaces are `schema`, `resources`, `validator`, `builder`, `pack`,
 `opencode`, and `cli`. The publishable packages are `pack`, the CLI, and
-the OpenCode adapter; `resources` remains private.
+the OpenCode adapter; `resources` remains private. The separate `website` workspace hosts the Astro landing site for [atlante.sh](https://atlante.sh); it stays outside the toolchain package graph and is not covered by these constraints.
 
 Schema changes require building and validating (`atlante validate`, `atlante build`). `atlante init` builds artifacts automatically; run `atlante build` after later source configuration changes. Tests mirror source paths in each package.
 
