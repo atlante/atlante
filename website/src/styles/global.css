@@ -33,6 +33,12 @@ body {
   outline-offset: 2px;
 }
 
+/* The hidden attribute must always win over component display values. */
+[hidden] {
+  display: none !important;
+}
+
+
 .skip-link {
   position: fixed;
   inset-block-start: var(--space-2);
