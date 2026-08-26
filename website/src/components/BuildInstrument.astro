@@ -970,7 +970,9 @@ const hints: Record<string, string> = {
     min-height: 36px;
     justify-content: flex-start;
     border: 0;
-    padding-inline: 0;
+    border-radius: 0;
+    background: color-mix(in oklab, var(--atlante-pine) 10%, transparent);
+    padding-inline: var(--space-2);
     color: var(--ds-fg);
     font-family: var(--font-mono);
     font-size: var(--text-small);
@@ -981,6 +983,7 @@ const hints: Record<string, string> = {
     text-underline-offset: 0.25em;
   }
 
+
   [data-tree-list] :global(.tree-name) {
     min-width: 0;
     overflow: hidden;
@@ -990,10 +993,11 @@ const hints: Record<string, string> = {
 
   [data-tree-list] :global(button:hover:not(:disabled)),
   [data-tree-list] :global(button:focus-visible:not(:disabled)) {
-    background: transparent;
+    background: color-mix(in oklab, var(--atlante-pine) 22%, transparent);
     color: var(--ds-fg);
     text-decoration-color: var(--ds-border);
   }
+
 
   [data-tree-list] :global(button.tree-active .tree-name) {
     text-decoration-color: var(--ds-border);
