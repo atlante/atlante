@@ -73,8 +73,8 @@ const links = [
           stroke-width="1"
           transform="rotate(-18 12 12)"></ellipse>
       </svg>
-      <span>Theme</span>
     </button>
+
 
 
 
@@ -192,36 +192,42 @@ const links = [
 
   .planet {
     display: none;
-    align-items: center;
-    gap: var(--space-2);
-    min-height: var(--control-min);
-    padding-inline: var(--space-3);
+    place-items: center;
+    width: var(--control-min);
+    height: var(--control-min);
+    padding: 0;
+    background: color-mix(in oklab, var(--ds-bg) 82%, transparent);
     border: 1px solid var(--ds-border-subtle);
-    background: transparent;
+    border-radius: 50%;
     color: var(--ds-fg);
-    font-family: var(--font-ui);
-    font-size: var(--text-small);
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
     cursor: pointer;
   }
 
   .planet svg {
-    width: 20px;
-    height: 20px;
+    width: 22px;
+    height: 22px;
   }
 
-  .planet:hover,
-  .planet:focus-visible {
+  .planet:hover {
     border-color: var(--ds-fg);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .planet svg {
+      transition: rotate var(--duration-editorial) var(--ease-standard);
+    }
+  }
+
+  :global([data-theme="dark"]) .planet svg {
+    rotate: 180deg;
   }
 
   @media (max-width: 700px) {
     .planet {
-      display: inline-flex;
+      display: grid;
     }
   }
+
 
 
   .license a {
