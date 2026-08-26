@@ -55,6 +55,43 @@ Then extend the preset and select a reusable template in `atlante.jsonc`:
 schema defines the remaining fields for that agent or skill. Local
 configuration takes precedence over the inherited preset.
 
+## Adaptive workflow phases
+
+The reusable workflow template supports opt-in phase resizing:
+
+```jsonc
+{
+  "phases": [
+    {
+      "name": "Review",
+      "policies": { "adaptive": true },
+      "instructions": ["Review the change."],
+    },
+  ],
+}
+```
+
+`policies.adaptive` defaults to `false`, so an omitted or `false` value leaves
+the phase mandatory. If any phase is adaptive, the rendered workflow emits one
+shared protocol and labels each phase as `adaptive` or `mandatory`.
+
+The protocol assigns every adaptive phase exactly one disposition:
+
+- `full` executes the complete phase.
+- `reduced` executes only the explicitly justified reduced scope.
+- `skipped` omits the phase only when its own instructions permit it.
+
+Before acting, the protocol MUST record the classification, evidence,
+disposition, and rationale. Missing or conflicting evidence, or material
+uncertainty, MUST use the conservative `full` fallback. Reclassification MUST
+follow implementation or review evidence that changes risk. Phase instructions
+MUST own concrete eligibility and escalation criteria; developer or project
+rules MAY strengthen the protocol but MUST NOT silently weaken a disposition.
+
+This is one built-in, prompt-only declarative capability. It does not execute
+phases or maintain runtime state, and it is not a configurable profile,
+taxonomy, enum, or skip matrix.
+
 ## Contents
 
 Useful public locators include:
