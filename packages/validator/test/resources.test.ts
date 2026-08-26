@@ -1509,6 +1509,33 @@ describe("resource-backed document validation", () => {
     },
   );
 
+  test("rejects root-level responsibilities in a bundled skill", () => {
+    const { configPath } = project({
+      $schema: SCHEMA_URI,
+      skills: {
+        testing: {
+          $template: "@atlante/pack/skill",
+          description: "Testing guidance",
+          title: "Testing",
+          overview: "Run tests.",
+          sections: [{ markdown: "Run tests." }],
+          responsibilities: ["Own the outcome."],
+        },
+      },
+    });
+
+    const result = load(configPath);
+
+    expect(result.document).toBeUndefined();
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: "invalid-prompt-input",
+        path: "/skills/testing/responsibilities",
+        message: expect.stringContaining("responsibilities"),
+      }),
+    );
+  });
+
   test("rejects responsibilities nested in agent sections", () => {
     const { configPath } = project({
       $schema: SCHEMA_URI,
