@@ -2129,6 +2129,127 @@ describe("resource-backed document validation", () => {
     );
   });
 
+  test.each([
+    ["omitted", {}],
+    ["valid non-empty", { responsibilities: ["Own the outcome."] }],
+  ] as const)("accepts %s top-level responsibilities", (_label, fields) => {
+    const { configPath } = project({
+      $schema: SCHEMA_URI,
+      agents: {
+        reviewer: {
+          $template: "@atlante/pack/agent",
+          description: "Reviews the change.",
+          identity: "You review.",
+          mission: "Find defects.",
+          ...fields,
+        },
+      },
+    });
+
+    const result = load(configPath);
+
+    expect(result.diagnostics).toEqual([]);
+    expect(result.document?.agents?.reviewer).toMatchObject(fields);
+  });
+
+  test.each([
+    [
+      "empty array",
+      [] as unknown,
+      "/agents/reviewer/responsibilities",
+      "fewer than 1 items",
+    ],
+    [
+      "empty string item",
+      [""],
+      "/agents/reviewer/responsibilities/0",
+      "fewer than 1 characters",
+    ],
+  ] as const)(
+    "rejects %s top-level responsibilities",
+    (_label, responsibilities, pointer, message) => {
+      const { root, configPath } = project({
+        $schema: SCHEMA_URI,
+        agents: {
+          reviewer: {
+            $template: "@atlante/pack/agent",
+            description: "Reviews the change.",
+            identity: "You review.",
+            mission: "Find defects.",
+            responsibilities,
+          },
+        },
+      });
+
+      const result = load(configPath);
+      const diagnostic = result.diagnostics.find(
+        ({ code, pointer: diagnosticPointer }) =>
+          code === "invalid-prompt-input" && diagnosticPointer === pointer,
+      );
+
+      expect(result.document).toBeUndefined();
+      expect(diagnostic).toMatchObject({
+        code: "invalid-prompt-input",
+        path: pointer,
+        pointer,
+      });
+      expect(diagnostic?.message).toContain(message);
+      expect(JSON.stringify(result.diagnostics)).not.toContain(root);
+    },
+  );
+
+  test("rejects root-level responsibilities in a bundled skill", () => {
+    const { configPath } = project({
+      $schema: SCHEMA_URI,
+      skills: {
+        testing: {
+          $template: "@atlante/pack/skill",
+          description: "Testing guidance",
+          title: "Testing",
+          overview: "Run tests.",
+          sections: [{ markdown: "Run tests." }],
+          responsibilities: ["Own the outcome."],
+        },
+      },
+    });
+
+    const result = load(configPath);
+
+    expect(result.document).toBeUndefined();
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: "invalid-prompt-input",
+        path: "/skills/testing/responsibilities",
+        message: expect.stringContaining("responsibilities"),
+      }),
+    );
+  });
+
+  test("rejects responsibilities nested in agent sections", () => {
+    const { configPath } = project({
+      $schema: SCHEMA_URI,
+      agents: {
+        reviewer: {
+          $template: "@atlante/pack/agent",
+          description: "Reviews the change.",
+          identity: "You review.",
+          mission: "Find defects.",
+          sections: [{ responsibilities: ["Own the outcome."] }],
+        },
+      },
+    });
+
+    const result = load(configPath);
+
+    expect(result.document).toBeUndefined();
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: "invalid-prompt-input",
+        message: expect.stringContaining("responsibilities"),
+      }),
+    );
+  });
+
   test("accepts a canonical workflow section in a bundled agent", () => {
     const { configPath } = project({
       $schema: SCHEMA_URI,
@@ -2157,6 +2278,98 @@ describe("resource-backed document validation", () => {
     expect(result.diagnostics).toEqual([]);
     expect(result.document?.agents?.reviewer).toBeDefined();
   });
+
+  test.each([
+    ["true", true],
+    ["false", false],
+    ["absent", undefined],
+  ] as const)(
+    "accepts %s adaptive phase policy in a bundled workflow",
+    (_label, adaptive) => {
+      const { configPath } = project({
+        $schema: SCHEMA_URI,
+        agents: {
+          reviewer: {
+            $template: "@atlante/pack/agent",
+            description: "Reviews the change.",
+            identity: "You review.",
+            mission: "Find defects.",
+            sections: [
+              {
+                workflow: {
+                  title: "Review workflow",
+                  phases: [
+                    {
+                      kind: "plan",
+                      instructions: ["Inspect the change."],
+                      ...(adaptive === undefined
+                        ? {}
+                        : { policies: { adaptive } }),
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      });
+
+      const result = load(configPath);
+
+      expect(result.diagnostics).toEqual([]);
+    },
+  );
+
+  test.each([
+    ["string", "true"],
+    ["null", null],
+  ] as const)(
+    "rejects non-boolean adaptive phase policy: %s",
+    (_label, adaptive) => {
+      const { root, configPath } = project({
+        $schema: SCHEMA_URI,
+        agents: {
+          reviewer: {
+            $template: "@atlante/pack/agent",
+            description: "Reviews the change.",
+            identity: "You review.",
+            mission: "Find defects.",
+            sections: [
+              {
+                workflow: {
+                  title: "Review workflow",
+                  phases: [
+                    {
+                      kind: "plan",
+                      policies: { adaptive },
+                      instructions: ["Inspect the change."],
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      });
+      const path =
+        "/agents/reviewer/sections/0/workflow/phases/0/policies/adaptive";
+
+      const result = load(configPath);
+      const diagnostic = result.diagnostics.find(
+        ({ code, path: diagnosticPath }) =>
+          code === "invalid-prompt-input" && diagnosticPath === path,
+      );
+
+      expect(result.document).toBeUndefined();
+      expect(diagnostic).toMatchObject({
+        code: "invalid-prompt-input",
+        path,
+        pointer: path,
+      });
+      expect(diagnostic?.message).toContain("must be boolean");
+      expect(JSON.stringify(result.diagnostics)).not.toContain(root);
+    },
+  );
 
   test("preserves workflow diagnostics for bundled agents", () => {
     const { configPath } = project({

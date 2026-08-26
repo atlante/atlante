@@ -15,7 +15,8 @@
     }
   ],
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "website"
   ],
   "scripts": {
     "test": "vitest run",

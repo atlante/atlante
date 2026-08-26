@@ -46,6 +46,11 @@
                 "type": "boolean",
                 "default": false
               },
+              "adaptive": {
+                "description": "Whether this phase may be resized or skipped by the adaptive workflow protocol.",
+                "type": "boolean",
+                "default": false
+              },
               "maxLoops": {
                 "description": "Maximum correction loops allowed per task.",
                 "type": "integer",

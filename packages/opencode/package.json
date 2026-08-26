@@ -1,6 +1,6 @@
 {
   "name": "@atlante/opencode",
-  "version": "0.1.6",
+  "version": "0.1.8",
   "type": "module",
   "description": "Atlante OpenCode host adapter",
   "license": "MIT",

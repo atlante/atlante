@@ -55,6 +55,51 @@ Then extend the preset and select a reusable template in `atlante.jsonc`:
 schema defines the remaining fields for that agent or skill. Local
 configuration takes precedence over the inherited preset.
 
+## Adaptive workflow phases
+
+The reusable workflow template supports opt-in phase resizing:
+
+```jsonc
+{
+  "phases": [
+    {
+      "name": "Review",
+      "policies": { "adaptive": true },
+      "instructions": ["Review the change."],
+    },
+  ],
+}
+```
+
+`policies.adaptive` defaults to `false`, so an omitted or `false` value leaves
+the phase mandatory. If any phase is adaptive, the rendered workflow emits one
+shared protocol and labels each phase as `adaptive` or `mandatory`.
+
+The protocol assigns every adaptive phase exactly one disposition:
+
+- `full` executes the complete phase.
+- `reduced` executes only the explicitly justified reduced scope.
+- `skipped` omits the phase only when its own instructions permit it.
+
+Before acting, the protocol MUST record the classification, evidence,
+disposition, and rationale. Before applying `full` because evidence is missing,
+signals conflict, or material uncertainty exists, determine whether the
+uncertainty is decision-relevant and developer-resolvable. When it is, ask one
+focused developer question and classify using the answer. Default to `full` only
+when material uncertainty remains after available evidence and that question,
+when no appropriate developer question can resolve the material
+uncertainty, or when asking is not possible. Do not make routine or immaterial
+uncertainty interactive. Reclassification MUST follow implementation or review
+evidence that changes risk. Phase instructions MUST own concrete eligibility and
+escalation criteria; developer or project rules MAY strengthen the protocol but
+MUST NOT silently weaken a disposition. Material scope changes MUST retain
+developer approval, and a focused developer question MUST NOT itself grant that
+approval.
+
+This is one built-in, prompt-only declarative capability. It does not execute
+phases or maintain runtime state, and it is not a configurable profile,
+taxonomy, enum, or skip matrix.
+
 ## Contents
 
 Useful public locators include:
@@ -69,9 +114,10 @@ Useful public locators include:
 
 The default preset exposes the `architect` agent and the `brainstorming` and
 `workflow` skills. The `workflow` skill is the `delivery-workflow` instance. The
-agent and skill templates support ordered `markdown`, `instructions`,
-`responsibilities`, `gotchas`, `workflow`, and `invariants` sections. Invariants
-are binding guarantees and approval gates, not suggestions.
+agent template accepts optional top-level `responsibilities` alongside
+`identity` and `mission`. The agent and skill templates support ordered
+`markdown`, `instructions`, `gotchas`, `workflow`, and `invariants` sections.
+Invariants are binding guarantees and approval gates, not suggestions.
 
 ## Pack behavior
 

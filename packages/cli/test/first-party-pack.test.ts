@@ -1,20 +1,24 @@
 import {
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   realpathSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, expect, test } from "vitest";
 import { resolveFirstPartyPack } from "../src/first-party-pack.js";
 
 const created: string[] = [];
-const expectedPackRoot = dirname(
-  fileURLToPath(import.meta.resolve("@atlante/pack/package.json")),
-);
+const expectedPackRoot = fileURLToPath(new URL("../../pack/", import.meta.url));
+const firstPartyPackVersion = (
+  JSON.parse(
+    readFileSync(new URL("../../pack/package.json", import.meta.url), "utf8"),
+  ) as { version: string }
+).version;
 
 afterEach(() => {
   for (const directory of created.splice(0))
@@ -32,9 +36,14 @@ test("resolves the first-party pack from the CLI installation, not cwd", () => {
     '{ "name": "@atlante/pack", "version": "99.0.0", "atlante": { "format": 2 } }\n',
   );
 
-  const pack = resolveFirstPartyPack();
-
-  expect(pack.root).toBe(realpathSync(expectedPackRoot));
-  expect(pack.package?.name).toBe("@atlante/pack");
-  expect(pack.package?.version).toBe("0.1.6");
+  const previous = process.cwd();
+  try {
+    process.chdir(directory);
+    const pack = resolveFirstPartyPack();
+    expect(pack.root).toBe(realpathSync(expectedPackRoot));
+    expect(pack.package?.name).toBe("@atlante/pack");
+    expect(pack.package?.version).toBe(firstPartyPackVersion);
+  } finally {
+    process.chdir(previous);
+  }
 });

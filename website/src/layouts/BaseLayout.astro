@@ -1,0 +1,73 @@
+---
+import "../styles/global.css";
+
+interface Props {
+  title: string;
+  description: string;
+}
+
+const { title, description } = Astro.props;
+const ogImage = Astro.site ? new URL("og.png", Astro.site) : "/og.png";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <script is:inline>
+      // Apply the stored or system theme before first paint to avoid a flash.
+      // Colors mirror --atlante-linen and --atlante-jet from the brand tokens.
+      let stored = null;
+      try {
+        stored = localStorage.getItem("atlante-theme");
+      } catch {
+        // Storage is unavailable; fall back to the system preference.
+      }
+      const dark =
+        stored === "dark" ||
+        (stored === null &&
+          matchMedia("(prefers-color-scheme: dark)").matches);
+      document.documentElement.dataset.theme = dark ? "dark" : "light";
+    </script>
+    <meta name="theme-color" content="#F4ECE4" />
+    <link
+      rel="preload"
+      href="/fonts/bodonimoda/bodoni-moda-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link rel="canonical" href={Astro.site} />
+
+    <link
+      rel="icon"
+      href="/brand/favicons/atlante-favicon.svg"
+      type="image/svg+xml"
+    />
+    <link
+      rel="icon"
+      href="/brand/favicons/atlante-favicon-32.png"
+      type="image/png"
+      sizes="32x32"
+    />
+    <link
+      rel="apple-touch-icon"
+      href="/brand/favicons/atlante-favicon-128.png"
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Atlante" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={Astro.site} />
+    <meta property="og:image" content={ogImage} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="generator" content={Astro.generator} />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <slot />
+  </body>
+</html>
