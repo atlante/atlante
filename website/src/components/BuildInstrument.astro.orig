@@ -273,72 +273,88 @@ const hints: Record<string, string> = {
       renderPane();
     };
 
-    /** Strips id/content digests from artifact payload names so the tree
-     * reads like source: architect-<id>-<sha256>.md -> architect.md. */
-    const displayName = (name: string): string => {
-      if (name.endsWith(".md")) {
-        const stem = name.slice(0, -3);
-        const trimmed = stem.replace(/-[0-9a-f]{8,}.*$/i, "");
-        return `${trimmed || stem}.md`;
-      }
-      return name;
-    };
+    interface TreeNode {
+      name: string;
+      path: string;
+      isFile: boolean;
+      children: Map<string, TreeNode>;
+    }
 
     const renderTree = (): void => {
       if (!fileTree || !treeList) return;
-      const groups = new Map<string, { path: string; name: string }[]>();
+      const root: Map<string, TreeNode> = new Map();
       for (const path of [...state.files.keys()].sort()) {
-        const rawName = path.slice(path.lastIndexOf("/") + 1);
-        const dir = path.includes("/")
-          ? path.slice(0, path.lastIndexOf("/"))
-          : ".";
-        const entry = { path, name: displayName(rawName) };
-        const group = groups.get(dir);
-        if (group) group.push(entry);
-        else groups.set(dir, [entry]);
+        const parts = path.split("/");
+        let level = root;
+        let prefix = "";
+        for (let index = 0; index < parts.length; index++) {
+          const name = parts[index];
+          const full = prefix ? `${prefix}/${name}` : name;
+          let node = level.get(name);
+          if (!node) {
+            node = {
+              name,
+              path: full,
+              isFile: index === parts.length - 1,
+              children: new Map(),
+            };
+            level.set(name, node);
+          }
+          level = node.children;
+          prefix = full;
+        }
       }
 
-      treeList.replaceChildren();
-      const dirs = [...groups.keys()].sort((a, b) =>
-        a === "." ? -1 : b === "." ? 1 : a.localeCompare(b),
-      );
-      for (const dir of dirs) {
-        const group = document.createElement("li");
-        group.className = "tree-group";
-        const label = document.createElement("p");
-        label.className = "tree-folder";
-        label.textContent = dir === "." ? "/" : `${dir}/`;
-        group.append(label);
-        const list = document.createElement("ul");
-        for (const file of groups.get(dir) ?? []) {
+      const rows: HTMLLIElement[] = [];
+      const walk = (nodes: Map<string, TreeNode>, depth: number): void => {
+        const entries = [...nodes.values()].sort((a, b) =>
+          a.isFile === b.isFile
+            ? a.name.localeCompare(b.name)
+            : a.isFile
+              ? 1
+              : -1,
+        );
+        entries.forEach((node, index) => {
+          const glyph = `${"│ ".repeat(depth)}${index === entries.length - 1 ? "└─ " : "├─ "}`;
+
           const item = document.createElement("li");
-          const button = document.createElement("button");
-          button.type = "button";
-          button.title = file.path;
-          button.classList.toggle(
-            "tree-active",
-            state.activePath === file.path,
-          );
-          const nameSpan = document.createElement("span");
-          nameSpan.className = "tree-name";
-          nameSpan.textContent = file.name;
-          button.append(nameSpan);
-          button.addEventListener("click", () => {
-            if (state.activePath === file.path) {
-              state.activePath = null;
-              state.editing = false;
-              renderPane();
-              refreshControls();
-              return;
-            }
-            openFile(file.path);
-          });
-          item.append(button);
-          list.append(item);
-        }
-        group.append(list);
-        treeList.append(group);
-      }
+          if (node.isFile) {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.title = node.path;
+            button.classList.toggle(
+              "tree-active",
+              state.activePath === node.path,
+            );
+            const glyphSpan = document.createElement("span");
+            glyphSpan.className = "tree-glyph";
+            glyphSpan.textContent = glyph;
+            const nameSpan = document.createElement("span");
+            nameSpan.className = "tree-name";
+            nameSpan.textContent = node.name;
+            button.append(glyphSpan, nameSpan);
+            button.addEventListener("click", () => {
+              if (state.activePath === node.path) {
+                state.activePath = null;
+                state.editing = false;
+                renderPane();
+                refreshControls();
+                return;
+              }
+              openFile(node.path);
+            });
+            item.append(button);
+          } else {
+            item.className = "tree-folder";
+            item.textContent = `${glyph}${node.name}/`;
+            walk(node.children, depth + 1);
+          }
+          rows.push(item);
+        });
+      };
+      walk(root, 0);
+
+      treeList.replaceChildren(...rows);
       fileTree.hidden = state.files.size === 0;
     };
 
@@ -916,40 +932,19 @@ const hints: Record<string, string> = {
 
   [data-tree-list] {
     margin: 0;
-    padding: var(--space-1) var(--space-4) var(--space-3);
+    padding: var(--space-2) var(--space-4) var(--space-3);
     list-style: none;
+  }
+
+  [data-tree-list] {
     max-width: 100%;
   }
 
-  [data-tree-list] :global(.tree-group) {
+  [data-tree-list] li {
     min-width: 0;
   }
 
-  [data-tree-list] :global(.tree-folder) {
-    margin: var(--space-2) 0 0;
-    color: var(--ds-muted);
-    font-family: var(--font-mono);
-    font-size: var(--text-small);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  [data-tree-list] :global(.tree-group > ul) {
-    margin: 0;
-    padding-inline-start: var(--space-6);
-    list-style: disc;
-  }
-
-  [data-tree-list] :global(.tree-group > ul > li) {
-    min-width: 0;
-  }
-
-  [data-tree-list] :global(.tree-group > ul > li)::marker {
-    color: var(--ds-muted);
-  }
-
-  [data-tree-list] :global(button) {
+  [data-tree-list] button {
     display: flex;
     width: 100%;
     min-width: 0;
@@ -968,6 +963,10 @@ const hints: Record<string, string> = {
     text-underline-offset: 0.25em;
   }
 
+  [data-tree-list] :global(.tree-glyph) {
+    flex: none;
+  }
+
   [data-tree-list] :global(.tree-name) {
     min-width: 0;
     overflow: hidden;
@@ -975,8 +974,10 @@ const hints: Record<string, string> = {
     white-space: nowrap;
   }
 
-  [data-tree-list] :global(button:hover:not(:disabled)),
-  [data-tree-list] :global(button:focus-visible:not(:disabled)) {
+
+
+  [data-tree-list] button:hover:not(:disabled),
+  [data-tree-list] button:focus-visible:not(:disabled) {
     background: transparent;
     color: var(--ds-fg);
     text-decoration-color: var(--ds-border);
@@ -986,6 +987,20 @@ const hints: Record<string, string> = {
     text-decoration-color: var(--ds-border);
     text-decoration-thickness: 2px;
   }
+
+  [data-tree-list] :global(.tree-glyph) {
+    color: var(--ds-muted);
+    white-space: pre;
+  }
+
+  [data-tree-list] :global(.tree-folder) {
+    color: var(--ds-muted);
+    font-family: var(--font-mono);
+    font-size: var(--text-small);
+    line-height: 36px;
+    white-space: pre;
+  }
+
 
   .docs-link {
     display: inline-flex;
@@ -1175,8 +1190,8 @@ const hints: Record<string, string> = {
       padding-block: var(--space-4);
     }
 
-    [data-tree-list] :global(button),
-    [data-tree-list] :global(.tree-folder) {
+    [data-tree-list] button,
+    .tree-folder {
       font-size: var(--text-meta);
       line-height: 32px;
     }
