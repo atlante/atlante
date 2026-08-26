@@ -88,11 +88,6 @@ export function validateResourceLocator(
   if (typeof raw !== "string" || raw.length === 0) return invalid(raw);
   if (hasForbiddenLocatorSyntax(raw)) return invalid(raw);
 
-  // This prefix was the temporary built-in resource vocabulary. Keep it
-  // invalid rather than silently interpreting old locators as a package named
-  // `atlante`.
-  if (raw.startsWith("atlante/")) return invalid(raw);
-
   if (raw.startsWith("./") || raw.startsWith("../")) {
     if (raw.includes("//") || namesFacetFile(raw)) return invalid(raw);
     return raw as ValidatedResourceLocator;

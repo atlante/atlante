@@ -70,14 +70,24 @@ describe("resource locator resolution", () => {
     ).toBe(join(pack.root, "config", "sibling"));
   });
 
-  test("rejects the temporary vocabulary and retains package locators", () => {
+  test("accepts legacy locators as ordinary package locators", () => {
     expect(parseResourceLocator("@atlante/pack/agent")).toMatchObject({
       kind: "package",
       packageName: "@atlante/pack",
       subpath: "agent",
     });
-    for (const locator of ["atlante/starter", "atlante/agent", "atlante/skill"])
-      expectFailure(() => parseResourceLocator(locator), "invalid-locator");
+    for (const [locator, subpath] of [
+      ["atlante/starter", "starter"],
+      ["atlante/agent", "agent"],
+      ["atlante/skill", "skill"],
+      ["atlante/one/two", "one/two"],
+    ] as const)
+      expect(parseResourceLocator(locator)).toMatchObject({
+        kind: "package",
+        packageName: "atlante",
+        subpath,
+      });
+    expectFailure(() => parseResourceLocator("atlante/"), "invalid-locator");
   });
 
   test("resolves relative references within the project root", () => {
@@ -120,7 +130,6 @@ describe("resource locator resolution", () => {
       "./resource\\child",
       "./resource\u0000child",
       "atlante/",
-      "atlante/one/two",
       "./resource/template.jsonc",
       "./resource/instance.jsonc",
     ]) {
