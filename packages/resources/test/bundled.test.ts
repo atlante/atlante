@@ -191,15 +191,13 @@ describe("first-party package resources", () => {
       config,
     );
 
+    expect(architect.input.responsibilities).toEqual([
+      "Clarify ambiguity with the developer and establish the issue's scope, constraints, and acceptance criteria.",
+      "Make focused, maintainable changes that follow established project conventions and preserve clear responsibility boundaries.",
+      "Validate and review the result against its acceptance criteria, project conventions, and relevant regression, compatibility, and security concerns.",
+      "Communicate decisions, validation evidence, blockers, and next steps.",
+    ]);
     expect(architect.input.sections).toEqual([
-      {
-        responsibilities: [
-          "Clarify ambiguity with the developer and establish the issue's scope, constraints, and acceptance criteria.",
-          "Make focused, maintainable changes that follow established project conventions and preserve clear responsibility boundaries.",
-          "Validate and review the result against its acceptance criteria, project conventions, and relevant regression, compatibility, and security concerns.",
-          "Communicate decisions, validation evidence, blockers, and next steps.",
-        ],
-      },
       {
         invariants: [
           "Introduce abstractions only when they remove real duplication or improve clarity.",
@@ -271,6 +269,44 @@ describe("first-party package resources", () => {
     expect(output).toContain(
       "Execute phases sequentially in the order listed.",
     );
+  });
+
+  test("renders top-level responsibilities after mission and preserves authored supporting-section order", () => {
+    const { root, config } = fixture();
+    const output = renderResolvedTemplate({
+      template: resolveResourceTemplate(
+        createProjectResourcePack(root),
+        "@atlante/pack/agent",
+        config,
+      ),
+      input: {
+        identity: "Identity",
+        mission: "Mission",
+        responsibilities: ["Own the outcome."],
+        sections: [
+          { instructions: ["Authored instruction."] },
+          { invariants: ["Authored invariant."] },
+          { markdown: "Authored markdown." },
+        ],
+      },
+    });
+
+    expect(output).toContain(
+      "# Mission\n\nMission\n\n## Responsibilities\n\n- Own the outcome.",
+    );
+    const markers = [
+      "# Mission\n\nMission",
+      "## Responsibilities",
+      "## Instructions",
+      "## Invariants",
+      "Authored markdown.",
+    ];
+    for (let index = 1; index < markers.length; index++) {
+      expect(output.indexOf(markers[index - 1])).toBeLessThan(
+        output.indexOf(markers[index]),
+      );
+    }
+    expect(output).toContain("- Own the outcome.");
   });
 
   test("renders the canonical workflow identically in agents and skills", () => {

@@ -69,9 +69,10 @@ Useful public locators include:
 
 The default preset exposes the `architect` agent and the `brainstorming` and
 `workflow` skills. The `workflow` skill is the `delivery-workflow` instance. The
-agent and skill templates support ordered `markdown`, `instructions`,
-`responsibilities`, `gotchas`, `workflow`, and `invariants` sections. Invariants
-are binding guarantees and approval gates, not suggestions.
+agent template accepts optional top-level `responsibilities` alongside
+`identity` and `mission`. The agent and skill templates support ordered
+`markdown`, `instructions`, `gotchas`, `workflow`, and `invariants` sections.
+Invariants are binding guarantees and approval gates, not suggestions.
 
 ## Pack behavior
 

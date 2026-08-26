@@ -5,7 +5,6 @@
 # Mission
 
 {{mission}}
-{{#each sections}}
 {{#if responsibilities}}
 
 ## Responsibilities
@@ -14,6 +13,7 @@
 - {{this}}
 {{/each}}
 {{/if}}
+{{#each sections}}
 {{#if invariants}}
 
 {{> slot/sections/invariants invariants}}
