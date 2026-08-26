@@ -305,10 +305,13 @@ const hints: Record<string, string> = {
       for (const dir of dirs) {
         const group = document.createElement("li");
         group.className = "tree-group";
-        const label = document.createElement("p");
-        label.className = "tree-folder";
-        label.textContent = dir === "." ? "/" : `${dir}/`;
-        group.append(label);
+        if (dir !== ".") {
+          const label = document.createElement("p");
+          label.className = "tree-folder";
+          label.textContent = `${dir}/`;
+          group.append(label);
+        }
+
         const list = document.createElement("ul");
         for (const file of groups.get(dir) ?? []) {
           const item = document.createElement("li");
