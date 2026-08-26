@@ -6,15 +6,10 @@
   "mcp": {
     "fallow": {
       "type": "local",
-      "command": ["npx", "-y", "-p", "fallow", "fallow-mcp"],
-      "enabled": true
+      "command": ["npx", "-y", "-p", "fallow", "fallow-mcp"]
     }
   },
 
-  // Disable OpenCode's user-facing default agents so the roster is Atlante's own.
-  // The internal system agents (compaction, summary, title) are intentionally left enabled
-  // because OpenCode relies on them for context compaction, session summaries,
-  // and title generation.
   "agent": {
     "architect": {
       "mode": "primary",
@@ -22,10 +17,6 @@
         "*": "allow",
         "edit": "deny"
       }
-    },
-    "general": {},
-    "explore": {},
-    "build": { "disable": true },
-    "plan": { "disable": true }
+    }
   }
 }
