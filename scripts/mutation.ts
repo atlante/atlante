@@ -8,11 +8,14 @@ import {
   hashSourceFiles,
   type MutationReport,
   mutationVerdictCounts,
+  RESOURCE_SOURCE_ALGORITHM,
   sourceFiles,
 } from "./mutation-evidence";
 import { acquireMutationCampaign, resolveMutationRoot } from "./mutation-root";
 
 const MUTATION_WORKSPACES = ["schema", "resources", "validator"] as const;
+export const MUTATION_PREFLIGHT_REFRESH_ENV =
+  "ATLANTE_MUTATION_PREFLIGHT_REFRESH";
 type MutationWorkspace = (typeof MUTATION_WORKSPACES)[number];
 
 type Child = {
@@ -134,6 +137,7 @@ export type PreflightRecord = {
   exitCode: number;
   signal: NodeJS.Signals | null;
   status: "passed" | "failed";
+  refreshMode: "ordinary" | "stale-source-bootstrap";
   counts?: VitestCounts;
   gitHead: string;
   sourceSha256: string;
@@ -141,6 +145,15 @@ export type PreflightRecord = {
   configSha256: string;
   toolVersions: { bun: string; node: string; vitest: string; stryker: string };
 };
+
+export function mutationPreflightRefreshEnabled(
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  return (
+    env.ATLANTE_MUTATION_PHASE === "preflight" &&
+    env[MUTATION_PREFLIGHT_REFRESH_ENV] === "1"
+  );
+}
 
 export type CampaignRecord = {
   schemaVersion: 2;
@@ -295,6 +308,7 @@ async function preflightRecord(
   exitCode: number,
   signal: NodeJS.Signals | null,
   output: string,
+  refreshMode: PreflightRecord["refreshMode"],
 ): Promise<string> {
   const files = await sourceFiles(".", `packages/${workspace}/src`);
   const config = await readFile("stryker.config.ts");
@@ -308,12 +322,13 @@ async function preflightRecord(
     exitCode,
     signal,
     status: exitCode === 0 ? "passed" : "failed",
+    refreshMode,
     counts: parseVitestCounts(output),
     gitHead: execFileSync("git", ["rev-parse", "HEAD"], {
       encoding: "utf8",
     }).trim(),
     sourceSha256: hashSourceFiles(files),
-    sourceAlgorithm: "sha256:path\\0bytes\\0:v1",
+    sourceAlgorithm: RESOURCE_SOURCE_ALGORITHM,
     configSha256: hashSourceFiles([
       { path: "stryker.config.ts", bytes: config },
     ]),
@@ -386,15 +401,17 @@ export async function runMutation(
   );
   const campaignId = randomUUID();
   const preflightStarted = Date.now();
+  const preflightEnv = {
+    ...process.env,
+    ATLANTE_MUTATION_PHASE: "preflight",
+    ATLANTE_MUTATION_CAMPAIGN_ID: campaignId,
+    [MUTATION_PREFLIGHT_REFRESH_ENV]: "1",
+  };
   const preflight = await runChild(
     ["bun", "run", "test"],
     {
       shell: false,
-      env: {
-        ...process.env,
-        ATLANTE_MUTATION_PHASE: "preflight",
-        ATLANTE_MUTATION_CAMPAIGN_ID: campaignId,
-      },
+      env: preflightEnv,
     },
     resolved,
   );
@@ -408,6 +425,9 @@ export async function runMutation(
     preflight.code,
     preflight.signal,
     preflight.output,
+    mutationPreflightRefreshEnabled(preflightEnv)
+      ? "stale-source-bootstrap"
+      : "ordinary",
   );
   if (preflight.code !== 0) return preflight.code;
 
@@ -416,12 +436,14 @@ export async function runMutation(
   const strykerStarted = Date.now();
   let stryker: ChildResult;
   try {
+    const campaignEnv = { ...process.env };
+    delete campaignEnv[MUTATION_PREFLIGHT_REFRESH_ENV];
     stryker = await runChild(
       ["bun", "x", "stryker", "run", "stryker.config.ts"],
       {
         shell: false,
         env: {
-          ...process.env,
+          ...campaignEnv,
           ATLANTE_MUTATION_WORKSPACE: workspace,
           ATLANTE_MUTATION_CAMPAIGN_ID: campaignId,
           ATLANTE_MUTATION_PREFLIGHT: preflightPath,

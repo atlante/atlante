@@ -16,6 +16,7 @@ import {
   type CampaignRecord,
   defaultSpawn,
   finalizeCampaign,
+  mutationPreflightRefreshEnabled,
   parseVitestCounts,
   runMutation,
   writePreflightRecord,
@@ -60,6 +61,24 @@ test("parses ordinary Vitest file and test counts", () => {
     tests: { failed: 2, passed: 774, total: 776 },
   });
 });
+
+test.each([
+  [{ ATLANTE_MUTATION_PREFLIGHT_REFRESH: "1" }, false],
+  [{ ATLANTE_MUTATION_PHASE: "preflight" }, false],
+  [
+    {
+      ATLANTE_MUTATION_PHASE: "preflight",
+      ATLANTE_MUTATION_PREFLIGHT_REFRESH: "1",
+    },
+    true,
+  ],
+  [{}, false],
+])(
+  "recognizes evidence refresh only for a preflight refresh",
+  (env, expected) => {
+    expect(mutationPreflightRefreshEnabled(env)).toBe(expected);
+  },
+);
 
 test("writes a preflight record atomically", async () => {
   const root = await mkdtemp(join(tmpdir(), "atlante-preflight-"));
@@ -197,6 +216,7 @@ test.each(["schema", "resources", "validator"])(
       env: expect.objectContaining({
         ATLANTE_MUTATION_PHASE: "preflight",
         ATLANTE_MUTATION_CAMPAIGN_ID: expect.any(String),
+        ATLANTE_MUTATION_PREFLIGHT_REFRESH: "1",
       }),
     });
     expect(spawn).toHaveBeenNthCalledWith(
@@ -206,6 +226,9 @@ test.each(["schema", "resources", "validator"])(
         shell: false,
         env: expect.objectContaining({ ATLANTE_MUTATION_WORKSPACE: workspace }),
       }),
+    );
+    expect(spawn.mock.calls[1]?.[1].env).not.toHaveProperty(
+      "ATLANTE_MUTATION_PREFLIGHT_REFRESH",
     );
   },
 );

@@ -5,7 +5,7 @@
   "source": {
     "identity": "packages/validator/src/**/*.ts",
     "algorithm": "sha256:path\u0000bytes\u0000:v1",
-    "sha256": "28377820ad37412bc51b8c1b795c8f75fd6c609687ea2da80502770ba29b7d91",
+    "sha256": "4a1b984f3cfa5725d983e34c7bf0ecbbacc34c1f6bf86045c2397a945059b0b1",
     "files": [
       "packages/validator/src/diagnostic-decoration.ts",
       "packages/validator/src/diagnostic.ts",
@@ -18,7 +18,7 @@
   },
   "report": {
     "identity": "mutation/validator/mutation.json",
-    "sha256": "d276e9123ec407e317a1fb7e3202b68e2b1c0e2c7d6b591a98b4b1bd9b0e8432"
+    "sha256": "c0209c3556f52a9a36296a44f6d7cb14057c4727613e652611f3819b825ff71f"
   },
   "versions": {
     "bun": "1.3.14",
@@ -26,48 +26,48 @@
     "vitest": "4.1.11",
     "stryker": "10.0.0"
   },
-  "runtime": "12m18s",
+  "runtime": "17m36s",
   "exitCode": 0,
   "counts": {
     "files": 5,
-    "mutants": 1324,
-    "killed": 930,
-    "survived": 308,
-    "noCoverage": 85,
-    "mutationScore": 70.29,
+    "mutants": 1338,
+    "killed": 956,
+    "survived": 295,
+    "noCoverage": 86,
+    "mutationScore": 71.5,
     "timeouts": 0,
     "errors": 0,
     "ignored": 1
   },
-  "generatedAt": "2026-08-25T21:56:38Z",
-  "commitBase": "d8294a59f73633712757f21cd6cdcdbfc65d2ca6",
+  "generatedAt": "2026-08-26T14:51:14.687Z",
+  "commitBase": "adae9d6ada5e7db4cb277b7505a2792f269c159b",
   "attestation": {
     "preflight": {
       "identity": "mutation-evidence/validator-preflight.json",
-      "sha256": "cca66cf12628f6018c95332c6481f466e5496878b65691296640bf66b977b82c"
+      "sha256": "93cf1ae7de2d7260695c59deb74e8794748739e35fe6611bb7826383e145f2fb"
     },
     "campaign": {
       "identity": "mutation-evidence/validator-campaign.json",
-      "sha256": "3be382b2c101de0414a6f67d0df4cc2794e01aa7fe5d647e3d4eb3109bec179d"
+      "sha256": "3061837607e0e11c298b6fc4031153938bda0a3d23f1d6ab3510045977d39136"
     },
     "manifest": {
       "identity": "mutation-evidence/validator-verdict.json",
-      "sha256": "d4500695ceb5cf8ee06d4cdb69d05c7883a53830548f24c414b2b04576e24733"
+      "sha256": "f9e9f5ed49a85499faf687b091962f577b6b0f64c429257c49c64de696dbeabd"
     }
   },
   "attestations": [
     {
       "preflight": {
         "identity": "mutation-evidence/validator-preflight.json",
-        "sha256": "cca66cf12628f6018c95332c6481f466e5496878b65691296640bf66b977b82c"
+        "sha256": "93cf1ae7de2d7260695c59deb74e8794748739e35fe6611bb7826383e145f2fb"
       },
       "campaign": {
         "identity": "mutation-evidence/validator-campaign.json",
-        "sha256": "3be382b2c101de0414a6f67d0df4cc2794e01aa7fe5d647e3d4eb3109bec179d"
+        "sha256": "3061837607e0e11c298b6fc4031153938bda0a3d23f1d6ab3510045977d39136"
       },
       "manifest": {
         "identity": "mutation-evidence/validator-verdict.json",
-        "sha256": "d4500695ceb5cf8ee06d4cdb69d05c7883a53830548f24c414b2b04576e24733"
+        "sha256": "f9e9f5ed49a85499faf687b091962f577b6b0f64c429257c49c64de696dbeabd"
       }
     }
   ],

@@ -53,7 +53,7 @@ describe("authored value layer validation", () => {
       {
         code: "non-string-value",
         message:
-          'binding value "good" must be a string or null (SPECIFICATION.md \u00a74.2)',
+          'binding value "good" must be a string or null (SPECIFICATION.md, Configuration Document)',
         pointer: "/values/good",
       },
     ]);
@@ -86,7 +86,7 @@ describe("authored value layer validation", () => {
       {
         code: "non-string-value",
         message:
-          'binding value "agentValue" must be a string or null (SPECIFICATION.md \u00a74.2)',
+          'binding value "agentValue" must be a string or null (SPECIFICATION.md, Configuration Document)',
         pointer: "/agents/valid/values/agentValue",
       },
       {
@@ -97,7 +97,7 @@ describe("authored value layer validation", () => {
       {
         code: "non-string-value",
         message:
-          'preset value "presetValue" must be a string or null (SPECIFICATION.md \u00a74.2)',
+          'preset value "presetValue" must be a string or null (SPECIFICATION.md, Configuration Document)',
         pointer: "/values/presetValue",
       },
     ]);

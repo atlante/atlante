@@ -22,12 +22,12 @@ describe("diagnostics", () => {
           path: "/agents/reviewer",
         }),
       ),
-    ).toBe("error config.jsonc:2:3: [invalid] bad at /agents/reviewer");
+    ).toBe("error [invalid]: bad\nat: config.jsonc:2:3 /agents/reviewer");
     expect(formatDiagnostic(warning("notice", "fine", { pointer: "/x" }))).toBe(
-      "warning: [notice] fine at /x",
+      "warning [notice]: fine\nat: /x",
     );
     expect(formatDiagnostic(error("plain", "message"))).toBe(
-      "error: [plain] message",
+      "error [plain]: message",
     );
   });
 
@@ -39,7 +39,7 @@ describe("diagnostics", () => {
           pointer: "/legacy",
         }),
       ),
-    ).toBe("error: [invalid] bad at /canonical");
+    ).toBe("error [invalid]: bad\nat: /canonical");
   });
 
   test("detects errors and sorts by stable diagnostic identity", () => {

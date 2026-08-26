@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { expect, test } from "vitest";
+import { mutationPreflightRefreshEnabled } from "./mutation";
 import {
   canonicalMutationVerdict,
   hashMutationVerdict,
@@ -38,6 +39,42 @@ const workspaces = [
   },
 ] as const;
 
+const expectedCounts = {
+  schema: {
+    files: 2,
+    mutants: 188,
+    killed: 130,
+    survived: 14,
+    noCoverage: 1,
+    mutationScore: 89.66,
+    timeouts: 0,
+    errors: 0,
+    ignored: 43,
+  },
+  resources: {
+    files: 20,
+    mutants: 4861,
+    killed: 3087,
+    survived: 1335,
+    noCoverage: 439,
+    mutationScore: 63.51,
+    timeouts: 0,
+    errors: 0,
+    ignored: 0,
+  },
+  validator: {
+    files: 5,
+    mutants: 1338,
+    killed: 956,
+    survived: 295,
+    noCoverage: 86,
+    mutationScore: 71.5,
+    timeouts: 0,
+    errors: 0,
+    ignored: 1,
+  },
+} as const;
+
 test.each(workspaces)(
   "validates durable $workspace mutation evidence and an ignored report when present",
   async ({
@@ -56,7 +93,7 @@ test.each(workspaces)(
           campaigns: 2,
           comparison: "source-file-and-mutant-id-plus-status",
           exact: true,
-          runtimes: ["0m56s", "0m56s"],
+          runtimes: ["1m10s", "1m7s"],
           exitCodes: [0, 0],
           manifests: [
             "mutation-evidence/schema-run1.json",
@@ -100,15 +137,7 @@ test.each(workspaces)(
       commitBase: expect.stringMatching(/^[0-9a-f]{7,40}$/),
       exitCode: 0,
       counts: {
-        files: expect.any(Number),
-        mutants: expect.any(Number),
-        killed: expect.any(Number),
-        survived: expect.any(Number),
-        noCoverage: expect.any(Number),
-        mutationScore: expect.any(Number),
-        timeouts: 0,
-        errors: 0,
-        ignored: expect.any(Number),
+        ...expectedCounts[workspace],
       },
       attestation: {
         preflight: {
@@ -136,14 +165,14 @@ test.each(workspaces)(
           10000,
       ) / 100,
     );
-    expect(evidence.source.sha256).toBe(
-      hashSourceFiles(await readSourceFiles(".")),
-    );
     const currentSource = await readSourceFiles(".");
-    expect(evidence.source.files).toEqual(
-      currentSource.map((file) => file.path),
-    );
-    expect(evidence.source.fileCount).toBe(currentSource.length);
+    if (!mutationPreflightRefreshEnabled()) {
+      expect(evidence.source.sha256).toBe(hashSourceFiles(currentSource));
+      expect(evidence.source.files).toEqual(
+        currentSource.map((file) => file.path),
+      );
+      expect(evidence.source.fileCount).toBe(currentSource.length);
+    }
 
     const attestation = await readAttestation(evidence);
     await validateAttestation(attestation, evidence, workspace, manifestPath);
@@ -179,9 +208,9 @@ test.each(workspaces)(
     expect(tracked).toEqual(expected);
 
     const report = await readOptionalReport(evidence.report.identity);
-    if (report && process.env.ATLANTE_MUTATION_PHASE !== "preflight") {
+    if (report) {
       await validateReport(report, evidence);
-      expect(hashFile(evidence.report.identity)).resolves.toBe(
+      await expect(hashFile(evidence.report.identity)).resolves.toBe(
         attestation.campaign.report.sha256,
       );
       for (const record of [evidence.attestation, ...evidence.attestations]) {
@@ -245,6 +274,8 @@ type PreflightRecord = {
   toolVersions: Record<string, string>;
 };
 
+type Attestation = { preflight: PreflightRecord; campaign: CampaignRecord };
+
 type CampaignRecord = {
   schemaVersion: 2;
   workspace: string;
@@ -306,7 +337,7 @@ async function hashFile(path: string): Promise<string> {
 
 async function readAttestation(
   evidence: Pick<Evidence, "attestation">,
-): Promise<{ preflight: PreflightRecord; campaign: CampaignRecord }> {
+): Promise<Attestation> {
   const preflightBytes = await readFile(
     resolve(evidence.attestation.preflight.identity),
   );
@@ -345,8 +376,11 @@ async function validateAttestation(
   expect(preflight.command).toBe("bun run test");
   expect(preflight.status).toBe("passed");
   expect(preflight.exitCode).toBe(0);
+  expect(["ordinary", "stale-source-bootstrap"]).toContain(
+    preflight.refreshMode,
+  );
   expect(preflight.counts.testFiles.total).toBe(53);
-  expect(preflight.counts.tests.total).toBe(783);
+  expect(preflight.counts.tests.total).toBe(829);
   expect(campaign.exitCode).toBe(0);
   expect(campaign.signal).toBeNull();
   expect(campaign.preflight.sha256).toBe(expected.preflight.sha256);
@@ -354,12 +388,14 @@ async function validateAttestation(
     identity: evidence.source.identity,
     sha256: evidence.source.sha256,
   });
+  expect(preflight.sourceSha256).toBe(campaign.source.sha256);
+  expect(preflight.sourceSha256).toBe(evidence.source.sha256);
   expect(campaign.config.identity).toBe("stryker.config.ts");
-  expect(campaign.config.sha256).toBe(
-    hashSourceFiles([
-      { path: "stryker.config.ts", bytes: await readFile("stryker.config.ts") },
-    ]),
-  );
+  const currentConfigSha256 = hashSourceFiles([
+    { path: "stryker.config.ts", bytes: await readFile("stryker.config.ts") },
+  ]);
+  expect(preflight.configSha256).toBe(campaign.config.sha256);
+  expect(preflight.configSha256).toBe(currentConfigSha256);
   expect(campaign.gitHead).toMatch(/^[0-9a-f]{7,40}$/);
   expect(campaign.gitHead).toBe(preflight.gitHead);
   expect(campaign.toolVersions).toEqual(preflight.toolVersions);
@@ -481,4 +517,45 @@ test("source identity changes when content or path changes", () => {
       { path: "packages/resources/src/b.ts", bytes: Buffer.from("a") },
     ]),
   );
+});
+
+test.each([
+  [
+    "preflight source digest",
+    (attestation: Attestation) => {
+      attestation.preflight.sourceSha256 = "0".repeat(64);
+    },
+  ],
+  [
+    "campaign source digest",
+    (attestation: Attestation) => {
+      attestation.campaign.source.sha256 = "0".repeat(64);
+    },
+  ],
+  [
+    "preflight config digest",
+    (attestation: Attestation) => {
+      attestation.preflight.configSha256 = "0".repeat(64);
+    },
+  ],
+  [
+    "campaign config digest",
+    (attestation: Attestation) => {
+      attestation.campaign.config.sha256 = "0".repeat(64);
+    },
+  ],
+])("rejects a mismatched %s attestation digest", async (_name, mutate) => {
+  const evidence = JSON.parse(
+    await readFile("mutation-evidence/schema-mutation.json", "utf8"),
+  ) as Evidence;
+  const attestation = await readAttestation(evidence);
+  mutate(attestation);
+  await expect(
+    validateAttestation(
+      attestation,
+      evidence,
+      "schema",
+      "mutation-evidence/schema-run2.json",
+    ),
+  ).rejects.toThrow();
 });

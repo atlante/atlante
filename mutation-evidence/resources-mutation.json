@@ -5,7 +5,7 @@
   "source": {
     "identity": "packages/resources/src/**/*.ts",
     "algorithm": "sha256:path\u0000bytes\u0000:v1",
-    "sha256": "41c87882f5a01e40161042ba81a7225569ae3ecad553b048a2f659ef47838e5b",
+    "sha256": "95661f59de1cac7ab454b875548bac4e26ae2fdcbb3c853f503d73e96299f708",
     "files": [
       "packages/resources/src/authored-values.ts",
       "packages/resources/src/composition.ts",
@@ -34,7 +34,7 @@
   },
   "report": {
     "identity": "mutation/resources/mutation.json",
-    "sha256": "a983eec5fc760da437f9e76427bb83ade7d77772180917ef55285270a0ffd5b8"
+    "sha256": "6b58c8ed166a8422d0bbeececfdca24ba173877a84d49972badca4902a0a047e"
   },
   "versions": {
     "bun": "1.3.14",
@@ -42,48 +42,48 @@
     "vitest": "4.1.11",
     "stryker": "10.0.0"
   },
-  "runtime": "122m38s",
+  "runtime": "169m30s",
   "exitCode": 0,
   "counts": {
     "files": 20,
-    "mutants": 4830,
-    "killed": 3031,
-    "survived": 1361,
-    "noCoverage": 438,
-    "mutationScore": 62.75,
+    "mutants": 4861,
+    "killed": 3087,
+    "survived": 1335,
+    "noCoverage": 439,
+    "mutationScore": 63.51,
     "timeouts": 0,
     "errors": 0,
     "ignored": 0
   },
-  "generatedAt": "2026-08-25T21:56:38Z",
-  "commitBase": "d8294a59f73633712757f21cd6cdcdbfc65d2ca6",
+  "generatedAt": "2026-08-26T14:51:14.683Z",
+  "commitBase": "adae9d6ada5e7db4cb277b7505a2792f269c159b",
   "attestation": {
     "preflight": {
       "identity": "mutation-evidence/resources-preflight.json",
-      "sha256": "cbb4465ee35e505dbeb16d2494df35bc4b1c27cf524263a42a6775f4deb2b78f"
+      "sha256": "98041020957fe5f30a3702aac807e6c5c6f733eb2caff3d2a7710fecc4fc1470"
     },
     "campaign": {
       "identity": "mutation-evidence/resources-campaign.json",
-      "sha256": "42856578ff6957d9efd5a25e16850f9a8c562a3249f5dc74b92fe6508e7b83a6"
+      "sha256": "d0d1e88e77a8c1abfba6c515d87f196e0e4ec53a199548be7c98ad95e64a4a8c"
     },
     "manifest": {
       "identity": "mutation-evidence/resources-verdict.json",
-      "sha256": "8702a747aa8f9f9fed77be89d8e3965e3dd8ccdc2b4b320e620be3e1fb573c4d"
+      "sha256": "0cce83de5bfee7072981f5b149165934defcfed6a72510731928c3ba1605eadb"
     }
   },
   "attestations": [
     {
       "preflight": {
         "identity": "mutation-evidence/resources-preflight.json",
-        "sha256": "cbb4465ee35e505dbeb16d2494df35bc4b1c27cf524263a42a6775f4deb2b78f"
+        "sha256": "98041020957fe5f30a3702aac807e6c5c6f733eb2caff3d2a7710fecc4fc1470"
       },
       "campaign": {
         "identity": "mutation-evidence/resources-campaign.json",
-        "sha256": "42856578ff6957d9efd5a25e16850f9a8c562a3249f5dc74b92fe6508e7b83a6"
+        "sha256": "d0d1e88e77a8c1abfba6c515d87f196e0e4ec53a199548be7c98ad95e64a4a8c"
       },
       "manifest": {
         "identity": "mutation-evidence/resources-verdict.json",
-        "sha256": "8702a747aa8f9f9fed77be89d8e3965e3dd8ccdc2b4b320e620be3e1fb573c4d"
+        "sha256": "0cce83de5bfee7072981f5b149165934defcfed6a72510731928c3ba1605eadb"
       }
     }
   ],
