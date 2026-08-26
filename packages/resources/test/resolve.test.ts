@@ -2,6 +2,7 @@ import {
   cpSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   realpathSync,
   rmSync,
   symlinkSync,
@@ -29,6 +30,11 @@ const created: string[] = [];
 const schemaUri = "https://json-schema.org/draft/2020-12/schema";
 const repositoryRoot = fileURLToPath(new URL("../../../", import.meta.url));
 const firstPartyPackRoot = join(repositoryRoot, "packages", "pack");
+const firstPartyPackVersion = (
+  JSON.parse(
+    readFileSync(join(firstPartyPackRoot, "package.json"), "utf8"),
+  ) as { version: string }
+).version;
 
 function rootOf(): { root: string; config: string } {
   const root = mkdtempSync(join(tmpdir(), "atlante-resolve-"));
@@ -475,7 +481,7 @@ describe("resource resolution", () => {
     );
     expect(
       result.provenance["/agents/architect/description"]?.path as string,
-    ).toBe("@atlante/pack@0.1.6/atlante.jsonc");
+    ).toBe(`@atlante/pack@${firstPartyPackVersion}/atlante.jsonc`);
   });
 
   test("merges ordered preset layers left-to-right with winning provenance", () => {
