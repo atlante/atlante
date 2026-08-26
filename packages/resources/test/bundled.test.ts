@@ -413,6 +413,44 @@ describe("first-party package resources", () => {
     expect(output).toContain("### 3. review (mandatory)");
   });
 
+  test("uses strict adaptive semantics for direct renderer phase labels", () => {
+    const { root, config } = fixture();
+    const output = renderResolvedTemplate({
+      template: resolveResourceTemplate(
+        createProjectResourcePack(root),
+        "@atlante/pack/skill",
+        config,
+      ),
+      input: {
+        title: "Defensive adaptive workflow",
+        overview: "Review the change.",
+        sections: [
+          {
+            workflow: {
+              title: "Adaptive review",
+              phases: [
+                {
+                  name: "Plan",
+                  policies: { adaptive: true },
+                  instructions: ["Plan the review."],
+                },
+                {
+                  name: "Malformed",
+                  policies: { adaptive: "false" },
+                  instructions: ["Review the change."],
+                },
+              ],
+            },
+          },
+        ],
+      },
+    });
+
+    expect(output.match(/^## Adaptive phase protocol$/gm)).toHaveLength(1);
+    expect(output).toContain("### 1. Plan (adaptive)");
+    expect(output).toContain("### 2. Malformed (mandatory)");
+  });
+
   test.each([
     ["omitted", undefined],
     ["false", { adaptive: false }],

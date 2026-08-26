@@ -125,6 +125,22 @@ function selectedSlot(
     )[0]) as ResolvedTemplateSlot;
 }
 
+function isAdaptivePhase(phase: unknown): boolean {
+  if (typeof phase !== "object" || phase === null || Array.isArray(phase))
+    return false;
+  const policies = (phase as Record<string, unknown>).policies;
+  return (
+    typeof policies === "object" &&
+    policies !== null &&
+    !Array.isArray(policies) &&
+    (policies as Record<string, unknown>).adaptive === true
+  );
+}
+
+function hasAdaptivePhase(phases: unknown): boolean {
+  return Array.isArray(phases) && phases.some(isAdaptivePhase);
+}
+
 export type ResolvedRenderArgs = {
   readonly template: ResolvedTemplate;
   readonly input: unknown;
@@ -164,20 +180,8 @@ export function renderResolvedTemplate(
       return hasWorkflowPolicy || hasPhasePolicy;
     },
   );
-  handlebars.registerHelper("hasAdaptivePhase", (phases: unknown) => {
-    if (!Array.isArray(phases)) return false;
-    return phases.some((phase) => {
-      if (typeof phase !== "object" || phase === null || Array.isArray(phase))
-        return false;
-      const policies = (phase as Record<string, unknown>).policies;
-      return (
-        typeof policies === "object" &&
-        policies !== null &&
-        !Array.isArray(policies) &&
-        (policies as Record<string, unknown>).adaptive === true
-      );
-    });
-  });
+  handlebars.registerHelper("hasAdaptivePhase", hasAdaptivePhase);
+  handlebars.registerHelper("isAdaptivePhase", isAdaptivePhase);
   const nextStack = [...stack, template.key];
   const slots = template.slots;
 

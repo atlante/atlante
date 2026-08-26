@@ -47,7 +47,7 @@ When evidence is missing, signals conflict, or material uncertainty remains, def
 {{/if}}{{/each}}{{/if}}
 {{#each phases}}
 
-### {{increment @index}}. {{#if name}}{{name}}{{else}}{{kind}}{{/if}}{{#if (hasAdaptivePhase ../phases)}} ({{#if policies.adaptive}}adaptive{{else}}mandatory{{/if}}){{/if}}
+### {{increment @index}}. {{#if name}}{{name}}{{else}}{{kind}}{{/if}}{{#if (hasAdaptivePhase ../phases)}} ({{#if (isAdaptivePhase this)}}adaptive{{else}}mandatory{{/if}}){{/if}}
 {{#if description}}
 
 {{description}}
