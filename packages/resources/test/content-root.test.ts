@@ -48,9 +48,10 @@ describe("resource content roots", () => {
     symlinkSync(outside, join(root, "escape"), "dir");
 
     const pack = createProjectResourcePack(root);
+    const canonicalEscape = realpathSync(join(root, "escape"));
 
     expect(
-      isResourcePackPathContained(pack, join(root, "escape", "file")),
+      isResourcePackPathContained(pack, join(canonicalEscape, "file")),
     ).toBe(false);
   });
 });
