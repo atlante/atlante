@@ -1,6 +1,6 @@
 # Atlante Design
 
-This file records the approved brand and design decisions applied across Atlante's public surfaces: positioning, naming, voice, and visual identity. `SPECIFICATION.md` remains the normative implementation contract for the product itself. The detailed upstream contract lives outside this repository in the design workspace as `brand_specs.md`; the canonical assets it governs are the files under `brand/`.
+This file records the approved brand and design decisions applied across Atlante's public surfaces: positioning, naming, voice, and visual identity. `../SPECIFICATION.md` remains the normative implementation contract for the product itself.
 
 ## Role and Precedence
 
@@ -8,15 +8,6 @@ When documents disagree, apply this order:
 
 1. Shipped behavior from `README.md`, `SPECIFICATION.md`, tests, and implementation.
 2. Approved brand decisions recorded here.
-3. Canonical asset masters: `brand/assets/final_logo.svg` for logo artwork and `brand/atlante-design-tokens.css` for the executable token and font-loading source.
-
-Detailed rationale, phase records, and approval history stay in the upstream contract. This file distills its decisions; it does not replace them. Upstream HTML specimens and phase records demonstrate intent and record evidence; they are rationale, not additional implementation requirements, and they never override shipped behavior or the canonical assets named here.
-
-Labels distinguish state:
-
-- **Current:** verified behavior that may be documented as shipped.
-- **Target:** approved behavior that requires implementation or migration.
-- **Open:** an unresolved decision that must not be silently guessed and authorizes no current claim.
 
 ## Product Truth
 
@@ -41,17 +32,9 @@ Never open with schema validation, artifact hashing, mythology, or a future regi
 
 **Boundary:** Atlante defines prompt-level orchestration; the host and prompted model execute it. In v0.1 Atlante performs no LLM inference, executes no agents, skills, or arbitrary project code, selects no host settings, maintains no runtime workflow state, and provides no other host than OpenCode.
 
-Claims ledger:
-
-| Status | Claims |
-| --- | --- |
-| Safe now | Open source under the repository license; declarative JSONC or JSON configuration; versioned source with project code; schema-backed validation; deterministic rendering; local and installed static packs; verified artifacts and atomic publication; OpenCode prompt and skill materialization; preservation of OpenCode-owned execution settings; no agent, skill, or arbitrary code execution by Atlante |
-| Requires qualification | Shared means Git inheritance, not hosted collaboration; portable describes architecture while only OpenCode is available; verified means local artifact integrity, not security provenance; orchestrated means Atlante renders while host and model execute; Terraform is a role analogy, not feature parity; pack ecosystem means static packages, not a registry |
-| Avoid until shipped | Render anywhere, works everywhere, any host, host-agnostic; secure, trusted, tamper-proof, or provenance-guaranteed artifacts; registry, marketplace, hosted collaboration; executing subagents or holding runtime state; improved model intelligence or outcomes; autonomous, magical, intelligent infrastructure, revolutionary, effortless, seamless, game-changing, next-generation |
-
 ## Naming and Vocabulary
 
-Atlante bears the celestial sphere. The sphere represents the complete harness, given form by the developer. Metaphors explain the product; they never replace its technical vocabulary and never enter schema fields, package names, types, or code identifiers.
+As analogy, Atlante bears the celestial sphere. The sphere represents the complete harness, given form by the developer. Metaphors explain the product; they never replace its technical vocabulary and never enter schema fields, package names, types, or code identifiers.
 
 | Metaphor | Meaning | Allowed use |
 | --- | --- | --- |
@@ -102,19 +85,3 @@ This section distills decisions into pointers; the named files are authoritative
 - Focus: never rely on color alone. Use a visible `3px` Jet outline on Linen surfaces and a `3px` Linen outline on Jet surfaces, with a `2px` offset.
 - Geometry: radius is always `0`, including controls, cards, dialogs, and fields. Circles stay reserved for celestial geometry and functionally circular controls; ordinary content is flat with no shadow.
 - Accessibility baseline: semantic HTML before ARIA; every control has a programmatic name; interactive targets are at least `44 x 44px`; focus stays visible and follows reading order; color never carries status alone; every shipped surface rechecks its exact combinations against WCAG 2.2 AA; surfaces are tested at mobile widths, 200% zoom, and reduced motion.
-
-## Open Decisions
-
-These decisions remain open and tracked upstream; none is resolved here.
-
-| Decision | Gate |
-| --- | --- |
-| Logo similarity findings versus Atlas, globe, astronomy, infrastructure, AI, and developer-tool marks | Issue #52, before final export packaging |
-| Exact export names, platform dimensions, numeric clear space, and wordmark live text versus outlined export | Issue #50 packaging review |
-| Implementation stack for public surfaces: framework, documentation generator, deployment | Issues #4 and #5 kickoff |
-| Stable diagnostic code inventory | Issue #49 implementation and test review |
-| Trademark and naming availability | Deferred; not a current design gate |
-| Historical imagery provenance and reuse rights | Asset-specific rights review |
-| Future `Almanac` behavior and naming | Future product decision; no v0.1 claims |
-
-No open decision authorizes a current claim. Future adapters, registries, workflow state, and runtime execution remain uncommitted.
