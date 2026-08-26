@@ -20,8 +20,8 @@
 
 {{> slot/sections/workflow}}
 {{/if}}
-{{#if constraints}}
+{{#if invariants}}
 
-{{> slot/sections/constraints constraints}}
+{{> slot/sections/invariants invariants}}
 {{/if}}
 {{/each}}

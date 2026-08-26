@@ -6,8 +6,8 @@ import { withStagedPublishManifest } from "./publish-manifest.js";
 
 const ROOT = join(import.meta.dir, "..");
 // The static pack must be published before the CLI that depends on it. The
-// OpenCode plugin remains the final public package and consumes artifacts only.
-const PACKAGES = ["pack", "cli", "opencode-plugin"] as const;
+// OpenCode adapter remains the final public package and consumes artifacts only.
+const PACKAGES = ["pack", "cli", "opencode"] as const;
 
 function parseArgs() {
   let version: string | undefined;
@@ -46,7 +46,7 @@ const REQUIRED_FILES: Record<(typeof PACKAGES)[number], string[]> = {
     "architect/instance.jsonc",
   ],
   cli: ["dist/bin/atlante.js"],
-  "opencode-plugin": [
+  opencode: [
     "dist/index.js",
     "dist/api.js",
     "dist/index.d.ts",
@@ -126,7 +126,7 @@ async function preflightArtifacts(): Promise<string[]> {
         if (!head.startsWith("#!/usr/bin/env node"))
           missing.push(`${name}: dist/bin/atlante.js shebang is not node`);
       }
-    } else if (pkg === "opencode-plugin") {
+    } else if (pkg === "opencode") {
       missing.push(...(await pluginImportIssues(dir, name)));
     }
   }

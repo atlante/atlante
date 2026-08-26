@@ -107,7 +107,7 @@ export function safeRecord<
 }
 
 /**
- * A single project value. Values are strings only (SPECIFICATION.md §4.2):
+ * A single project value. Values are strings only (SPECIFICATION.md, Configuration Document):
  * there is no non-string type a `{{values.key}}` reference could splice into
  * a string field without either failing template input validation (array,
  * object) or degrading to `String(...)` output (`one,two`,

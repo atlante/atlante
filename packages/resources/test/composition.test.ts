@@ -160,6 +160,37 @@ describe("resource template composition", () => {
     ]);
   });
 
+  test("finds invariant section slots across ordered branches", () => {
+    expect(
+      slotsOf({
+        type: "object",
+        properties: {
+          sections: {
+            type: "array",
+            items: {
+              oneOf: [
+                {
+                  type: "object",
+                  properties: {
+                    invariants: { template: "@atlante/pack/invariants" },
+                  },
+                },
+              ],
+            },
+          },
+        },
+      }),
+    ).toEqual([
+      {
+        property: "invariants",
+        templateId: "@atlante/pack/invariants",
+        path: ["sections", "items", "oneOf", "0", "invariants"],
+        dataPath: ["sections", "invariants"],
+        arrayItems: true,
+      },
+    ]);
+  });
+
   test("rejects legacy built-in ids and accepts locator-backed markers", () => {
     expect(
       slotsOf({

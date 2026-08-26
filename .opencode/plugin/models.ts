@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import type { Plugin } from "@opencode-ai/plugin";
 
 const MODEL_FILE = ".opencode/models.json";
-const DEFAULT_MODEL = "opencode/deepseek-v4-flash-free";
+const DEFAULT_MODEL = "opencode/x-preview-f-free";
 const ROLES = ["architect", "general", "explore"] as const;
 
 type Role = (typeof ROLES)[number];
@@ -133,7 +133,15 @@ export default (async ({ directory, worktree }) => {
           entry.model = override.model;
         }
         if (override.reasoningEffort !== undefined) {
-          entry.reasoningEffort = override.reasoningEffort;
+          // `variant` is what opencode surfaces in the model picker and records
+          // on the session; `options.reasoningEffort` is the request-level
+          // fallback when no variant is resolved. Keep both aligned.
+          entry.variant = override.reasoningEffort;
+          const options = (entry.options ?? {}) as Record<string, unknown>;
+          entry.options = {
+            ...options,
+            reasoningEffort: override.reasoningEffort,
+          };
         }
         agents[role] = entry;
       }

@@ -14,9 +14,9 @@
 - {{this}}
 {{/each}}
 {{/if}}
-{{#if constraints}}
+{{#if invariants}}
 
-{{> slot/sections/constraints constraints}}
+{{> slot/sections/invariants invariants}}
 {{/if}}
 {{#if markdown}}
 
@@ -29,5 +29,9 @@
 {{#if gotchas}}
 
 {{> slot/sections/gotchas gotchas}}
+{{/if}}
+{{#if workflow}}
+
+{{> slot/sections/workflow}}
 {{/if}}
 {{/each}}

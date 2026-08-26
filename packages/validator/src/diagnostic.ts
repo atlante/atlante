@@ -17,6 +17,12 @@ export type Diagnostic = {
   location?: { line: number; column: number };
   /** Complete resource traversal when the resolver supplied one. */
   chain?: readonly DiagnosticChainEntry[];
+  /** Contract the authored input must satisfy, when useful for recovery. */
+  expected?: string;
+  /** One deterministic recovery action, when available. */
+  next?: string;
+  /** Normalized low-level cause, reported last. */
+  cause?: string;
 };
 
 /** Escapes one JSON Pointer segment (RFC 6901). */
@@ -25,13 +31,20 @@ export function escapeJsonPointerSegment(segment: string): string {
 }
 
 export function formatDiagnostic(diagnostic: Diagnostic): string {
-  const source = diagnostic.source ? `${diagnostic.source}` : "";
-  const where = diagnostic.location
-    ? `:${diagnostic.location.line}:${diagnostic.location.column}`
-    : "";
+  const lines = [
+    `${diagnostic.severity} [${diagnostic.code}]: ${diagnostic.message}`,
+  ];
   const path = diagnostic.path ?? diagnostic.pointer;
-  const pointer = path ? ` at ${path}` : "";
-  return `${diagnostic.severity}${source ? ` ${source}` : ""}${where}: [${diagnostic.code}] ${diagnostic.message}${pointer}`;
+  const source = diagnostic.source ?? "";
+  const where = diagnostic.location
+    ? `${source ? `${source}:` : ""}${diagnostic.location.line}:${diagnostic.location.column}`
+    : source;
+  const location = [where, path].filter(Boolean).join(" ");
+  if (location) lines.push(`at: ${location}`);
+  if (diagnostic.expected) lines.push(`expected: ${diagnostic.expected}`);
+  if (diagnostic.next) lines.push(`next: ${diagnostic.next}`);
+  if (diagnostic.cause) lines.push(`cause: ${diagnostic.cause}`);
+  return lines.join("\n");
 }
 
 export function error(

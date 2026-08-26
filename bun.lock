@@ -42,8 +42,8 @@
         "commander": "^12.1.0",
       },
     },
-    "packages/opencode-plugin": {
-      "name": "@atlante/opencode-plugin",
+    "packages/opencode": {
+      "name": "@atlante/opencode",
       "version": "0.1.6",
       "devDependencies": {
         "@atlante/builder": "workspace:*",
@@ -91,7 +91,7 @@
 
     "@atlante/cli": ["@atlante/cli@workspace:packages/cli"],
 
-    "@atlante/opencode-plugin": ["@atlante/opencode-plugin@workspace:packages/opencode-plugin"],
+    "@atlante/opencode": ["@atlante/opencode@workspace:packages/opencode"],
 
     "@atlante/pack": ["@atlante/pack@workspace:packages/pack"],
 

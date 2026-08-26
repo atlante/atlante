@@ -9,6 +9,7 @@ import {
 import { basename, dirname, resolve, sep } from "node:path";
 import type { ProjectContext } from "@atlante/builder";
 import { firstPartyProjectContext } from "../first-party-pack.js";
+import { diagnosticPath, printDiagnostic } from "../report.js";
 import { type BuildOutcome, runBuildWithContext } from "./build.js";
 import { resolveWatchFiles, type WatchFiles } from "./build-watch-inputs.js";
 import {
@@ -173,9 +174,14 @@ export function runBuildWatchWithDependencies(
       outcome = normalizeBuildOutcome(deps.build(target));
       succeeded = outcome.code === 0;
     } catch (cause) {
-      console.error(
-        `error: ${cause instanceof Error ? cause.message : String(cause)}`,
-      );
+      printDiagnostic({
+        severity: "error",
+        code: "watch-build-failed",
+        message: "watch rebuild failed",
+        source: diagnosticPath(target),
+        next: "fix the reported error; watch mode will retry on changes",
+        cause: cause instanceof Error ? cause.message : String(cause),
+      });
     }
 
     try {
@@ -183,9 +189,14 @@ export function runBuildWatchWithDependencies(
       lastFiles = files;
       reconcile(files, succeeded);
     } catch (cause) {
-      console.error(
-        `error: ${cause instanceof Error ? cause.message : String(cause)}`,
-      );
+      printDiagnostic({
+        severity: "error",
+        code: "watch-inputs-failed",
+        message: "could not update watched files",
+        source: diagnosticPath(target),
+        next: "fix the reported error; watch mode will retry on changes",
+        cause: cause instanceof Error ? cause.message : String(cause),
+      });
       if (lastFiles) reconcile(lastFiles, false);
     } finally {
       building = false;

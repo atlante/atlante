@@ -25,15 +25,15 @@ rejected:
 ```json
 {
   "architect": {
-    "model": "opencode/deepseek-v4-flash-free",
+    "model": "opencode/x-preview-f-free",
     "reasoningEffort": "xhigh"
   },
   "general": {
-    "model": "opencode/deepseek-v4-flash-free",
+    "model": "opencode/x-preview-f-free",
     "reasoningEffort": "max"
   },
   "explore": {
-    "model": "opencode/deepseek-v4-flash-free",
+    "model": "opencode/x-preview-f-free",
     "reasoningEffort": "max"
   }
 }
@@ -42,7 +42,7 @@ rejected:
 ## Behavior
 
 - **Generated defaults**: if the file is missing, the plugin creates it with the
-  exact starter above — `opencode/deepseek-v4-flash-free` for every role, with
+  exact starter above — `opencode/x-preview-f-free` for every role, with
   `reasoningEffort` `xhigh` for `architect` and `max` for `general`/`explore` —
   and applies it for the current startup.
 - **Partial fallback**: each role and each field is optional; omitted roles and
@@ -54,6 +54,11 @@ rejected:
 - **Preserved shared fields**: only `model` and `reasoningEffort` change; role
   mode, permissions, tools, prompts, descriptions, and all other fields remain
   intact.
+- **How reasoningEffort applies**: the value is written both to the agent's
+  `variant` — which drives the model-picker display and the variant recorded on
+  new sessions — and to `options.reasoningEffort`, the request-level fallback
+  used when no variant is resolved. A variant manually selected for the agent
+  in the model picker during a session still takes precedence.
 - **No live availability validation**: validation does not check live provider
   or catalog availability.
 - **Restart requirement**: restart OpenCode after changing this file or the
