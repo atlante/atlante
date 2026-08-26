@@ -17,12 +17,18 @@ export type MutationReport = {
   files: Record<string, { mutants: { id: string; status: string }[] }>;
 };
 
+export type MutationVerdictCounts = {
+  entries: number;
+  files: number;
+  statuses: Record<string, number>;
+};
+
 export function canonicalMutationVerdict(
   report: MutationReport,
 ): MutationVerdictEntry[] {
-  return Object.entries(report.files)
+  return Object.entries(report.files ?? {})
     .flatMap(([source, file]) =>
-      file.mutants.map((mutant) => ({
+      (file.mutants ?? []).map((mutant) => ({
         source,
         mutantId: mutant.id,
         status: mutant.status,
@@ -42,6 +48,19 @@ export function hashMutationVerdict(
   verdict: readonly MutationVerdictEntry[],
 ): string {
   return createHash("sha256").update(JSON.stringify(verdict)).digest("hex");
+}
+
+export function mutationVerdictCounts(
+  verdict: readonly MutationVerdictEntry[],
+): MutationVerdictCounts {
+  return {
+    entries: verdict.length,
+    files: new Set(verdict.map((entry) => entry.source)).size,
+    statuses: verdict.reduce<Record<string, number>>((counts, entry) => {
+      counts[entry.status] = (counts[entry.status] ?? 0) + 1;
+      return counts;
+    }, {}),
+  };
 }
 
 export function hashSourceFiles(files: readonly SourceFile[]): string {

@@ -117,7 +117,9 @@ export function safeRecord<
 export const valueSchema = z.string();
 
 /** Value names are flat keys accepted by the `{{values.key}}` syntax. */
+// Stryker disable all: Official Vitest sandbox imports this module before mutant activation; static initializer mutation cannot activate, and the runtime contract is covered.
 export const VALUE_KEY_PATTERN = /^[A-Za-z_$][A-Za-z0-9_$-]*$/;
+// Stryker restore all
 
 export const valuesMapSchema = safeRecord(
   z.string().regex(VALUE_KEY_PATTERN),
@@ -131,8 +133,10 @@ export type ValuesMap = z.infer<typeof valuesMapSchema>;
  * Overlay values map — allows `null` for tombstoning inherited values.
  * Expanded into a canonical ValuesMap by stripping null entries during merge.
  */
+// Stryker disable all: Official Vitest sandbox imports this module before mutant activation; static initializer mutation cannot activate, and the runtime contract is covered.
 export const valuesMapOverlaySchema = safeRecord(
   z.string().regex(VALUE_KEY_PATTERN),
   z.union([z.string(), z.null()]),
 );
+// Stryker restore all
 export type ValuesMapOverlay = z.infer<typeof valuesMapOverlaySchema>;

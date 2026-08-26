@@ -34,27 +34,58 @@
   },
   "report": {
     "identity": "mutation/resources/mutation.json",
-    "sha256": "658a021dbe478908451d09cccb9e984effa7614c3230ab4430ec4d77bcd0bf2c"
+    "sha256": "a983eec5fc760da437f9e76427bb83ade7d77772180917ef55285270a0ffd5b8"
   },
   "versions": {
     "bun": "1.3.14",
-    "node": "22.20.0",
+    "node": "v22.20.0",
     "vitest": "4.1.11",
     "stryker": "10.0.0"
   },
-  "runtime": "122m17s",
+  "runtime": "122m38s",
   "exitCode": 0,
   "counts": {
     "files": 20,
     "mutants": 4830,
-    "killed": 3030,
-    "survived": 1362,
+    "killed": 3031,
+    "survived": 1361,
     "noCoverage": 438,
-    "mutationScore": 62.73,
+    "mutationScore": 62.75,
     "timeouts": 0,
     "errors": 0,
     "ignored": 0
   },
-  "generatedAt": "2026-08-25T12:42:22Z",
-  "commitBase": "ed0120dce9ab51d5f8abfefdd64c85a9235dd456"
+  "generatedAt": "2026-08-25T21:56:38Z",
+  "commitBase": "d8294a59f73633712757f21cd6cdcdbfc65d2ca6",
+  "attestation": {
+    "preflight": {
+      "identity": "mutation-evidence/resources-preflight.json",
+      "sha256": "cbb4465ee35e505dbeb16d2494df35bc4b1c27cf524263a42a6775f4deb2b78f"
+    },
+    "campaign": {
+      "identity": "mutation-evidence/resources-campaign.json",
+      "sha256": "42856578ff6957d9efd5a25e16850f9a8c562a3249f5dc74b92fe6508e7b83a6"
+    },
+    "manifest": {
+      "identity": "mutation-evidence/resources-verdict.json",
+      "sha256": "8702a747aa8f9f9fed77be89d8e3965e3dd8ccdc2b4b320e620be3e1fb573c4d"
+    }
+  },
+  "attestations": [
+    {
+      "preflight": {
+        "identity": "mutation-evidence/resources-preflight.json",
+        "sha256": "cbb4465ee35e505dbeb16d2494df35bc4b1c27cf524263a42a6775f4deb2b78f"
+      },
+      "campaign": {
+        "identity": "mutation-evidence/resources-campaign.json",
+        "sha256": "42856578ff6957d9efd5a25e16850f9a8c562a3249f5dc74b92fe6508e7b83a6"
+      },
+      "manifest": {
+        "identity": "mutation-evidence/resources-verdict.json",
+        "sha256": "8702a747aa8f9f9fed77be89d8e3965e3dd8ccdc2b4b320e620be3e1fb573c4d"
+      }
+    }
+  ],
+  "reproducibility": {}
 }

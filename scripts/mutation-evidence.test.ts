@@ -1,4 +1,5 @@
-import { readFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { readdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { expect, test } from "vitest";
 import {
@@ -7,6 +8,7 @@ import {
   hashSourceFiles,
   type MutationReport,
   type MutationVerdictEntry,
+  mutationVerdictCounts,
   RESOURCE_SOURCE_ALGORITHM,
   resourceSourceFiles,
   sourceFiles,
@@ -18,18 +20,21 @@ const workspaces = [
     sourceRoot: "packages/resources/src",
     sourceFiles: resourceSourceFiles,
     workspace: "resources",
+    manifestPath: "mutation-evidence/resources-verdict.json",
   },
   {
     evidencePath: "mutation-evidence/schema-mutation.json",
     sourceRoot: "packages/schema/src",
     sourceFiles: (root: string) => sourceFiles(root, "packages/schema/src"),
     workspace: "schema",
+    manifestPath: "mutation-evidence/schema-run2.json",
   },
   {
     evidencePath: "mutation-evidence/validator-mutation.json",
     sourceRoot: "packages/validator/src",
     sourceFiles: (root: string) => sourceFiles(root, "packages/validator/src"),
     workspace: "validator",
+    manifestPath: "mutation-evidence/validator-verdict.json",
   },
 ] as const;
 
@@ -40,6 +45,7 @@ test.each(workspaces)(
     sourceFiles: readSourceFiles,
     sourceRoot,
     workspace,
+    manifestPath,
   }) => {
     const evidence = JSON.parse(
       await readFile(resolve(evidencePath), "utf8"),
@@ -50,11 +56,19 @@ test.each(workspaces)(
           campaigns: 2,
           comparison: "source-file-and-mutant-id-plus-status",
           exact: true,
-          runtimes: ["0m57s", "0m57s"],
+          runtimes: ["0m56s", "0m56s"],
           exitCodes: [0, 0],
           manifests: [
             "mutation-evidence/schema-run1.json",
             "mutation-evidence/schema-run2.json",
+          ],
+          preflightRecords: [
+            "mutation-evidence/schema-run1-preflight.json",
+            "mutation-evidence/schema-run2-preflight.json",
+          ],
+          campaignRecords: [
+            "mutation-evidence/schema-run1-campaign.json",
+            "mutation-evidence/schema-run2-campaign.json",
           ],
           verdictEntries: 188,
           verdictSha256:
@@ -96,6 +110,16 @@ test.each(workspaces)(
         errors: 0,
         ignored: expect.any(Number),
       },
+      attestation: {
+        preflight: {
+          identity: expect.stringContaining("mutation-evidence/"),
+          sha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+        },
+        campaign: {
+          identity: expect.stringContaining("mutation-evidence/"),
+          sha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+        },
+      },
     });
     expect(
       evidence.counts.killed +
@@ -121,8 +145,58 @@ test.each(workspaces)(
     );
     expect(evidence.source.fileCount).toBe(currentSource.length);
 
+    const attestation = await readAttestation(evidence);
+    await validateAttestation(attestation, evidence, workspace, manifestPath);
+    for (const record of evidence.attestations) {
+      const tracked = await readAttestation({ attestation: record });
+      await validateAttestation(
+        tracked,
+        evidence,
+        workspace,
+        record.manifest.identity,
+        record,
+      );
+    }
+
+    const tracked = (await readdir(resolve("mutation-evidence")))
+      .filter((path) => /(?:preflight|campaign)\.json$/.test(path))
+      .sort();
+    const allEvidence = await Promise.all(
+      workspaces.map(
+        async ({ evidencePath }) =>
+          JSON.parse(await readFile(resolve(evidencePath), "utf8")) as Evidence,
+      ),
+    );
+    const expected = allEvidence
+      .flatMap((item) => [item.attestation, ...item.attestations])
+      .flatMap((record) => [
+        record.preflight.identity,
+        record.campaign.identity,
+      ])
+      .map((path) => path.replace(/^mutation-evidence\//, ""))
+      .filter((path, index, paths) => paths.indexOf(path) === index)
+      .sort();
+    expect(tracked).toEqual(expected);
+
     const report = await readOptionalReport(evidence.report.identity);
-    if (report) await validateReport(report, evidence);
+    if (report && process.env.ATLANTE_MUTATION_PHASE !== "preflight") {
+      await validateReport(report, evidence);
+      expect(hashFile(evidence.report.identity)).resolves.toBe(
+        attestation.campaign.report.sha256,
+      );
+      for (const record of [evidence.attestation, ...evidence.attestations]) {
+        const campaign = await readAttestation({ attestation: record });
+        const manifest = await readManifest(record.manifest.identity);
+        expect(await hashFile(evidence.report.identity)).toBe(
+          campaign.campaign.report.sha256,
+        );
+        expect(canonicalMutationVerdict(report)).toEqual(manifest.verdict);
+        expect(hashMutationVerdict(canonicalMutationVerdict(report))).toBe(
+          campaign.campaign.verdict.sha256,
+        );
+      }
+      if (workspace === "schema") await validateIgnoredDispositions(report);
+    }
   },
 );
 
@@ -149,16 +223,66 @@ type Evidence = {
   source: { sha256: string; files: string[]; fileCount: number };
   report: { identity: string };
   counts: Record<string, number>;
+  attestation: {
+    preflight: { identity: string; sha256: string };
+    campaign: { identity: string; sha256: string };
+    manifest: { identity: string; sha256: string };
+  };
+  attestations: Evidence["attestation"][];
+  manifestPath: string;
+};
+
+type PreflightRecord = {
+  schemaVersion: 1;
+  campaignId: string;
+  command: string;
+  status: string;
+  exitCode: number;
+  counts: { testFiles: { total: number }; tests: { total: number } };
+  sourceSha256: string;
+  configSha256: string;
+  gitHead: string;
+  toolVersions: Record<string, string>;
+};
+
+type CampaignRecord = {
+  schemaVersion: 2;
+  workspace: string;
+  campaignId: string;
+  preflight: { identity: string; sha256: string };
+  report: { identity: string; sha256?: string };
+  verdict: {
+    identity: string;
+    sha256: string;
+    counts: ReturnType<typeof mutationVerdictCounts>;
+  };
+  source: { identity: string; sha256: string };
+  config: { identity: string; sha256: string };
+  stryker: { startedAt: string; endedAt: string; runtimeMs: number };
+  exitCode: number;
+  signal: string | null;
+  gitHead: string;
+  toolVersions: Record<string, string>;
 };
 
 type Manifest = {
   schemaVersion: number;
   workspace: string;
-  run: number;
-  algorithm: string;
+  run?: number;
+  algorithm?: string;
+  campaignId: string;
+  rawReportSha256: string;
   verdictSha256: string;
   counts: { entries: number; files: number; statuses: Record<string, number> };
   verdict: MutationVerdictEntry[];
+};
+
+type IgnoredDisposition = {
+  source: string;
+  id: string;
+  mutator: string;
+  start: unknown;
+  end: unknown;
 };
 
 async function readOptionalReport(
@@ -172,6 +296,81 @@ async function readOptionalReport(
     }
     throw error;
   }
+}
+
+async function hashFile(path: string): Promise<string> {
+  return createHash("sha256")
+    .update(await readFile(resolve(path)))
+    .digest("hex");
+}
+
+async function readAttestation(
+  evidence: Pick<Evidence, "attestation">,
+): Promise<{ preflight: PreflightRecord; campaign: CampaignRecord }> {
+  const preflightBytes = await readFile(
+    resolve(evidence.attestation.preflight.identity),
+  );
+  const campaignBytes = await readFile(
+    resolve(evidence.attestation.campaign.identity),
+  );
+  expect(createHash("sha256").update(preflightBytes).digest("hex")).toBe(
+    evidence.attestation.preflight.sha256,
+  );
+  expect(createHash("sha256").update(campaignBytes).digest("hex")).toBe(
+    evidence.attestation.campaign.sha256,
+  );
+  return {
+    preflight: JSON.parse(preflightBytes.toString("utf8")) as PreflightRecord,
+    campaign: JSON.parse(campaignBytes.toString("utf8")) as CampaignRecord,
+  };
+}
+
+async function validateAttestation(
+  attestation: { preflight: PreflightRecord; campaign: CampaignRecord },
+  evidence: Evidence,
+  workspace: string,
+  manifestPath: string,
+  expected = evidence.attestation,
+): Promise<void> {
+  const { campaign, preflight } = attestation;
+  const manifestBytes = await readFile(resolve(manifestPath));
+  const manifest = JSON.parse(manifestBytes.toString("utf8")) as Manifest;
+  expect(createHash("sha256").update(manifestBytes).digest("hex")).toBe(
+    expected.manifest.sha256,
+  );
+  expect(preflight.schemaVersion).toBe(1);
+  expect(campaign.schemaVersion).toBe(2);
+  expect(preflight.campaignId).toBe(campaign.campaignId);
+  expect(campaign.workspace).toBe(workspace);
+  expect(preflight.command).toBe("bun run test");
+  expect(preflight.status).toBe("passed");
+  expect(preflight.exitCode).toBe(0);
+  expect(preflight.counts.testFiles.total).toBe(53);
+  expect(preflight.counts.tests.total).toBe(783);
+  expect(campaign.exitCode).toBe(0);
+  expect(campaign.signal).toBeNull();
+  expect(campaign.preflight.sha256).toBe(expected.preflight.sha256);
+  expect(campaign.source).toEqual({
+    identity: evidence.source.identity,
+    sha256: evidence.source.sha256,
+  });
+  expect(campaign.config.identity).toBe("stryker.config.ts");
+  expect(campaign.config.sha256).toBe(
+    hashSourceFiles([
+      { path: "stryker.config.ts", bytes: await readFile("stryker.config.ts") },
+    ]),
+  );
+  expect(campaign.gitHead).toMatch(/^[0-9a-f]{7,40}$/);
+  expect(campaign.gitHead).toBe(preflight.gitHead);
+  expect(campaign.toolVersions).toEqual(preflight.toolVersions);
+  expect(campaign.report.sha256).toMatch(/^[a-f0-9]{64}$/);
+  expect(campaign.report.sha256).toBe(manifest.rawReportSha256);
+  expect(campaign.verdict.sha256).toBe(manifest.verdictSha256);
+  expect(campaign.verdict.counts).toEqual(manifest.counts);
+  expect(manifest.campaignId).toBe(campaign.campaignId);
+  expect(manifest.workspace).toBe(workspace);
+  expect(hashMutationVerdict(manifest.verdict)).toBe(manifest.verdictSha256);
+  expect(mutationVerdictCounts(manifest.verdict)).toEqual(manifest.counts);
 }
 
 async function validateReport(
@@ -202,6 +401,46 @@ async function validateReport(
   }
 }
 
+async function validateIgnoredDispositions(
+  report: MutationReport,
+): Promise<void> {
+  const manifest = JSON.parse(
+    await readFile(
+      resolve("mutation-evidence/schema-ignored-dispositions.json"),
+      "utf8",
+    ),
+  ) as { count: number; mutants: IgnoredDisposition[] };
+  const ignored = Object.entries(report.files)
+    .flatMap(([source, file]) =>
+      file.mutants
+        .filter((mutant) => mutant.status === "Ignored")
+        .map((mutant) => ({
+          source,
+          id: mutant.id,
+          location: mutant.location,
+          mutator: mutant.mutatorName,
+        })),
+    )
+    .sort((left, right) =>
+      `${left.source}:${left.id}`.localeCompare(
+        `${right.source}:${right.id}`,
+        undefined,
+        {
+          numeric: true,
+        },
+      ),
+    );
+  expect(manifest.count).toBe(ignored.length);
+  expect(
+    manifest.mutants.map(({ source, id, mutator, start, end }) => ({
+      source,
+      id,
+      location: { start, end },
+      mutator,
+    })),
+  ).toEqual(ignored);
+}
+
 async function readManifest(path: string): Promise<Manifest> {
   return JSON.parse(await readFile(resolve(path), "utf8")) as Manifest;
 }
@@ -213,6 +452,8 @@ function validateManifest(manifest: Manifest, expectedRun: number): void {
   expect(manifest.algorithm).toBe(
     "sha256:json(sorted-source-mutantId-status):v1",
   );
+  expect(manifest.campaignId).toMatch(/^[0-9a-f-]{36}$/);
+  expect(manifest.rawReportSha256).toMatch(/^[a-f0-9]{64}$/);
   expect(manifest.verdict).toHaveLength(manifest.counts.entries);
   expect(hashMutationVerdict(manifest.verdict)).toBe(manifest.verdictSha256);
   expect(

@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 2,
+  "workspace": "validator",
+  "campaignId": "3e6ee6f0-d27a-4c2d-bfa2-6b7fe77b3b56",
+  "preflight": {
+    "identity": "mutation/validator/preflight/3e6ee6f0-d27a-4c2d-bfa2-6b7fe77b3b56.json",
+    "sha256": "cca66cf12628f6018c95332c6481f466e5496878b65691296640bf66b977b82c"
+  },
+  "report": {
+    "identity": "mutation/validator/mutation.json",
+    "sha256": "d276e9123ec407e317a1fb7e3202b68e2b1c0e2c7d6b591a98b4b1bd9b0e8432"
+  },
+  "source": {
+    "identity": "packages/validator/src/**/*.ts",
+    "sha256": "28377820ad37412bc51b8c1b795c8f75fd6c609687ea2da80502770ba29b7d91"
+  },
+  "config": {
+    "identity": "stryker.config.ts",
+    "sha256": "2bb7c2bf218c0f1f746d5a1e75d7948e012262b654a2bdc7a90bd8a8930eb214"
+  },
+  "stryker": {
+    "startedAt": "2026-08-26T08:01:46.723Z",
+    "endedAt": "2026-08-26T08:14:05.680Z",
+    "runtimeMs": 738957
+  },
+  "exitCode": 0,
+  "signal": null,
+  "gitHead": "d8294a59f73633712757f21cd6cdcdbfc65d2ca6",
+  "toolVersions": {
+    "bun": "1.3.14",
+    "node": "v22.20.0",
+    "vitest": "4.1.11",
+    "stryker": "10.0.0"
+  },
+  "verdict": {
+    "identity": "mutation-evidence/validator-verdict.json",
+    "sha256": "7041f9fbf9219ab53abaea97c75475fec702af3f23a0ad40648f947ea0cd8b1f",
+    "counts": {
+      "entries": 1324,
+      "files": 5,
+      "statuses": {
+        "Killed": 930,
+        "Survived": 308,
+        "NoCoverage": 85,
+        "Ignored": 1
+      }
+    }
+  }
+}

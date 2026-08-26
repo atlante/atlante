@@ -28,17 +28,10 @@ const config = {
   // Keep mutant executions finite. Adequacy is established only by the final
   // campaign, not by this configuration check.
   timeoutMS: 5_000,
-  // Stryker 10 cannot execute module-initializer mutants after import. Schema
-  // boundary tests still exercise the resulting runtime contracts directly.
-  ignoreStatic: workspace === "schema",
   // Sandboxes keep source restoration independent from signal handling.
   inPlace: false,
   vitest: { configFile: "vitest.config.ts", related: false },
-  testFiles: [
-    "packages/*/test/**/*.test.ts",
-    "scripts/mutation.test.ts",
-    "scripts/mutation-root.test.ts",
-  ],
+  testFiles: ["packages/*/test/**/*.test.ts"],
   mutate: [`packages/${workspace}/src/**/*.ts`],
   reporters: ["clear-text", "html", "json", "progress"],
   htmlReporter: { fileName: reportPath("mutation.html") },

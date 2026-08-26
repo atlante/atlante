@@ -1,8 +1,9 @@
 {
   "schemaVersion": 1,
+  "campaignId": "1db7b71f-2682-4ba8-a955-5d8b4f3bd876",
   "workspace": "schema",
-  "run": 1,
   "algorithm": "sha256:json(sorted-source-mutantId-status):v1",
+  "rawReportSha256": "43db1ff98306e05a06df87db8e69c46523352385da5a8a452f6298e602b0d532",
   "verdictSha256": "104bf4cccd3b885deba7e7ce4de4b12fdb37ac836cf6fe88589e346cc096c187",
   "counts": {
     "entries": 188,
@@ -955,5 +956,6 @@
       "mutantId": "196",
       "status": "Ignored"
     }
-  ]
+  ],
+  "run": 1
 }

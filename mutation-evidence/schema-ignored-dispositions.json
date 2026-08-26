@@ -1,0 +1,564 @@
+{
+  "count": 43,
+  "mutants": [
+    {
+      "source": "packages/schema/src/document.ts",
+      "id": "0",
+      "start": {
+        "column": 27,
+        "line": 10
+      },
+      "end": {
+        "column": 71,
+        "line": 10
+      },
+      "mutator": "StringLiteral"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "id": "1",
+      "start": {
+        "column": 41,
+        "line": 15
+      },
+      "end": {
+        "column": 58,
+        "line": 15
+      },
+      "mutator": "MethodExpression"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "id": "2",
+      "start": {
+        "column": 10,
+        "line": 23
+      },
+      "end": {
+        "column": 36,
+        "line": 23
+      },
+      "mutator": "ArrayDeclaration"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "id": "3",
+      "start": {
+        "column": 46,
+        "line": 29
+      },
+      "end": {
+        "column": 2,
+        "line": 32
+      },
+      "mutator": "ArrayDeclaration"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "id": "4",
+      "start": {
+        "column": 50,
+        "line": 39
+      },
+      "end": {
+        "column": 2,
+        "line": 41
+      },
+      "mutator": "ObjectLiteral"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "id": "5",
+      "start": {
+        "column": 16,
+        "line": 40
+      },
+      "end": {
+        "column": 33,
+        "line": 40
+      },
+      "mutator": "MethodExpression"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "id": "18",
+      "start": {
+        "column": 1,
+        "line": 64
+      },
+      "end": {
+        "column": 2,
+        "line": 99
+      },
+      "mutator": "BlockStatement"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "id": "44",
+      "start": {
+        "column": 1,
+        "line": 107
+      },
+      "end": {
+        "column": 2,
+        "line": 114
+      },
+      "mutator": "BlockStatement"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "id": "74",
+      "start": {
+        "column": 49,
+        "line": 135
+      },
+      "end": {
+        "column": 2,
+        "line": 140
+      },
+      "mutator": "ObjectLiteral"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "id": "75",
+      "start": {
+        "column": 24,
+        "line": 138
+      },
+      "end": {
+        "column": 53,
+        "line": 138
+      },
+      "mutator": "ArrayDeclaration"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "id": "76",
+      "start": {
+        "column": 25,
+        "line": 138
+      },
+      "end": {
+        "column": 42,
+        "line": 138
+      },
+      "mutator": "MethodExpression"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "id": "77",
+      "start": {
+        "column": 11,
+        "line": 180
+      },
+      "end": {
+        "column": 62,
+        "line": 180
+      },
+      "mutator": "ArrayDeclaration"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "id": "78",
+      "start": {
+        "column": 12,
+        "line": 180
+      },
+      "end": {
+        "column": 23,
+        "line": 180
+      },
+      "mutator": "StringLiteral"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "id": "79",
+      "start": {
+        "column": 25,
+        "line": 180
+      },
+      "end": {
+        "column": 36,
+        "line": 180
+      },
+      "mutator": "StringLiteral"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "id": "80",
+      "start": {
+        "column": 38,
+        "line": 180
+      },
+      "end": {
+        "column": 51,
+        "line": 180
+      },
+      "mutator": "StringLiteral"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "id": "81",
+      "start": {
+        "column": 53,
+        "line": 180
+      },
+      "end": {
+        "column": 61,
+        "line": 180
+      },
+      "mutator": "StringLiteral"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "id": "82",
+      "start": {
+        "column": 45,
+        "line": 190
+      },
+      "end": {
+        "column": 2,
+        "line": 193
+      },
+      "mutator": "ArrayDeclaration"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "id": "83",
+      "start": {
+        "column": 11,
+        "line": 202
+      },
+      "end": {
+        "column": 49,
+        "line": 202
+      },
+      "mutator": "ArrayDeclaration"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "id": "84",
+      "start": {
+        "column": 12,
+        "line": 202
+      },
+      "end": {
+        "column": 23,
+        "line": 202
+      },
+      "mutator": "StringLiteral"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "id": "85",
+      "start": {
+        "column": 25,
+        "line": 202
+      },
+      "end": {
+        "column": 36,
+        "line": 202
+      },
+      "mutator": "StringLiteral"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "id": "86",
+      "start": {
+        "column": 38,
+        "line": 202
+      },
+      "end": {
+        "column": 48,
+        "line": 202
+      },
+      "mutator": "StringLiteral"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "id": "87",
+      "start": {
+        "column": 3,
+        "line": 203
+      },
+      "end": {
+        "column": 68,
+        "line": 203
+      },
+      "mutator": "StringLiteral"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "id": "88",
+      "start": {
+        "column": 50,
+        "line": 212
+      },
+      "end": {
+        "column": 2,
+        "line": 215
+      },
+      "mutator": "ObjectLiteral"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "id": "89",
+      "start": {
+        "column": 11,
+        "line": 228
+      },
+      "end": {
+        "column": 36,
+        "line": 228
+      },
+      "mutator": "ArrayDeclaration"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "id": "90",
+      "start": {
+        "column": 12,
+        "line": 228
+      },
+      "end": {
+        "column": 25,
+        "line": 228
+      },
+      "mutator": "StringLiteral"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "id": "91",
+      "start": {
+        "column": 27,
+        "line": 228
+      },
+      "end": {
+        "column": 35,
+        "line": 228
+      },
+      "mutator": "StringLiteral"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "id": "92",
+      "start": {
+        "column": 11,
+        "line": 236
+      },
+      "end": {
+        "column": 36,
+        "line": 236
+      },
+      "mutator": "ArrayDeclaration"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "id": "93",
+      "start": {
+        "column": 12,
+        "line": 236
+      },
+      "end": {
+        "column": 25,
+        "line": 236
+      },
+      "mutator": "StringLiteral"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "id": "94",
+      "start": {
+        "column": 27,
+        "line": 236
+      },
+      "end": {
+        "column": 35,
+        "line": 236
+      },
+      "mutator": "StringLiteral"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "id": "95",
+      "start": {
+        "column": 3,
+        "line": 253
+      },
+      "end": {
+        "column": 20,
+        "line": 253
+      },
+      "mutator": "MethodExpression"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "id": "96",
+      "start": {
+        "column": 11,
+        "line": 254
+      },
+      "end": {
+        "column": 43,
+        "line": 254
+      },
+      "mutator": "ArrayDeclaration"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "id": "97",
+      "start": {
+        "column": 3,
+        "line": 259
+      },
+      "end": {
+        "column": 20,
+        "line": 259
+      },
+      "mutator": "MethodExpression"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "id": "98",
+      "start": {
+        "column": 11,
+        "line": 260
+      },
+      "end": {
+        "column": 43,
+        "line": 260
+      },
+      "mutator": "ArrayDeclaration"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "id": "99",
+      "start": {
+        "column": 60,
+        "line": 269
+      },
+      "end": {
+        "column": 2,
+        "line": 275
+      },
+      "mutator": "ObjectLiteral"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "id": "100",
+      "start": {
+        "column": 53,
+        "line": 284
+      },
+      "end": {
+        "column": 2,
+        "line": 289
+      },
+      "mutator": "ObjectLiteral"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "id": "101",
+      "start": {
+        "column": 22,
+        "line": 287
+      },
+      "end": {
+        "column": 39,
+        "line": 287
+      },
+      "mutator": "MethodExpression"
+    },
+    {
+      "source": "packages/schema/src/document.ts",
+      "id": "102",
+      "start": {
+        "column": 22,
+        "line": 288
+      },
+      "end": {
+        "column": 39,
+        "line": 288
+      },
+      "mutator": "MethodExpression"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "id": "191",
+      "start": {
+        "column": 34,
+        "line": 121
+      },
+      "end": {
+        "column": 63,
+        "line": 121
+      },
+      "mutator": "Regex"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "id": "192",
+      "start": {
+        "column": 34,
+        "line": 121
+      },
+      "end": {
+        "column": 63,
+        "line": 121
+      },
+      "mutator": "Regex"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "id": "193",
+      "start": {
+        "column": 34,
+        "line": 121
+      },
+      "end": {
+        "column": 63,
+        "line": 121
+      },
+      "mutator": "Regex"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "id": "194",
+      "start": {
+        "column": 34,
+        "line": 121
+      },
+      "end": {
+        "column": 63,
+        "line": 121
+      },
+      "mutator": "Regex"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "id": "195",
+      "start": {
+        "column": 34,
+        "line": 121
+      },
+      "end": {
+        "column": 63,
+        "line": 121
+      },
+      "mutator": "Regex"
+    },
+    {
+      "source": "packages/schema/src/values.ts",
+      "id": "196",
+      "start": {
+        "column": 11,
+        "line": 139
+      },
+      "end": {
+        "column": 33,
+        "line": 139
+      },
+      "mutator": "ArrayDeclaration"
+    }
+  ]
+}
