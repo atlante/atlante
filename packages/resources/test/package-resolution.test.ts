@@ -19,11 +19,17 @@ import {
   loadPresetFacet,
   loadTemplateFacet,
   parseResourceLocator,
+  type ResourceBindingCollectionSpec,
   ResourceResolutionError,
   resolvePackageResourcePack,
   resolveResourceDocument,
   resourcePackMetadataPaths,
 } from "../src/index.js";
+
+const atlanteBindingCollections: readonly ResourceBindingCollectionSpec[] = [
+  { key: "agents", subject: "agent", defaultTemplate: "@atlante/pack/agent" },
+  { key: "skills", subject: "skill", defaultTemplate: "@atlante/pack/skill" },
+];
 
 const created: string[] = [];
 const schemaUri = "https://json-schema.org/draft/2020-12/schema";
@@ -259,6 +265,7 @@ describe("package resource loading", () => {
     const result = resolveResourceDocument({
       pack: createProjectResourcePack(root),
       rootFile: config,
+      bindingCollections: atlanteBindingCollections,
     });
 
     expect(result.normalized.values).toEqual({ named: "preset" });
@@ -2047,6 +2054,7 @@ describe("package resource loading", () => {
     const request = {
       pack: createProjectResourcePack(root),
       rootFile: config,
+      bindingCollections: atlanteBindingCollections,
       beforeRead: (_path: string) => {
         reads += 1;
       },
@@ -2106,6 +2114,7 @@ describe("package resource loading", () => {
       result = resolveResourceDocument({
         pack: createProjectResourcePack(root),
         rootFile: config,
+        bindingCollections: atlanteBindingCollections,
         beforeRead: (path) => reads.push(path),
       });
     } catch (error) {

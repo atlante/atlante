@@ -71,7 +71,7 @@ export function prepareResolvedDocument(
     return failedPreparation(initialDiagnostics);
 
   const agents: AgentArtifact[] = [];
-  for (const binding of Object.values(resources.bindings.agents)) {
+  for (const binding of Object.values(resources.bindings.agents ?? {})) {
     try {
       const rendered = renderBinding(resources, binding, "agent");
       agents.push({
@@ -89,7 +89,7 @@ export function prepareResolvedDocument(
   }
 
   const skills: SkillArtifact[] = [];
-  for (const binding of Object.values(resources.bindings.skills)) {
+  for (const binding of Object.values(resources.bindings.skills ?? {})) {
     try {
       const rendered = renderBinding(resources, binding, "skill");
       skills.push({

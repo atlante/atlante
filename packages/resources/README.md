@@ -26,6 +26,17 @@ selected templates and instances and their transitive dependencies are read, and
 parent directories are returned for watch-mode recovery. The package does not depend
 on Atlante's schema, validator, builder, or host integration.
 
+Binding collections are a generic seam: `resolveResourceDocument` materializes
+only the collections declared through its `bindingCollections` option
+(`ResourceBindingCollectionSpec`, each declaring a document key, a subject label
+for diagnostics, and an optional default template used when a root binding
+source omits a selector). Undeclared collection keys stay ordinary merged
+document values, and a declared collection without a default fails selector-less
+root sources instead of guessing one. The resolver owns the resolution
+mechanics — entry selection via `$template`/`$instance`, description and value
+metadata, provenance, and graph edges — while hosts that declare the collections
+own their product semantics, including any first-party default templates.
+
 Locators and origins in resource identities are validated branded types. Raw
 authored strings are separate types used for diagnostics. Resource failures are
 typed and source-aware; normal diagnostics use project-relative or stable

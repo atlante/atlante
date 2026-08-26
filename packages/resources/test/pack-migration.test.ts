@@ -19,12 +19,18 @@ import {
   loadPresetFacet,
   loadTemplateFacet,
   parseResourceLocator,
+  type ResourceBindingCollectionSpec,
   ResourceResolutionError,
   renderResolvedTemplate,
   resolveResourceDocument,
   resolveResourceInstance,
   resolveResourceTemplate,
 } from "../src/index.js";
+
+const atlanteBindingCollections: readonly ResourceBindingCollectionSpec[] = [
+  { key: "agents", subject: "agent", defaultTemplate: "@atlante/pack/agent" },
+  { key: "skills", subject: "skill", defaultTemplate: "@atlante/pack/skill" },
+];
 
 const repositoryRoot = fileURLToPath(new URL("../../../", import.meta.url));
 const packRoot = join(repositoryRoot, "packages", "pack");
@@ -304,6 +310,7 @@ describe("first-party package resolution", () => {
     const document = resolveResourceDocument({
       pack: projectPack,
       rootFile: fixture.configPath,
+      bindingCollections: atlanteBindingCollections,
     });
 
     expect(Object.keys(document.bindings.agents)).toEqual(["architect"]);

@@ -79,10 +79,30 @@ import type {
   TemplateFacet,
 } from "./types.js";
 
+/**
+ * Declares one named binding collection of a configuration document so the
+ * resolver can materialize and resolve its entries.
+ */
+export type ResourceBindingCollectionSpec = Readonly<{
+  /** Document key holding the collection. */
+  readonly key: string;
+  /** Subject label used in diagnostics for entries of this collection. */
+  readonly subject: string;
+  /** Default template locator for root sources that omit a selector. */
+  readonly defaultTemplate?: RawResourceLocator;
+}>;
+
 export type ResourceResolveOptions = Readonly<{
   /** Existing facet read seam, also used by package metadata reads. */
   readonly beforeRead?: (path: string) => void;
   readonly resourceContext?: ResourceResolutionContext;
+  /**
+   * Declared binding collections materialized into the resolved document.
+   * Undeclared collection keys stay ordinary merged document values; a root
+   * binding source without a selector requires its collection's declared
+   * default template.
+   */
+  readonly bindingCollections?: readonly ResourceBindingCollectionSpec[];
 }>;
 
 export type ResolveInstanceRequest = ResourceResolveOptions & {
@@ -138,7 +158,7 @@ export type ResolvedResourceInstance = Readonly<{
 
 export type ResolvedResourceBinding = Readonly<{
   readonly id: string;
-  readonly kind: "agent" | "skill";
+  readonly kind: string;
   readonly description: string;
   readonly template: ResolvedTemplate;
   readonly input: JsonObject;
@@ -150,8 +170,6 @@ export type NormalizedResourceDocument = {
   readonly [key: string]: unknown;
   readonly $schema?: string;
   readonly values?: Record<string, unknown>;
-  readonly agents: Record<string, Record<string, unknown>>;
-  readonly skills: Record<string, Record<string, unknown>>;
 };
 
 export type ResolvedResourceDocument = Readonly<{
@@ -161,10 +179,9 @@ export type ResolvedResourceDocument = Readonly<{
   readonly effectiveRaw: JsonObject;
   readonly normalized: NormalizedResourceDocument;
   readonly document: NormalizedResourceDocument;
-  readonly bindings: Readonly<{
-    readonly agents: Readonly<Record<string, ResolvedResourceBinding>>;
-    readonly skills: Readonly<Record<string, ResolvedResourceBinding>>;
-  }>;
+  readonly bindings: Readonly<
+    Record<string, Readonly<Record<string, ResolvedResourceBinding>>>
+  >;
   readonly provenance: ResourceProvenance;
   readonly graph: ResourceGraph;
   readonly templates: readonly ResolvedTemplate[];
@@ -343,7 +360,9 @@ type SourceResolutionContext = Readonly<{
   readonly path: readonly ResourceGraphNode[];
   readonly hops: number;
   readonly origin: ResourceOrigin;
-  readonly subject: "agent" | "skill";
+  readonly subject: string;
+  /** Declared default template for root sources that omit a selector. */
+  readonly defaultTemplate?: RawResourceLocator;
   readonly sourcePointer: string;
   readonly sourceProvenance?: ResourceProvenance;
   readonly sourceAuthoring?: AuthoringProvenance;
@@ -420,6 +439,9 @@ type BindingCollection = Readonly<{
   readonly normalized: Readonly<Record<string, Record<string, unknown>>>;
   readonly provenance: Readonly<Record<string, ResourceOrigin>>;
 }>;
+
+/** Neutral subject label for sources resolved outside a declared collection. */
+const neutralBindingSubject = "binding";
 
 function composeFailurePointer(
   parent: string | undefined,
@@ -848,6 +870,7 @@ function runResourceRequest<T extends ResourceRequest, Result>(
 class ResourceResolver {
   private readonly beforeRead: ResourceResolveOptions["beforeRead"];
   private readonly resourceContext: ResourceResolveOptions["resourceContext"];
+  private readonly bindingCollections: readonly ResourceBindingCollectionSpec[];
   private readonly packageCache = createPackageResolutionCache();
   private readonly graph: ResourceGraphState = createResourceGraphState();
   private readonly dependencies = new Set<string>();
@@ -867,6 +890,7 @@ class ResourceResolver {
   ) {
     this.beforeRead = options.beforeRead;
     this.resourceContext = options.resourceContext;
+    this.bindingCollections = options.bindingCollections ?? [];
   }
 
   private locatorOptions(): ResourceLocatorOptions {
@@ -2029,7 +2053,7 @@ class ResourceResolver {
       path,
       hops + 1,
       origin,
-      "agent",
+      undefined,
       sourcePointer,
       provenance,
       authoring,
@@ -2258,7 +2282,7 @@ class ResourceResolver {
       path,
       hops + 1,
       origin ?? expected.origin,
-      "agent",
+      undefined,
       sourcePointer,
       provenance,
       authoring,
@@ -2367,11 +2391,21 @@ class ResourceResolver {
       );
     }
 
+    if (!sourceContext.defaultTemplate) {
+      return this.failAt(
+        "invalid-resolved-input",
+        "binding source object requires $template, $instance, or a collection default template",
+        traversalContext(sourceContext.path, sourceContext.hops),
+        {
+          source: sourceContext.origin,
+          pointer: sourceContext.sourcePointer || undefined,
+        },
+      );
+    }
+
     const template = this.resolveTemplateAt(
       sourceContext.pack,
-      sourceContext.subject === "skill"
-        ? "@atlante/pack/skill"
-        : "@atlante/pack/agent",
+      sourceContext.defaultTemplate,
       sourceContext.authoringFile,
       sourceContext.path,
       sourceContext.hops,
@@ -2503,7 +2537,7 @@ class ResourceResolver {
   private sourceDescription(
     context: "root" | "nested",
     value: JsonObject,
-    subject: "agent" | "skill",
+    subject: string,
     origin: ResourceOrigin,
     sourcePointer: string,
     path: readonly ResourceGraphNode[],
@@ -2560,7 +2594,7 @@ class ResourceResolver {
     value: JsonObject,
     provenance: ResourceProvenance,
     origin: ResourceOrigin,
-    subject: "agent" | "skill",
+    subject: string,
     sourcePointer: string,
     path: readonly ResourceGraphNode[],
     hops: number,
@@ -2670,11 +2704,12 @@ class ResourceResolver {
     path: readonly ResourceGraphNode[],
     hops: number,
     origin: ResourceOrigin,
-    subject: "agent" | "skill" = "agent",
+    spec?: ResourceBindingCollectionSpec,
     sourcePointer = "",
     sourceProvenance?: ResourceProvenance,
     sourceAuthoring?: AuthoringProvenance,
   ): SourceResult {
+    const subject = spec?.subject ?? neutralBindingSubject;
     const selection = this.selectSource(source, context, {
       pack,
       authoringFile,
@@ -2682,6 +2717,9 @@ class ResourceResolver {
       hops,
       origin,
       subject,
+      ...(spec?.defaultTemplate
+        ? { defaultTemplate: spec.defaultTemplate }
+        : {}),
       sourcePointer,
       sourceProvenance,
       sourceAuthoring,
@@ -2759,7 +2797,7 @@ class ResourceResolver {
   }
 
   private resolveBinding(
-    kind: "agent" | "skill",
+    spec: ResourceBindingCollectionSpec,
     id: string,
     source: JsonValue,
     pointer: string,
@@ -2779,14 +2817,14 @@ class ResourceResolver {
     if (typeof source !== "string" && !isObject(source)) {
       return this.failAt(
         "invalid-resolved-input",
-        `${kind} source must be a locator string or object`,
+        `${spec.subject} source must be a locator string or object`,
         traversal,
         { source: origin, pointer },
       );
     }
     const sourceResult = this.resolveBindingSource(
       source,
-      kind,
+      spec,
       origin,
       context,
       traversal,
@@ -2796,14 +2834,14 @@ class ResourceResolver {
     if (!sourceResult.description) {
       return this.failAt(
         "invalid-resolved-input",
-        `${kind} description must be a non-empty string after resolution`,
+        `${spec.subject} description must be a non-empty string after resolution`,
         traversal,
         { source: origin, pointer: `${pointer}/description` },
       );
     }
     return Object.freeze({
       id,
-      kind,
+      kind: spec.subject,
       description: sourceResult.description,
       template: sourceResult.template,
       input: sourceResult.input,
@@ -2814,7 +2852,7 @@ class ResourceResolver {
 
   private resolveBindingSource(
     source: string | Record<string, JsonValue>,
-    kind: "agent" | "skill",
+    spec: ResourceBindingCollectionSpec,
     origin: ResourceOrigin,
     authoring: AuthoringContext,
     traversal: TraversalContext,
@@ -2840,7 +2878,7 @@ class ResourceResolver {
       traversal.path,
       traversal.hops,
       origin,
-      kind,
+      spec,
       pointer,
       sourceProvenance,
       sourceAuthoring,
@@ -2848,7 +2886,7 @@ class ResourceResolver {
   }
 
   private resolveBindingCollection(
-    kind: "agents" | "skills",
+    spec: ResourceBindingCollectionSpec,
     collection: JsonValue | undefined,
     root: PresetResult,
   ): BindingCollection {
@@ -2858,9 +2896,9 @@ class ResourceResolver {
     if (!isObject(collection)) {
       return this.failAt(
         "invalid-resolved-input",
-        `${kind} must be a JSON object`,
+        `${spec.key} must be a JSON object`,
         traversalContext(root.path, root.effectiveHops),
-        { source: root.facet.origin, pointer: `/${kind}` },
+        { source: root.facet.origin, pointer: `/${spec.key}` },
       );
     }
 
@@ -2869,10 +2907,10 @@ class ResourceResolver {
     const provenance: Record<string, ResourceOrigin> = {};
     for (const id of Object.keys(collection).sort()) {
       const binding = this.resolveBinding(
-        kind === "agents" ? "agent" : "skill",
+        spec,
         id,
         collection[id] as JsonValue,
-        `/${kind}/${escapePointer(id)}`,
+        `/${spec.key}/${escapePointer(id)}`,
         root,
       );
       own(bindings, id, binding);
@@ -2880,7 +2918,7 @@ class ResourceResolver {
       for (const pointer of Object.keys(binding.provenance).sort()) {
         own(
           provenance,
-          `/${kind}/${escapePointer(id)}${pointer}`,
+          `/${spec.key}/${escapePointer(id)}${pointer}`,
           binding.provenance[pointer],
         );
       }
@@ -2919,40 +2957,38 @@ class ResourceResolver {
     const resultProvenance: Record<string, ResourceOrigin> = {
       ...root.provenance,
     };
-    for (const key of ["/agents", "/skills"])
-      removeProvenanceSubtree(resultProvenance, key);
+    for (const { key } of this.bindingCollections)
+      removeProvenanceSubtree(resultProvenance, `/${key}`);
 
-    const agentsResult = this.resolveBindingCollection(
-      "agents",
-      normalizedValue.agents,
-      root,
-    );
-    const skillsResult = this.resolveBindingCollection(
-      "skills",
-      normalizedValue.skills,
-      root,
-    );
+    const bindingResults = this.bindingCollections.map((spec) => ({
+      spec,
+      result: this.resolveBindingCollection(
+        spec,
+        normalizedValue[spec.key],
+        root,
+      ),
+    }));
 
-    own(normalizedValue, "agents", agentsResult.normalized);
-    own(normalizedValue, "skills", skillsResult.normalized);
-    for (const provenance of [
-      agentsResult.provenance,
-      skillsResult.provenance,
-    ]) {
-      for (const pointer of Object.keys(provenance).sort())
-        own(resultProvenance, pointer, provenance[pointer]);
+    for (const { spec, result } of bindingResults)
+      own(normalizedValue, spec.key, result.normalized);
+    for (const { result } of bindingResults) {
+      for (const pointer of Object.keys(result.provenance).sort())
+        own(resultProvenance, pointer, result.provenance[pointer]);
     }
 
     const normalized = cloneNormalizedDocument(normalizedValue);
+    const bindings: Record<
+      string,
+      Readonly<Record<string, ResolvedResourceBinding>>
+    > = {};
+    for (const { spec, result } of bindingResults)
+      own(bindings, spec.key, Object.freeze({ ...result.bindings }));
     const result = Object.freeze({
       raw: cloneObject(root.facet.document),
       effectiveRaw: cloneObject(root.effectiveRaw),
       normalized,
       document: normalized,
-      bindings: Object.freeze({
-        agents: Object.freeze({ ...agentsResult.bindings }),
-        skills: Object.freeze({ ...skillsResult.bindings }),
-      }),
+      bindings: Object.freeze(bindings),
       provenance: Object.freeze(sortProvenance(resultProvenance)),
       graph: snapshotResourceGraph(this.graph),
       templates: Object.freeze(
@@ -3173,6 +3209,7 @@ class ResourceResolver {
       loaded.loaded.locations,
       path,
       hops,
+      this.bindingCollections.map(({ key }) => key),
     );
     const base = this.loadPresetBase(loaded, raw, path, hops);
     const local = withoutKeys(raw, new Set(["extends"]));
@@ -3225,10 +3262,12 @@ class ResourceResolver {
     locations: Readonly<Record<string, JsoncLocation>> | undefined,
     path: readonly ResourceGraphNode[],
     hops: number,
+    bindingKeys: readonly string[] = [],
   ): void {
     const valueIssue = authoredValueLayerIssues(source, {
       kind,
       locations,
+      bindingKeys,
     })[0];
     if (!valueIssue) return;
     this.failAt(
