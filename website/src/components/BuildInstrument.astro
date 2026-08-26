@@ -201,6 +201,54 @@ const hints: Record<string, string> = {
     const referenceHtml = codeView?.innerHTML ?? "";
     const referenceCopy = paneCopy?.dataset.copyText ?? "";
 
+    const escapeHtml = (value: string): string =>
+      value
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
+
+    const highlightJson = (source: string): string => {
+      const escaped = escapeHtml(source);
+      const pattern =
+        /("(?:\\.|[^"\\])*")(?=\s*:)|("(?:\\.|[^"\\])*")|(\b(?:true|false|null)\b|-?\d+(?:\.\d+)?)/g;
+      return escaped.replace(
+        pattern,
+        (token, key?: string, value?: string) => {
+          if (key) return `<span class="token-key">${token}</span>`;
+          if (value) return `<span class="token-string">${token}</span>`;
+          return `<span class="token-literal">${token}</span>`;
+        },
+      );
+    };
+
+    const escapeMarkdown = (source: string): string =>
+      escapeHtml(source)
+        .replace(
+          /^(#{1,6} .*)$/gm,
+          '<span class="token-md-heading">$1</span>',
+        )
+        .replace(/\*\*([^*]+)\*\*/g, '<span class="token-key">**$1**</span>')
+        .replace(
+          /`([^`\n]+)`/g,
+          '<span class="token-string">`$1`</span>',
+        )
+        .replace(
+          /^([-*] .*)$/gm,
+          '<span class="token-md-item">$1</span>',
+        );
+
+    const highlightFile = (path: string, content: string): string => {
+      const name = path.slice(path.lastIndexOf("/") + 1);
+      if (name.endsWith(".jsonc") || name.endsWith(".json")) {
+        return highlightJson(content);
+      }
+      if (name.endsWith(".md")) {
+        return escapeMarkdown(content);
+      }
+      return escapeHtml(content);
+    };
+
+
 
     const EDITABLE = new Set(["atlante.jsonc", "opencode.jsonc"]);
 
@@ -250,7 +298,7 @@ const hints: Record<string, string> = {
         codeView.hidden = false;
         if (generated) {
           const content = state.files.get(state.activePath) ?? "";
-          codeView.textContent = content;
+          codeView.innerHTML = `<code>${highlightFile(state.activePath, content)}</code>`;
           if (paneCopy) paneCopy.dataset.copyText = content;
         } else {
           codeView.innerHTML = referenceHtml;
@@ -581,9 +629,17 @@ const hints: Record<string, string> = {
 <style>
   .workbench {
     position: relative;
-    border-block-start: 1px solid var(--ds-border-subtle);
     background: color-mix(in oklab, var(--ds-bg) 96%, var(--ds-fg));
   }
+
+  .workbench::before {
+    content: "";
+    display: block;
+    max-width: var(--container-wide);
+    margin-inline: auto;
+    border-block-start: 1px solid var(--ds-border);
+  }
+
 
   .inner {
     max-width: var(--container-wide);
@@ -757,6 +813,16 @@ const hints: Record<string, string> = {
   pre :global(.token-literal) {
     color: var(--ds-warning);
   }
+
+  pre :global(.token-md-heading) {
+    color: var(--ds-accent);
+    font-weight: 650;
+  }
+
+  pre :global(.token-md-item) {
+    color: var(--ds-muted);
+  }
+
 
   textarea[data-code-editor] {
     display: block;
@@ -998,6 +1064,20 @@ const hints: Record<string, string> = {
     text-decoration-color: var(--ds-border);
   }
 
+  :global(html:not([data-theme="dark"])) [data-tree-list] :global(button) {
+    background: color-mix(in oklab, var(--atlante-pine) 18%, transparent);
+  }
+
+  :global(html:not([data-theme="dark"]))
+    [data-tree-list]
+    :global(button:hover:not(:disabled)),
+  :global(html:not([data-theme="dark"]))
+    [data-tree-list]
+    :global(button:focus-visible:not(:disabled)) {
+    background: color-mix(in oklab, var(--atlante-pine) 32%, transparent);
+  }
+
+
 
   [data-tree-list] :global(button.tree-active .tree-name) {
     text-decoration-color: var(--ds-border);
@@ -1148,7 +1228,8 @@ const hints: Record<string, string> = {
     pre[data-code-view],
     textarea[data-code-editor] {
       padding-inline: var(--space-4);
-      font-size: 12px;
+      font-size: clamp(12px, 1.05vw, 16px);
+
     }
 
     .instrument-bar > span {

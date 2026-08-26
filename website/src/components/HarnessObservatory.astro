@@ -124,8 +124,17 @@ const observations = [
 
 <style>
   .observatory {
-    border-block-start: 1px solid var(--ds-border-subtle);
+    border-block-start: 0;
   }
+
+  .observatory::before {
+    content: "";
+    display: block;
+    max-width: var(--container-wide);
+    margin-inline: auto;
+    border-block-start: 1px solid var(--ds-border);
+  }
+
 
   .inner {
     max-width: var(--container-wide);
