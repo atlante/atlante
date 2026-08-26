@@ -138,13 +138,13 @@ describe("first-party package resources as user configurations", () => {
     );
 
     expect(workflow).toContain(
-      "- Workflow: the orchestrator is read-only and delegates every file edit.",
+      "### Workflow: read-only orchestration\n\nThe orchestrator is read-only and delegates every file edit.",
     );
     expect(workflow).toContain(
-      "- build: commit task implementation and corrections in separate commits, after the task's focused tests and checks pass; the orchestrator owns all commit authorship and pushing, and never amends or force-pushes.",
+      "### build: task commits\n\nCommit task implementation and corrections in separate commits, after the task's focused tests and checks pass; the orchestrator owns all commit authorship and pushing, and never amends or force-pushes.",
     );
     expect(workflow).toContain(
-      "- build: apply task review according to this phase's review criteria.",
+      "### build: task review\n\nApply task review according to this phase's review criteria.",
     );
     expect(workflow).not.toContain("review after each task");
     expect(workflow).toContain(
@@ -169,7 +169,7 @@ describe("first-party package resources as user configurations", () => {
       "create a separate correction commit; never amend or force-push.",
     );
     expect(workflow).toContain(
-      "- build: limit correction to 5 loops per task.",
+      "### build: correction loops\n\nLimit correction to 5 loops per task.",
     );
     expect(workflow).not.toContain("five rounds per task");
     expect(workflow).toContain(

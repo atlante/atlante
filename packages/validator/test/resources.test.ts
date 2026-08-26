@@ -1590,6 +1590,98 @@ describe("resource-backed document validation", () => {
     expect(result.document?.agents?.reviewer).toBeDefined();
   });
 
+  test.each([
+    ["true", true],
+    ["false", false],
+    ["absent", undefined],
+  ] as const)(
+    "accepts %s adaptive phase policy in a bundled workflow",
+    (_label, adaptive) => {
+      const { configPath } = project({
+        $schema: SCHEMA_URI,
+        agents: {
+          reviewer: {
+            $template: "@atlante/pack/agent",
+            description: "Reviews the change.",
+            identity: "You review.",
+            mission: "Find defects.",
+            sections: [
+              {
+                workflow: {
+                  title: "Review workflow",
+                  phases: [
+                    {
+                      kind: "plan",
+                      instructions: ["Inspect the change."],
+                      ...(adaptive === undefined
+                        ? {}
+                        : { policies: { adaptive } }),
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      });
+
+      const result = load(configPath);
+
+      expect(result.diagnostics).toEqual([]);
+    },
+  );
+
+  test.each([
+    ["string", "true"],
+    ["null", null],
+  ] as const)(
+    "rejects non-boolean adaptive phase policy: %s",
+    (_label, adaptive) => {
+      const { root, configPath } = project({
+        $schema: SCHEMA_URI,
+        agents: {
+          reviewer: {
+            $template: "@atlante/pack/agent",
+            description: "Reviews the change.",
+            identity: "You review.",
+            mission: "Find defects.",
+            sections: [
+              {
+                workflow: {
+                  title: "Review workflow",
+                  phases: [
+                    {
+                      kind: "plan",
+                      policies: { adaptive },
+                      instructions: ["Inspect the change."],
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      });
+      const path =
+        "/agents/reviewer/sections/0/workflow/phases/0/policies/adaptive";
+
+      const result = load(configPath);
+      const diagnostic = result.diagnostics.find(
+        ({ code, path: diagnosticPath }) =>
+          code === "invalid-prompt-input" && diagnosticPath === path,
+      );
+
+      expect(result.document).toBeUndefined();
+      expect(diagnostic).toMatchObject({
+        code: "invalid-prompt-input",
+        path,
+        pointer: path,
+      });
+      expect(diagnostic?.message).toContain("must be boolean");
+      expect(JSON.stringify(result.diagnostics)).not.toContain(root);
+    },
+  );
+
   test("preserves workflow diagnostics for bundled agents", () => {
     const { configPath } = project({
       $schema: SCHEMA_URI,

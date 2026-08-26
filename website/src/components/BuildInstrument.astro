@@ -1,0 +1,687 @@
+---
+const config = `{
+  "$schema": "https://atlante.sh/schema/v0.1/schema.json",
+  "extends": "@atlante/pack",
+  "values": {
+    "project": "my-app"
+  },
+  "agents": {
+    "implementer": {
+      "$template": "@atlante/pack/agent",
+      "description": "Implements changes in the project.",
+      "identity": "You are a senior implementer on {{values.project}}.",
+      "mission": "Write clean, tested, production-ready code.",
+      "sections": [
+        { "invariants": ["Every change ships with tests."] }
+      ]
+    }
+  }
+}`;
+
+const escapedConfig = config
+  .replaceAll("&", "&amp;")
+  .replaceAll("<", "&lt;")
+  .replaceAll(">", "&gt;");
+const highlightedConfig = escapedConfig.replace(
+  /("(?:\\.|[^"\\])*")(?=\s*:)|("(?:\\.|[^"\\])*")|(\b(?:true|false|null)\b|-?\d+(?:\.\d+)?)/g,
+  (token, key?: string, stringValue?: string) => {
+    if (key) return `<span class="token-key">${token}</span>`;
+    if (stringValue) return `<span class="token-string">${token}</span>`;
+    return `<span class="token-literal">${token}</span>`;
+  },
+);
+
+
+const fields = [
+  { name: "$schema", detail: "Structural contract" },
+  { name: "extends", detail: "Ordered composition" },
+  { name: "values", detail: "Explicit inputs" },
+  { name: "agents", detail: "Bound templates" },
+];
+
+const commands = [
+  {
+    id: "init",
+    label: "Init",
+    command: "npx @atlante/cli init",
+    detail:
+      "Writes the configuration, builds the first artifact tree, and registers the OpenCode adapter.",
+    effects: [
+      ["Writes", "atlante.jsonc"],
+      ["Builds", ".atlante/artifacts/"],
+      ["Registers", "@atlante/opencode"],
+    ],
+  },
+  {
+    id: "validate",
+    label: "Validate",
+    command: "npx @atlante/cli validate",
+    detail:
+      "Checks the document, selected templates, instances, and resources before publication.",
+    effects: [
+      ["Checks", "document structure"],
+      ["Checks", "template inputs"],
+      ["On failure", "publishes nothing"],
+    ],
+  },
+  {
+    id: "build",
+    label: "Build",
+    command: "npx @atlante/cli build",
+    detail:
+      "Validates, renders, and atomically publishes the host-neutral artifact tree.",
+    effects: [
+      ["Validates", "atlante.jsonc"],
+      ["Renders", "Markdown payloads"],
+      ["Publishes", ".atlante/artifacts/"],
+    ],
+  },
+];
+
+const pipeline = [
+  { id: "source", label: "Source", value: "atlante.jsonc" },
+  { id: "validate", label: "Contract", value: "document + templates" },
+  { id: "build", label: "Artifacts", value: ".atlante/artifacts/" },
+  { id: "adapter", label: "Host adapter", value: "OpenCode" },
+];
+---
+
+<section class="workbench" id="quick-start">
+  <div class="inner">
+    <header class="intro">
+      <h2>The configuration is the product surface</h2>
+    </header>
+
+    <div class="build-instrument" data-build-instrument data-stage="init">
+      <div class="instrument-bar">
+        <p><span class="status-dot"></span>Atlante build instrument</p>
+        <span>Node.js 22+</span>
+      </div>
+
+      <div class="workspace">
+        <div class="configuration-pane">
+          <div class="pane-head">
+            <div>
+              <span>Repository source</span>
+              <strong>atlante.jsonc</strong>
+            </div>
+            <button type="button" data-copy-text={config}>Copy configuration</button>
+          </div>
+          <pre><code set:html={highlightedConfig} /></pre>
+          <dl class="field-map">
+            {
+              fields.map((field) => (
+                <div>
+                  <dt>{field.name}</dt>
+                  <dd>{field.detail}</dd>
+                </div>
+              ))
+            }
+          </dl>
+        </div>
+
+        <div class="command-pane">
+          <div class="command-selector" aria-label="Choose a CLI command">
+            {
+              commands.map((item, index) => (
+                <button
+                  type="button"
+                  data-command-select={item.id}
+                  aria-pressed={index === 0 ? "true" : "false"}
+                >
+                  {item.label}
+                </button>
+              ))
+            }
+          </div>
+
+          <div class="command-panels">
+            {
+              commands.map((item, index) => (
+                <div
+                  class="command-panel"
+                  data-command-panel={item.id}
+                  hidden={index !== 0}
+                >
+                  <p class="command-line">
+                    <span aria-hidden="true">$</span>
+                    <code>{item.command}</code>
+                  </p>
+                  <button
+                    class="copy-command"
+                    type="button"
+                    data-copy-text={item.command}
+                  >
+                    Copy command
+                  </button>
+                  <p class="command-detail">{item.detail}</p>
+                  <dl class="effects">
+                    {
+                      item.effects.map(([term, value]) => (
+                        <div>
+                          <dt>{term}</dt>
+                          <dd><code>{value}</code></dd>
+                        </div>
+                      ))
+                    }
+                  </dl>
+                </div>
+              ))
+            }
+          </div>
+
+          <a class="docs-link" href="https://docs.atlante.sh">
+            Read the documentation <span aria-hidden="true">↗</span>
+          </a>
+        </div>
+      </div>
+
+      <div class="pipeline" aria-label="Configuration build path">
+        {
+          pipeline.map((item) => (
+            <div class="pipeline-item" data-pipeline-stage={item.id}>
+              <span class="pipeline-marker"></span>
+              <small>{item.label}</small>
+              <code>{item.value}</code>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  for (const instrument of document.querySelectorAll<HTMLElement>(
+    "[data-build-instrument]",
+  )) {
+    const buttons = instrument.querySelectorAll<HTMLButtonElement>(
+      "[data-command-select]",
+    );
+    const panels = instrument.querySelectorAll<HTMLElement>(
+      "[data-command-panel]",
+    );
+
+    for (const button of buttons) {
+      button.addEventListener("click", () => {
+        const command = button.dataset.commandSelect;
+        if (!command) return;
+
+        instrument.dataset.stage = command;
+        for (const candidate of buttons) {
+          candidate.setAttribute(
+            "aria-pressed",
+            String(candidate === button),
+          );
+        }
+        for (const panel of panels) {
+          panel.hidden = panel.dataset.commandPanel !== command;
+        }
+      });
+    }
+  }
+</script>
+
+<style>
+  .workbench {
+    position: relative;
+    border-block-start: 1px solid var(--ds-border-subtle);
+    background: color-mix(in oklab, var(--ds-bg) 96%, var(--ds-fg));
+  }
+
+  .inner {
+    max-width: var(--container-wide);
+    margin-inline: auto;
+    padding: clamp(var(--space-24), 9vw, 168px) var(--space-4);
+  }
+
+  .intro {
+    margin-block-end: var(--space-16);
+  }
+
+
+  h2 {
+    max-width: 12ch;
+    margin: 0;
+    font-family: var(--font-display);
+    font-optical-sizing: auto;
+    font-size: clamp(52px, 6.4vw, 108px);
+    font-weight: 500;
+    line-height: 0.95;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+  }
+
+
+  .build-instrument {
+    border: 1px solid var(--ds-fg);
+    background: var(--ds-bg);
+  }
+
+  .instrument-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    min-height: var(--control-min);
+    padding-inline: var(--space-4);
+    border-block-end: 1px solid var(--ds-fg);
+    font-family: var(--font-ui);
+    font-size: var(--text-meta);
+    font-weight: 650;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .instrument-bar p {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin: 0;
+  }
+
+  .instrument-bar > span {
+    color: var(--ds-muted);
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--ds-success);
+  }
+
+  .workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.5fr);
+  }
+
+  .configuration-pane {
+    min-width: 0;
+    border-inline-end: 1px solid var(--ds-fg);
+  }
+
+  .pane-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    min-height: 72px;
+    padding: var(--space-3) var(--space-4);
+    border-block-end: 1px solid var(--ds-border-subtle);
+  }
+
+  .pane-head > div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .pane-head span {
+    color: var(--ds-muted);
+    font-family: var(--font-ui);
+    font-size: var(--text-meta);
+    font-weight: 650;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+  }
+
+  .pane-head strong {
+    font-family: var(--font-mono);
+    font-size: var(--text-small);
+    font-weight: 500;
+  }
+
+  button,
+  .docs-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--control-min);
+    padding-inline: var(--space-4);
+    border: 1px solid var(--ds-fg);
+    border-radius: 0;
+    background: transparent;
+    color: var(--ds-fg);
+    font-family: var(--font-ui);
+    font-size: var(--text-small);
+    font-weight: 650;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  button:hover,
+  button:focus-visible,
+  .docs-link:hover,
+  .docs-link:focus-visible {
+    background: var(--ds-fg);
+    color: var(--ds-bg);
+  }
+
+  pre {
+    min-height: 610px;
+    margin: 0;
+    padding: var(--space-8) clamp(var(--space-4), 3vw, var(--space-12));
+    overflow: auto;
+    font-family: var(--font-mono);
+    font-size: clamp(12px, 1.05vw, 16px);
+    line-height: 1.8;
+    tab-size: 2;
+  }
+
+  pre code {
+    display: block;
+    width: max-content;
+    min-width: 100%;
+    color: var(--ds-fg);
+    font-family: inherit;
+  }
+
+  pre :global(.token-key) {
+    color: var(--ds-warning);
+    font-weight: 650;
+  }
+
+  pre :global(.token-string) {
+    color: var(--ds-accent);
+  }
+
+  pre :global(.token-literal) {
+    color: var(--ds-warning);
+  }
+
+
+
+  .field-map {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    margin: 0;
+    border-block-start: 1px solid var(--ds-fg);
+  }
+
+  .field-map > div {
+    min-width: 0;
+    padding: var(--space-4);
+    border-inline-end: 1px solid var(--ds-border-subtle);
+  }
+
+  .field-map > div:last-child {
+    border-inline-end: 0;
+  }
+
+  .field-map dt,
+  .field-map dd {
+    margin: 0;
+  }
+
+  .field-map dt {
+    overflow: hidden;
+    margin-block-end: var(--space-1);
+    font-family: var(--font-mono);
+    font-size: var(--text-small);
+    font-weight: 600;
+    text-overflow: ellipsis;
+  }
+
+  .field-map dd {
+    color: var(--ds-muted);
+    font-family: var(--font-ui);
+    font-size: var(--text-small);
+    line-height: 1.35;
+  }
+
+  .command-pane {
+    display: flex;
+    min-height: 100%;
+    flex-direction: column;
+  }
+
+  .command-selector {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    border-block-end: 1px solid var(--ds-fg);
+  }
+
+  .command-selector button {
+    border: 0;
+    border-inline-end: 1px solid var(--ds-border-subtle);
+  }
+
+  .command-selector button:last-child {
+    border-inline-end: 0;
+  }
+
+  .command-selector button[aria-pressed="true"] {
+    background: var(--ds-fg);
+    color: var(--ds-bg);
+  }
+
+  .command-panels {
+    flex: 1;
+  }
+
+  .command-panel {
+    padding: clamp(var(--space-6), 3vw, var(--space-12)) var(--space-6);
+  }
+
+  .command-panel[hidden] {
+    display: none;
+  }
+
+  .command-line {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    margin: 0 0 var(--space-4);
+    padding-block-end: var(--space-6);
+    border-block-end: 1px solid var(--ds-border-subtle);
+    font-family: var(--font-mono);
+    font-size: clamp(15px, 1.4vw, 20px);
+    line-height: 1.5;
+  }
+
+  .command-line > span {
+    color: var(--ds-success);
+  }
+
+  .command-line code {
+    font-family: inherit;
+    overflow-wrap: anywhere;
+  }
+
+  .copy-command {
+    width: 100%;
+    margin-block-end: var(--space-8);
+  }
+
+  .command-detail {
+    margin: 0 0 var(--space-8);
+    color: var(--ds-muted);
+    font-family: var(--font-body);
+    font-size: var(--text-ui);
+    line-height: 1.65;
+  }
+
+  .effects,
+  .effects dd {
+    margin: 0;
+  }
+
+  .effects > div {
+    display: grid;
+    grid-template-columns: 92px minmax(0, 1fr);
+    gap: var(--space-3);
+    padding-block: var(--space-3);
+    border-block-start: 1px solid var(--ds-border-subtle);
+  }
+
+  .effects dt {
+    color: var(--ds-muted);
+    font-family: var(--font-ui);
+    font-size: var(--text-small);
+  }
+
+  .effects code {
+    font-family: var(--font-mono);
+    font-size: var(--text-small);
+    overflow-wrap: anywhere;
+  }
+
+  .docs-link {
+    justify-content: space-between;
+    margin: auto var(--space-6) var(--space-6);
+  }
+
+  .pipeline {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    border-block-start: 1px solid var(--ds-fg);
+  }
+
+  .pipeline-item {
+    position: relative;
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding: var(--space-6) var(--space-4) var(--space-4);
+    border-inline-end: 1px solid var(--ds-border-subtle);
+    opacity: 0.35;
+    transition: opacity var(--duration-editorial) var(--ease-standard);
+  }
+
+  .pipeline-item:last-child {
+    border-inline-end: 0;
+  }
+
+  .pipeline-marker {
+    position: absolute;
+    inset-block-start: -6px;
+    inset-inline-start: var(--space-4);
+    width: 10px;
+    height: 10px;
+    border: 1px solid var(--ds-fg);
+    border-radius: 50%;
+    background: var(--ds-bg);
+  }
+
+  .pipeline small {
+    font-family: var(--font-ui);
+    font-size: var(--text-meta);
+    font-weight: 650;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .pipeline code {
+    overflow: hidden;
+    font-family: var(--font-mono);
+    font-size: var(--text-small);
+    text-overflow: ellipsis;
+  }
+
+  .build-instrument[data-stage="init"] .pipeline-item,
+  .build-instrument[data-stage="validate"]
+    :is(
+      [data-pipeline-stage="source"],
+      [data-pipeline-stage="validate"]
+    ),
+  .build-instrument[data-stage="build"]
+    :is(
+      [data-pipeline-stage="source"],
+      [data-pipeline-stage="validate"],
+      [data-pipeline-stage="build"]
+    ) {
+    opacity: 1;
+  }
+
+  .build-instrument[data-stage="init"] .pipeline-marker,
+  .build-instrument[data-stage="validate"]
+    :is(
+      [data-pipeline-stage="source"],
+      [data-pipeline-stage="validate"]
+    )
+    .pipeline-marker,
+  .build-instrument[data-stage="build"]
+    :is(
+      [data-pipeline-stage="source"],
+      [data-pipeline-stage="validate"],
+      [data-pipeline-stage="build"]
+    )
+    .pipeline-marker {
+    background: var(--ds-success);
+  }
+
+  @media (max-width: 980px) {
+    .workspace {
+      grid-template-columns: 1fr;
+    }
+
+
+    .configuration-pane {
+      border-inline-end: 0;
+      border-block-end: 1px solid var(--ds-fg);
+    }
+
+    pre {
+      min-height: 0;
+    }
+
+    .command-pane {
+      min-height: 520px;
+    }
+  }
+
+  @media (max-width: 680px) {
+    .pane-head {
+      align-items: flex-start;
+      flex-direction: column;
+      padding-block: var(--space-4);
+    }
+
+    .pane-head button {
+      width: 100%;
+    }
+
+    .field-map,
+    .pipeline {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .field-map > div:nth-child(2),
+    .pipeline-item:nth-child(2) {
+      border-inline-end: 0;
+    }
+
+    .field-map > div:nth-child(-n + 2),
+    .pipeline-item:nth-child(-n + 2) {
+      border-block-end: 1px solid var(--ds-border-subtle);
+    }
+
+    pre {
+      padding-inline: var(--space-4);
+      font-size: 12px;
+    }
+
+
+    .instrument-bar > span {
+      display: none;
+    }
+  }
+
+  @media (max-width: 440px) {
+    .command-selector {
+      grid-template-columns: 1fr;
+    }
+
+    .command-selector button {
+      border-inline-end: 0;
+      border-block-end: 1px solid var(--ds-border-subtle);
+    }
+
+    .command-selector button:last-child {
+      border-block-end: 0;
+    }
+  }
+</style>
+

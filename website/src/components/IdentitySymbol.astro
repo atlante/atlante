@@ -1,0 +1,146 @@
+---
+type Kind =
+  | "harness"
+  | "stars"
+  | "constellation"
+  | "projection"
+  | "coordinates"
+  | "bearing";
+
+interface Props {
+  kind: Kind;
+}
+
+const { kind } = Astro.props;
+---
+
+<div class={`identity-symbol ${kind}`} aria-hidden="true">
+  {
+    kind === "harness" && (
+      <svg viewBox="0 0 120 120">
+        <circle class="outline" cx="60" cy="60" r="43" />
+        <path class="line" d="M35 70 50 57 67 69 83 41" />
+        <circle class="node" cx="35" cy="70" r="3.2" />
+        <circle class="node" cx="50" cy="57" r="3.2" />
+        <circle class="node" cx="67" cy="69" r="3.2" />
+        <path
+          class="spark"
+          d="m83 31 2.2 7.8 7.8 2.2-7.8 2.2L83 51l-2.2-7.8L73 41l7.8-2.2Z"
+        />
+      </svg>
+    )
+  }
+  {
+    kind === "stars" && (
+      <svg viewBox="0 0 120 120">
+        <path
+          class="star"
+          d="m60 8 4 39 17-20-13 25 40 8-40 4 21 25-25-21-4 44-4-44-25 21 21-25-40-4 40-8-13-25 17 20Z"
+        />
+      </svg>
+    )
+  }
+  {
+    kind === "constellation" && (
+      <svg viewBox="0 0 120 120">
+        <path class="line" d="M24 83 55 57 91 34" />
+        <circle class="node" cx="24" cy="83" r="4" />
+        <circle class="node" cx="55" cy="57" r="4" />
+        <circle class="node" cx="91" cy="34" r="4" />
+      </svg>
+    )
+  }
+  {
+    kind === "projection" && (
+      <svg viewBox="0 0 120 120">
+        <path class="project" d="M24 96Q30 54 49 27" />
+        <path class="project" d="M24 96Q47 51 76 30" />
+        <path class="project" d="M24 96Q61 62 96 49" />
+        <path class="project" d="M24 96Q65 84 101 78" />
+      </svg>
+    )
+  }
+  {
+    kind === "coordinates" && (
+      <svg viewBox="0 0 120 120">
+        <circle class="outline" cx="60" cy="60" r="25" />
+        <path class="line" d="M60 18v25m0 34v25M18 60h25m34 0h25" />
+      </svg>
+    )
+  }
+  {
+    kind === "bearing" && (
+      <svg viewBox="0 0 120 120">
+        <path class="outline" d="M25 79a35 35 0 0 1 70 0" />
+        <path class="line" d="M17 79h86" />
+      </svg>
+    )
+  }
+</div>
+
+<style>
+  .identity-symbol,
+  svg {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1;
+  }
+
+  svg {
+    overflow: visible;
+  }
+
+  .outline,
+  .line,
+  .project {
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .outline {
+    stroke-width: 1.5;
+  }
+
+  .line {
+    stroke-width: 1.35;
+  }
+
+  .project {
+    stroke-width: 1.5;
+    stroke-dasharray: 1 6;
+  }
+
+  .node,
+  .spark,
+  .star {
+    fill: currentColor;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .project {
+      animation: project 10s linear infinite;
+    }
+
+    .spark,
+    .star {
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: breathe 4s var(--ease-standard) infinite;
+    }
+
+    @keyframes project {
+      to {
+        stroke-dashoffset: -84;
+      }
+    }
+
+    @keyframes breathe {
+      50% {
+        scale: 1.04;
+      }
+    }
+  }
+</style>
+

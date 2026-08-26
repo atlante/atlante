@@ -1,0 +1,93 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SiteNav from "../components/SiteNav.astro";
+import Stars from "../components/Stars.astro";
+import Hero from "../components/Hero.astro";
+import HarnessObservatory from "../components/HarnessObservatory.astro";
+import BuildInstrument from "../components/BuildInstrument.astro";
+import ReviewClose from "../components/ReviewClose.astro";
+import SiteFooter from "../components/SiteFooter.astro";
+
+const title = "Atlante";
+const description =
+  "Atlante turns agents, skills, and workflows into one versioned source in your repository, then materializes it through a host adapter.";
+---
+
+<BaseLayout title={title} description={description}>
+  <Stars />
+  <SiteNav />
+  <main id="main">
+    <Hero />
+    <HarnessObservatory />
+    <BuildInstrument />
+    <ReviewClose />
+  </main>
+  <SiteFooter />
+</BaseLayout>
+
+<script>
+  for (const button of document.querySelectorAll<HTMLButtonElement>(
+    "button[data-copy-text]",
+  )) {
+    button.addEventListener("click", () => {
+      const text = button.dataset.copyText ?? "";
+      navigator.clipboard.writeText(text).then(() => {
+        const label = button.textContent;
+        button.textContent = "Copied";
+        setTimeout(() => {
+          button.textContent = label;
+        }, 1600);
+      });
+    });
+  }
+</script>
+
+<style>
+  main :global(section) {
+    opacity: 1;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    main :global(section.js-reveal) {
+      opacity: 0;
+      translate: 0 var(--space-4);
+      transition:
+        opacity var(--duration-editorial) var(--ease-standard),
+        translate var(--duration-editorial) var(--ease-standard);
+    }
+
+    main :global(section.js-reveal.is-visible) {
+      opacity: 1;
+      translate: 0 0;
+    }
+  }
+</style>
+
+<script>
+  const sections = document.querySelectorAll("main section");
+
+  for (const section of sections) {
+    if (
+      section instanceof HTMLElement &&
+      matchMedia("(prefers-reduced-motion: reduce)").matches === false
+    ) {
+      section.classList.add("js-reveal");
+    }
+  }
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("is-visible");
+          observer.unobserve(entry.target);
+        }
+      }
+    },
+    { threshold: 0.15 },
+  );
+
+  for (const section of sections) {
+    observer.observe(section);
+  }
+</script>

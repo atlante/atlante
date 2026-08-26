@@ -1,0 +1,16 @@
+{
+  "name": "@atlante/website",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run sync:brand && astro dev",
+    "build": "bun run sync:brand && astro build",
+    "preview": "astro preview",
+    "sync:brand": "bun scripts/sync-brand.ts",
+    "astro": "astro"
+  },
+  "devDependencies": {
+    "astro": "^5.0.0"
+  }
+}

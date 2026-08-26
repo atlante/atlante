@@ -125,6 +125,60 @@ function selectedSlot(
     )[0]) as ResolvedTemplateSlot;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+type PathValue = Readonly<{
+  readonly found: boolean;
+  readonly value: unknown;
+}>;
+
+function pathValue(source: unknown, path: unknown): PathValue {
+  if (typeof path !== "string" || path.length === 0)
+    return { found: false, value: undefined };
+
+  let current = source;
+  for (const segment of path.split(".")) {
+    if (!isRecord(current) || !Object.hasOwn(current, segment))
+      return { found: false, value: undefined };
+    current = current[segment];
+  }
+  return { found: true, value: current };
+}
+
+function hasTruthyMember(value: unknown): boolean {
+  return isRecord(value) && Object.values(value).some(Boolean);
+}
+
+function anyTruthyAt(collection: unknown, path: unknown): boolean {
+  if (!Array.isArray(collection)) return false;
+  return collection.some((item) => {
+    const resolved = pathValue(item, path);
+    return resolved.found && hasTruthyMember(resolved.value);
+  });
+}
+
+function anyTruthy(
+  value: unknown,
+  collection: unknown,
+  path: unknown,
+): boolean {
+  return hasTruthyMember(value) || anyTruthyAt(collection, path);
+}
+
+function anyEqual(
+  collection: unknown,
+  path: unknown,
+  expected: unknown,
+): boolean {
+  if (!Array.isArray(collection)) return false;
+  return collection.some((item) => {
+    const resolved = pathValue(item, path);
+    return resolved.found && resolved.value === expected;
+  });
+}
+
 export type ResolvedRenderArgs = {
   readonly template: ResolvedTemplate;
   readonly input: unknown;
@@ -144,26 +198,11 @@ export function renderResolvedTemplate(
   handlebars.registerHelper("increment", (value: unknown) => Number(value) + 1);
   handlebars.registerHelper("input", () => input);
   handlebars.registerHelper(
-    "anyPolicy",
-    (policies: unknown, phases: unknown) => {
-      const hasWorkflowPolicy =
-        typeof policies === "object" &&
-        policies !== null &&
-        Object.values(policies).some(Boolean);
-      const hasPhasePolicy =
-        Array.isArray(phases) &&
-        phases.some((phase) => {
-          if (typeof phase !== "object" || phase === null) return false;
-          const phasePolicies = (phase as Record<string, unknown>).policies;
-          return (
-            typeof phasePolicies === "object" &&
-            phasePolicies !== null &&
-            Object.values(phasePolicies).some(Boolean)
-          );
-        });
-      return hasWorkflowPolicy || hasPhasePolicy;
-    },
+    "isEqual",
+    (value: unknown, expected: unknown) => value === expected,
   );
+  handlebars.registerHelper("anyEqual", anyEqual);
+  handlebars.registerHelper("anyTruthy", anyTruthy);
   const nextStack = [...stack, template.key];
   const slots = template.slots;
 
