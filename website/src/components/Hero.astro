@@ -36,7 +36,9 @@ import glyphDark from "../assets/atlante-glyph-reverse.svg";
       height={480}
       fetchpriority="high"
     />
+    <p class="glyph-caption">Atlas bearing the celestial sphere</p>
   </div>
+
 
 </section>
 
@@ -106,6 +108,18 @@ import glyphDark from "../assets/atlante-glyph-reverse.svg";
     width: clamp(280px, 30vw, 460px);
     height: auto;
   }
+
+  .glyph-caption {
+    grid-area: 2 / 1;
+    margin: var(--space-4) 0 0;
+    color: var(--ds-muted);
+    font-family: var(--font-mono);
+    font-size: var(--text-meta);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    text-align: center;
+  }
+
 
   .actions {
     display: flex;

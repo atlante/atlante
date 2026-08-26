@@ -271,7 +271,14 @@ const hints: Record<string, string> = {
       state.activePath = path;
       state.editing = false;
       renderPane();
+      // The two panes stack on mobile; bring the opened file into view.
+      if (matchMedia("(max-width: 980px)").matches) {
+        instrument
+          ?.querySelector(".configuration-pane")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
     };
+
 
     /** Strips id/content digests from artifact payload names so the tree
      * reads like source: architect-<id>-<sha256>.md -> architect.md. */
