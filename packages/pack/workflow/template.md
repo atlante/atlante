@@ -40,14 +40,17 @@ Before applying `full` because evidence is missing, signals conflict, or materia
 {{/if}}{{#if policies.orchestratorReadOnly}}### Workflow: read-only orchestration
 
 The orchestrator is read-only and delegates every file edit.
+
 {{/if}}{{#each phases}}{{#if policies.commit~}}
 ### {{#if name}}{{name}}{{else}}{{kind}}{{/if}}: task commits
 
 Commit task implementation and corrections in separate commits, after the task's focused tests and checks pass; the orchestrator owns all commit authorship and pushing, and never amends or force-pushes.
+
 {{/if}}{{#if policies.review~}}
 ### {{#if name}}{{name}}{{else}}{{kind}}{{/if}}: task review
 
 Apply task review according to this phase's review criteria.
+
 {{/if}}{{#if policies.maxLoops~}}
 ### {{#if name}}{{name}}{{else}}{{kind}}{{/if}}: correction loops
 

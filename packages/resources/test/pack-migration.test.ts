@@ -62,12 +62,15 @@ Policies are binding; follow them in every phase.
 ### Workflow: read-only orchestration
 
 The orchestrator is read-only and delegates every file edit.
+
 ### build: task commits
 
 Commit task implementation and corrections in separate commits, after the task's focused tests and checks pass; the orchestrator owns all commit authorship and pushing, and never amends or force-pushes.
+
 ### build: task review
 
 Apply task review according to this phase's review criteria.
+
 ### build: correction loops
 
 Limit correction to 5 loops per task.

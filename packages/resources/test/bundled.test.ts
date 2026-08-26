@@ -584,7 +584,7 @@ describe("first-party package resources", () => {
           },
         ],
       },
-      "## Policies\n\nPolicies are binding; follow them in every phase.\n\n### Build: task commits\n\nCommit task implementation and corrections in separate commits, after the task's focused tests and checks pass; the orchestrator owns all commit authorship and pushing, and never amends or force-pushes.\n### Build: task review\n\nApply task review according to this phase's review criteria.\n### Build: correction loops\n\nLimit correction to 2 loops per task.",
+      "## Policies\n\nPolicies are binding; follow them in every phase.\n\n### Build: task commits\n\nCommit task implementation and corrections in separate commits, after the task's focused tests and checks pass; the orchestrator owns all commit authorship and pushing, and never amends or force-pushes.\n\n### Build: task review\n\nApply task review according to this phase's review criteria.\n\n### Build: correction loops\n\nLimit correction to 2 loops per task.",
     ],
     [
       "no truthy values",
