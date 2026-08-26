@@ -24,7 +24,6 @@ export interface PlaygroundRequest {
   force: boolean;
 }
 
-
 export interface PlaygroundResult {
   ok: boolean;
   exitCode: number | null;
@@ -88,7 +87,6 @@ export function parsePlaygroundRequest(raw: unknown): PlaygroundRequest {
   return { step, files, force };
 }
 
-
 interface ExecResult {
   exitCode: number | null;
   timedOut: boolean;
@@ -106,7 +104,6 @@ function execStep(
         ? ["init", ".", ...(force ? ["--force"] : [])]
         : [step, "."];
     const child = spawn(process.execPath, [cliEntry(), ...args], {
-
       cwd: dir,
       env: { ...process.env, NO_COLOR: "1" },
       stdio: ["ignore", "pipe", "pipe"],
