@@ -1,6 +1,6 @@
 {
   "name": "@atlante/validator",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "type": "module",
   "description": "Atlante document, resource, and template validator",
   "license": "MIT",
