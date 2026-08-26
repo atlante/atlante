@@ -365,18 +365,41 @@ const hints: Record<string, string> = {
               .map(([path, content]) => ({ path, content })),
           }),
         });
-        const payload = await response.json();
-        if (!response.ok) {
+        const text = await response.text();
+        let payload: unknown;
+        try {
+          payload = JSON.parse(text);
+        } catch {
+          throw new Error(`playground unavailable (HTTP ${response.status})`);
+        }
+        const result = payload as {
+          ok?: boolean;
+          exitCode?: number | null;
+          timedOut?: boolean;
+          output?: string;
+          files?: { path: string; content: string }[];
+          error?: string;
+        };
+        if (!response.ok || result.error) {
           showTerminal(
             step,
-            `! ${payload.error ?? response.statusText}`,
+            `! ${result.error ?? response.statusText}`,
             false,
             response.status,
             false,
           );
+        } else if (result.output !== undefined && result.files !== undefined) {
+          applyResult(result as {
+            ok: boolean;
+            exitCode: number | null;
+            timedOut: boolean;
+            output: string;
+            files: { path: string; content: string }[];
+          });
         } else {
-          applyResult(payload);
+          throw new Error("unexpected playground response");
         }
+
       } catch (error) {
         showTerminal(
           step,

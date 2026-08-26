@@ -5,10 +5,10 @@
   "trailingSlash": false,
   "functions": {
     "api/**": {
-      "runtime": "nodejs22.x",
       "maxDuration": 30,
       "includeFiles": "node_modules/@atlante/**"
     }
+
   },
   "headers": [
     {
