@@ -167,11 +167,7 @@ const hints: Record<string, string> = {
 
   if (instrument) {
     const codeView = instrument.querySelector<HTMLElement>("[data-code-view]");
-    const codeEditor = instrument.querySelector<HTMLTextAreaElement>(
-      "[data-code-editor]",
-    );
     const paneLabel = instrument.querySelector<HTMLElement>("[data-pane-label]");
-
     const paneName = instrument.querySelector<HTMLElement>("[data-pane-name]");
     const paneCopy = instrument.querySelector<HTMLButtonElement>(
       "[data-pane-copy]",
