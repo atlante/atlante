@@ -74,7 +74,7 @@ describe("authored value layer validation", () => {
             ignored: [],
           },
         },
-        { kind: "preset" },
+        { kind: "preset", bindingKeys: ["agents", "skills"] },
       ),
     ).toEqual([
       {
@@ -112,7 +112,7 @@ describe("authored value layer validation", () => {
         },
         values: { bad: 1 },
       },
-      { kind: "preset" },
+      { kind: "preset", bindingKeys: ["agents", "skills"] },
     );
 
     expect(issues.map(({ pointer }) => pointer)).toEqual([

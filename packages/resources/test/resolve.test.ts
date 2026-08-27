@@ -2335,6 +2335,7 @@ describe("resource resolution", () => {
       pack: createProjectResourcePack(root),
       rootFile: config,
       rootDocument: document,
+      bindingCollections: atlanteBindingCollections,
     });
 
     expect(result.raw).toEqual(document);
