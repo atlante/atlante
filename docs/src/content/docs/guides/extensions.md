@@ -48,5 +48,5 @@ When a future version defines an extension contract, it must be versioned and
 must preserve the boundary between static content selection, artifact
 publication, and host execution.
 
-For the supported authoring workflow, read [Author a pack](/guides/authoring-packs/)
-and [Resources and packs](/concepts/resources/).
+For the supported authoring workflow, read [Author a pack](/guides/authoring-packs)
+and [Resources and packs](/concepts/resources).

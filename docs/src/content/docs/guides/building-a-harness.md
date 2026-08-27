@@ -50,7 +50,7 @@ Use the `@atlante/pack/agent` template when a project needs a local role:
 }
 ```
 
-The template owns the prompt fields. Read [templates and instances](/concepts/templates/)
+The template owns the prompt fields. Read [templates and instances](/concepts/templates)
 for the supported section variants and composition rules.
 
 ## Add reusable skills

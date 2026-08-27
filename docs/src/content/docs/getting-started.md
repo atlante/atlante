@@ -40,6 +40,6 @@ and the artifact tree is a build output rather than source configuration.
 
 ## Continue
 
-- [Install the CLI](/getting-started/installation/)
-- [Complete your first build](/getting-started/first-build/)
-- [Understand the configuration document](/concepts/configuration/)
+- [Install the CLI](/getting-started/installation)
+- [Complete your first build](/getting-started/first-build)
+- [Understand the configuration document](/concepts/configuration)

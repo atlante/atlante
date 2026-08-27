@@ -56,7 +56,7 @@ npx @atlante/cli build [path] --watch
 ```
 
 `--watch` keeps the process running and rebuilds when the selected configuration
-or resources change. See [watch for changes](/guides/watch-mode/).
+or resources change. See [watch for changes](/guides/watch-mode).
 
 A successful command prints:
 

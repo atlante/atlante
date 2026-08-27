@@ -78,5 +78,5 @@ npx @atlante/cli validate
 npx @atlante/cli build
 ```
 
-Use [resources and packs](/concepts/resources/) and [resolution and composition](/concepts/resolution/)
+Use [resources and packs](/concepts/resources) and [resolution and composition](/concepts/resolution)
 for locator and inheritance rules.

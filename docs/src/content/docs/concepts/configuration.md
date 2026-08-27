@@ -77,5 +77,5 @@ The authored document may contain preset selectors, source overlays, and
 document with no `extends`, source selectors, or unresolved removals. Templates
 then validate the fields they own.
 
-Read [resolution and composition](/concepts/resolution/) for the stages and
-[configuration fields](/reference/configuration/) for the complete field reference.
+Read [resolution and composition](/concepts/resolution) for the stages and
+[configuration fields](/reference/configuration) for the complete field reference.

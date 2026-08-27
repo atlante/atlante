@@ -57,5 +57,5 @@ After resolution, the canonical document contains the schema URI, resolved
 values, agent bindings, and skill bindings. It has no `extends`, `$template`,
 `$instance`, or unresolved `null` removals.
 
-See the [versioned JSON Schema](./schema/) and [resolution and composition](/concepts/resolution/)
+See the [versioned JSON Schema](./schema/) and [resolution and composition](/concepts/resolution)
 for the validation stages around this contract.

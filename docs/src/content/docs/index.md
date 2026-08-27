@@ -33,7 +33,7 @@ bindings need.
 ```
 
 Run `npx @atlante/cli init` to scaffold this starting point. Continue with the
-[installation guide](/getting-started/), or read [your first build](/getting-started/first-build/)
+[installation guide](/getting-started), or read [your first build](/getting-started/first-build)
 for the complete source-to-artifact path.
 
 ## The system boundary

@@ -52,7 +52,7 @@ The preset supplies the default `architect` agent and the `brainstorming` and
 ```
 
 The fields after `description` belong to the selected template. Read [templates
-and instances](/concepts/templates/) before adding template-owned fields.
+and instances](/concepts/templates) before adding template-owned fields.
 
 ## 3. Validate the document
 
@@ -90,5 +90,5 @@ resources when watch mode is not active.
 The OpenCode adapter reads only the verified artifact tree. It materializes the
 rendered prompts and exposes the resolved skills through `atlante_skill`.
 
-See [Use OpenCode](/guides/opencode/) for the adapter boundary and host-owned
+See [Use OpenCode](/guides/opencode) for the adapter boundary and host-owned
 settings.

@@ -36,4 +36,4 @@ and local. Do not publish artifact payloads or treat their digests as proof that
 the source or build environment is trusted.
 
 For the exact manifest fields and verification rules, read [the artifact format
-reference](/reference/artifacts/).
+reference](/reference/artifacts).
