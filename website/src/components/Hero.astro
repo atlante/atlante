@@ -19,8 +19,21 @@ import glyphDark from "../assets/atlante-glyph-reverse.svg";
       <a class="secondary" href="https://docs.atlante.sh">Documentation</a>
     </div>
     <div class="command-row">
-      <code>npx @atlante/cli init</code>
-      <button type="button" aria-label="Copy init command" data-copy-text="npx @atlante/cli init">Copy</button>
+      <code><span class="command-prompt" aria-hidden="true">$ </span>npx @atlante/cli init</code>
+      <button
+        type="button"
+        aria-label="Copy init command"
+        data-copy-text="npx @atlante/cli init"
+      ><svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+          aria-hidden="true"
+        >
+          <rect x="4" y="4" width="12" height="12" rx="2"></rect>
+          <rect x="8" y="8" width="12" height="12" rx="2"></rect>
+        </svg></button>
     </div>
   </div>
   <div class="visual">
@@ -180,34 +193,56 @@ import glyphDark from "../assets/atlante-glyph-reverse.svg";
     display: flex;
     flex-wrap: wrap;
     align-items: center;
+    justify-content: space-between;
     gap: var(--space-3);
     margin-block-start: var(--space-8);
     max-width: 100%;
+    padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+    border: 1px solid var(--ds-border);
+    background: var(--ds-code-bg);
   }
 
   .command-row code {
     min-width: 0;
     overflow-wrap: anywhere;
-    color: var(--ds-fg);
+    color: var(--ds-code-fg);
     font-family: var(--font-mono);
     font-size: var(--text-small);
+    line-height: 1.6;
+  }
+
+  /* Decorative shell prompt: hidden from assistive tech, never selectable,
+     and never part of data-copy-text. */
+  .command-prompt {
+    user-select: none;
+    color: var(--ds-code-muted);
   }
 
   .command-row button {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    min-width: var(--control-min);
     min-height: var(--control-min);
-    padding-inline: var(--space-4);
-    border: 1px solid var(--ds-border);
+    padding: 0 var(--space-2);
+    border: 1px solid color-mix(in oklab, var(--ds-code-fg) 40%, transparent);
     background: transparent;
-    color: var(--ds-fg);
+    color: var(--ds-code-fg);
     font-family: var(--font-ui);
-    font-size: var(--text-small);
+    font-size: var(--text-meta);
     cursor: pointer;
   }
 
   .command-row button:hover,
   .command-row button:focus-visible {
-    background: var(--ds-fg);
-    color: var(--ds-bg);
+    background: var(--ds-code-fg);
+    color: var(--ds-code-bg);
+  }
+
+  .command-row button svg {
+    width: 18px;
+    height: 18px;
   }
 
   @media (max-width: 860px) {

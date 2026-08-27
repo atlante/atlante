@@ -29,13 +29,15 @@ const description =
   for (const button of document.querySelectorAll<HTMLButtonElement>(
     "button[data-copy-text]",
   )) {
+    // Captured once at bind time, so the temporary "Copied" feedback can
+    // never be mistaken for the original content on rapid repeat clicks.
+    const originalChildren = [...button.childNodes];
     button.addEventListener("click", () => {
       const text = button.dataset.copyText ?? "";
       navigator.clipboard.writeText(text).then(() => {
-        const label = button.textContent;
-        button.textContent = "Copied";
+        button.replaceChildren("Copied");
         setTimeout(() => {
-          button.textContent = label;
+          button.replaceChildren(...originalChildren);
         }, 1600);
       });
     });
