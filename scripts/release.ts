@@ -17,6 +17,15 @@ const PACKAGES = [
   "cli",
 ] as const;
 
+// Exact-pinned consumers outside the package graph must track the released
+// version. Deployment installs (npm inside website/) resolve the pin from
+// the registry, where the tagged version exists by the time they run, while
+// the local workspace install links the workspace package so dev exercises
+// the current source bundle.
+const DEPENDENTS = [
+  { manifest: "website/package.json", dependency: "@atlante/cli" },
+] as const;
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -58,6 +67,14 @@ interface Pkg {
   path: string;
   json: Record<string, unknown>;
   currentVersion: string;
+}
+
+interface Dependent {
+  manifest: string;
+  path: string;
+  json: Record<string, unknown>;
+  dependency: string;
+  currentPin: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -176,6 +193,28 @@ async function readPackages(): Promise<Pkg[]> {
   return pkgs;
 }
 
+async function readDependents(): Promise<Dependent[]> {
+  const dependents: Dependent[] = [];
+  for (const { manifest, dependency } of DEPENDENTS) {
+    const path = join(ROOT, manifest);
+    const json: Record<string, unknown> = JSON.parse(
+      await readFile(path, "utf8"),
+    );
+    const dependencies = json.dependencies as Record<string, unknown>;
+    const pin = dependencies?.[dependency];
+    if (typeof pin !== "string")
+      throw new Error(
+        `${manifest} does not declare ${dependency} in dependencies`,
+      );
+    if (!/^\d+\.\d+\.\d+$/.test(pin))
+      throw new Error(
+        `${manifest} must pin ${dependency} to an exact X.Y.Z version, got "${pin}"`,
+      );
+    dependents.push({ manifest, path, json, dependency, currentPin: pin });
+  }
+  return dependents;
+}
+
 // ---------------------------------------------------------------------------
 // Mutations
 // ---------------------------------------------------------------------------
@@ -188,8 +227,31 @@ async function bump(pkgs: Pkg[], v: ReturnType<typeof parseVersion>) {
   }
 }
 
-async function commitAndTag(pkgs: Pkg[], v: ReturnType<typeof parseVersion>) {
-  const paths = pkgs.map((p) => p.path.slice(ROOT.length + 1));
+/** Pin dependents to the version being released. */
+async function bumpDependents(
+  dependents: Dependent[],
+  releasedVersion: string,
+) {
+  for (const d of dependents) {
+    (d.json.dependencies as Record<string, unknown>)[d.dependency] =
+      releasedVersion;
+    await writeFile(d.path, `${JSON.stringify(d.json, null, 2)}\n`, "utf8");
+    console.log(
+      `${d.manifest}: ${d.dependency} ${d.currentPin} → ${releasedVersion}`,
+    );
+  }
+}
+
+async function commitAndTag(
+  pkgs: Pkg[],
+  dependents: Dependent[],
+  v: ReturnType<typeof parseVersion>,
+) {
+  const paths = [
+    ...pkgs.map((p) => p.path.slice(ROOT.length + 1)),
+    ...dependents.map((d) => d.manifest),
+    "bun.lock",
+  ];
   await run`git add -- ${paths}`;
   await run`git commit --allow-empty -m ${`release: v${v.raw}`}`;
   await run`git tag -a ${`v${v.raw}`} -m ${`v${v.raw}`}`;
@@ -214,10 +276,15 @@ async function main() {
   await validateRepo();
   await validateVersion(version);
   const pkgs = await readPackages();
+  const dependents = await readDependents();
 
   console.log("\nVersion bump plan:");
   for (const p of pkgs)
     console.log(`  ${p.path}: ${p.currentVersion} → ${version.raw}`);
+  for (const d of dependents)
+    console.log(
+      `  ${d.manifest}: ${d.dependency} ${d.currentPin} → ${version.raw}`,
+    );
 
   if (dryRun) {
     console.log(`\nDry run complete; no files were changed`);
@@ -227,7 +294,10 @@ async function main() {
   }
 
   await bump(pkgs, version);
-  await commitAndTag(pkgs, version);
+  await bumpDependents(dependents, version.raw);
+  console.log("\nRefreshing bun.lock...");
+  await run`bun install`;
+  await commitAndTag(pkgs, dependents, version);
   await pushRelease(version);
 }
 

@@ -41,15 +41,21 @@
 <style>
   .site-nav {
     position: sticky;
-    inset-block-start: var(--space-4);
+    inset-block-start: 0;
     inset-inline: 0;
     z-index: 60;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: var(--space-2);
-    width: min(calc(100% - 2 * var(--space-4)), var(--container-hero));
-    margin-inline: auto;
+    width: 100%;
+    box-sizing: border-box;
+    /* Align the wordmark with the page container while the bar spans
+       the full viewport width. */
+    padding-block: var(--space-4);
+    padding-inline: max(var(--space-4), calc((100% - var(--container-hero)) / 2));
+    /* Opaque strip: scrolling content must not bleed through the bar. */
+    background: var(--ds-bg);
   }
 
 
@@ -112,6 +118,12 @@
   }
 
   @media (prefers-reduced-motion: no-preference) {
+    .site-nav {
+      transition:
+        background-color var(--duration-editorial) var(--ease-standard),
+        border-color var(--duration-editorial) var(--ease-standard);
+    }
+
     svg {
       transition: rotate var(--duration-editorial) var(--ease-standard);
     }

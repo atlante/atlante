@@ -29,7 +29,7 @@ rebuilt on every `dev` or `build` run; never edit them directly.
 
 The build instrument on the landing page runs the published
 `@atlante/cli` for real. `website/api/playground.ts` is a stateless
-Vercel function (Node 22): each request writes the visitor's files into
+Vercel function: each request writes the visitor's files into
 an isolated temp directory, executes one CLI command, and returns the
 actual output and generated file tree. Nothing is stored between
 requests, and the CLI never executes project code. `bun run dev` serves
@@ -37,10 +37,14 @@ the same endpoint in-process through a dev-only Vite middleware, so the
 playground works locally; `astro preview` stays static and shows a
 friendly offline message instead.
 
-On a fresh clone, run `bun install` and `bun run build` at the
-repository root before starting the website: the dev playground spawns
-the CLI from the workspace package's built bundle in
-`packages/cli/dist/`.
+Production installs the exact `@atlante/cli` version pinned in
+`website/package.json` from npm; `scripts/release.ts` advances the pin
+to the released version at every release. Locally the workspace install
+links the workspace package instead, so run `bun install` and
+`bun run build` at the repository root to exercise current source
+through the dev playground. The published CLI bundle is self-contained,
+so the lambda only needs the pinned package itself (see `includeFiles`
+in `vercel.json`).
 
 
 
