@@ -179,6 +179,7 @@ const expectedPackFiles = [
   "markdown/template.jsonc",
   "markdown/template.md",
   "plan/instance.jsonc",
+  "review/instance.jsonc",
   "skill/template.jsonc",
   "skill/template.md",
   "workflow/template.jsonc",
@@ -186,6 +187,7 @@ const expectedPackFiles = [
   "test/brainstorm.test.ts",
   "test/build.test.ts",
   "test/plan.test.ts",
+  "test/review.test.ts",
   "test/selection-fixture.ts",
 ] as const;
 
