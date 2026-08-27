@@ -1,13 +1,7 @@
-import {
-  createProjectResourcePack,
-  interpolateValues,
-  renderResolvedTemplate,
-  resolveResourceInstance,
-} from "@atlante/resources";
 import { afterEach, describe, expect, test } from "vitest";
 import {
   cleanupPackResourceFixtures,
-  packResourceFixture,
+  resolvePackSkill,
 } from "./selection-fixture.js";
 
 const locator = "@atlante/pack/plan";
@@ -24,83 +18,20 @@ const recordFields = [
   "Adaptive decision",
 ] as const;
 
-type ListSectionKind = "instructions" | "gotchas" | "invariants";
-
-interface SkillInput {
-  readonly title: string;
-  readonly overview: string;
-  readonly sections?: readonly Record<string, unknown>[];
-}
-
-interface SkillInstance {
-  readonly input: SkillInput;
-  readonly effectiveTemplate: { readonly locator: string };
-}
-
-function resolvePlan(): { instance: SkillInstance } {
-  const { root, config } = packResourceFixture();
-  const instance = resolveResourceInstance(
-    createProjectResourcePack(root),
-    locator,
-    config,
-  );
-  return { instance: instance as unknown as SkillInstance };
-}
-
-function listItems(input: SkillInput, kind: ListSectionKind): string[] {
-  const items: string[] = [];
-  for (const section of input.sections ?? []) {
-    const value = section[kind];
-    if (Array.isArray(value))
-      items.push(
-        ...value.filter((item): item is string => typeof item === "string"),
-      );
-  }
-  return items;
-}
-
-function markdownText(input: SkillInput): string {
-  return (input.sections ?? [])
-    .map((section) =>
-      typeof section.markdown === "string" ? section.markdown : "",
-    )
-    .join("\n");
-}
-
-function everythingText(input: SkillInput): string {
-  return [
-    input.overview,
-    markdownText(input),
-    listItems(input, "instructions").join("\n"),
-    listItems(input, "gotchas").join("\n"),
-    listItems(input, "invariants").join("\n"),
-  ].join("\n");
-}
-
-function renderedOutput(): string {
-  const { instance } = resolvePlan();
-  return renderResolvedTemplate({
-    template: instance.effectiveTemplate,
-    input: interpolateValues(instance.input, {}),
-  });
-}
-
 describe("plan skill instance", () => {
   afterEach(cleanupPackResourceFixtures);
 
   test("resolves through the existing skill template with one phase role", () => {
-    const { instance } = resolvePlan();
+    const skill = resolvePackSkill(locator);
 
-    expect(String(instance.effectiveTemplate.locator)).toBe(
-      "@atlante/pack/skill",
-    );
-    expect(instance.input.title).toBe("Plan");
-    expect(instance.input.overview).toContain("`full`");
-    expect(instance.input.overview).toContain("`reduced`");
-    expect(instance.input.overview).toContain("original planner");
-    expect(instance.input.overview).not.toMatch(/\b(MUST|SHOULD|MAY)\b/);
+    expect(skill.templateLocator).toBe("@atlante/pack/skill");
+    expect(skill.title).toBe("Plan");
+    expect(skill.overview).toContain("`full`");
+    expect(skill.overview).toContain("`reduced`");
+    expect(skill.overview).toContain("original planner");
+    expect(skill.overview).not.toMatch(/\b(MUST|SHOULD|MAY)\b/);
     expect(
-      (instance.input.sections ?? []).some(
+      skill.sections.some(
         (section) =>
           !("markdown" in section) &&
           !("instructions" in section) &&
@@ -111,8 +42,7 @@ describe("plan skill instance", () => {
   });
 
   test("authored instructions carry the planning lifecycle in order", () => {
-    const { instance } = resolvePlan();
-    const instructions = listItems(instance.input, "instructions").join("\n");
+    const instructions = resolvePackSkill(locator).listText("instructions");
 
     for (const marker of [
       "Read the complete assignment first",
@@ -131,6 +61,8 @@ describe("plan skill instance", () => {
     ])
       expect(instructions).toContain(marker);
 
+    expect(instructions).toContain("Return the finished or updated plan");
+
     const indexOfMarker = (marker: string) => instructions.indexOf(marker);
     expect(indexOfMarker("Read the complete assignment first")).toBeLessThan(
       indexOfMarker("new for this cycle"),
@@ -141,25 +73,25 @@ describe("plan skill instance", () => {
   });
 
   test("both dispositions record one identical ten-field contract with one canonical adaptive decision", () => {
-    const { instance } = resolvePlan();
-    const markdown = markdownText(instance.input);
-    const everything = everythingText(instance.input);
+    const skill = resolvePackSkill(locator);
+    const markdown = skill.markdownText();
+    const everything = skill.everythingText();
 
     expect(markdown).toContain("Plan record");
+    expect(markdown).toContain(
+      "Both dispositions record the identical complete contract",
+    );
     for (const field of recordFields)
       expect(everything.split(field).length - 1).toBe(1);
     expect(markdown).toContain(
       "classification, evidence, disposition, and rationale supplied by the architect",
     );
     expect(markdown).toContain("cycle and each of its tasks");
-    expect(listItems(instance.input, "invariants").join("\n")).toContain(
-      "full record complete",
-    );
+    expect(skill.listText("invariants")).toContain("full record complete");
   });
 
   test("authored contract pins the exact workflow artifact layout", () => {
-    const { instance } = resolvePlan();
-    const markdown = markdownText(instance.input);
+    const markdown = resolvePackSkill(locator).markdownText();
 
     for (const marker of [
       ".atlante/workflows/<cycle-id>/",
@@ -175,9 +107,9 @@ describe("plan skill instance", () => {
   });
 
   test("boundaries route authority up and stop rather than improvise", () => {
-    const { instance } = resolvePlan();
-    const invariants = listItems(instance.input, "invariants").join("\n");
-    const gotchas = listItems(instance.input, "gotchas").join("\n");
+    const skill = resolvePackSkill(locator);
+    const invariants = skill.listText("invariants");
+    const gotchas = skill.listText("gotchas");
 
     for (const marker of [
       "weaker disposition than assigned",
@@ -205,8 +137,7 @@ describe("plan skill instance", () => {
   });
 
   test("claims no adaptive eligibility, selection, or skip authority", () => {
-    const { instance } = resolvePlan();
-    const everything = everythingText(instance.input);
+    const everything = resolvePackSkill(locator).everythingText();
 
     expect(everything).toContain("the architect");
     expect(everything).toContain("routing and classification decision");
@@ -221,7 +152,7 @@ describe("plan skill instance", () => {
   });
 
   test("renders structural landmarks in the shared section order", () => {
-    const output = renderedOutput();
+    const output = resolvePackSkill(locator).renderedOutput();
 
     for (const heading of [
       "# Plan",

@@ -1,13 +1,7 @@
-import {
-  createProjectResourcePack,
-  interpolateValues,
-  renderResolvedTemplate,
-  resolveResourceInstance,
-} from "@atlante/resources";
 import { afterEach, describe, expect, test } from "vitest";
 import {
   cleanupPackResourceFixtures,
-  packResourceFixture,
+  resolvePackSkill,
 } from "./selection-fixture.js";
 
 const locator = "@atlante/pack/brainstorm";
@@ -23,72 +17,19 @@ const handoffFields = [
   "Remaining open decisions",
 ] as const;
 
-type ListSectionKind = "instructions" | "gotchas" | "invariants";
-
-interface SkillInput {
-  readonly title: string;
-  readonly overview: string;
-  readonly sections?: readonly Record<string, unknown>[];
-}
-
-interface SkillInstance {
-  readonly input: SkillInput;
-  readonly effectiveTemplate: { readonly locator: string };
-}
-
-function resolveBrainstorm(): { instance: SkillInstance } {
-  const { root, config } = packResourceFixture();
-  const instance = resolveResourceInstance(
-    createProjectResourcePack(root),
-    locator,
-    config,
-  );
-  return { instance: instance as unknown as SkillInstance };
-}
-
-function listItems(input: SkillInput, kind: ListSectionKind): string[] {
-  const items: string[] = [];
-  for (const section of input.sections ?? []) {
-    const value = section[kind];
-    if (Array.isArray(value))
-      items.push(
-        ...value.filter((item): item is string => typeof item === "string"),
-      );
-  }
-  return items;
-}
-
-function markdownText(input: SkillInput): string {
-  return (input.sections ?? [])
-    .map((section) =>
-      typeof section.markdown === "string" ? section.markdown : "",
-    )
-    .join("\n");
-}
-
-function renderedOutput(input: SkillInput): string {
-  const { instance } = resolveBrainstorm();
-  return renderResolvedTemplate({
-    template: instance.effectiveTemplate,
-    input: interpolateValues(input, {}),
-  });
-}
-
 describe("brainstorm skill instance", () => {
   afterEach(cleanupPackResourceFixtures);
 
   test("resolves through the existing skill template with one phase role", () => {
-    const { instance } = resolveBrainstorm();
+    const skill = resolvePackSkill(locator);
 
-    expect(String(instance.effectiveTemplate.locator)).toBe(
-      "@atlante/pack/skill",
-    );
-    expect(instance.input.title).toBe("Brainstorm");
-    expect(instance.input.overview).toContain("`full`");
-    expect(instance.input.overview).toContain("`reduced`");
-    expect(instance.input.overview).not.toMatch(/\b(MUST|SHOULD|MAY)\b/);
+    expect(skill.templateLocator).toBe("@atlante/pack/skill");
+    expect(skill.title).toBe("Brainstorm");
+    expect(skill.overview).toContain("`full`");
+    expect(skill.overview).toContain("`reduced`");
+    expect(skill.overview).not.toMatch(/\b(MUST|SHOULD|MAY)\b/);
     expect(
-      (instance.input.sections ?? []).some(
+      skill.sections.some(
         (section) =>
           !("markdown" in section) &&
           !("instructions" in section) &&
@@ -99,8 +40,7 @@ describe("brainstorm skill instance", () => {
   });
 
   test("authored instructions carry the full and reduced procedures in order", () => {
-    const { instance } = resolveBrainstorm();
-    const instructions = listItems(instance.input, "instructions").join("\n");
+    const instructions = resolvePackSkill(locator).listText("instructions");
 
     for (const marker of [
       "explore the repository",
@@ -127,29 +67,23 @@ describe("brainstorm skill instance", () => {
   });
 
   test("both dispositions share one identical nine-field handoff contract", () => {
-    const { instance } = resolveBrainstorm();
-    const markdown = markdownText(instance.input);
-    const everything = [
-      instance.input.overview,
-      markdown,
-      listItems(instance.input, "instructions").join("\n"),
-      listItems(instance.input, "gotchas").join("\n"),
-      listItems(instance.input, "invariants").join("\n"),
-    ].join("\n");
+    const skill = resolvePackSkill(locator);
+    const markdown = skill.markdownText();
+    const everything = skill.everythingText();
 
     expect(markdown).toContain("Handoff contract");
     for (const field of handoffFields)
       expect(everything.split(field).length - 1).toBe(1);
     expect(markdown).toContain("no standalone brainstorming artifact");
-    expect(listItems(instance.input, "invariants").join("\n")).toContain(
+    expect(skill.listText("invariants")).toContain(
       "previously approved content",
     );
   });
 
   test("boundaries route authority up and stop rather than improvise", () => {
-    const { instance } = resolveBrainstorm();
-    const invariants = listItems(instance.input, "invariants").join("\n");
-    const gotchas = listItems(instance.input, "gotchas").join("\n");
+    const skill = resolvePackSkill(locator);
+    const invariants = skill.listText("invariants");
+    const gotchas = skill.listText("gotchas");
 
     for (const marker of [
       "weaker disposition than assigned",
@@ -166,7 +100,7 @@ describe("brainstorm skill instance", () => {
   });
 
   test("renders structural landmarks in the shared section order", () => {
-    const output = renderedOutput(resolveBrainstorm().instance.input);
+    const output = resolvePackSkill(locator).renderedOutput();
 
     for (const heading of [
       "# Brainstorm",
