@@ -1,564 +1,272 @@
 {
   "count": 43,
-  "mutants": [
-    {
-      "source": "packages/schema/src/document.ts",
-      "id": "0",
-      "start": {
-        "column": 27,
-        "line": 10
-      },
-      "end": {
-        "column": 71,
-        "line": 10
-      },
-      "mutator": "StringLiteral"
-    },
-    {
-      "source": "packages/schema/src/document.ts",
-      "id": "1",
-      "start": {
-        "column": 41,
-        "line": 15
-      },
-      "end": {
-        "column": 58,
-        "line": 15
-      },
-      "mutator": "MethodExpression"
-    },
-    {
-      "source": "packages/schema/src/document.ts",
-      "id": "2",
-      "start": {
-        "column": 10,
-        "line": 23
-      },
-      "end": {
-        "column": 36,
-        "line": 23
-      },
-      "mutator": "ArrayDeclaration"
-    },
-    {
-      "source": "packages/schema/src/document.ts",
-      "id": "3",
-      "start": {
-        "column": 46,
-        "line": 29
-      },
-      "end": {
-        "column": 2,
-        "line": 32
-      },
-      "mutator": "ArrayDeclaration"
-    },
-    {
-      "source": "packages/schema/src/document.ts",
-      "id": "4",
-      "start": {
-        "column": 50,
-        "line": 39
-      },
-      "end": {
-        "column": 2,
-        "line": 41
-      },
-      "mutator": "ObjectLiteral"
-    },
-    {
-      "source": "packages/schema/src/document.ts",
-      "id": "5",
-      "start": {
-        "column": 16,
-        "line": 40
-      },
-      "end": {
-        "column": 33,
-        "line": 40
-      },
-      "mutator": "MethodExpression"
-    },
-    {
-      "source": "packages/schema/src/document.ts",
-      "id": "18",
-      "start": {
-        "column": 1,
-        "line": 64
-      },
-      "end": {
-        "column": 2,
-        "line": 99
-      },
-      "mutator": "BlockStatement"
-    },
-    {
-      "source": "packages/schema/src/document.ts",
-      "id": "44",
-      "start": {
-        "column": 1,
-        "line": 107
-      },
-      "end": {
-        "column": 2,
-        "line": 114
-      },
-      "mutator": "BlockStatement"
-    },
-    {
-      "source": "packages/schema/src/document.ts",
-      "id": "74",
-      "start": {
-        "column": 49,
-        "line": 135
-      },
-      "end": {
-        "column": 2,
-        "line": 140
-      },
-      "mutator": "ObjectLiteral"
-    },
-    {
-      "source": "packages/schema/src/document.ts",
-      "id": "75",
-      "start": {
-        "column": 24,
-        "line": 138
-      },
-      "end": {
-        "column": 53,
-        "line": 138
-      },
-      "mutator": "ArrayDeclaration"
-    },
-    {
-      "source": "packages/schema/src/document.ts",
-      "id": "76",
-      "start": {
-        "column": 25,
-        "line": 138
-      },
-      "end": {
-        "column": 42,
-        "line": 138
-      },
-      "mutator": "MethodExpression"
-    },
-    {
-      "source": "packages/schema/src/document.ts",
-      "id": "77",
-      "start": {
-        "column": 11,
-        "line": 180
-      },
-      "end": {
-        "column": 62,
-        "line": 180
-      },
-      "mutator": "ArrayDeclaration"
-    },
-    {
-      "source": "packages/schema/src/document.ts",
-      "id": "78",
-      "start": {
-        "column": 12,
-        "line": 180
-      },
-      "end": {
-        "column": 23,
-        "line": 180
-      },
-      "mutator": "StringLiteral"
-    },
-    {
-      "source": "packages/schema/src/document.ts",
-      "id": "79",
-      "start": {
-        "column": 25,
-        "line": 180
-      },
-      "end": {
-        "column": 36,
-        "line": 180
-      },
-      "mutator": "StringLiteral"
-    },
-    {
-      "source": "packages/schema/src/document.ts",
-      "id": "80",
-      "start": {
-        "column": 38,
-        "line": 180
-      },
-      "end": {
-        "column": 51,
-        "line": 180
-      },
-      "mutator": "StringLiteral"
-    },
-    {
-      "source": "packages/schema/src/document.ts",
-      "id": "81",
-      "start": {
-        "column": 53,
-        "line": 180
-      },
-      "end": {
-        "column": 61,
-        "line": 180
-      },
-      "mutator": "StringLiteral"
-    },
-    {
-      "source": "packages/schema/src/document.ts",
-      "id": "82",
-      "start": {
-        "column": 45,
-        "line": 190
-      },
-      "end": {
-        "column": 2,
-        "line": 193
-      },
-      "mutator": "ArrayDeclaration"
-    },
-    {
-      "source": "packages/schema/src/document.ts",
-      "id": "83",
-      "start": {
-        "column": 11,
-        "line": 202
-      },
-      "end": {
-        "column": 49,
-        "line": 202
-      },
-      "mutator": "ArrayDeclaration"
-    },
-    {
-      "source": "packages/schema/src/document.ts",
-      "id": "84",
-      "start": {
-        "column": 12,
-        "line": 202
-      },
-      "end": {
-        "column": 23,
-        "line": 202
-      },
-      "mutator": "StringLiteral"
-    },
-    {
-      "source": "packages/schema/src/document.ts",
-      "id": "85",
-      "start": {
-        "column": 25,
-        "line": 202
-      },
-      "end": {
-        "column": 36,
-        "line": 202
-      },
-      "mutator": "StringLiteral"
-    },
-    {
-      "source": "packages/schema/src/document.ts",
-      "id": "86",
-      "start": {
-        "column": 38,
-        "line": 202
-      },
-      "end": {
-        "column": 48,
-        "line": 202
-      },
-      "mutator": "StringLiteral"
-    },
-    {
-      "source": "packages/schema/src/document.ts",
-      "id": "87",
-      "start": {
-        "column": 3,
-        "line": 203
-      },
-      "end": {
-        "column": 68,
-        "line": 203
-      },
-      "mutator": "StringLiteral"
-    },
-    {
-      "source": "packages/schema/src/document.ts",
-      "id": "88",
-      "start": {
-        "column": 50,
-        "line": 212
-      },
-      "end": {
-        "column": 2,
-        "line": 215
-      },
-      "mutator": "ObjectLiteral"
-    },
-    {
-      "source": "packages/schema/src/document.ts",
-      "id": "89",
-      "start": {
-        "column": 11,
-        "line": 228
-      },
-      "end": {
-        "column": 36,
-        "line": 228
-      },
-      "mutator": "ArrayDeclaration"
-    },
-    {
-      "source": "packages/schema/src/document.ts",
-      "id": "90",
-      "start": {
-        "column": 12,
-        "line": 228
-      },
-      "end": {
-        "column": 25,
-        "line": 228
-      },
-      "mutator": "StringLiteral"
-    },
-    {
-      "source": "packages/schema/src/document.ts",
-      "id": "91",
-      "start": {
-        "column": 27,
-        "line": 228
-      },
-      "end": {
-        "column": 35,
-        "line": 228
-      },
-      "mutator": "StringLiteral"
-    },
-    {
-      "source": "packages/schema/src/document.ts",
-      "id": "92",
-      "start": {
-        "column": 11,
-        "line": 236
-      },
-      "end": {
-        "column": 36,
-        "line": 236
-      },
-      "mutator": "ArrayDeclaration"
-    },
-    {
-      "source": "packages/schema/src/document.ts",
-      "id": "93",
-      "start": {
-        "column": 12,
-        "line": 236
-      },
-      "end": {
-        "column": 25,
-        "line": 236
-      },
-      "mutator": "StringLiteral"
-    },
-    {
-      "source": "packages/schema/src/document.ts",
-      "id": "94",
-      "start": {
-        "column": 27,
-        "line": 236
-      },
-      "end": {
-        "column": 35,
-        "line": 236
-      },
-      "mutator": "StringLiteral"
-    },
-    {
-      "source": "packages/schema/src/document.ts",
-      "id": "95",
-      "start": {
-        "column": 3,
-        "line": 253
-      },
-      "end": {
-        "column": 20,
-        "line": 253
-      },
-      "mutator": "MethodExpression"
-    },
-    {
-      "source": "packages/schema/src/document.ts",
-      "id": "96",
-      "start": {
-        "column": 11,
-        "line": 254
-      },
-      "end": {
-        "column": 43,
-        "line": 254
-      },
-      "mutator": "ArrayDeclaration"
-    },
-    {
-      "source": "packages/schema/src/document.ts",
-      "id": "97",
-      "start": {
-        "column": 3,
-        "line": 259
-      },
-      "end": {
-        "column": 20,
-        "line": 259
-      },
-      "mutator": "MethodExpression"
-    },
-    {
-      "source": "packages/schema/src/document.ts",
-      "id": "98",
-      "start": {
-        "column": 11,
-        "line": 260
-      },
-      "end": {
-        "column": 43,
-        "line": 260
-      },
-      "mutator": "ArrayDeclaration"
-    },
-    {
-      "source": "packages/schema/src/document.ts",
-      "id": "99",
-      "start": {
-        "column": 60,
-        "line": 269
-      },
-      "end": {
-        "column": 2,
-        "line": 275
-      },
-      "mutator": "ObjectLiteral"
-    },
-    {
-      "source": "packages/schema/src/document.ts",
-      "id": "100",
-      "start": {
-        "column": 53,
-        "line": 284
-      },
-      "end": {
-        "column": 2,
-        "line": 289
-      },
-      "mutator": "ObjectLiteral"
-    },
-    {
-      "source": "packages/schema/src/document.ts",
-      "id": "101",
-      "start": {
-        "column": 22,
-        "line": 287
-      },
-      "end": {
-        "column": 39,
-        "line": 287
-      },
-      "mutator": "MethodExpression"
-    },
-    {
-      "source": "packages/schema/src/document.ts",
-      "id": "102",
-      "start": {
-        "column": 22,
-        "line": 288
-      },
-      "end": {
-        "column": 39,
-        "line": 288
-      },
-      "mutator": "MethodExpression"
-    },
-    {
-      "source": "packages/schema/src/values.ts",
-      "id": "191",
-      "start": {
-        "column": 34,
-        "line": 121
-      },
-      "end": {
-        "column": 63,
-        "line": 121
-      },
-      "mutator": "Regex"
-    },
-    {
-      "source": "packages/schema/src/values.ts",
-      "id": "192",
-      "start": {
-        "column": 34,
-        "line": 121
-      },
-      "end": {
-        "column": 63,
-        "line": 121
-      },
-      "mutator": "Regex"
-    },
-    {
-      "source": "packages/schema/src/values.ts",
-      "id": "193",
-      "start": {
-        "column": 34,
-        "line": 121
-      },
-      "end": {
-        "column": 63,
-        "line": 121
-      },
-      "mutator": "Regex"
-    },
-    {
-      "source": "packages/schema/src/values.ts",
-      "id": "194",
-      "start": {
-        "column": 34,
-        "line": 121
-      },
-      "end": {
-        "column": 63,
-        "line": 121
-      },
-      "mutator": "Regex"
-    },
-    {
-      "source": "packages/schema/src/values.ts",
-      "id": "195",
-      "start": {
-        "column": 34,
-        "line": 121
-      },
-      "end": {
-        "column": 63,
-        "line": 121
-      },
-      "mutator": "Regex"
-    },
-    {
-      "source": "packages/schema/src/values.ts",
-      "id": "196",
-      "start": {
-        "column": 11,
-        "line": 139
-      },
-      "end": {
-        "column": 33,
-        "line": 139
-      },
-      "mutator": "ArrayDeclaration"
-    }
-  ]
+  "reason": "Stryker reports these mutants as ignored but does not provide a more specific disposition reason.",
+  "legend": {
+    "mutant": "{ id, mutator, start: [line, column], end: [line, column] }",
+    "sources": "source path -> ordered mutants"
+  },
+  "sources": {
+    "packages/schema/src/document.ts": [
+      {
+        "id": "0",
+        "mutator": "StringLiteral",
+        "start": [10, 27],
+        "end": [10, 71]
+      },
+      {
+        "id": "1",
+        "mutator": "MethodExpression",
+        "start": [15, 41],
+        "end": [15, 58]
+      },
+      {
+        "id": "2",
+        "mutator": "ArrayDeclaration",
+        "start": [23, 10],
+        "end": [23, 36]
+      },
+      {
+        "id": "3",
+        "mutator": "ArrayDeclaration",
+        "start": [29, 46],
+        "end": [32, 2]
+      },
+      {
+        "id": "4",
+        "mutator": "ObjectLiteral",
+        "start": [39, 50],
+        "end": [41, 2]
+      },
+      {
+        "id": "5",
+        "mutator": "MethodExpression",
+        "start": [40, 16],
+        "end": [40, 33]
+      },
+      {
+        "id": "18",
+        "mutator": "BlockStatement",
+        "start": [64, 1],
+        "end": [99, 2]
+      },
+      {
+        "id": "44",
+        "mutator": "BlockStatement",
+        "start": [107, 1],
+        "end": [114, 2]
+      },
+      {
+        "id": "74",
+        "mutator": "ObjectLiteral",
+        "start": [135, 49],
+        "end": [140, 2]
+      },
+      {
+        "id": "75",
+        "mutator": "ArrayDeclaration",
+        "start": [138, 24],
+        "end": [138, 53]
+      },
+      {
+        "id": "76",
+        "mutator": "MethodExpression",
+        "start": [138, 25],
+        "end": [138, 42]
+      },
+      {
+        "id": "77",
+        "mutator": "ArrayDeclaration",
+        "start": [180, 11],
+        "end": [180, 62]
+      },
+      {
+        "id": "78",
+        "mutator": "StringLiteral",
+        "start": [180, 12],
+        "end": [180, 23]
+      },
+      {
+        "id": "79",
+        "mutator": "StringLiteral",
+        "start": [180, 25],
+        "end": [180, 36]
+      },
+      {
+        "id": "80",
+        "mutator": "StringLiteral",
+        "start": [180, 38],
+        "end": [180, 51]
+      },
+      {
+        "id": "81",
+        "mutator": "StringLiteral",
+        "start": [180, 53],
+        "end": [180, 61]
+      },
+      {
+        "id": "82",
+        "mutator": "ArrayDeclaration",
+        "start": [190, 45],
+        "end": [193, 2]
+      },
+      {
+        "id": "83",
+        "mutator": "ArrayDeclaration",
+        "start": [202, 11],
+        "end": [202, 49]
+      },
+      {
+        "id": "84",
+        "mutator": "StringLiteral",
+        "start": [202, 12],
+        "end": [202, 23]
+      },
+      {
+        "id": "85",
+        "mutator": "StringLiteral",
+        "start": [202, 25],
+        "end": [202, 36]
+      },
+      {
+        "id": "86",
+        "mutator": "StringLiteral",
+        "start": [202, 38],
+        "end": [202, 48]
+      },
+      {
+        "id": "87",
+        "mutator": "StringLiteral",
+        "start": [203, 3],
+        "end": [203, 68]
+      },
+      {
+        "id": "88",
+        "mutator": "ObjectLiteral",
+        "start": [212, 50],
+        "end": [215, 2]
+      },
+      {
+        "id": "89",
+        "mutator": "ArrayDeclaration",
+        "start": [228, 11],
+        "end": [228, 36]
+      },
+      {
+        "id": "90",
+        "mutator": "StringLiteral",
+        "start": [228, 12],
+        "end": [228, 25]
+      },
+      {
+        "id": "91",
+        "mutator": "StringLiteral",
+        "start": [228, 27],
+        "end": [228, 35]
+      },
+      {
+        "id": "92",
+        "mutator": "ArrayDeclaration",
+        "start": [236, 11],
+        "end": [236, 36]
+      },
+      {
+        "id": "93",
+        "mutator": "StringLiteral",
+        "start": [236, 12],
+        "end": [236, 25]
+      },
+      {
+        "id": "94",
+        "mutator": "StringLiteral",
+        "start": [236, 27],
+        "end": [236, 35]
+      },
+      {
+        "id": "95",
+        "mutator": "MethodExpression",
+        "start": [253, 3],
+        "end": [253, 20]
+      },
+      {
+        "id": "96",
+        "mutator": "ArrayDeclaration",
+        "start": [254, 11],
+        "end": [254, 43]
+      },
+      {
+        "id": "97",
+        "mutator": "MethodExpression",
+        "start": [259, 3],
+        "end": [259, 20]
+      },
+      {
+        "id": "98",
+        "mutator": "ArrayDeclaration",
+        "start": [260, 11],
+        "end": [260, 43]
+      },
+      {
+        "id": "99",
+        "mutator": "ObjectLiteral",
+        "start": [269, 60],
+        "end": [275, 2]
+      },
+      {
+        "id": "100",
+        "mutator": "ObjectLiteral",
+        "start": [284, 53],
+        "end": [289, 2]
+      },
+      {
+        "id": "101",
+        "mutator": "MethodExpression",
+        "start": [287, 22],
+        "end": [287, 39]
+      },
+      {
+        "id": "102",
+        "mutator": "MethodExpression",
+        "start": [288, 22],
+        "end": [288, 39]
+      }
+    ],
+    "packages/schema/src/values.ts": [
+      {
+        "id": "191",
+        "mutator": "Regex",
+        "start": [121, 34],
+        "end": [121, 63]
+      },
+      {
+        "id": "192",
+        "mutator": "Regex",
+        "start": [121, 34],
+        "end": [121, 63]
+      },
+      {
+        "id": "193",
+        "mutator": "Regex",
+        "start": [121, 34],
+        "end": [121, 63]
+      },
+      {
+        "id": "194",
+        "mutator": "Regex",
+        "start": [121, 34],
+        "end": [121, 63]
+      },
+      {
+        "id": "195",
+        "mutator": "Regex",
+        "start": [121, 34],
+        "end": [121, 63]
+      },
+      {
+        "id": "196",
+        "mutator": "ArrayDeclaration",
+        "start": [139, 11],
+        "end": [139, 33]
+      }
+    ]
+  }
 }

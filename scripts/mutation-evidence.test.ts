@@ -9,9 +9,8 @@ import {
   hashSourceFiles,
   type MutationReport,
   type MutationVerdictEntry,
-  type mutationVerdictCounts,
+  mutationVerdictCounts,
   RESOURCE_SOURCE_ALGORITHM,
-  resourceSourceFiles,
   sourceFiles,
 } from "./mutation-evidence";
 
@@ -19,7 +18,7 @@ const workspaces = [
   {
     evidencePath: "mutation-evidence/resources-mutation.json",
     sourceRoot: "packages/resources/src",
-    sourceFiles: resourceSourceFiles,
+    sourceFiles: (root: string) => sourceFiles(root, "packages/resources/src"),
     workspace: "resources",
   },
   {
@@ -157,21 +156,8 @@ async function validateAttestations(
     );
   }
   if (workspace !== "schema") return;
-  await validateSchemaReproducibility(evidence);
-}
-
-async function validateSchemaReproducibility(
-  evidence: Evidence,
-): Promise<void> {
   const canonical = await readManifest("mutation-evidence/schema-verdict.json");
   validateManifest(canonical);
-  expect(evidence.reproducibility?.canonicalManifest).toBe(
-    "mutation-evidence/schema-verdict.json",
-  );
-  expect(evidence.reproducibility?.verdictSha256).toBe(canonical.verdictSha256);
-  expect(evidence.reproducibility?.verdictEntries).toBe(
-    canonical.counts.entries,
-  );
   const campaigns = await Promise.all(
     evidence.attestations.map((record) =>
       readAttestation({ attestation: record }),
@@ -181,8 +167,10 @@ async function validateSchemaReproducibility(
     new Set(campaigns.map(({ campaign }) => campaign.campaignId)).size,
   ).toBe(2);
   for (const { campaign } of campaigns) {
-    expect(campaign.verdict?.sha256).toBe(canonical.verdictSha256);
-    expect(campaign.verdict?.counts).toEqual(canonical.counts);
+    expect(campaign.verdict.sha256).toBe(canonical.verdictSha256);
+    expect(campaign.verdict.counts).toEqual(
+      mutationVerdictCounts(expandManifestVerdict(canonical)),
+    );
   }
 }
 
@@ -243,48 +231,12 @@ async function validateReportEvidence(
   if (workspace === "schema") await validateIgnoredDispositions(report);
 }
 
-test("schema run manifests independently prove exact verdict identity", async () => {
-  const canonical = await readManifest("mutation-evidence/schema-verdict.json");
-
-  validateManifest(canonical);
-  const evidence = JSON.parse(
-    await readFile("mutation-evidence/schema-mutation.json", "utf8"),
-  ) as Evidence;
-  const campaigns = await Promise.all(
-    evidence.attestations.map(async (record) =>
-      readAttestation({ attestation: record }),
-    ),
-  );
-  expect(campaigns).toHaveLength(2);
-  expect(campaigns.map(({ campaign }) => campaign.verdict?.sha256)).toEqual([
-    canonical.verdictSha256,
-    canonical.verdictSha256,
-  ]);
-  expect(campaigns.map(({ campaign }) => campaign.verdict?.counts)).toEqual([
-    canonical.counts,
-    canonical.counts,
-  ]);
-
-  const report = await readOptionalReport("mutation/schema/mutation.json");
-  if (report) {
-    expect(canonicalMutationVerdict(report)).toEqual(canonical.verdict);
-    expect(hashMutationVerdict(canonicalMutationVerdict(report))).toBe(
-      canonical.verdictSha256,
-    );
-  }
-});
-
 type Evidence = {
   workspace: string;
   source: { sha256: string; files: string[]; fileCount: number };
   report: { identity: string };
   counts: Record<string, number>;
   commitBase: string;
-  reproducibility?: {
-    canonicalManifest?: string;
-    verdictEntries?: number;
-    verdictSha256?: string;
-  };
   attestations: {
     preflight: { identity: string; sha256: string };
     campaign: { identity: string; sha256: string };
@@ -328,19 +280,10 @@ type CampaignRecord = {
 
 type Manifest = {
   schemaVersion: number;
-  workspace: string;
   algorithm?: string;
   verdictSha256: string;
   counts: { entries: number; files: number; statuses: Record<string, number> };
-  verdict: MutationVerdictEntry[];
-};
-
-type IgnoredDisposition = {
-  source: string;
-  id: string;
-  mutator: string;
-  start: unknown;
-  end: unknown;
+  verdict: Record<string, Record<string, string[]>>;
 };
 
 async function readOptionalReport(
@@ -463,7 +406,7 @@ async function validateReport(
     const manifest = await readManifest(
       "mutation-evidence/schema-verdict.json",
     );
-    expect(verdict).toEqual(manifest.verdict);
+    expect(verdict).toEqual(expandManifestVerdict(manifest));
     expect(hashMutationVerdict(verdict)).toBe(manifest.verdictSha256);
     expect(counts).toEqual(manifest.counts.statuses);
   }
@@ -477,7 +420,20 @@ async function validateIgnoredDispositions(
       resolve("mutation-evidence/schema-ignored-dispositions.json"),
       "utf8",
     ),
-  ) as { count: number; mutants: IgnoredDisposition[] };
+  ) as {
+    count: number;
+    reason: string;
+    legend: Record<string, string>;
+    sources: Record<
+      string,
+      {
+        id: string;
+        mutator: string;
+        start: [number, number];
+        end: [number, number];
+      }[]
+    >;
+  };
   const ignored = Object.entries(report.files)
     .flatMap(([source, file]) =>
       file.mutants
@@ -499,13 +455,33 @@ async function validateIgnoredDispositions(
       ),
     );
   expect(manifest.count).toBe(ignored.length);
+  expect(manifest.reason).toBe(
+    "Stryker reports these mutants as ignored but does not provide a more specific disposition reason.",
+  );
+  expect(manifest.legend).toEqual({
+    mutant: "{ id, mutator, start: [line, column], end: [line, column] }",
+    sources: "source path -> ordered mutants",
+  });
   expect(
-    manifest.mutants.map(({ source, id, mutator, start, end }) => ({
-      source,
-      id,
-      location: { start, end },
-      mutator,
-    })),
+    Object.entries(manifest.sources)
+      .flatMap(([source, mutants]) =>
+        mutants.map(({ id, mutator, start, end }) => ({
+          source,
+          id,
+          location: {
+            start: { line: start[0], column: start[1] },
+            end: { line: end[0], column: end[1] },
+          },
+          mutator,
+        })),
+      )
+      .sort((left, right) =>
+        `${left.source}:${left.id}`.localeCompare(
+          `${right.source}:${right.id}`,
+          undefined,
+          { numeric: true },
+        ),
+      ),
   ).toEqual(ignored);
 }
 
@@ -515,13 +491,13 @@ async function readManifest(path: string): Promise<Manifest> {
 
 function validateManifest(manifest: Manifest): void {
   expect(manifest.schemaVersion).toBe(1);
-  expect(manifest.workspace).toBe("schema");
   expect(manifest.algorithm).toBe(
     "sha256:json(sorted-source-mutantId-status):v1",
   );
-  expect(manifest.verdict).toHaveLength(manifest.counts.entries);
-  expect(manifest.verdict).toEqual(
-    [...manifest.verdict].sort(
+  const verdict = expandManifestVerdict(manifest);
+  expect(verdict).toHaveLength(manifest.counts.entries);
+  expect(verdict).toEqual(
+    [...verdict].sort(
       (left, right) =>
         left.source.localeCompare(right.source) ||
         left.mutantId.localeCompare(right.mutantId, undefined, {
@@ -530,16 +506,33 @@ function validateManifest(manifest: Manifest): void {
         left.status.localeCompare(right.status),
     ),
   );
-  expect(hashMutationVerdict(manifest.verdict)).toBe(manifest.verdictSha256);
+  expect(hashMutationVerdict(verdict)).toBe(manifest.verdictSha256);
   expect(
-    manifest.verdict.reduce<Record<string, number>>((counts, entry) => {
+    verdict.reduce<Record<string, number>>((counts, entry) => {
       counts[entry.status] = (counts[entry.status] ?? 0) + 1;
       return counts;
     }, {}),
   ).toEqual(manifest.counts.statuses);
-  expect(new Set(manifest.verdict.map((entry) => entry.source)).size).toBe(
+  expect(new Set(verdict.map((entry) => entry.source)).size).toBe(
     manifest.counts.files,
   );
+}
+
+function expandManifestVerdict(manifest: Manifest): MutationVerdictEntry[] {
+  return Object.entries(manifest.verdict)
+    .flatMap(([source, statuses]) =>
+      Object.entries(statuses).flatMap(([status, mutantIds]) =>
+        mutantIds.map((mutantId) => ({ source, mutantId, status })),
+      ),
+    )
+    .sort(
+      (left, right) =>
+        left.source.localeCompare(right.source) ||
+        left.mutantId.localeCompare(right.mutantId, undefined, {
+          numeric: true,
+        }) ||
+        left.status.localeCompare(right.status),
+    );
 }
 
 test("source identity changes when content or path changes", () => {

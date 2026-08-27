@@ -38,7 +38,7 @@ function realpathOfExistingAncestor(path: string): string {
 
 export function resolveMutationRoot(
   configuredRoot: string | undefined,
-  _projectRoot: string,
+  ..._ignored: string[]
 ): string {
   if (configuredRoot === undefined) return "mutation";
   if (

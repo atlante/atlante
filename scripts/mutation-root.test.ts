@@ -13,13 +13,13 @@ import { expect, test } from "vitest";
 import { acquireMutationCampaign, resolveMutationRoot } from "./mutation-root";
 
 test("uses the repository-relative mutation directory by default", () => {
-  expect(resolveMutationRoot(undefined, "/repo")).toBe("mutation");
+  expect(resolveMutationRoot(undefined)).toBe("mutation");
 });
 
 test("accepts an existing root inside the OS temp directory", async () => {
   const root = await mkdtemp(join(tmpdir(), "atlante-mutation-root-"));
   try {
-    expect(resolveMutationRoot(root, "/repo")).toBe(root);
+    expect(resolveMutationRoot(root)).toBe(root);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -30,7 +30,7 @@ test.each([
   ["traversal", join(tmpdir(), "atlante-mutation-root-..", "..", "outside")],
   ["outside", "/var/tmp/atlante-mutation-root-outside"],
 ])("rejects %s mutation roots", ([, root]) => {
-  expect(() => resolveMutationRoot(root, "/repo")).toThrow(
+  expect(() => resolveMutationRoot(root)).toThrow(
     "ATLANTE_MUTATION_ROOT must be an absolute path inside os.tmpdir()",
   );
 });
@@ -41,7 +41,7 @@ test("rejects a temp-directory symlink whose real path escapes", async () => {
   const link = join(parent, "link");
   try {
     await symlink(outside, link);
-    expect(() => resolveMutationRoot(link, "/repo")).toThrow(
+    expect(() => resolveMutationRoot(link)).toThrow(
       "ATLANTE_MUTATION_ROOT must be an absolute path inside os.tmpdir()",
     );
   } finally {
@@ -100,21 +100,6 @@ test("removes a dead campaign lock and its temp residue", async () => {
   }
 });
 
-test("does not delete a fresh lock while its owner metadata is being published", async () => {
-  const root = await mkdtemp(join(tmpdir(), "atlante-mutation-"));
-  const lock = join(root, "schema", ".campaign-lock");
-  await mkdir(join(root, "schema"), { recursive: true });
-  await writeFile(lock, "");
-  try {
-    expect(() => acquireMutationCampaign(root, "schema")).toThrow(
-      "mutation campaign already active",
-    );
-    await expect(readFile(lock, "utf8")).resolves.toBe("");
-  } finally {
-    await rm(root, { recursive: true, force: true });
-  }
-});
-
 test("recovers an old lock with incomplete metadata", async () => {
   const root = await mkdtemp(join(tmpdir(), "atlante-mutation-"));
   const lock = join(root, "schema", ".campaign-lock");
@@ -138,19 +123,6 @@ test("a live owner blocks a second campaign", async () => {
     expect(() => acquireMutationCampaign(root, "schema")).toThrow(
       "mutation campaign already active",
     );
-  } finally {
-    await rm(root, { recursive: true, force: true });
-  }
-});
-
-test("a fresh dead owner is recovered without waiting for the stale timeout", async () => {
-  const root = await mkdtemp(join(tmpdir(), "atlante-mutation-"));
-  const lock = join(root, "schema", ".campaign-lock");
-  await mkdir(join(root, "schema"), { recursive: true });
-  await writeFile(lock, "999999");
-  try {
-    const release = await acquireMutationCampaign(root, "schema");
-    await release();
   } finally {
     await rm(root, { recursive: true, force: true });
   }

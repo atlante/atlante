@@ -59,23 +59,5 @@
         "sha256": "2bafaaeda33d1e2df20b28dedba44ac0a0d11aca0a3bf7494674ef47b8997579"
       }
     }
-  ],
-  "reproducibility": {
-    "campaigns": 2,
-    "comparison": "source-file-and-mutant-id-plus-status",
-    "exact": true,
-    "runtimes": ["1m10s", "1m7s"],
-    "exitCodes": [0, 0],
-    "canonicalManifest": "mutation-evidence/schema-verdict.json",
-    "preflightRecords": [
-      "mutation-evidence/schema-run1-preflight.json",
-      "mutation-evidence/schema-run2-preflight.json"
-    ],
-    "campaignRecords": [
-      "mutation-evidence/schema-run1-campaign.json",
-      "mutation-evidence/schema-run2-campaign.json"
-    ],
-    "verdictEntries": 188,
-    "verdictSha256": "104bf4cccd3b885deba7e7ce4de4b12fdb37ac836cf6fe88589e346cc096c187"
-  }
+  ]
 }

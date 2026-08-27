@@ -395,10 +395,7 @@ export async function runMutation(
       }),
     escalationMs: dependencies.escalationMs ?? 5_000,
   };
-  const mutationRoot = resolveMutationRoot(
-    process.env.ATLANTE_MUTATION_ROOT,
-    process.cwd(),
-  );
+  const mutationRoot = resolveMutationRoot(process.env.ATLANTE_MUTATION_ROOT);
   const campaignId = randomUUID();
   const preflightStarted = Date.now();
   const preflightEnv = {

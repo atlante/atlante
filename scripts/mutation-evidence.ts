@@ -2,7 +2,6 @@ import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import { relative, resolve } from "node:path";
 
-const RESOURCE_SOURCE_ROOT = "packages/resources/src";
 export const RESOURCE_SOURCE_ALGORITHM = "sha256:path\0bytes\0:v1";
 
 export type SourceFile = { path: string; bytes: Buffer };
@@ -98,8 +97,4 @@ export async function sourceFiles(
       bytes: await readFile(path),
     })),
   );
-}
-
-export async function resourceSourceFiles(root: string): Promise<SourceFile[]> {
-  return sourceFiles(root, RESOURCE_SOURCE_ROOT);
 }
