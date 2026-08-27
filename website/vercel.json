@@ -6,7 +6,7 @@
   "functions": {
     "api/**": {
       "maxDuration": 30,
-      "includeFiles": "node_modules/@atlante/**"
+      "includeFiles": ["node_modules/@atlante/**", "node_modules/ajv/**"]
     }
   },
   "headers": [
