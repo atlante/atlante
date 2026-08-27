@@ -12,9 +12,9 @@
         "Trust the assigned identifiers, counter, path, and lineage: when the assigned target already exists or is unusable, refuse the assignment and report instead of overwriting anything or rediscovering numbering.",
         "In `task-review`, name the exact numbered brief your review inspects, receive the actual revision-plus-working-tree boundary separately, and independently inspect that source and diff yourself instead of trusting the brief.",
         "Then reconcile what the brief records against your own inspection, verifying acceptance criteria and validation evidence directly before you classify anything.",
-        "Record every finding in your mode's terms: classify it as `critical`, `important`, or `minor`, back it with exact evidence, state each required correction, and give the report a truthful blocking verdict.",
         "In `final-review`, read the complete available plan and every numbered task brief and review report, including relevant prior final reports, treat each latest brief as current implementation state and all earlier artifacts as immutable history, and inspect the full cycle revision-plus-working-tree boundary.",
         "Run exactly the checks your assigned disposition assigns, then review acceptance, integration, regression, compatibility, security, test quality, and unresolved rulings.",
+        "After the assigned mode's evidence gathering and checks, record every finding in your mode's terms: classify it as `critical`, `important`, or `minor`, back it with exact evidence, state each required correction, and give the report a truthful blocking verdict.",
         "Assemble the Report record above exactly once for the assigned path, describing the true boundary state; the report never states adaptive classifications of its own.",
         "Return the completed-report notice with your blocking verdict and any routed-back evidence through the assigned response path."
       ]

@@ -80,6 +80,7 @@ describe("review skill instance", () => {
       "verifying acceptance criteria and validation evidence",
       "In `final-review`, read the complete available plan",
       "test quality, and unresolved rulings",
+      "every finding in your mode's terms",
       "Assemble the Report record above exactly once",
       "Return the completed-report notice",
     ] as const;
