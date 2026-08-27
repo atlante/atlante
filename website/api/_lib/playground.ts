@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import {
+  mkdir,
   mkdtemp,
   readdir,
   readFile,
@@ -177,8 +178,14 @@ function sanitize(output: string, dirs: string[]): string {
 export async function runPlaygroundStep(
   request: PlaygroundRequest,
 ): Promise<PlaygroundResult> {
-  const dir = await mkdtemp(join(tmpdir(), "atlante-playground-"));
-  const dirs = [dir, await realpath(dir)];
+  // The sandbox root is random for isolation, but the project leaf keeps a
+  // constant name: the default preset derives values.project from the
+  // working directory's basename, and a stable name is what makes identical
+  // input render identical digests (same source -> same output).
+  const root = await mkdtemp(join(tmpdir(), "atlante-playground-"));
+  const dir = join(root, "project");
+  await mkdir(dir, { recursive: true });
+  const dirs = [dir, root, await realpath(root)];
   try {
     for (const file of request.files) {
       await writeFile(join(dir, file.path), file.content, "utf8");
@@ -192,11 +199,10 @@ export async function runPlaygroundStep(
       exitCode: run.exitCode,
       timedOut: run.timedOut,
       output: sanitize(run.output, dirs),
-
       files,
       durationMs: Date.now() - started,
     };
   } finally {
-    await rm(dir, { recursive: true, force: true });
+    await rm(root, { recursive: true, force: true });
   }
 }

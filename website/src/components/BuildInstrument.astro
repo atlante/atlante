@@ -457,6 +457,16 @@ const hints: Record<string, string> = {
       output: string;
       files: { path: string; content: string }[];
     }): void => {
+      // Each command runs in a fresh sandbox, so its output replaces the
+      // previous generation entirely instead of merging beside it.
+      if (state.lastCommand === "build" && result.ok) {
+        for (const path of [...state.files.keys()]) {
+          if (path.startsWith(".atlante/") || path === "opencode.jsonc") {
+            state.files.delete(path);
+          }
+        }
+      }
+      if (state.lastCommand === "init" && result.ok) state.files.clear();
       for (const file of result.files) state.files.set(file.path, file.content);
       showTerminal(
         state.lastCommand,
