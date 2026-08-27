@@ -168,6 +168,7 @@ const expectedPackFiles = [
   "atlante.jsonc",
   "brainstorm/instance.jsonc",
   "brainstorming/instance.jsonc",
+  "build/instance.jsonc",
   "delivery-workflow/instance.jsonc",
   "gotchas/template.jsonc",
   "gotchas/template.md",
@@ -183,6 +184,7 @@ const expectedPackFiles = [
   "workflow/template.jsonc",
   "workflow/template.md",
   "test/brainstorm.test.ts",
+  "test/build.test.ts",
   "test/plan.test.ts",
   "test/selection-fixture.ts",
 ] as const;
