@@ -105,7 +105,16 @@ main section[id] {
   header,
   footer,
   section {
-    transition-property: background-color, color, border-color;
+    transition-property: background-color, color;
+    transition-duration: var(--duration-editorial);
+    transition-timing-function: var(--ease-standard);
+  }
+
+  /* Decorative rules are solid bronze bars; transition everything that
+     could tint them so scrolling never shows a blend between themes. */
+  ::before,
+  ::after {
+    transition-property: background-color;
     transition-duration: var(--duration-editorial);
     transition-timing-function: var(--ease-standard);
   }
