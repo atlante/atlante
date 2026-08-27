@@ -68,8 +68,19 @@ const guarantees = [
 
 <style>
   .review-close {
-    border-block-start: 1px solid var(--ds-border-subtle);
+    border-block-start: 0;
   }
+
+  .review-close::before {
+    content: "";
+    display: block;
+    width: min(100% - 2 * var(--space-4), var(--container-wide));
+    margin-inline: auto;
+    background: var(--ds-border);
+    height: 1px;
+  }
+
+
 
   .inner {
     max-width: var(--container-wide);
@@ -87,9 +98,9 @@ const guarantees = [
     margin: 0;
     font-family: var(--font-display);
     font-optical-sizing: auto;
-    font-size: clamp(52px, 6.4vw, 108px);
+    font-size: clamp(44px, 5vw, 84px);
     font-weight: 500;
-    line-height: 0.95;
+    line-height: 1.04;
     letter-spacing: -0.015em;
     text-wrap: balance;
   }
@@ -99,7 +110,7 @@ const guarantees = [
   .guarantees {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    border-block: 1px solid var(--ds-fg);
+    border-block: 1px solid var(--ds-border);
   }
 
   article {
@@ -124,7 +135,8 @@ const guarantees = [
     max-width: 14ch;
     margin: var(--space-12) 0 var(--space-4);
     font-family: var(--font-display);
-    font-size: clamp(28px, 2.5vw, 42px);
+    font-size: clamp(26px, 2.2vw, 36px);
+
     font-weight: 500;
     line-height: 1.02;
   }
@@ -161,9 +173,9 @@ const guarantees = [
     max-width: 11ch;
     margin: 0 0 var(--space-8);
     font-family: var(--font-display);
-    font-size: clamp(58px, 8.2vw, 136px);
+    font-size: clamp(44px, 5.5vw, 88px);
     font-weight: 500;
-    line-height: 0.9;
+    line-height: 1.04;
     letter-spacing: -0.02em;
     text-wrap: balance;
   }
@@ -228,13 +240,13 @@ const guarantees = [
   }
 
   .primary {
-    border: 1px solid var(--ds-fg);
+    border: 1px solid var(--ds-border);
     background: var(--ds-fg);
     color: var(--ds-bg);
   }
 
   .secondary {
-    border: 1px solid color-mix(in oklab, var(--ds-fg) 38%, transparent);
+    border: 1px solid var(--ds-border);
     color: var(--ds-fg);
   }
 

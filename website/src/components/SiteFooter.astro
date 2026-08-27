@@ -46,11 +46,76 @@ const links = [
       </ul>
     </nav>
     <p class="license">
+      <a href={`${github}/releases/latest`}>v0.1</a>
+      <span aria-hidden="true">·</span>
       <a href={`${github}/blob/main/LICENSE`}>MIT</a>
     </p>
+    <button type="button" class="planet" data-theme-toggle-footer>
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle
+          cx="12"
+          cy="12"
+          r="8.25"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"></circle>
+        <path
+          class="phase"
+          d="M12 3.75 A 8.25 8.25 0 0 1 12 20.25 Z"
+          fill="currentColor"></path>
+        <ellipse
+          cx="12"
+          cy="12"
+          rx="11.25"
+          ry="3.75"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1"
+          transform="rotate(-18 12 12)"></ellipse>
+      </svg>
+    </button>
+
+
+
 
   </div>
 </footer>
+
+<script>
+  const button = document.querySelector<HTMLButtonElement>(
+    "[data-theme-toggle-footer]",
+  );
+
+  const sync = (): void => {
+    if (!button) return;
+    const dark = document.documentElement.dataset.theme === "dark";
+    button.setAttribute(
+      "aria-label",
+      dark ? "Switch to the light theme" : "Switch to the dark theme",
+    );
+    const meta = document.querySelector<HTMLMetaElement>(
+      'meta[name="theme-color"]',
+    );
+    if (meta) {
+      meta.content = dark ? "#112135" : "#F4ECE4";
+    }
+  };
+
+  sync();
+
+  button?.addEventListener("click", () => {
+    const next =
+      document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+    document.documentElement.dataset.theme = next;
+    try {
+      localStorage.setItem("atlante-theme", next);
+    } catch {
+      // Storage is unavailable; the theme still applies for this page load.
+    }
+    sync();
+  });
+</script>
+
 
 <style>
   .site-footer {
@@ -104,8 +169,11 @@ const links = [
     font-family: var(--font-ui);
     font-size: var(--text-small);
     font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
     text-decoration: none;
   }
+
 
   nav a:hover,
   nav a:focus-visible {
@@ -121,6 +189,46 @@ const links = [
     font-size: var(--text-meta);
     letter-spacing: 0.08em;
   }
+
+  .planet {
+    display: none;
+    place-items: center;
+    width: var(--control-min);
+    height: var(--control-min);
+    padding: 0;
+    background: color-mix(in oklab, var(--ds-bg) 82%, transparent);
+    border: 1px solid var(--ds-border-subtle);
+    border-radius: 50%;
+    color: var(--ds-fg);
+    cursor: pointer;
+  }
+
+  .planet svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .planet:hover {
+    border-color: var(--ds-fg);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .planet svg {
+      transition: rotate var(--duration-editorial) var(--ease-standard);
+    }
+  }
+
+  :global([data-theme="dark"]) .planet svg {
+    rotate: 180deg;
+  }
+
+  @media (max-width: 700px) {
+    .planet {
+      display: grid;
+    }
+  }
+
+
 
   .license a {
     display: inline-flex;
@@ -145,7 +253,9 @@ const links = [
       grid-template-columns: 1fr;
       gap: var(--space-4);
       padding-block: var(--space-8);
+      justify-items: start;
     }
+
 
     ul {
       justify-content: flex-start;

@@ -25,7 +25,27 @@ approved social image to `public/og.png`, the used font families into
 tokens with root-relative font URLs. All generated files are git-ignored or
 rebuilt on every `dev` or `build` run; never edit them directly.
 
+## Playground
+
+The build instrument on the landing page runs the published
+`@atlante/cli` for real. `website/api/playground.ts` is a stateless
+Vercel function (Node 22): each request writes the visitor's files into
+an isolated temp directory, executes one CLI command, and returns the
+actual output and generated file tree. Nothing is stored between
+requests, and the CLI never executes project code. `bun run dev` serves
+the same endpoint in-process through a dev-only Vite middleware, so the
+playground works locally; `astro preview` stays static and shows a
+friendly offline message instead.
+
+On a fresh clone, run `bun install` and `bun run build` at the
+repository root before starting the website: the dev playground spawns
+the CLI from the workspace package's built bundle in
+`packages/cli/dist/`.
+
+
+
 ## Deployment
+
 
 The site deploys automatically through Vercel:
 

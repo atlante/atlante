@@ -3,12 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "bun run sync:brand && astro dev",
     "build": "bun run sync:brand && astro build",
     "preview": "astro preview",
     "sync:brand": "bun scripts/sync-brand.ts",
     "astro": "astro"
+  },
+  "dependencies": {
+    "@atlante/cli": "0.1.11"
   },
   "devDependencies": {
     "astro": "^5.0.0"
