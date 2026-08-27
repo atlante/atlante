@@ -100,3 +100,29 @@ jobs:
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
           vercel-args: '--prod'
           working-directory: website/
+
+  deploy-docs:
+    needs: publish-packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: ".bun-version"
+
+      - name: Sync docs brand assets
+        shell: bash
+        working-directory: docs
+        run: |
+          set -euo pipefail
+          bun run sync:brand
+
+      - name: Deploy docs to Vercel
+        uses: amondnet/vercel-action@v42.3.0
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_DOCS_PROJECT_ID }}
+          vercel-args: '--prod'
+          working-directory: docs/

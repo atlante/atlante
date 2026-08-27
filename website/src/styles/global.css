@@ -64,10 +64,11 @@ body {
 }
 
 :root {
-  /* Site-local layout caps: more content, less margin. */
-  --container-wide: 1760px;
+  /* Reading surfaces stay centered; the playground is intentionally wider. */
+  --container-wide: 1440px;
+  --container-hero: 1280px;
+  --container-playground: 1760px;
   --container-content: 86ch;
-  --container-code: 106ch;
 }
 
 :root {
@@ -128,7 +129,7 @@ main section[id] {
   .review-close .intro,
   .review-close .guarantees,
   .review-close .next-step {
-    max-width: min(100%, 1240px);
+    max-width: min(100%, var(--container-hero));
     margin-inline: auto;
   }
 }

@@ -1,0 +1,201 @@
+:root,
+::backdrop {
+  --sl-color-white: var(--atlante-jet);
+  --sl-color-black: var(--atlante-linen);
+  --sl-color-gray-1: var(--atlante-jet);
+  --sl-color-gray-2: var(--atlante-jet);
+  --sl-color-gray-3: var(--ds-muted);
+  --sl-color-gray-4: var(--ds-muted);
+  --sl-color-gray-5: var(--ds-border-subtle);
+  --sl-color-gray-6: var(--atlante-linen);
+  --sl-color-gray-7: var(--atlante-linen);
+  --sl-color-accent: var(--atlante-pine);
+  --sl-color-accent-high: var(--atlante-pine);
+  --sl-color-accent-low: color-mix(in oklab, var(--atlante-pine) 12%, var(--atlante-linen));
+  --sl-color-text: var(--atlante-jet);
+  --sl-color-text-accent: var(--atlante-pine);
+  --sl-color-text-invert: var(--atlante-linen);
+  --sl-color-bg: var(--atlante-linen);
+  --sl-color-bg-nav: var(--atlante-linen);
+  --sl-color-bg-sidebar: var(--atlante-linen);
+  --sl-color-bg-inline-code: color-mix(in oklab, var(--atlante-bronze) 13%, var(--atlante-linen));
+  --sl-color-bg-accent: var(--atlante-pine);
+  --sl-color-hairline-light: var(--ds-border-subtle);
+  --sl-color-hairline: var(--atlante-bronze);
+  --sl-color-hairline-shade: var(--ds-border-subtle);
+  --sl-color-blue: var(--atlante-pine);
+  --sl-color-blue-high: var(--atlante-jet);
+  --sl-color-blue-low: color-mix(in oklab, var(--atlante-pine) 12%, var(--atlante-linen));
+  --sl-color-orange: var(--atlante-bronze);
+  --sl-color-orange-high: var(--atlante-jet);
+  --sl-color-orange-low: color-mix(in oklab, var(--atlante-bronze) 18%, var(--atlante-linen));
+  --sl-color-red: var(--atlante-brown);
+  --sl-color-red-high: var(--atlante-brown);
+  --sl-color-red-low: color-mix(in oklab, var(--atlante-brown) 10%, var(--atlante-linen));
+  --sl-shadow-sm: none;
+  --sl-shadow-md: none;
+  --sl-shadow-lg: none;
+  --sl-font: var(--font-ui);
+  --font-body: var(--font-ui);
+  --font-display: var(--font-ui);
+  --sl-font-system: var(--font-ui);
+  --sl-font-mono: var(--font-mono);
+  --sl-text-h1: clamp(2.5rem, 5vw, 4rem);
+  --sl-text-h2: clamp(1.75rem, 3vw, 2.25rem);
+  --sl-text-h3: clamp(1.375rem, 2vw, 1.75rem);
+  --sl-text-h4: 1.2rem;
+  --sl-line-height: 1.65;
+  --sl-line-height-headings: 1.1;
+  --sl-content-width: 56rem;
+  --sl-sidebar-width: 16rem;
+  --sl-content-pad-x: clamp(1rem, 2.5vw, 2rem);
+}
+:root[data-theme="dark"],
+[data-theme="dark"] ::backdrop {
+  --sl-color-white: var(--atlante-linen);
+  --sl-color-black: var(--atlante-jet);
+  --sl-color-gray-1: var(--atlante-linen);
+  --sl-color-gray-2: var(--atlante-linen);
+  --sl-color-gray-3: var(--ds-muted);
+  --sl-color-gray-4: var(--ds-muted);
+  --sl-color-gray-5: var(--ds-border-subtle);
+  --sl-color-gray-6: var(--atlante-jet);
+  --sl-color-gray-7: var(--atlante-jet);
+  --sl-color-accent: var(--atlante-bronze);
+  --sl-color-accent-high: var(--atlante-bronze);
+  --sl-color-accent-low: color-mix(in oklab, var(--atlante-bronze) 18%, var(--atlante-jet));
+  --sl-color-text: var(--atlante-linen);
+  --sl-color-text-accent: var(--atlante-bronze);
+  --sl-color-text-invert: var(--atlante-jet);
+  --sl-color-bg: var(--atlante-jet);
+  --sl-color-bg-nav: var(--atlante-jet);
+  --sl-color-bg-sidebar: var(--atlante-jet);
+  --sl-color-bg-inline-code: color-mix(in oklab, var(--atlante-bronze) 15%, var(--atlante-jet));
+  --sl-color-bg-accent: var(--atlante-bronze);
+  --sl-color-hairline-light: var(--ds-border-subtle);
+  --sl-color-hairline: var(--atlante-bronze);
+  --sl-color-hairline-shade: var(--ds-border-subtle);
+  --sl-color-blue: var(--atlante-bronze);
+  --sl-color-blue-high: var(--atlante-linen);
+  --sl-color-blue-low: color-mix(in oklab, var(--atlante-bronze) 18%, var(--atlante-jet));
+  --sl-color-orange: var(--atlante-bronze);
+  --sl-color-orange-high: var(--atlante-linen);
+  --sl-color-orange-low: color-mix(in oklab, var(--atlante-bronze) 18%, var(--atlante-jet));
+  --sl-color-red: var(--atlante-brown);
+  --sl-color-red-high: var(--atlante-linen);
+  --sl-color-red-low: color-mix(in oklab, var(--atlante-brown) 24%, var(--atlante-jet));
+}
+:root {
+  --ds-muted: color-mix(in oklab, var(--atlante-jet) 78%, var(--atlante-linen));
+  --ds-border-subtle: color-mix(in oklab, var(--atlante-bronze) 42%, var(--atlante-linen));
+}
+[data-theme="dark"] {
+  --ds-muted: color-mix(in oklab, var(--atlante-linen) 72%, var(--atlante-jet));
+  --ds-border-subtle: color-mix(in oklab, var(--atlante-bronze) 42%, var(--atlante-jet));
+}
+
+html {
+  scroll-behavior: smooth;
+}
+body {
+  background: var(--sl-color-bg);
+  color: var(--sl-color-text);
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  line-height: 1.65;
+}
+button,
+input,
+select {
+  font-family: var(--font-ui);
+}
+header.header,
+footer {
+  border-color: var(--atlante-bronze);
+}
+.content-panel > .sl-container > h1,
+.sl-markdown-content :is(h1, h2, h3, h4, h5, h6) {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+.content-panel > .sl-container > h1 {
+  max-width: 18ch;
+  line-height: 1.05;
+}
+.sl-markdown-content {
+  font-family: var(--font-ui);
+}
+.sl-markdown-content :is(p, li, td, th) {
+  text-wrap: pretty;
+}
+.content-panel {
+  padding-block: clamp(1.75rem, 3.5vw, 3.25rem);
+}
+.content-panel:first-of-type {
+  padding-block-start: clamp(2rem, 4vw, 4rem);
+  padding-block-end: 1.25rem;
+}
+.content-panel + .content-panel {
+  border-color: var(--sl-color-hairline-light);
+  padding-block-start: 1.25rem;
+}
+header.header {
+  background: var(--sl-color-bg-nav);
+}
+.sidebar-content a,
+.right-sidebar-panel a {
+  font-family: var(--font-ui);
+}
+button,
+input,
+select,
+textarea,
+details,
+.sl-markdown-content :is(pre, table, blockquote) {
+  border-radius: 0;
+}
+.sl-markdown-content code:not(pre code) {
+  border: 1px solid var(--ds-border-subtle);
+  border-radius: 0;
+  background: var(--sl-color-bg-inline-code);
+  color: var(--sl-color-text);
+}
+.sl-markdown-content pre,
+.sl-markdown-content table,
+.sl-markdown-content blockquote,
+.sl-markdown-content details {
+  border-radius: 0;
+}
+.sl-markdown-content pre {
+  border: 1px solid var(--atlante-bronze);
+}
+.sl-markdown-content a,
+.sidebar-content a {
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+.sl-markdown-content a:hover,
+.sidebar-content a:hover {
+  text-decoration-thickness: 2px;
+}
+.sl-markdown-content .starlight-aside {
+  border-radius: 0;
+}
+:focus-visible {
+  outline: 3px solid var(--sl-color-text);
+  outline-offset: 2px;
+}
+@media (max-width: 50rem) {
+  :root {
+    --sl-content-pad-x: 1rem;
+  }
+  .sl-markdown-content h1 {
+    font-size: clamp(2.25rem, 11vw, 3.25rem);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
