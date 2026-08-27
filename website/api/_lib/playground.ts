@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import {
   mkdir,
   mkdtemp,
@@ -48,7 +49,13 @@ const require = createRequire(import.meta.url);
  * any working directory works as a project sandbox. */
 function cliEntry(): string {
   const manifest: string = require.resolve("@atlante/cli/package.json");
-  return join(dirname(manifest), "dist", "bin", "atlante.js");
+  const entry = join(dirname(manifest), "dist", "bin", "atlante.js");
+  if (!existsSync(entry)) {
+    throw new Error(
+      "the @atlante/cli bundle is missing; run `bun run build` at the repository root first",
+    );
+  }
+  return entry;
 }
 
 export function parsePlaygroundRequest(raw: unknown): PlaygroundRequest {

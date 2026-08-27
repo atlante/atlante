@@ -37,6 +37,12 @@ the same endpoint in-process through a dev-only Vite middleware, so the
 playground works locally; `astro preview` stays static and shows a
 friendly offline message instead.
 
+On a fresh clone, run `bun install` and `bun run build` at the
+repository root before starting the website: the dev playground spawns
+the CLI from the workspace package's built bundle in
+`packages/cli/dist/`.
+
+
 
 ## Deployment
 
