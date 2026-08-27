@@ -1,6 +1,6 @@
 {
   "name": "@atlante/builder",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "type": "module",
   "description": "Atlante project loading, validation, and preparation",
   "license": "MIT",
