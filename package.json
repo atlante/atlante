@@ -16,7 +16,8 @@
   ],
   "workspaces": [
     "packages/*",
-    "website"
+    "website",
+    "docs"
   ],
   "scripts": {
     "test": "vitest run",
@@ -28,8 +29,9 @@
     "mutation:test": "bun scripts/mutation.ts",
     "mutation:verify": "bun scripts/mutation-verify.ts",
     "build": "bun scripts/build.ts",
+    "docs:build": "bun run --cwd docs build",
     "quick:check": "bun scripts/parallel.ts type:check lint:check test",
-    "full:check": "bun run build && bun scripts/parallel.ts quick:check smoke:test",
+    "full:check": "bun run build && bun scripts/parallel.ts quick:check smoke:test docs:build",
     "prepack": "bun run build",
     "release": "bun scripts/release.ts",
     "work": "bun scripts/work.ts"

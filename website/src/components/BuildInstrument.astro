@@ -645,7 +645,7 @@ const hints: Record<string, string> = {
   .workbench::before {
     content: "";
     display: block;
-    width: min(100% - 2 * var(--space-4), var(--container-wide));
+    width: min(100% - 2 * var(--space-4), var(--container-playground));
     margin-inline: auto;
     background: var(--ds-border);
     height: 1px;
@@ -654,7 +654,7 @@ const hints: Record<string, string> = {
 
 
   .inner {
-    max-width: var(--container-wide);
+    max-width: var(--container-playground);
     margin-inline: auto;
     padding: clamp(var(--space-24), 9vw, 168px) var(--space-4);
   }
