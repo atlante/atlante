@@ -69,9 +69,11 @@ if (!bundle.startsWith("#!/usr/bin/env node"))
     "@atlante/cli: bundle shebang is not node; check bin/atlante.ts",
   );
 // Contract check: fully self-contained. The Vercel lambda ships only
-// node_modules/@atlante/** plus ajv (vercel.json includeFiles), so the
-// only allowed externals are Node builtins and ajv's runtime modules,
-// which ajv-generated validator code requires dynamically at runtime.
+// node_modules/@atlante/** (vercel.json includeFiles), so the only allowed
+// externals are Node builtins and ajv's runtime modules, which ajv's
+// generated validator code requires dynamically when schemas use the
+// matching keywords; the Atlante schema does not, so ajv itself does not
+// ship in the lambda.
 const builtinModules = new Set(cliRequire("node:module").builtinModules);
 const externalImports = new Set(
   [

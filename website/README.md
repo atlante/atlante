@@ -43,9 +43,8 @@ to the released version at every release. Locally the workspace install
 links the workspace package instead, so run `bun install` and
 `bun run build` at the repository root to exercise current source
 through the dev playground. The published CLI bundle is self-contained,
-so the lambda only needs the pinned package itself plus `ajv` (whose
-validator code requires runtime modules dynamically), as configured in
-`vercel.json`.
+so the lambda only needs the pinned package itself (see `includeFiles`
+in `vercel.json`).
 
 
 
