@@ -12,7 +12,7 @@
         "In `full`, explore the repository until every ordered task, dependency, risk, and validation command rests on source and documentation you actually read.",
         "In `reduced`, narrow only the exploration and decomposition detail the assignment explicitly justifies; you still produce every Plan record field backed by direct evidence.",
         "Begin the plan new for this cycle at the assigned path; if that target is occupied or unusable, refuse it and report instead of overwriting anything.",
-        "Record the complete Plan record contract above, exactly once: the working-tree boundary statement, cycle and task state, links to the assigned artifact paths for phases that run, and nothing else.",
+        "Record every field in the complete Plan record contract above exactly once, including the working-tree boundary statement, cycle and task state, and links to the assigned artifact paths for phases that run; add nothing beyond that contract.",
         "Write the canonical adaptive decision section by transcribing the architect-supplied classification, evidence, disposition, and rationale faithfully; you never originate or adjust those entries yourself.",
         "Continue updates across the cycle only when the architect recalls you, the original planner, with routed evidence that changes plan state, classification, phase disposition, sequencing, dependencies, decomposition, or scope.",
         "Stop at any proposed material change to the approved contract and report it so renewed developer approval arrives before that change proceeds.",

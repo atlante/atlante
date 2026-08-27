@@ -90,6 +90,16 @@ describe("plan skill instance", () => {
     expect(skill.listText("invariants")).toContain("full record complete");
   });
 
+  test("records every Plan record field exactly once and nothing beyond that contract", () => {
+    const instructions = resolvePackSkill(locator).listText("instructions");
+
+    expect(instructions).toContain(
+      "Record every field in the complete Plan record contract above exactly once",
+    );
+    expect(instructions).toContain("add nothing beyond that contract");
+    expect(instructions).not.toContain("and nothing else");
+  });
+
   test("authored contract pins the exact workflow artifact layout", () => {
     const markdown = resolvePackSkill(locator).markdownText();
 
