@@ -119,3 +119,16 @@ main section[id] {
     transition-timing-function: var(--ease-standard);
   }
 }
+
+/* Text-and-image sections read better with a shared content cap on big
+   screens; app-like surfaces (the build instrument panel) stay wide. */
+@media (min-width: 1200px) {
+  .observatory .intro,
+  .observatory .instrument,
+  .review-close .intro,
+  .review-close .guarantees,
+  .review-close .next-step {
+    max-width: min(100%, 1240px);
+    margin-inline: auto;
+  }
+}
