@@ -2,8 +2,10 @@
 
 Atlante's first-party static pack gives a project a useful default agent and
 skills for deliberate AI-assisted work. It provides the `architect` agent,
-`brainstorming` and `workflow` skills, and reusable templates and instances for
-composing your own agents, skills, workflows, and supporting prompt content.
+`brainstorm`, `plan`, `build`, and `review` delivery-phase skills alongside
+legacy `brainstorming` and `workflow` entry points, and reusable templates and
+instances for composing your own agents, skills, workflows, and supporting
+prompt content.
 
 ## Default usage
 
@@ -108,13 +110,21 @@ Useful public locators include:
 | --- | --- |
 | Default preset | `@atlante/pack` |
 | Agent instance | `@atlante/pack/architect` |
-| Skill instances | `@atlante/pack/brainstorming`, `@atlante/pack/delivery-workflow` |
+| Skill instances | `@atlante/pack/brainstorming`, `@atlante/pack/delivery-workflow`, `@atlante/pack/brainstorm`, `@atlante/pack/plan`, `@atlante/pack/build`, `@atlante/pack/review` |
 | Agent and skill templates | `@atlante/pack/agent`, `@atlante/pack/skill` |
 | Supporting templates | `@atlante/pack/workflow`, `@atlante/pack/markdown`, `@atlante/pack/artifact`, `@atlante/pack/gotchas`, `@atlante/pack/instructions`, `@atlante/pack/invariants` |
 
-The default preset exposes the `architect` agent and the `brainstorming` and
-`workflow` skills. The `workflow` skill is the `delivery-workflow` instance. The
-agent template accepts optional top-level `responsibilities` alongside
+During the transition from
+[#64](https://github.com/atlante/atlante/issues/64) to
+[#65](https://github.com/atlante/atlante/issues/65), the default preset
+intentionally exposes the `architect` agent plus six skill bindings:
+`brainstorming`, `workflow`, `brainstorm`, `plan`, `build`, and `review`.
+`brainstorming` and `workflow` are legacy entry points (`workflow` binds the
+`delivery-workflow` instance) whose bindings and instances
+[#65](https://github.com/atlante/atlante/issues/65) removes. `brainstorm`,
+`plan`, `build`, and `review` are the durable phase contracts consuming the
+adaptive dispositions from [#75](https://github.com/atlante/atlante/issues/75).
+The agent template accepts optional top-level `responsibilities` alongside
 `identity` and `mission`. The agent and skill templates support ordered
 `markdown`, `instructions`, `gotchas`, `workflow`, and `invariants` sections.
 Invariants are binding guarantees and approval gates, not suggestions.
