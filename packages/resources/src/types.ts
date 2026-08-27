@@ -5,10 +5,12 @@ export type JsonValue =
   | boolean
   | null
   | readonly JsonValue[]
-  | { readonly [key: string]: JsonValue };
-
-export type JsonObject = { readonly [key: string]: JsonValue };
-
+  | {
+      readonly [key: string]: JsonValue;
+    };
+export type JsonObject = {
+  readonly [key: string]: JsonValue;
+};
 declare const validatedLocatorBrand: unique symbol;
 declare const validatedProjectOriginPathBrand: unique symbol;
 declare const validatedPackageOriginPathBrand: unique symbol;
@@ -31,7 +33,6 @@ export type ValidatedLocalResourceLocator = (`./${string}` | `../${string}`) & {
 export type ValidatedPackageResourceLocator = string & {
   readonly [validatedLocatorBrand]: "package";
 };
-
 export type ValidatedResourceLocator =
   | ValidatedLocalResourceLocator
   | ValidatedPackageResourceLocator;
@@ -40,23 +41,19 @@ export type ValidatedResourceLocator =
 export type LocalResourceLocator = ValidatedLocalResourceLocator;
 export type PackageResourceLocator = ValidatedPackageResourceLocator;
 export type ResourceLocator = ValidatedResourceLocator;
-
 export type RawProjectResourceOrigin = {
   readonly kind: "project";
   /** Untrusted content-root-relative path authored by a source file. */
   readonly path: string;
 };
-
 export type RawPackageResourceOrigin = {
   readonly kind: "package";
   /** Untrusted package-qualified source identity authored by a loader. */
   readonly path: string;
 };
-
 export type RawResourceOrigin =
   | RawProjectResourceOrigin
   | RawPackageResourceOrigin;
-
 export type ProjectResourceOrigin = {
   readonly kind: "project";
   /** Validated content-root-relative, stable source path. */
@@ -64,7 +61,6 @@ export type ProjectResourceOrigin = {
     readonly [validatedProjectOriginPathBrand]: "project";
   };
 };
-
 export type PackageResourceOrigin = {
   readonly kind: "package";
   /** Validated identity such as @acme/pack@1.2.0/agent/template.jsonc. */
@@ -72,7 +68,6 @@ export type PackageResourceOrigin = {
     readonly [validatedPackageOriginPathBrand]: "package";
   };
 };
-
 export type ResourceOrigin = ProjectResourceOrigin | PackageResourceOrigin;
 
 /** Authorization data for external resource paths during watch reconciliation. */
@@ -82,42 +77,33 @@ export type ResourceWatchRoot = Readonly<{
   /** Lexical spelling used by package-manager symlink watch inputs. */
   readonly lexical: string;
 }>;
-
 export type ResourceIdentity = {
   readonly locator: ResourceLocator;
   readonly origin: ResourceOrigin;
 };
-
 export type ResourceFacetKind = "template" | "instance";
-
 export type TemplateFacet = ResourceIdentity & {
   readonly kind: "template";
   readonly inputSchema: JsonObject;
   readonly source: string;
 };
-
 export type InstanceFacet = ResourceIdentity & {
   readonly kind: "instance";
   readonly input: JsonObject;
 };
-
 export type Preset = ResourceIdentity & {
   readonly kind: "preset";
   readonly document: JsonObject;
 };
-
 export type PresetResourceGraphNode = ResourceIdentity & {
   readonly kind: "preset";
 };
-
 export type InstanceResourceGraphNode = ResourceIdentity & {
   readonly kind: "instance";
 };
-
 export type TemplateResourceGraphNode = ResourceIdentity & {
   readonly kind: "template";
 };
-
 export type ResourceGraphNode =
   | PresetResourceGraphNode
   | InstanceResourceGraphNode
@@ -131,13 +117,11 @@ export type ResourceGraphChain = readonly [
   ResourceGraphNode,
   ...ResourceGraphNode[],
 ];
-
 export type ResourceLocation = {
   /** One-based authoring location. */
   readonly line: number;
   readonly column: number;
 };
-
 export type ResourceFailureCode =
   | "invalid-locator"
   | "package-not-declared"
@@ -158,13 +142,11 @@ export type ResourceFailureCode =
   | "resource-depth-exceeded"
   | "incompatible-template"
   | "invalid-resolved-input";
-
 export type ResourceGraphFailureCode =
   | "resource-cycle"
   | "resource-depth-exceeded"
   | "missing-effective-template"
   | "incompatible-template";
-
 type ResourceFailureDetails = {
   readonly message: string;
   /** The authored value is retained for invalid-locator diagnostics. */
@@ -173,12 +155,10 @@ type ResourceFailureDetails = {
   readonly pointer?: string;
   readonly location?: ResourceLocation;
 };
-
 export type ResourceGraphFailure = ResourceFailureDetails & {
   readonly code: ResourceGraphFailureCode;
   readonly chain: ResourceGraphChain;
 };
-
 export type ResourceFailure =
   | ResourceGraphFailure
   | (ResourceFailureDetails & {

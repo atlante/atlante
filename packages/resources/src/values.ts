@@ -14,26 +14,23 @@ export type ValueReference = {
  */
 export function analyzeValueReferences(source: string): ValueReference[] {
   const references: ValueReference[] = [];
-  let cursor = 0;
+  const expressionPattern = /\{\{([\s\S]*?)\}\}/g;
 
-  while (cursor < source.length) {
-    const start = source.indexOf("{{", cursor);
-    if (start < 0) break;
-    const close = source.indexOf("}}", start + 2);
-    if (close < 0) break;
-
-    const expression = source.slice(start + 2, close).trim();
+  for (const match of source.matchAll(expressionPattern)) {
+    const expression = (match[1] ?? "").trim();
     const isValuesLike = /^values(?:[^A-Za-z0-9_$-]|$)/.test(expression);
-    if (isValuesLike) {
-      const supported = /^values\.([^\s{}]+)$/.exec(expression);
+    const valueTokens = expression.match(
+      /(?:^|\s)values(?=[^A-Za-z0-9_$-]|$)/g,
+    );
+    if (isValuesLike && valueTokens?.length === 1) {
+      const supported = /values\.([^\s{}]+)$/.exec(expression);
       references.push({
         expression,
         key: supported?.[1],
-        start,
-        end: close + 2,
+        start: match.index,
+        end: match.index + match[0].length,
       });
     }
-    cursor = close + 2;
   }
 
   return references;

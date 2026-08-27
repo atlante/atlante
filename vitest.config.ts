@@ -14,6 +14,7 @@ export default defineConfig({
       "**/mutation/**",
       "**/reports/**",
       "**/coverage/**",
+      ".stryker-tmp/**",
     ],
   },
 });

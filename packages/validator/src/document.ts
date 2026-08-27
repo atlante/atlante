@@ -34,6 +34,7 @@ import {
 } from "./templates.js";
 
 export type DocumentLoadOptions = {
+  cwd?: string;
   statSync?: (
     path: string,
     options: { throwIfNoEntry: false },
@@ -474,7 +475,7 @@ export function loadDocument(
   pathOrDirectory: string,
   options: DocumentLoadOptions = {},
 ): LoadResult {
-  const target = resolve(pathOrDirectory);
+  const target = resolve(options.cwd ?? process.cwd(), pathOrDirectory);
   let path = target;
   let isDirectory = false;
   try {

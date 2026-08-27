@@ -109,6 +109,22 @@ function pathPrefixes(root: string, normalized: string): readonly string[] {
   });
 }
 
+function* parentPaths(candidate: string, root?: string): Generator<string> {
+  let current = resolve(candidate);
+  const visited = new Set<string>();
+  // Bound the walk by the resolved path depth so traversal mutants terminate.
+  for (const _ of current.split(sep)) {
+    if (root && !isWithin(root, current)) return;
+    if (visited.has(current)) return;
+    visited.add(current);
+    yield current;
+    if (root && current === root) return;
+    const parent = dirname(current);
+    if (parent === current) return;
+    current = parent;
+  }
+}
+
 type ParentLookup =
   | { readonly kind: "parents"; readonly paths: readonly string[] }
   | { readonly kind: "escaped" };
@@ -126,8 +142,7 @@ function unresolvedParents(
   pack: ResourcePack,
   candidate: string,
 ): ParentLookup {
-  let current = candidate;
-  while (true) {
+  for (const current of parentPaths(candidate)) {
     try {
       const canonical = realpathSync(current);
       if (!isWithin(pack.root, canonical)) return { kind: "escaped" };
@@ -137,9 +152,6 @@ function unresolvedParents(
     } catch {
       // Continue to the nearest existing parent.
     }
-    const parent = dirname(current);
-    if (parent === current) break;
-    current = parent;
   }
   return { kind: "parents", paths: [] };
 }
@@ -152,10 +164,9 @@ function pendingParents(
   const root = lexicalRootFor(pack, candidate);
   if (!root) return { kind: "escaped" };
 
-  let current = resolve(candidate);
   let missing = false;
   const paths = new Map<string, string>();
-  while (isWithin(root, current)) {
+  for (const current of parentPaths(candidate, root)) {
     try {
       const canonical = realpathSync(current);
       if (!isWithin(pack.root, canonical)) return { kind: "escaped" };
@@ -165,8 +176,6 @@ function pendingParents(
     } catch {
       missing = true;
     }
-    if (current === root) break;
-    current = dirname(current);
   }
   return {
     kind: "parents",
@@ -178,8 +187,7 @@ function safeParentFor(pack: ResourcePack, candidate: string): string[] {
   const root = lexicalRootFor(pack, candidate);
   if (!root) return [];
 
-  let current = dirname(resolve(candidate));
-  while (isWithin(root, current)) {
+  for (const current of parentPaths(dirname(candidate), root)) {
     try {
       const canonical = realpathSync(current);
       if (
@@ -191,8 +199,6 @@ function safeParentFor(pack: ResourcePack, candidate: string): string[] {
     } catch {
       // Continue to the nearest existing lexical parent.
     }
-    if (current === root) break;
-    current = dirname(current);
   }
   return [pack.root];
 }

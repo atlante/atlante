@@ -2202,4 +2202,131 @@ describe("package resource loading", () => {
     expect(failure.message).not.toContain(fixture.root);
     expect(JSON.stringify(failure.failure)).not.toContain(fixture.root);
   });
+
+  test("prefers the nearest package installation over an ancestor installation", () => {
+    const fixture = projectRoot({ "precedence-pack": "1.0.0" });
+    const source = join(fixture.root, "source", "deep");
+    const local = join(source, "node_modules", "precedence-pack");
+    const ancestor = installedPackage(fixture.root, "precedence-pack");
+    mkdirSync(local, { recursive: true });
+    writePackManifest(local, "precedence-pack", { version: "2.0.0" });
+    writeJson(join(local, "atlante.jsonc"), { values: { from: "local" } });
+    writeJson(join(ancestor, "atlante.jsonc"), {
+      values: { from: "ancestor" },
+    });
+    const authoringFile = join(source, "authoring.jsonc");
+    writeJson(authoringFile, {});
+
+    const result = resolvePackageResourcePack(
+      createProjectResourcePack(fixture.root),
+      packageLocator("precedence-pack"),
+      authoringFile,
+    );
+
+    expect(result.pack.package?.version).toBe("2.0.0");
+  });
+
+  test("rejects package identity changes during reconstruction", () => {
+    const fixture = projectRoot({
+      "author-pack": "file:workspace",
+    });
+    const workspace = mkdtempSync(join(tmpdir(), "atlante-package-workspace-"));
+    created.push(workspace);
+    const authorRoot = join(workspace, "author-pack");
+    mkdirSync(authorRoot, { recursive: true });
+    writePackManifest(authorRoot, "author-pack", {
+      dependencies: { "dependency-pack": "1.0.0" },
+    });
+    writeJson(join(authorRoot, "atlante.jsonc"), {});
+    const dependencyRoot = installedPackage(workspace, "dependency-pack");
+    writeJson(join(dependencyRoot, "atlante.jsonc"), {});
+    const installed = join(fixture.root, "node_modules", "author-pack");
+    mkdirSync(join(installed, ".."), { recursive: true });
+    symlinkSync(authorRoot, installed, "dir");
+
+    const authoringPack = resolvePackageResourcePack(
+      createProjectResourcePack(fixture.root),
+      packageLocator("author-pack"),
+      fixture.config,
+    ).pack;
+    const manifest = join(dependencyRoot, "package.json");
+    const failure = expectFailure(
+      () =>
+        resolvePackageResourcePack(
+          authoringPack,
+          packageLocator("dependency-pack"),
+          join(installed, "atlante.jsonc"),
+          {
+            beforePackageRootReconstruction: () =>
+              writePackManifest(dependencyRoot, "dependency-pack", {
+                version: "9.9.9",
+              }),
+          },
+        ),
+      "unsafe-path",
+    );
+
+    expect(failure.failure.message).toBe(
+      "package metadata identity changed during resolution",
+    );
+    expect(failure.dependencies).toContain(realpathSync(manifest));
+  });
+
+  test.each([
+    { name: "other-pack", version: "1.0.0" },
+    { name: "dependency-pack", version: "1.2" },
+    { name: "dependency-pack", version: 1 },
+  ])(
+    "rejects malformed resolved package identity: $name/$version",
+    ({ name, version }) => {
+      const fixture = projectRoot({ "dependency-pack": "1.0.0" });
+      const packageRoot = installedPackage(fixture.root, "dependency-pack", {
+        version: "1.0.0",
+      });
+      writeJson(join(packageRoot, "package.json"), {
+        name,
+        version,
+        atlante: { format: 1 },
+      });
+
+      expectFailure(
+        () =>
+          loadPresetFacet(
+            createProjectResourcePack(fixture.root),
+            "dependency-pack",
+            fixture.config,
+          ),
+        "package-metadata-unreadable",
+      );
+    },
+  );
+
+  test("does not let package metadata exports bypass resource path validation", () => {
+    const fixture = projectRoot({ "exports-pack": "1.0.0" });
+    const packageRoot = installedPackage(fixture.root, "exports-pack");
+    writeJson(join(packageRoot, "package.json"), {
+      name: "exports-pack",
+      version: "1.0.0",
+      exports: { ".": "./private.js" },
+      atlante: { format: 1 },
+    });
+    writeTemplate(packageRoot, "public");
+
+    expect(
+      loadTemplateFacet(
+        createProjectResourcePack(fixture.root),
+        "exports-pack/public",
+        fixture.config,
+      ).facet.source,
+    ).toBe("# package template\n");
+    expectFailure(
+      () =>
+        loadTemplateFacet(
+          createProjectResourcePack(fixture.root),
+          "exports-pack/missing",
+          fixture.config,
+        ),
+      "missing-package-subpath",
+    );
+  });
 });

@@ -9,6 +9,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { resourceTemplateSelection } from "@atlante/resources";
 import { SCHEMA_URI } from "@atlante/schema";
 import { afterEach, describe, expect, test } from "vitest";
 import { loadDocument } from "../src/index.js";
@@ -404,7 +405,34 @@ describe("resource-backed document validation", () => {
     expect(JSON.stringify(diagnostic)).not.toContain(root);
   });
 
-  test.each(["oneOf", "anyOf"] as const)(
+  test("preserves decorated diagnostic source and location from the template", () => {
+    const { root, configPath } = project({
+      $schema: SCHEMA_URI,
+      agents: {
+        reviewer: {
+          $template: "./template",
+          description: "Review",
+        },
+      },
+    });
+    writeTemplate(root, "template", {
+      type: "object",
+      properties: { marker: { template: 42 } },
+    });
+
+    const diagnostic = load(configPath).diagnostics.find(
+      ({ code }) => code === "invalid-input-schema",
+    );
+
+    expect(diagnostic).toMatchObject({
+      source: "template/template.jsonc",
+      path: "/agents/reviewer/marker",
+      pointer: "/agents/reviewer/marker",
+    });
+    expect(diagnostic?.location?.line).toBeGreaterThan(0);
+  });
+
+  test.each(["oneOf", "anyOf", "allOf"] as const)(
     "attributes same-path %s child failures to the matching template after branch reversal",
     (keyword) => {
       const { root, configPath } = project({
@@ -471,6 +499,467 @@ describe("resource-backed document validation", () => {
       }
     },
   );
+
+  test("selects a valid inline branch and annotates its nested input", () => {
+    const { root, configPath } = project({
+      $schema: SCHEMA_URI,
+      agents: {
+        reviewer: {
+          $template: "./parent",
+          description: "Review",
+          choice: { leftOnly: "selected" },
+        },
+      },
+    });
+    writeTemplate(root, "parent", {
+      type: "object",
+      properties: {
+        choice: {
+          oneOf: [{ template: "../left" }, { template: "../right" }],
+        },
+      },
+      required: ["choice"],
+      additionalProperties: false,
+    });
+    writeTemplate(root, "left", {
+      type: "object",
+      properties: { leftOnly: { type: "string" } },
+      required: ["leftOnly"],
+      additionalProperties: false,
+    });
+    writeTemplate(root, "right", {
+      type: "object",
+      properties: { rightOnly: { type: "string" } },
+      required: ["rightOnly"],
+      additionalProperties: false,
+    });
+
+    const result = load(configPath);
+
+    expect(result.diagnostics).toEqual([]);
+    expect(
+      resourceTemplateSelection(
+        result.resources?.bindings.agents.reviewer?.input.choice,
+      ),
+    ).toEqual({ templateId: "../left" });
+  });
+
+  test("records the selected output for a direct nested child template", () => {
+    const { root, configPath } = project({
+      $schema: SCHEMA_URI,
+      agents: {
+        reviewer: {
+          $template: "./parent",
+          description: "Review",
+          child: { value: "selected" },
+        },
+      },
+    });
+    writeTemplate(root, "parent", {
+      type: "object",
+      properties: { child: { template: "./child" } },
+      required: ["child"],
+      additionalProperties: false,
+    });
+    writeTemplate(root, "parent/child", {
+      type: "object",
+      properties: { value: { type: "string" } },
+      required: ["value"],
+      additionalProperties: false,
+    });
+
+    const result = load(configPath);
+
+    expect(result.diagnostics).toEqual([]);
+    expect(
+      resourceTemplateSelection(
+        result.resources?.bindings.agents.reviewer?.input.child,
+      ),
+    ).toEqual({ templateId: "./child" });
+  });
+
+  test("validates input through a direct nested child template", () => {
+    const { root, configPath } = project({
+      $schema: SCHEMA_URI,
+      agents: {
+        reviewer: {
+          $template: "./parent",
+          description: "Review",
+          child: { value: 42 },
+        },
+      },
+    });
+    writeTemplate(root, "parent", {
+      type: "object",
+      properties: { child: { template: "./child" } },
+      required: ["child"],
+      additionalProperties: false,
+    });
+    writeTemplate(root, "parent/child", {
+      type: "object",
+      properties: { value: { type: "string" } },
+      required: ["value"],
+      additionalProperties: false,
+    });
+
+    expect(load(configPath).diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: "invalid-prompt-input",
+        path: "/agents/reviewer/child/value",
+        source: "parent/child/template.jsonc",
+      }),
+    );
+  });
+
+  test("preserves an authored inline selection over lexical branch fallback", () => {
+    const { root, configPath } = project({
+      $schema: SCHEMA_URI,
+      agents: {
+        reviewer: {
+          $template: "./parent",
+          description: "Review",
+          choice: { $instance: "./selected" },
+        },
+      },
+    });
+    writeTemplate(root, "parent", {
+      type: "object",
+      properties: {
+        choice: {
+          anyOf: [{ template: "../z-left" }, { template: "../a-right" }],
+        },
+      },
+      required: ["choice"],
+      additionalProperties: false,
+    });
+    for (const name of ["z-left", "a-right"])
+      writeTemplate(root, name, {
+        type: "object",
+        properties: { shared: { type: "string" } },
+        required: ["shared"],
+        additionalProperties: false,
+      });
+    writeInstance(root, "selected", {
+      $template: "../z-left",
+      shared: "selected",
+    });
+
+    const result = load(configPath);
+    const choice = result.resources?.bindings.agents.reviewer?.input.choice;
+
+    expect(result.diagnostics).toEqual([]);
+    expect(resourceTemplateSelection(choice)).toEqual({
+      templateId: "../z-left",
+    });
+  });
+
+  test.each(["anyOf", "allOf"] as const)(
+    "uses stable lexical fallback for same-shape %s branches",
+    (keyword) => {
+      const { root, configPath } = project({
+        $schema: SCHEMA_URI,
+        agents: {
+          reviewer: {
+            $template: "./parent",
+            description: "Review",
+            choice: { shared: "selected" },
+          },
+        },
+      });
+      writeTemplate(root, "parent", {
+        type: "object",
+        properties: {
+          choice: {
+            [keyword]: [{ template: "./z-left" }, { template: "./a-right" }],
+          },
+        },
+        required: ["choice"],
+        additionalProperties: false,
+      });
+      for (const name of ["z-left", "a-right"])
+        writeTemplate(root, `parent/${name}`, {
+          type: "object",
+          properties: { shared: { type: "string" } },
+          required: ["shared"],
+          additionalProperties: false,
+        });
+
+      const result = load(configPath);
+      const choice = result.resources?.bindings.agents.reviewer?.input.choice;
+
+      expect(result.diagnostics).toEqual([]);
+      expect(resourceTemplateSelection(choice)).toEqual({
+        templateId: "./a-right",
+      });
+    },
+  );
+
+  test("retains branch selection while recursing into a selected child", () => {
+    const { root, configPath } = project({
+      $schema: SCHEMA_URI,
+      agents: {
+        reviewer: {
+          $template: "./parent",
+          description: "Review",
+          choice: { $instance: "./selected" },
+        },
+      },
+    });
+    writeTemplate(root, "parent", {
+      type: "object",
+      properties: {
+        choice: {
+          anyOf: [{ template: "./left" }, { template: "./right" }],
+        },
+      },
+      required: ["choice"],
+      additionalProperties: false,
+    });
+    writeTemplate(root, "parent/left", {
+      type: "object",
+      properties: { nested: { template: "../nested" } },
+      required: ["nested"],
+      additionalProperties: false,
+    });
+    writeTemplate(root, "parent/right", {
+      type: "object",
+      properties: { nested: { template: "../nested" } },
+      required: ["nested"],
+      additionalProperties: false,
+    });
+    writeTemplate(root, "parent/nested", {
+      type: "object",
+      properties: { right: { type: "string" } },
+      required: ["right"],
+      additionalProperties: false,
+    });
+    writeInstance(root, "selected", {
+      $template: "../parent/right",
+      nested: { right: "selected" },
+    });
+
+    const result = load(configPath);
+    const choice = result.resources?.bindings.agents.reviewer?.input.choice;
+
+    expect(result.diagnostics).toEqual([]);
+    expect(resourceTemplateSelection(choice)).toEqual({
+      templateId: "./right",
+    });
+    expect(
+      resourceTemplateSelection((choice as Record<string, unknown>).nested),
+    ).toEqual({ templateId: "../nested" });
+  });
+
+  test("rebases tuple child validation paths for each prefix item", () => {
+    const { root, configPath } = project({
+      $schema: SCHEMA_URI,
+      agents: {
+        reviewer: {
+          $template: "./parent",
+          description: "Review",
+          items: [{ name: 1 }, { count: "not-a-number" }],
+        },
+      },
+    });
+    writeTemplate(root, "parent", {
+      type: "object",
+      properties: {
+        items: {
+          type: "array",
+          prefixItems: [{ template: "./name" }, { template: "./count" }],
+          minItems: 2,
+          maxItems: 2,
+        },
+      },
+      required: ["items"],
+      additionalProperties: false,
+    });
+    writeTemplate(root, "parent/name", {
+      type: "object",
+      properties: { name: { type: "string" } },
+      required: ["name"],
+      additionalProperties: false,
+    });
+    writeTemplate(root, "parent/count", {
+      type: "object",
+      properties: { count: { type: "number" } },
+      required: ["count"],
+      additionalProperties: false,
+    });
+
+    const diagnostics = load(configPath).diagnostics;
+
+    expect(diagnostics.map(({ path }) => path)).toEqual([
+      "/agents/reviewer/items/1/count",
+      "/agents/reviewer/items/0/name",
+    ]);
+    expect(
+      diagnostics.every(({ code }) => code === "invalid-prompt-input"),
+    ).toBe(true);
+  });
+
+  test("rebases nested child-template paths below tuple items", () => {
+    const { root, configPath } = project({
+      $schema: SCHEMA_URI,
+      agents: {
+        reviewer: {
+          $template: "./parent",
+          description: "Review",
+          items: [{ metadata: { value: 1 } }, { metadata: { value: false } }],
+        },
+      },
+    });
+    writeTemplate(root, "parent", {
+      type: "object",
+      properties: {
+        items: {
+          type: "array",
+          prefixItems: [{ template: "./name" }, { template: "./count" }],
+          minItems: 2,
+          maxItems: 2,
+        },
+      },
+      required: ["items"],
+      additionalProperties: false,
+    });
+    for (const name of ["name", "count"])
+      writeTemplate(root, `parent/${name}`, {
+        type: "object",
+        properties: { metadata: { template: "../metadata" } },
+        required: ["metadata"],
+        additionalProperties: false,
+      });
+    writeTemplate(root, "parent/metadata", {
+      type: "object",
+      properties: { value: { type: "string" } },
+      required: ["value"],
+      additionalProperties: false,
+    });
+
+    const diagnostics = load(configPath).diagnostics;
+
+    expect(diagnostics.map(({ path }) => path)).toEqual([
+      "/agents/reviewer/items/0/metadata/value",
+      "/agents/reviewer/items/1/metadata/value",
+    ]);
+    expect(
+      diagnostics.every(({ code }) => code === "invalid-prompt-input"),
+    ).toBe(true);
+  });
+
+  test("annotates every item when a child template is selected through array items", () => {
+    const { root, configPath } = project({
+      $schema: SCHEMA_URI,
+      agents: {
+        reviewer: {
+          $template: "./parent",
+          description: "Review",
+          items: [{ name: "first" }, { name: "second" }],
+        },
+      },
+    });
+    writeTemplate(root, "parent", {
+      type: "object",
+      properties: {
+        items: {
+          type: "array",
+          items: { template: "./item" },
+          minItems: 2,
+        },
+      },
+      required: ["items"],
+      additionalProperties: false,
+    });
+    writeTemplate(root, "parent/item", {
+      type: "object",
+      properties: { name: { type: "string" } },
+      required: ["name"],
+      additionalProperties: false,
+    });
+
+    const result = load(configPath);
+    const items = result.resources?.bindings.agents.reviewer?.input.items;
+
+    expect(result.diagnostics).toEqual([]);
+    expect(Array.isArray(items)).toBe(true);
+    if (Array.isArray(items)) {
+      expect(items.map(resourceTemplateSelection)).toEqual([
+        { templateId: "./item" },
+        { templateId: "./item" },
+      ]);
+    }
+  });
+
+  test("selects inline branches independently for each array item", () => {
+    const { root, configPath } = project({
+      $schema: SCHEMA_URI,
+      agents: {
+        reviewer: {
+          $template: "./parent",
+          description: "Review",
+          items: [{ left: "first" }, { right: "second" }],
+        },
+      },
+    });
+    writeTemplate(root, "parent", {
+      type: "object",
+      properties: {
+        items: {
+          type: "array",
+          items: {
+            oneOf: [{ template: "./left" }, { template: "./right" }],
+          },
+          minItems: 2,
+          maxItems: 2,
+        },
+      },
+      required: ["items"],
+      additionalProperties: false,
+    });
+    writeTemplate(root, "parent/left", {
+      type: "object",
+      properties: { left: { type: "string" } },
+      required: ["left"],
+      additionalProperties: false,
+    });
+    writeTemplate(root, "parent/right", {
+      type: "object",
+      properties: { right: { type: "string" } },
+      required: ["right"],
+      additionalProperties: false,
+    });
+
+    const result = load(configPath);
+    const items = result.resources?.bindings.agents.reviewer?.input.items;
+
+    expect(result.diagnostics).toEqual([]);
+    expect(Array.isArray(items)).toBe(true);
+    if (Array.isArray(items)) {
+      expect(items.map(resourceTemplateSelection)).toEqual([
+        { templateId: "./left" },
+        { templateId: "./right" },
+      ]);
+    }
+  });
+
+  test("reports unresolved interpolated descriptions", () => {
+    const unresolved = project({
+      $schema: SCHEMA_URI,
+      agents: {
+        reviewer: {
+          $template: "./template",
+          description: "{{values.missing}}",
+        },
+      },
+    });
+    writeTemplate(unresolved.root, "template", { type: "object" });
+    expect(load(unresolved.configPath).diagnostics).toEqual([
+      expect.objectContaining({
+        code: "missing-value",
+        path: "/agents/reviewer/description",
+      }),
+    ]);
+  });
 
   test("accepts a nested input property named template", () => {
     const { root, configPath } = project({
@@ -802,6 +1291,83 @@ describe("resource-backed document validation", () => {
     );
   });
 
+  test("reports all schema contract failures with input paths and template locations", () => {
+    const { root, configPath } = project({
+      $schema: SCHEMA_URI,
+      agents: {
+        reviewer: {
+          $template: "./template",
+          description: "Review",
+          extra: true,
+        },
+      },
+    });
+    writeRawTemplate(
+      root,
+      "template",
+      `{
+  "$schema": "${DRAFT_URI}",
+  "type": "object",
+  "properties": { "requiredValue": { "type": "string" } },
+  "required": ["requiredValue"],
+  "additionalProperties": false
+}
+`,
+    );
+
+    const diagnostics = load(configPath).diagnostics;
+
+    expect(diagnostics).toEqual([
+      expect.objectContaining({
+        code: "invalid-prompt-input",
+        message: expect.stringContaining("must NOT have additional properties"),
+        path: "/agents/reviewer/extra",
+        pointer: "/agents/reviewer/extra",
+        source: "atlante.jsonc",
+      }),
+      expect.objectContaining({
+        code: "invalid-prompt-input",
+        message: expect.stringMatching(/must have required property/),
+        path: "/agents/reviewer/requiredValue",
+        pointer: "/agents/reviewer/requiredValue",
+        source: "template/template.jsonc",
+      }),
+    ]);
+  });
+
+  test("rejects invalid composition markers throughout nested arrays with stable paths", () => {
+    const { root, configPath } = project({
+      $schema: SCHEMA_URI,
+      agents: {
+        reviewer: {
+          $template: "./template",
+          description: "Review",
+          items: [{ template: "" }, { template: "not-a-locator" }],
+        },
+      },
+    });
+    writeTemplate(root, "template", {
+      type: "object",
+      properties: {
+        items: {
+          type: "array",
+          items: { template: "" },
+        },
+      },
+    });
+
+    const diagnostics = load(configPath).diagnostics;
+
+    expect(diagnostics).toEqual([
+      expect.objectContaining({
+        code: "invalid-input-schema",
+        path: "/agents/reviewer/items",
+        pointer: "/agents/reviewer/items",
+        source: "template/template.jsonc",
+      }),
+    ]);
+  });
+
   test("diagnoses unknown system values without a consuming binding", () => {
     const { configPath } = project({
       $schema: SCHEMA_URI,
@@ -819,6 +1385,7 @@ describe("resource-backed document validation", () => {
       pointer: "/values/unused",
       source: "atlante.jsonc",
     });
+    expect(diagnostic?.message).toContain('value "unused"');
   });
 
   test("anchors unknown system values inherited from a preset", () => {
@@ -1258,6 +1825,7 @@ describe("resource-backed document validation", () => {
       expect.objectContaining({
         code: "value-reference-collision",
         path: "/agents/reviewer",
+        message: expect.stringContaining("interpolated object keys collide"),
       }),
     );
   });
@@ -1350,6 +1918,127 @@ describe("resource-backed document validation", () => {
         code: "unknown-system-variable",
         path: "/values/project",
       }),
+    );
+  });
+
+  test("distinguishes invalid, missing, and non-string binding references", () => {
+    const { root, configPath } = project({
+      $schema: SCHEMA_URI,
+      agents: {
+        invalid: {
+          $template: "./agent",
+          description: "Invalid",
+          identity: "{{values.}}",
+        },
+        missing: {
+          $template: "./agent",
+          description: "Missing",
+          identity: "{{values.absent}}",
+        },
+      },
+    });
+    writeTemplate(root, "agent", {
+      type: "object",
+      properties: { identity: { type: "string" } },
+      required: ["identity"],
+      additionalProperties: false,
+    });
+
+    const result = load(configPath);
+
+    expect(result.document).toBeUndefined();
+    expect(result.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "invalid-value-reference",
+          path: "/agents/invalid/identity",
+          message: expect.stringContaining(
+            'invalid values reference "{{values.}}"',
+          ),
+        }),
+        expect.objectContaining({
+          code: "missing-value",
+          path: "/agents/missing/identity",
+          message: expect.stringContaining(
+            'missing required value "{{values.absent}}"',
+          ),
+        }),
+      ]),
+    );
+  });
+
+  test("reports binding value contracts before resolving system values", () => {
+    const { root, configPath } = project({
+      $schema: SCHEMA_URI,
+      extends: "./base",
+      agents: { reviewer: { values: { valid: "local" } } },
+    });
+    writeTemplate(root, "agent", { type: "object" });
+    mkdirSync(join(root, "base"));
+    writeFileSync(
+      join(root, "base", "atlante.jsonc"),
+      `${JSON.stringify({
+        $schema: SCHEMA_URI,
+        agents: {
+          reviewer: {
+            $template: "../agent",
+            description: "Review",
+            values: { "bad key": "invalid" },
+          },
+        },
+      })}\n`,
+    );
+
+    const result = load(configPath);
+
+    expect(result.document).toBeUndefined();
+    expect(result.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "invalid-value-reference",
+          path: "/agents/reviewer/values/bad key",
+          message: expect.stringContaining('binding value name "bad key"'),
+        }),
+      ]),
+    );
+    expect(result.diagnostics).not.toContainEqual(
+      expect.objectContaining({ code: "unknown-system-variable" }),
+    );
+  });
+
+  test("does not validate the prompt schema when a value reference is unresolved", () => {
+    const { root, configPath } = project({
+      $schema: SCHEMA_URI,
+      agents: {
+        reviewer: {
+          $template: "./agent",
+          description: "Review",
+          identity: "{{values.missing}}",
+          mission: 42,
+        },
+      },
+    });
+    writeTemplate(root, "agent", {
+      type: "object",
+      properties: {
+        identity: { type: "string", minLength: 99 },
+        mission: { type: "string" },
+      },
+      required: ["identity", "mission"],
+      additionalProperties: false,
+    });
+
+    const result = load(configPath);
+
+    expect(result.document).toBeUndefined();
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: "missing-value",
+        path: "/agents/reviewer/identity",
+      }),
+    );
+    expect(result.diagnostics).not.toContainEqual(
+      expect.objectContaining({ code: "invalid-prompt-input" }),
     );
   });
 

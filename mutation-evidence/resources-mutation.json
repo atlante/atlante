@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 2,
+  "workspace": "resources",
+  "command": "bun run mutation:test resources",
+  "source": {
+    "identity": "packages/resources/src/**/*.ts",
+    "algorithm": "sha256:path\u0000bytes\u0000:v1",
+    "sha256": "95661f59de1cac7ab454b875548bac4e26ae2fdcbb3c853f503d73e96299f708",
+    "files": [
+      "packages/resources/src/authored-values.ts",
+      "packages/resources/src/composition.ts",
+      "packages/resources/src/content-root.ts",
+      "packages/resources/src/errors.ts",
+      "packages/resources/src/facets.ts",
+      "packages/resources/src/filesystem.ts",
+      "packages/resources/src/graph.ts",
+      "packages/resources/src/index.ts",
+      "packages/resources/src/json-path.ts",
+      "packages/resources/src/jsonc.ts",
+      "packages/resources/src/locator.ts",
+      "packages/resources/src/merge.ts",
+      "packages/resources/src/object.ts",
+      "packages/resources/src/package-resolution.ts",
+      "packages/resources/src/provenance.ts",
+      "packages/resources/src/renderer.ts",
+      "packages/resources/src/resolution.ts",
+      "packages/resources/src/resolve.ts",
+      "packages/resources/src/schema.ts",
+      "packages/resources/src/system-values.ts",
+      "packages/resources/src/types.ts",
+      "packages/resources/src/values.ts"
+    ],
+    "fileCount": 22
+  },
+  "report": {
+    "identity": "mutation/resources/mutation.json",
+    "sha256": "6b58c8ed166a8422d0bbeececfdca24ba173877a84d49972badca4902a0a047e"
+  },
+  "versions": {
+    "bun": "1.3.14",
+    "node": "v22.20.0",
+    "vitest": "4.1.11",
+    "stryker": "10.0.0"
+  },
+  "runtime": "169m30s",
+  "exitCode": 0,
+  "counts": {
+    "files": 20,
+    "mutants": 4861,
+    "killed": 3087,
+    "survived": 1335,
+    "noCoverage": 439,
+    "mutationScore": 63.51,
+    "timeouts": 0,
+    "errors": 0,
+    "ignored": 0
+  },
+  "generatedAt": "2026-08-26T14:51:14.683Z",
+  "commitBase": "adae9d6ada5e7db4cb277b7505a2792f269c159b",
+  "attestations": [
+    {
+      "preflight": {
+        "identity": "mutation-evidence/resources-preflight.json",
+        "sha256": "98041020957fe5f30a3702aac807e6c5c6f733eb2caff3d2a7710fecc4fc1470"
+      },
+      "campaign": {
+        "identity": "mutation-evidence/resources-campaign.json",
+        "sha256": "d0d1e88e77a8c1abfba6c515d87f196e0e4ec53a199548be7c98ad95e64a4a8c"
+      }
+    }
+  ]
+}

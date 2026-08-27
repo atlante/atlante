@@ -49,16 +49,15 @@ function positionOf(
 ): JsoncLocation {
   let low = 0;
   let high = lineStarts.length;
-  while (low < high) {
+  for (const _ of lineStarts) {
     const middle = low + Math.floor((high - low) / 2);
-    const lineStart = lineStarts[middle];
-    if (lineStart !== undefined && lineStart <= offset) {
+    const lineStart = lineStarts[middle] ?? Number.POSITIVE_INFINITY;
+    if (lineStart <= offset) {
       low = middle + 1;
     } else {
       high = middle;
     }
   }
-
   const lineStart = lineStarts[low - 1] ?? 0;
   return {
     line: low,
@@ -119,8 +118,8 @@ function parseSource(
   options: { allowTrailingComma: boolean; disallowComments: boolean },
 ): ParsedJsonc {
   const lineStarts = [0];
-  for (let index = 0; index < source.length; index++) {
-    if (source.charCodeAt(index) === 10) lineStarts.push(index + 1);
+  for (const [index, character] of source.split("").entries()) {
+    if (character === "\n") lineStarts.push(index + 1);
   }
 
   const errors: ParseError[] = [];

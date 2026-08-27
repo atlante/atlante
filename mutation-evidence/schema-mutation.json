@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 2,
+  "workspace": "schema",
+  "command": "bun run mutation:test schema",
+  "source": {
+    "identity": "packages/schema/src/**/*.ts",
+    "algorithm": "sha256:path\u0000bytes\u0000:v1",
+    "sha256": "d2c035191c8a9098e99c404f5bf60c5e84d89e7da6ff2f03ae2102b87c361210",
+    "files": [
+      "packages/schema/src/document.ts",
+      "packages/schema/src/index.ts",
+      "packages/schema/src/values.ts"
+    ],
+    "fileCount": 3
+  },
+  "report": {
+    "identity": "mutation/schema/mutation.json",
+    "sha256": "9afa2d742e5e75cf85fe3e08be1571a689e0547098763719f4de808847b94820"
+  },
+  "versions": {
+    "bun": "1.3.14",
+    "node": "v22.20.0",
+    "vitest": "4.1.11",
+    "stryker": "10.0.0"
+  },
+  "runtime": "1m7s",
+  "exitCode": 0,
+  "counts": {
+    "files": 2,
+    "mutants": 188,
+    "killed": 130,
+    "survived": 14,
+    "noCoverage": 1,
+    "mutationScore": 89.66,
+    "timeouts": 0,
+    "errors": 0,
+    "ignored": 43
+  },
+  "generatedAt": "2026-08-26T14:51:14.675Z",
+  "commitBase": "adae9d6ada5e7db4cb277b7505a2792f269c159b",
+  "attestations": [
+    {
+      "preflight": {
+        "identity": "mutation-evidence/schema-run1-preflight.json",
+        "sha256": "c818dd0886f04704b1ff945e0492a2150afecd87636c878c134ac9fd9dc6a5d5"
+      },
+      "campaign": {
+        "identity": "mutation-evidence/schema-run1-campaign.json",
+        "sha256": "ad32e0f2c00e87033518f0dade8f50f018ef7d08481914e23b67243d28ff5b48"
+      }
+    },
+    {
+      "preflight": {
+        "identity": "mutation-evidence/schema-run2-preflight.json",
+        "sha256": "c0aae1acbb74798c49550fcd3e796acfcfc1f24611f473e7a9609916d40089e7"
+      },
+      "campaign": {
+        "identity": "mutation-evidence/schema-run2-campaign.json",
+        "sha256": "2bafaaeda33d1e2df20b28dedba44ac0a0d11aca0a3bf7494674ef47b8997579"
+      }
+    }
+  ]
+}

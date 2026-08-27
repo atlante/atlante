@@ -112,6 +112,70 @@ describe("resource filesystem", () => {
     );
   });
 
+  test("rejects traversal and authoring paths outside the captured root", () => {
+    const root = rootOf();
+    const source = sourceFile(root);
+    const directory = resource(root);
+    writeFileSync(join(directory, "template.jsonc"), schema);
+    writeFileSync(join(directory, "template.md"), "safe\n");
+    const outside = rootOf();
+    const outsideSource = sourceFile(outside);
+    const pack = createProjectResourcePack(root);
+
+    expectFailure(
+      () => loadTemplateFacet(pack, "../resource", source),
+      "unsafe-path",
+    );
+    expectFailure(
+      () => loadTemplateFacet(pack, "./resource", outsideSource),
+      "unsafe-path",
+    );
+  });
+
+  test("reports invalid UTF-8 as a typed read failure", () => {
+    const root = rootOf();
+    const source = sourceFile(root);
+    const directory = resource(root);
+    writeFileSync(join(directory, "template.jsonc"), schema);
+    writeFileSync(join(directory, "template.md"), Buffer.from([0xc3, 0x28]));
+
+    const failure = expectFailure(
+      () =>
+        loadTemplateFacet(
+          createProjectResourcePack(root),
+          "./resource",
+          source,
+        ),
+      "invalid-resolved-input",
+    );
+    expect(failure.failure.message).toBe("resource facet is not valid UTF-8");
+    expect(failure.message).not.toContain(root);
+  });
+
+  test("keeps read failures deterministic and scoped to the selected resource", () => {
+    const root = rootOf();
+    const source = sourceFile(root);
+    const directory = resource(root);
+    writeFileSync(join(directory, "template.jsonc"), schema);
+    writeFileSync(join(directory, "template.md"), "safe\n");
+    const pack = createProjectResourcePack(root);
+    const load = () =>
+      loadTemplateFacet(pack, "./resource", source, {
+        beforeRead: () => {
+          throw new Error("injected read failure");
+        },
+      });
+
+    const first = expectFailure(load, "wrong-target-type");
+    const second = expectFailure(load, "wrong-target-type");
+    expect(first.failure).toEqual(second.failure);
+    expect(first.dependencies).toEqual([
+      join(pack.root, "resource", "template.jsonc"),
+      join(pack.root, "resource", "template.md"),
+    ]);
+    expect(first.unresolvedParents).toEqual([join(pack.root, "resource")]);
+  });
+
   test("rejects FIFOs and other non-regular facet files without blocking", () => {
     const root = rootOf();
     const source = sourceFile(root);
