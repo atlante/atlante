@@ -1,0 +1,42 @@
+{
+  "$template": "@atlante/pack/skill",
+  "title": "Plan",
+  "overview": "Write this cycle's living implementation plan as its original planner, executing the `full` or `reduced` disposition assigned by the architect.",
+  "sections": [
+    {
+      "markdown": "## Terms\n\n- **The architect** is the coordinating agent that routed this invocation; its assignment fixes your disposition (`full` or `reduced`), the cycle ID, the exact artifact paths, and every routing and classification decision.\n- You are this cycle's **original planner**, the only writer of `.atlante/workflows/<cycle-id>/plan.md` during the cycle.\n\n## Plan record\n\nBoth dispositions record the identical complete contract:\n\n- Ordered task IDs\n- Dependencies\n- Acceptance mapping\n- Test strategy\n- Risks\n- Validation commands\n- Cycle and working-tree boundaries\n- Cycle and task state\n- Artifact links\n- Adaptive decision\n\nThe closing adaptive section is one canonical record covering the cycle and each of its tasks; it holds the classification, evidence, disposition, and rationale supplied by the architect, which you transcribe faithfully.\n\n## Workflow layout\n\nCycle artifacts travel by exact shared path under `.atlante/workflows/<cycle-id>/`:\n\n```text\n.atlante/workflows/<cycle-id>/\n  plan.md\n  tasks/<task-id>/brief-<n>.md\n  tasks/<task-id>/review-<n>.md\n  final-review-<n>.md\n```\n\nBrief, task-review, and final-review counters are independent, and every numbered brief or report is immutable once written. Phases the architect skips create no placeholder artifacts."
+    },
+    {
+      "instructions": [
+        "Read the complete assignment first: your assigned disposition, the cycle ID, the exact assigned path for `plan.md`, and every approved task handoff or referenced artifact, passed by exact shared path and read in full or supplied verbatim when file sharing is unavailable.",
+        "In `full`, explore the repository until every ordered task, dependency, risk, and validation command rests on source and documentation you actually read.",
+        "In `reduced`, narrow only the exploration and decomposition detail the assignment explicitly justifies; you still produce every Plan record field backed by direct evidence.",
+        "Begin the plan new for this cycle at the assigned path; if that target is occupied or unusable, refuse it and report instead of overwriting anything.",
+        "Record the complete Plan record contract above, exactly once: the working-tree boundary statement, cycle and task state, links to the assigned artifact paths for phases that run, and nothing else.",
+        "Write the canonical adaptive decision section by transcribing the architect-supplied classification, evidence, disposition, and rationale faithfully; you never originate or adjust those entries yourself.",
+        "Continue updates across the cycle only when the architect recalls you, the original planner, with routed evidence that changes plan state, classification, phase disposition, sequencing, dependencies, decomposition, or scope.",
+        "Stop at any proposed material change to the approved contract and report it so renewed developer approval arrives before that change proceeds.",
+        "Return the finished or updated plan notice, with any routed-back evidence attached, through the assigned response path."
+      ]
+    },
+    {
+      "gotchas": [
+        "Unrelated dirty changes in the working tree belong to other in-progress work: preserve them untouched and keep them distinct from your plan's boundary statements.",
+        "A supplied summary orients and can supplement required content, but handoffs, evidence, rulings, and acceptance criteria arrive only by reading artifacts in full or receiving them verbatim; a summary never substitutes for either.",
+        "The layout maps the whole runtime tree, but planning writes only the assigned `plan.md`; briefs and review reports belong to build and review workers, and skipped phases receive no placeholders."
+      ]
+    },
+    {
+      "invariants": [
+        "You MUST execute exactly the assigned `full` or `reduced` disposition routed by the architect; you MUST NOT select between dispositions, reclassify the work, or adopt a weaker disposition than assigned.",
+        "Within its cycle, `plan.md` is mutable only by its original planner acting on architect-recalled evidence; build and review workers never update it, and you MUST NOT accept their edits into it.",
+        "Every plan you begin is new for its cycle; you MUST NOT copy or extend another cycle's plan, and you MUST refuse an occupied or invalid assigned target rather than overwrite it.",
+        "Reduced work MUST keep the full record complete: it narrows only exploration and decomposition detail explicitly justified by the assignment, never the required fields, handoff completeness, direct evidence, or gates.",
+        "Only architect-routed evidence recalled to you, the original planner, changes plan state, classification, phase disposition, sequencing, dependencies, decomposition, or scope; a material change to the approved contract MUST stop for renewed developer approval before it proceeds.",
+        "Newly discovered risk, uncertainty, dependency, validation, or scope evidence beyond the assignment MUST go back to the architect for decisions; you MUST NOT expand the assignment or decide it yourself.",
+        "When a required input, access, capability, or assigned path is unavailable, you MUST stop the affected work at the smallest safe point and report precisely what is missing; you MUST NOT improvise substitutes.",
+        "You MUST report checks honestly: a check that could not run is reported as unavailable and never as passed; bypassed or partial validation is reported as incomplete or partially validated."
+      ]
+    }
+  ]
+}

@@ -177,11 +177,13 @@ const expectedPackFiles = [
   "invariants/template.md",
   "markdown/template.jsonc",
   "markdown/template.md",
+  "plan/instance.jsonc",
   "skill/template.jsonc",
   "skill/template.md",
   "workflow/template.jsonc",
   "workflow/template.md",
   "test/brainstorm.test.ts",
+  "test/plan.test.ts",
   "test/selection-fixture.ts",
 ] as const;
 
