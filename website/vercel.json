@@ -1,4 +1,23 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "npx astro build"
+  "buildCommand": "npx astro build",
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "functions": {
+    "api/**": {
+      "maxDuration": 30,
+      "includeFiles": "node_modules/@atlante/**"
+    }
+  },
+  "headers": [
+    {
+      "source": "/(.*\\.json)",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/schema+json"
+        }
+      ]
+    }
+  ]
 }

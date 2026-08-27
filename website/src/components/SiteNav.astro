@@ -3,10 +3,9 @@
 ---
 
 <nav class="site-nav" aria-label="Primary">
-  <a
-    class="nav-link"
-    href="https://github.com/atlante/atlante/releases/latest">v0.1</a
-  >
+  <a class="wordmark" href="#main">ATLANTE</a>
+
+
 
   <button type="button" class="planet" data-theme-toggle>
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -38,30 +37,32 @@
   .site-nav {
     position: fixed;
     inset-block-start: var(--space-4);
-    inset-inline-end: var(--space-4);
+    inset-inline: var(--space-4);
     z-index: 60;
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: var(--space-2);
   }
 
 
-  .nav-link {
+
+
+  .wordmark {
     display: inline-flex;
     align-items: center;
     min-height: var(--control-min);
-    padding-inline: var(--space-2);
-    color: var(--ds-muted);
-    font-family: var(--font-ui);
-    font-size: var(--text-small);
-    font-weight: 600;
-    letter-spacing: 0.02em;
+    color: var(--ds-fg);
+    font-family: var(--font-display);
+    font-size: 20px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
     text-decoration: none;
   }
 
 
-  .nav-link:hover,
-  .nav-link:focus-visible {
+  .wordmark:hover,
+  .wordmark:focus-visible {
     color: var(--ds-fg);
     text-decoration: underline;
     text-decoration-color: var(--ds-border);
@@ -69,8 +70,15 @@
     text-underline-offset: 0.25em;
   }
 
-  :global([data-theme="dark"]) .nav-link:hover,
-  :global([data-theme="dark"]) .nav-link:focus-visible {
+  @media (max-width: 700px) {
+    .site-nav {
+      display: none;
+    }
+  }
+
+
+  :global([data-theme="dark"]) .wordmark:hover,
+  :global([data-theme="dark"]) .wordmark:focus-visible {
     color: var(--atlante-bronze);
   }
 

@@ -33,6 +33,12 @@ body {
   outline-offset: 2px;
 }
 
+/* The hidden attribute must always win over component display values. */
+[hidden] {
+  display: none !important;
+}
+
+
 .skip-link {
   position: fixed;
   inset-block-start: var(--space-2);
@@ -49,6 +55,9 @@ body {
   letter-spacing: 0.04em;
   text-decoration: none;
 }
+
+/* Nothing renders below 11px: the brand meta size is the floor. */
+
 
 .skip-link:focus {
   translate: 0 0;
@@ -96,8 +105,30 @@ main section[id] {
   header,
   footer,
   section {
-    transition-property: background-color, color, border-color;
+    transition-property: background-color, color;
     transition-duration: var(--duration-editorial);
     transition-timing-function: var(--ease-standard);
+  }
+
+  /* Decorative rules are solid bronze bars; transition everything that
+     could tint them so scrolling never shows a blend between themes. */
+  ::before,
+  ::after {
+    transition-property: background-color;
+    transition-duration: var(--duration-editorial);
+    transition-timing-function: var(--ease-standard);
+  }
+}
+
+/* Text-and-image sections read better with a shared content cap on big
+   screens; app-like surfaces (the build instrument panel) stay wide. */
+@media (min-width: 1200px) {
+  .observatory .intro,
+  .observatory .instrument,
+  .review-close .intro,
+  .review-close .guarantees,
+  .review-close .next-step {
+    max-width: min(100%, 1240px);
+    margin-inline: auto;
   }
 }
