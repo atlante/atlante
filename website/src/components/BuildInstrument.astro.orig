@@ -1078,7 +1078,7 @@ const hints: Record<string, string> = {
 
 
   [data-tree-list] :global(button.tree-active .tree-name) {
-    text-decoration-color: var(--ds-fg);
+    text-decoration-color: var(--ds-border);
     text-decoration-thickness: 2px;
   }
 
