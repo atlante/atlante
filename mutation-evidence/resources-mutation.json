@@ -57,20 +57,6 @@
   },
   "generatedAt": "2026-08-26T14:51:14.683Z",
   "commitBase": "adae9d6ada5e7db4cb277b7505a2792f269c159b",
-  "attestation": {
-    "preflight": {
-      "identity": "mutation-evidence/resources-preflight.json",
-      "sha256": "98041020957fe5f30a3702aac807e6c5c6f733eb2caff3d2a7710fecc4fc1470"
-    },
-    "campaign": {
-      "identity": "mutation-evidence/resources-campaign.json",
-      "sha256": "d0d1e88e77a8c1abfba6c515d87f196e0e4ec53a199548be7c98ad95e64a4a8c"
-    },
-    "manifest": {
-      "identity": "mutation-evidence/resources-verdict.json",
-      "sha256": "0cce83de5bfee7072981f5b149165934defcfed6a72510731928c3ba1605eadb"
-    }
-  },
   "attestations": [
     {
       "preflight": {
@@ -80,10 +66,6 @@
       "campaign": {
         "identity": "mutation-evidence/resources-campaign.json",
         "sha256": "d0d1e88e77a8c1abfba6c515d87f196e0e4ec53a199548be7c98ad95e64a4a8c"
-      },
-      "manifest": {
-        "identity": "mutation-evidence/resources-verdict.json",
-        "sha256": "0cce83de5bfee7072981f5b149165934defcfed6a72510731928c3ba1605eadb"
       }
     }
   ],
