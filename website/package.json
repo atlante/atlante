@@ -14,7 +14,7 @@
     "astro": "astro"
   },
   "dependencies": {
-    "@atlante/cli": "0.1.11"
+    "@atlante/cli": "0.1.15"
   },
   "devDependencies": {
     "astro": "^5.0.0"
