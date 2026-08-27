@@ -58,6 +58,9 @@
     "packages/pack": {
       "name": "@atlante/pack",
       "version": "0.1.12",
+      "devDependencies": {
+        "@atlante/resources": "workspace:*",
+      },
     },
     "packages/resources": {
       "name": "@atlante/resources",

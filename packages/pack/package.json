@@ -34,6 +34,9 @@
     "README.md",
     "LICENSE"
   ],
+  "devDependencies": {
+    "@atlante/resources": "workspace:*"
+  },
   "atlante": {
     "format": 1
   }
