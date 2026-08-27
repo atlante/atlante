@@ -60,6 +60,7 @@
       "version": "0.1.12",
       "devDependencies": {
         "@atlante/resources": "workspace:*",
+        "@atlante/validator": "workspace:*",
       },
     },
     "packages/resources": {

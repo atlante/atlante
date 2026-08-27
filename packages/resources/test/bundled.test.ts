@@ -170,8 +170,12 @@ describe("first-party package resources", () => {
     );
 
     expect(Object.keys(document.bindings.agents)).toEqual(["architect"]);
-    expect(Object.keys(document.bindings.skills)).toEqual([
+    expect(Object.keys(document.bindings.skills).sort()).toEqual([
+      "brainstorm",
       "brainstorming",
+      "build",
+      "plan",
+      "review",
       "workflow",
     ]);
     expect(String(instance.effectiveTemplate.locator)).toBe(

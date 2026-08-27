@@ -187,6 +187,7 @@ const expectedPackFiles = [
   "test/brainstorm.test.ts",
   "test/build.test.ts",
   "test/plan.test.ts",
+  "test/preset.test.ts",
   "test/review.test.ts",
   "test/selection-fixture.ts",
 ] as const;
@@ -329,8 +330,12 @@ describe("first-party package resolution", () => {
     });
 
     expect(Object.keys(document.bindings.agents)).toEqual(["architect"]);
-    expect(Object.keys(document.bindings.skills)).toEqual([
+    expect(Object.keys(document.bindings.skills).sort()).toEqual([
+      "brainstorm",
       "brainstorming",
+      "build",
+      "plan",
+      "review",
       "workflow",
     ]);
     const descriptionOrigin =

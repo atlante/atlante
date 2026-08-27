@@ -89,7 +89,8 @@ try {
   );
   const skillIds = manifest.skills.map((skill) => skill.id).sort();
   assert(
-    skillIds.join(",") === "brainstorming,workflow",
+    skillIds.join(",") ===
+      "brainstorm,brainstorming,build,plan,review,workflow",
     `unexpected skill ids: ${skillIds}`,
   );
 
@@ -149,7 +150,7 @@ try {
     rootManifest.skills
       .map(({ id }) => id)
       .sort()
-      .join(",") === "brainstorming,workflow",
+      .join(",") === "brainstorm,brainstorming,build,plan,review,workflow",
     "root skill artifact IDs changed",
   );
   assert(
