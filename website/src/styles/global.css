@@ -69,9 +69,6 @@ body {
   --container-hero: 1280px;
   --container-playground: 1760px;
   --container-content: 86ch;
-  --container-code: 106ch;
-  --ds-muted: color-mix(in oklab, var(--atlante-jet) 78%, var(--atlante-linen));
-  --ds-border-subtle: color-mix(in oklab, var(--atlante-bronze) 42%, var(--atlante-linen));
 }
 
 :root {
