@@ -7,7 +7,12 @@
 
 
 
-  <button type="button" class="planet" data-theme-toggle>
+  <button
+    type="button"
+    class="planet"
+    data-theme-toggle
+    aria-label="Switch theme"
+  >
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <circle
         cx="12"
@@ -35,14 +40,16 @@
 
 <style>
   .site-nav {
-    position: fixed;
+    position: sticky;
     inset-block-start: var(--space-4);
-    inset-inline: var(--space-4);
+    inset-inline: 0;
     z-index: 60;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: var(--space-2);
+    width: min(calc(100% - 2 * var(--space-4)), var(--container-hero));
+    margin-inline: auto;
   }
 
 

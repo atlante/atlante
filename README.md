@@ -9,6 +9,8 @@ Atlante gives software architects, engineers, and developers one versioned sourc
 The builder validates the authored configuration, composes selected templates, instances, and presets, and publishes deterministic artifacts. A host adapter materializes those artifacts for the host.
 
 [OpenCode](https://opencode.ai/) is the only supported host adapter today.
+Read the [documentation](https://docs.atlante.sh) for installation, concepts,
+configuration, CLI reference, and OpenCode integration.
 
 ## Why Atlante
 

@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.astro/
+public/brand/
+public/fonts/
+src/assets/
+src/styles/atlante-tokens.css

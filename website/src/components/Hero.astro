@@ -45,10 +45,11 @@ import glyphDark from "../assets/atlante-glyph-reverse.svg";
 <style>
   .hero {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
     align-items: center;
-    column-gap: clamp(var(--space-16), 6vw, var(--space-32));
-    max-width: var(--container-wide);
+    column-gap: clamp(var(--space-12), 5vw, var(--space-24));
+    width: min(calc(100% - 2 * var(--space-4)), var(--container-hero));
+    box-sizing: border-box;
     margin-inline: auto;
     padding: var(--space-24) var(--space-4) var(--space-16);
   }
@@ -106,7 +107,7 @@ import glyphDark from "../assets/atlante-glyph-reverse.svg";
 
   .glyph {
     grid-area: 1 / 1;
-    width: clamp(280px, 30vw, 460px);
+    width: clamp(260px, 28vw, 400px);
     height: auto;
   }
 
@@ -167,7 +168,7 @@ import glyphDark from "../assets/atlante-glyph-reverse.svg";
     border-color: var(--ds-border);
   }
 
-  @media (max-width: 760px) {
+  @media (max-width: 860px) {
 
     .hero {
       grid-template-columns: 1fr;

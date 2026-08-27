@@ -11,7 +11,7 @@ Sans 3 for interface text, and JetBrains Mono for code and diagnostics.
 ## Commands
 
 ```sh
-bun run dev      # sync brand assets, then start the dev server
+bun run dev      # sync brand assets, then start the dev server on port 4321
 bun run build    # sync brand assets, then build to dist/
 bun run preview  # serve the built site locally
 ```
