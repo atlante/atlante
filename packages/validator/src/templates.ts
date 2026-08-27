@@ -1380,15 +1380,17 @@ export function validateResolvedDocument(
   resources: ResolvedResourceDocument,
 ): Diagnostic[] {
   const diagnostics: Diagnostic[] = unknownSystemValueDiagnostics(resources);
-  for (const id of Object.keys(resources.bindings.agents).sort()) {
-    const binding = resources.bindings.agents[id];
+  const agents = resources.bindings.agents ?? {};
+  for (const id of Object.keys(agents).sort()) {
+    const binding = agents[id];
     if (binding)
       diagnostics.push(
         ...validateResolvedBinding(resources, "agents", "agent", binding),
       );
   }
-  for (const id of Object.keys(resources.bindings.skills).sort()) {
-    const binding = resources.bindings.skills[id];
+  const skills = resources.bindings.skills ?? {};
+  for (const id of Object.keys(skills).sort()) {
+    const binding = skills[id];
     if (binding)
       diagnostics.push(
         ...validateResolvedBinding(resources, "skills", "skill", binding),

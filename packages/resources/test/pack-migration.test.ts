@@ -19,12 +19,18 @@ import {
   loadPresetFacet,
   loadTemplateFacet,
   parseResourceLocator,
+  type ResourceBindingCollectionSpec,
   ResourceResolutionError,
   renderResolvedTemplate,
   resolveResourceDocument,
   resolveResourceInstance,
   resolveResourceTemplate,
 } from "../src/index.js";
+
+const atlanteBindingCollections: readonly ResourceBindingCollectionSpec[] = [
+  { key: "agents", subject: "agent", defaultTemplate: "@atlante/pack/agent" },
+  { key: "skills", subject: "skill", defaultTemplate: "@atlante/pack/skill" },
+];
 
 const repositoryRoot = fileURLToPath(new URL("../../../", import.meta.url));
 const packRoot = join(repositoryRoot, "packages", "pack");
@@ -304,6 +310,7 @@ describe("first-party package resolution", () => {
     const document = resolveResourceDocument({
       pack: projectPack,
       rootFile: fixture.configPath,
+      bindingCollections: atlanteBindingCollections,
     });
 
     expect(Object.keys(document.bindings.agents)).toEqual(["architect"]);
@@ -613,20 +620,33 @@ describe("first-party section semantics", () => {
 });
 
 describe("temporary first-party vocabulary removal", () => {
-  test("rejects old built-in locators instead of assigning a bundled identity", () => {
-    for (const locator of [
-      "atlante/starter",
-      "atlante/agent",
-      "atlante/skill",
-    ]) {
-      try {
-        parseResourceLocator(locator);
-        throw new Error(`expected ${locator} to be rejected`);
-      } catch (error) {
-        expect(error).toBeInstanceOf(ResourceResolutionError);
-        if (error instanceof ResourceResolutionError)
-          expect(error.failure.code).toBe("invalid-locator");
-      }
+  test("parses old built-in locators as ordinary package locators", () => {
+    for (const [locator, subpath] of [
+      ["atlante/starter", "starter"],
+      ["atlante/agent", "agent"],
+      ["atlante/skill", "skill"],
+    ] as const)
+      expect(parseResourceLocator(locator)).toMatchObject({
+        kind: "package",
+        packageName: "atlante",
+        subpath,
+      });
+    expect(() => parseResourceLocator("atlante/")).toThrow(
+      ResourceResolutionError,
+    );
+  });
+
+  test("fails old built-in locators through the generic declared-package path", () => {
+    const fixture = firstPartyProject({ extends: "@atlante/pack" });
+    const projectPack = createProjectResourcePack(fixture.root);
+
+    try {
+      loadTemplateFacet(projectPack, "atlante/starter", fixture.configPath);
+      throw new Error("expected atlante/starter to fail resolution");
+    } catch (error) {
+      expect(error).toBeInstanceOf(ResourceResolutionError);
+      if (error instanceof ResourceResolutionError)
+        expect(error.failure.code).toBe("package-not-declared");
     }
   });
 

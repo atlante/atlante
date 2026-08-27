@@ -20,11 +20,17 @@ import type {
 import {
   canonicalGraphKey,
   createProjectResourcePack,
+  type ResourceBindingCollectionSpec,
   resolveResourceDocument,
   resolveResourceInstance,
   resolveResourceTemplate,
   resourceTemplateSelection,
 } from "../src/index.js";
+
+const atlanteBindingCollections: readonly ResourceBindingCollectionSpec[] = [
+  { key: "agents", subject: "agent", defaultTemplate: "@atlante/pack/agent" },
+  { key: "skills", subject: "skill", defaultTemplate: "@atlante/pack/skill" },
+];
 
 const created: string[] = [];
 const schemaUri = "https://json-schema.org/draft/2020-12/schema";
@@ -212,6 +218,7 @@ function resolveDocument(root: string, config: string) {
   return resolveResourceDocument({
     pack: createProjectResourcePack(root),
     rootFile: config,
+    bindingCollections: atlanteBindingCollections,
   });
 }
 
@@ -615,6 +622,7 @@ describe("resource resolution", () => {
     resolveResourceDocument({
       pack: createProjectResourcePack(root),
       rootFile: config,
+      bindingCollections: atlanteBindingCollections,
       beforeRead: (path) => reads.push(path),
     });
 
@@ -652,6 +660,7 @@ describe("resource resolution", () => {
         resolveResourceDocument({
           pack: createProjectResourcePack(root),
           rootFile: config,
+          bindingCollections: atlanteBindingCollections,
           beforeRead: (path) => {
             reads.push(path);
             if (!created && path === realpathSync(bridgeFile)) {
@@ -2006,6 +2015,112 @@ describe("resource resolution", () => {
     expect(JSON.stringify(result.normalized)).not.toContain('"project":null');
   });
 
+  test("resolves an implicit binding selector from the declared collection default template", () => {
+    const { root, config } = rootOf();
+    writeFileSync(
+      config,
+      `${JSON.stringify({
+        agents: {
+          implied: {
+            description: "Implied agent",
+            identity: "Identity",
+            mission: "Mission",
+          },
+        },
+        skills: {
+          implied: {
+            description: "Implied skill",
+            title: "Testing",
+            overview: "Overview",
+          },
+        },
+      })}\n`,
+    );
+
+    const result = resolveDocument(root, config);
+    const agent = result.bindings.agents.implied;
+    const skill = result.bindings.skills.implied;
+    if (!agent || !skill) throw new Error("implied bindings missing");
+
+    expect(String(agent.template.locator)).toBe("@atlante/pack/agent");
+    expect(agent.template.origin).toMatchObject({
+      kind: "package",
+      path: `@atlante/pack@${firstPartyPackVersion}/agent/template.jsonc`,
+    });
+    expect(String(skill.template.locator)).toBe("@atlante/pack/skill");
+    expect(skill.template.origin).toMatchObject({
+      kind: "package",
+      path: `@atlante/pack@${firstPartyPackVersion}/skill/template.jsonc`,
+    });
+    expect(agent.input).toEqual({ identity: "Identity", mission: "Mission" });
+    expect(originPath(result.provenance, "/agents/implied/identity")).toBe(
+      "atlante.jsonc",
+    );
+    expect(skill.input).toEqual({ title: "Testing", overview: "Overview" });
+    expect(originPath(result.provenance, "/skills/implied/title")).toBe(
+      "atlante.jsonc",
+    );
+  });
+
+  test("fails a root binding source without a selector when no collection default is declared", () => {
+    const { root, config } = rootOf();
+    writeFileSync(
+      config,
+      `${JSON.stringify({
+        agents: {
+          unselected: { description: "No default", payload: true },
+        },
+      })}\n`,
+    );
+
+    const failure = expectFailure(
+      () =>
+        resolveResourceDocument({
+          pack: createProjectResourcePack(root),
+          rootFile: config,
+          bindingCollections: [{ key: "agents", subject: "agent" }],
+        }),
+      "invalid-resolved-input",
+    );
+    expect(failure.failure.message).toBe(
+      "binding source object requires $template, $instance, or a collection default template",
+    );
+    expect(failure.failure.pointer).toBe("/agents/unselected");
+  });
+
+  test("materializes only declared binding collections and passes undeclared keys through", () => {
+    const { root, config } = rootOf();
+    writeTemplate(root, "agent-template");
+    const helpers = {
+      utility: {
+        description: "Undeclared helper",
+        target: "./definitely-missing-target",
+      },
+    };
+    writeFileSync(
+      config,
+      `${JSON.stringify({
+        agents: {
+          reviewer: {
+            $template: "./agent-template",
+            description: "Review",
+          },
+        },
+        helpers,
+      })}\n`,
+    );
+
+    const result = resolveResourceDocument({
+      pack: createProjectResourcePack(root),
+      rootFile: config,
+      bindingCollections: [atlanteBindingCollections[0]],
+    });
+
+    expect(Object.keys(result.bindings)).toEqual(["agents"]);
+    expect(result.bindings.agents.reviewer?.description).toBe("Review");
+    expect(result.document.helpers).toEqual(helpers);
+  });
+
   test("fails closed when a cached package template is retargeted externally", () => {
     const { root, config } = rootOf();
     const { packageRoot, template } = writePackageTemplate(root);
@@ -2032,6 +2147,7 @@ describe("resource resolution", () => {
         resolveResourceDocument({
           pack: createProjectResourcePack(root),
           rootFile: config,
+          bindingCollections: atlanteBindingCollections,
           beforeRead: (path) => {
             reads.push(path);
             if (!retargeted && path === realpathSync(mutatorFile)) {
@@ -2095,6 +2211,7 @@ describe("resource resolution", () => {
         resolveResourceDocument({
           pack: createProjectResourcePack(root),
           rootFile: config,
+          bindingCollections: atlanteBindingCollections,
           beforeRead: (path) => {
             reads.push(path);
             if (!retargeted && path === realpathSync(mutatorFile)) {
@@ -2159,6 +2276,7 @@ describe("resource resolution", () => {
         resolveResourceDocument({
           pack: createProjectResourcePack(root),
           rootFile: config,
+          bindingCollections: atlanteBindingCollections,
           beforeRead: (path) => {
             reads.push(path);
             if (!retargeted && path === realpathSync(mutatorFile)) {

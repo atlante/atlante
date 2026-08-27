@@ -17,6 +17,8 @@ export type AuthoredValueLayerKind = "instance" | "preset";
 type AuthoredValueLayerOptions = Readonly<{
   readonly kind: AuthoredValueLayerKind;
   readonly locations?: Readonly<Record<string, JsoncLocation>>;
+  /** Document keys holding binding collections with binding-local values. */
+  readonly bindingKeys?: readonly string[];
 }>;
 
 function pointerSegment(segment: string): string {
@@ -100,8 +102,8 @@ export function authoredValueLayerIssues(
   );
   if (options.kind === "instance") return issues;
 
-  for (const kind of ["agents", "skills"] as const) {
-    const collection = source[kind];
+  for (const key of options.bindingKeys ?? []) {
+    const collection = source[key];
     if (!isSafeJsonObject(collection)) continue;
     for (const id of Object.keys(collection).sort()) {
       const binding = collection[id];
@@ -109,7 +111,7 @@ export function authoredValueLayerIssues(
       issues.push(
         ...valueLayerIssues(
           binding.values,
-          `/${kind}/${pointerSegment(id)}/values`,
+          `/${key}/${pointerSegment(id)}/values`,
           "binding",
           options.locations,
         ),

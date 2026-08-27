@@ -3,6 +3,7 @@ import { basename, dirname, isAbsolute, resolve } from "node:path";
 import {
   createProjectResourcePack,
   type JsonObject,
+  type ResourceBindingCollectionSpec,
   type ResourcePack,
   type ResourceResolutionContext,
   ResourceResolutionError,
@@ -41,6 +42,16 @@ export type DocumentLoadOptions = {
   ) => { isDirectory(): boolean } | undefined;
   resourceContext?: ResourceResolutionContext;
 };
+
+/**
+ * Atlante binding collections and their first-party default templates
+ * (SPECIFICATION §7 Bindings). The generic resolver only materializes
+ * declared collections; the document layer owns this product semantics.
+ */
+const atlanteBindingCollections: readonly ResourceBindingCollectionSpec[] = [
+  { key: "agents", subject: "agent", defaultTemplate: "@atlante/pack/agent" },
+  { key: "skills", subject: "skill", defaultTemplate: "@atlante/pack/skill" },
+];
 
 /** Files and parents needed to retry the same resource resolution. */
 export type ResourceWatchContext = Readonly<{
@@ -443,6 +454,7 @@ function resolveResourceBackedDocument(
       rootFile: path,
       ...(rootDocument ? { rootDocument } : {}),
       ...(resourceContext ? { resourceContext } : {}),
+      bindingCollections: atlanteBindingCollections,
     });
   } catch (cause) {
     return {

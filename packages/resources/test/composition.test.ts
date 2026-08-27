@@ -1,5 +1,34 @@
-import { describe, expect, test } from "vitest";
-import { isCompositionMarker, type JsonObject, slotsOf } from "../src/index.js";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, test } from "vitest";
+import type { ResourceFailureCode } from "../src/index.js";
+import {
+  createProjectResourcePack,
+  isCompositionMarker,
+  type JsonObject,
+  ResourceResolutionError,
+  resolveResourceLocator,
+  slotsOf,
+} from "../src/index.js";
+
+const created: string[] = [];
+
+function expectFailure(action: () => unknown, code: ResourceFailureCode): void {
+  try {
+    action();
+    throw new Error("expected resource resolution to fail");
+  } catch (error) {
+    expect(error).toBeInstanceOf(ResourceResolutionError);
+    if (error instanceof ResourceResolutionError)
+      expect(error.failure.code).toBe(code);
+  }
+}
+
+afterEach(() => {
+  for (const root of created.splice(0))
+    rmSync(root, { recursive: true, force: true });
+});
 
 describe("resource template composition", () => {
   test("finds a top-level slot marker", () => {
@@ -191,7 +220,7 @@ describe("resource template composition", () => {
     ]);
   });
 
-  test("rejects legacy built-in ids and accepts locator-backed markers", () => {
+  test("accepts legacy built-in ids as package-style markers alongside other locator-backed markers", () => {
     expect(
       slotsOf({
         type: "object",
@@ -205,6 +234,9 @@ describe("resource template composition", () => {
         },
       }),
     ).toEqual([
+      { property: "agent", templateId: "atlante/agent" },
+      { property: "skill", templateId: "atlante/skill" },
+      { property: "starter", templateId: "atlante/starter" },
       { property: "local", templateId: "../shared" },
       {
         property: "unscoped",
@@ -215,5 +247,18 @@ describe("resource template composition", () => {
         templateId: "@acme/review-pack/strict/base",
       },
     ]);
+  });
+
+  test("fails legacy package-style markers through the generic declared-package path", () => {
+    const root = mkdtempSync(join(tmpdir(), "atlante-composition-"));
+    created.push(root);
+    const source = join(root, "source.jsonc");
+    writeFileSync(source, "{}\n");
+    const pack = createProjectResourcePack(root);
+
+    expectFailure(
+      () => resolveResourceLocator(pack, "atlante/agent", source),
+      "package-not-declared",
+    );
   });
 });

@@ -1698,7 +1698,7 @@ describe("resource-backed document validation", () => {
     ).toBe(true);
   });
 
-  test("rejects legacy built-in ids as semantic composition markers", () => {
+  test("fails legacy built-in id composition markers through generic package resolution", () => {
     const { root, configPath } = project({
       $schema: SCHEMA_URI,
       agents: {
@@ -1720,16 +1720,14 @@ describe("resource-backed document validation", () => {
     const result = load(configPath);
 
     expect(result.document).toBeUndefined();
+    expect(result.resources).toBeUndefined();
     expect(result.diagnostics.map(({ code }) => code)).toEqual([
-      "invalid-input-schema",
-      "invalid-input-schema",
-      "invalid-input-schema",
+      "package-not-declared",
     ]);
-    expect(result.diagnostics.map(({ path }) => path)).toEqual([
-      "/agents/reviewer/agent",
-      "/agents/reviewer/skill",
-      "/agents/reviewer/starter",
-    ]);
+    expect(result.diagnostics[0]?.path).toBe(
+      "/agents/reviewer/$template/agent",
+    );
+    expect(JSON.stringify(result.diagnostics)).not.toContain(root);
   });
 
   test("sanitizes an absolute invalid composition marker from every diagnostic field", () => {

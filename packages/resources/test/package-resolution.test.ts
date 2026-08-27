@@ -13,16 +13,23 @@ import { join } from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
 import {
   createPackageResolutionCache,
+  createPackageResourcePack,
   createProjectResourcePack,
   loadInstanceFacet,
   loadPresetFacet,
   loadTemplateFacet,
   parseResourceLocator,
+  type ResourceBindingCollectionSpec,
   ResourceResolutionError,
   resolvePackageResourcePack,
   resolveResourceDocument,
   resourcePackMetadataPaths,
 } from "../src/index.js";
+
+const atlanteBindingCollections: readonly ResourceBindingCollectionSpec[] = [
+  { key: "agents", subject: "agent", defaultTemplate: "@atlante/pack/agent" },
+  { key: "skills", subject: "skill", defaultTemplate: "@atlante/pack/skill" },
+];
 
 const created: string[] = [];
 const schemaUri = "https://json-schema.org/draft/2020-12/schema";
@@ -258,6 +265,7 @@ describe("package resource loading", () => {
     const result = resolveResourceDocument({
       pack: createProjectResourcePack(root),
       rootFile: config,
+      bindingCollections: atlanteBindingCollections,
     });
 
     expect(result.normalized.values).toEqual({ named: "preset" });
@@ -2046,6 +2054,7 @@ describe("package resource loading", () => {
     const request = {
       pack: createProjectResourcePack(root),
       rootFile: config,
+      bindingCollections: atlanteBindingCollections,
       beforeRead: (_path: string) => {
         reads += 1;
       },
@@ -2105,6 +2114,7 @@ describe("package resource loading", () => {
       result = resolveResourceDocument({
         pack: createProjectResourcePack(root),
         rootFile: config,
+        bindingCollections: atlanteBindingCollections,
         beforeRead: (path) => reads.push(path),
       });
     } catch (error) {
@@ -2328,5 +2338,237 @@ describe("package resource loading", () => {
         ),
       "missing-package-subpath",
     );
+  });
+});
+
+describe("provided package contexts", () => {
+  function trustedPack(
+    name: string,
+    options: PackManifestOptions = {},
+  ): string {
+    const root = mkdtempSync(join(tmpdir(), "atlante-package-provided-"));
+    created.push(root);
+    writePackManifest(root, name, options);
+    return root;
+  }
+
+  test("revalidates a provided pack identity from its lexical root on every request", () => {
+    const fixture = projectRoot();
+    const trusted = trustedPack("acme-pack", { version: "1.0.0" });
+    const captured = createPackageResourcePack(trusted, "acme-pack");
+    const consulted: string[] = [];
+    const options = {
+      resourceContext: {
+        packageProvider: (name: string) => {
+          consulted.push(name);
+          return name === "acme-pack" ? captured : undefined;
+        },
+      },
+    };
+
+    const first = resolvePackageResourcePack(
+      createProjectResourcePack(fixture.root),
+      packageLocator("acme-pack"),
+      fixture.config,
+      options,
+    );
+    expect(first.pack.root).toBe(realpathSync(trusted));
+    expect(first.pack.package?.version).toBe("1.0.0");
+    expect(first.dependencies).toContain(
+      realpathSync(join(trusted, "package.json")),
+    );
+    expect(first.dependencies).toContain(join(trusted, "package.json"));
+    expect(consulted).toEqual(["acme-pack"]);
+
+    writePackManifest(trusted, "acme-pack", { version: "1.1.0" });
+    const second = resolvePackageResourcePack(
+      createProjectResourcePack(fixture.root),
+      packageLocator("acme-pack"),
+      fixture.config,
+      options,
+    );
+    expect(second.pack.package?.version).toBe("1.1.0");
+    expect(second.pack.package?.manifestPath).toBe(
+      realpathSync(join(trusted, "package.json")),
+    );
+    expect(captured.package?.version).toBe("1.0.0");
+    expect(consulted).toEqual(["acme-pack", "acme-pack"]);
+  });
+
+  test("picks up a repaired provided-pack manifest without mutating the captured pack", () => {
+    const fixture = projectRoot();
+    const trusted = trustedPack("acme-pack", { version: "1.2.3" });
+    const captured = createPackageResourcePack(trusted, "acme-pack");
+    const authoringPack = createProjectResourcePack(fixture.root);
+    const options = {
+      resourceContext: { packageProvider: () => captured },
+    };
+
+    writeFileSync(join(trusted, "package.json"), "{ not JSON\n");
+    const broken = expectFailure(
+      () =>
+        resolvePackageResourcePack(
+          authoringPack,
+          packageLocator("acme-pack"),
+          fixture.config,
+          options,
+        ),
+      "package-metadata-unreadable",
+    );
+    expect(broken.failure.message).toBe("package metadata is not valid JSON");
+    expect(broken.dependencies).toContain(join(trusted, "package.json"));
+
+    writePackManifest(trusted, "acme-pack", { version: "2.0.0" });
+    const recovered = resolvePackageResourcePack(
+      authoringPack,
+      packageLocator("acme-pack"),
+      fixture.config,
+      options,
+    );
+    expect(recovered.pack.package?.name).toBe("acme-pack");
+    expect(recovered.pack.package?.version).toBe("2.0.0");
+    expect(captured.package?.version).toBe("1.2.3");
+  });
+
+  test("fails closed when a provided pack lexical root changes", () => {
+    const fixture = projectRoot();
+    const trusted = trustedPack("acme-pack");
+    const captured = createPackageResourcePack(trusted, "acme-pack");
+    const authoringPack = createProjectResourcePack(fixture.root);
+    const options = {
+      resourceContext: { packageProvider: () => captured },
+    };
+
+    rmSync(trusted, { recursive: true, force: true });
+    const failure = expectFailure(
+      () =>
+        resolvePackageResourcePack(
+          authoringPack,
+          packageLocator("acme-pack"),
+          fixture.config,
+          options,
+        ),
+      "unsafe-path",
+    );
+
+    expect(failure.failure.message).toBe("provided package root changed");
+    expect(failure.unresolvedParents).toEqual([captured.root]);
+    expect(failure.trustedRoots).toContainEqual({
+      canonical: captured.root,
+      lexical: captured.lexicalRoot,
+    });
+  });
+
+  test("falls through to declared package resolution when the provider declines", () => {
+    const fixture = projectRoot({ "declared-pack": "1.0.0" });
+    const declaredRoot = installedPackage(fixture.root, "declared-pack");
+    writeJson(join(declaredRoot, "atlante.jsonc"), {});
+    const requested: string[] = [];
+    const options = {
+      resourceContext: {
+        packageProvider: (name: string) => {
+          requested.push(name);
+          return undefined;
+        },
+      },
+    };
+
+    const resolved = resolvePackageResourcePack(
+      createProjectResourcePack(fixture.root),
+      packageLocator("declared-pack"),
+      fixture.config,
+      options,
+    );
+
+    expect(resolved.pack.root).toBe(realpathSync(declaredRoot));
+    expect(resolved.pack.package?.name).toBe("declared-pack");
+    expect(requested).toEqual(["declared-pack"]);
+  });
+
+  test("never consults the provider for package-authored packs", () => {
+    const fixture = projectRoot({ "author-pack": "1.0.0" });
+    const authorRoot = installedPackage(fixture.root, "author-pack", {
+      dependencies: { "dependency-pack": "1.0.0" },
+    });
+    writeJson(join(authorRoot, "atlante.jsonc"), {});
+    const dependencyRoot = installedPackage(fixture.root, "dependency-pack");
+    const authoringPack = resolvePackageResourcePack(
+      createProjectResourcePack(fixture.root),
+      packageLocator("author-pack"),
+      fixture.config,
+    ).pack;
+    expect(authoringPack.kind).toBe("package");
+
+    const resolved = resolvePackageResourcePack(
+      authoringPack,
+      packageLocator("dependency-pack"),
+      join(realpathSync(authorRoot), "atlante.jsonc"),
+      {
+        resourceContext: {
+          packageProvider: () => {
+            throw new Error("provider must not be consulted");
+          },
+        },
+      },
+    );
+
+    expect(resolved.pack.root).toBe(realpathSync(dependencyRoot));
+  });
+
+  test("fails validation when a provider supplies a differently named pack", () => {
+    const fixture = projectRoot();
+    const trusted = trustedPack("acme-pack");
+    const captured = createPackageResourcePack(trusted, "acme-pack");
+
+    const failure = expectFailure(
+      () =>
+        resolvePackageResourcePack(
+          createProjectResourcePack(fixture.root),
+          packageLocator("review-pack"),
+          fixture.config,
+          { resourceContext: { packageProvider: () => captured } },
+        ),
+      "package-metadata-unreadable",
+    );
+
+    expect(failure.failure.message).toBe(
+      "package metadata must declare the resolved package name and version",
+    );
+  });
+
+  test("caches provided packs by root within a request and revalidates across requests", () => {
+    const fixture = projectRoot();
+    const trusted = trustedPack("acme-pack", { version: "1.0.0" });
+    const captured = createPackageResourcePack(trusted, "acme-pack");
+    const context = {
+      resourceContext: {
+        packageProvider: (name: string) =>
+          name === "acme-pack" ? captured : undefined,
+      },
+    };
+    const cache = createPackageResolutionCache();
+
+    const first = resolvePackageResourcePack(
+      createProjectResourcePack(fixture.root),
+      packageLocator("acme-pack"),
+      fixture.config,
+      { ...context, cache },
+    );
+    writePackManifest(trusted, "acme-pack", { version: "9.9.9" });
+    const second = resolvePackageResourcePack(
+      createProjectResourcePack(fixture.root),
+      packageLocator("acme-pack"),
+      fixture.config,
+      { ...context, cache },
+    );
+    expect(second.pack).toBe(first.pack);
+
+    const freshRequest = resolvePackageResourcePack(
+      createProjectResourcePack(fixture.root),
+      packageLocator("acme-pack"),
+      fixture.config,
+      context,
+    );
+    expect(freshRequest.pack.package?.version).toBe("9.9.9");
   });
 });

@@ -26,5 +26,9 @@ export function resolveFirstPartyPack(): ResourcePack {
 }
 
 export function firstPartyProjectContext(): ProjectContext {
-  return { firstPartyPack: resolveFirstPartyPack() };
+  const capturedFirstPartyPack = resolveFirstPartyPack();
+  return {
+    packageProvider: (packageName) =>
+      packageName === FIRST_PARTY_PACKAGE ? capturedFirstPartyPack : undefined,
+  };
 }

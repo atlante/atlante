@@ -116,6 +116,7 @@ export type {
   ResolvedTemplateSlot,
   ResolveInstanceRequest,
   ResolveTemplateRequest,
+  ResourceBindingCollectionSpec,
   ResourceResolveOptions,
 } from "./resolve.js";
 export {

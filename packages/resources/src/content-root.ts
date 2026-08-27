@@ -16,9 +16,14 @@ export type ResourcePack = Readonly<{
   readonly package?: ResourcePackageIdentity;
 }>;
 
-/** Trusted roots supplied by a host for first-party package resolution. */
+/** Trusted host strategies supplied for generic package resolution. */
 export type ResourceResolutionContext = Readonly<{
-  readonly firstPartyPack?: ResourcePack;
+  /**
+   * Host-supplied trusted pack consulted before node_modules lookup for a
+   * requested package locator. Returning undefined falls through to the
+   * generic declared-package path.
+   */
+  readonly packageProvider?: (packageName: string) => ResourcePack | undefined;
 }>;
 
 /** Returns authorization data without exposing package metadata as identity. */
