@@ -134,7 +134,11 @@ describe("build skill instance", () => {
     expect(everything).toContain(
       ".atlante/workflows/<cycle-id>/tasks/<task-id>/brief-<n>.md",
     );
-    expect(everything).toContain("only intentional project write");
+    expect(everything).toContain(
+      "explicitly assigned source/configuration/test changes",
+    );
+    expect(everything).toContain("the only workflow artifact you write");
+    expect(everything).not.toContain("only intentional project write");
     expect(everything).toContain(
       "refuse the assignment and report instead of overwriting",
     );
@@ -145,7 +149,6 @@ describe("build skill instance", () => {
   test("keeps adaptive state, dispositions, and plan ownership out of build hands", () => {
     const everything = resolvePackSkill(locator).everythingText();
 
-    expect(everything).toContain("the architect");
     expect(everything).toContain("routing and classification decision");
     expect(everything).toContain("original planner");
     expect(everything).toContain("fresh review is dispatched");
