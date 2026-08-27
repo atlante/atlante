@@ -118,7 +118,7 @@ describe("brainstorm skill instance", () => {
       expect(instructions).toContain(marker);
 
     const indexOfMarker = (marker: string) => instructions.indexOf(marker);
-    expect(indexOfMarker("Explore the repository")).toBeLessThan(
+    expect(indexOfMarker("explore the repository first")).toBeLessThan(
       indexOfMarker("two or three viable approaches"),
     );
     expect(indexOfMarker("two or three viable approaches")).toBeLessThan(
