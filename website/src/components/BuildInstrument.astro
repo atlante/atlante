@@ -82,8 +82,22 @@ const hints: Record<string, string> = {
 
               <button type="button" data-action="save" hidden>Save</button>
               <button type="button" data-action="revert" hidden>Revert</button>
-              <button type="button" data-copy-text={config} data-pane-copy>
-                Copy
+              <button
+                type="button"
+                aria-label="Copy configuration"
+                data-copy-text={config}
+                data-pane-copy
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  aria-hidden="true"
+                >
+                  <rect x="4" y="4" width="12" height="12" rx="2"></rect>
+                  <rect x="8" y="8" width="12" height="12" rx="2"></rect>
+                </svg>
               </button>
             </div>
 
@@ -125,12 +139,8 @@ const hints: Record<string, string> = {
               <span>Terminal</span>
               <span data-exit hidden>exit 0</span>
               <span class="terminal-actions">
-                <button type="button" data-action="copy-output" hidden>
-                  Copy output
-                </button>
                 <button type="button" data-action="reset">Reset</button>
               </span>
-
             </div>
             <pre data-terminal-out>$ npx @atlante/cli init</pre>
           </div>
@@ -402,8 +412,6 @@ const hints: Record<string, string> = {
       }
       fileTree.hidden = state.files.size === 0;
     };
-
-
     const showTerminal = (
       command: string,
       output: string,
@@ -422,8 +430,6 @@ const hints: Record<string, string> = {
       statusDot.style.background = ok
         ? "var(--ds-success)"
         : "var(--ds-error)";
-      const copyOutput = action("copy-output");
-      if (copyOutput) copyOutput.hidden = false;
     };
 
     const updateStages = (): void => {
@@ -565,15 +571,6 @@ const hints: Record<string, string> = {
       });
     }
 
-    action("copy-output")?.addEventListener("click", () => {
-      const copy = paneCopy;
-      if (!copy || !terminalOut) return;
-      const previous = copy.dataset.copyText;
-      copy.dataset.copyText = terminalOut.textContent ?? "";
-      copy.click();
-      copy.dataset.copyText = previous ?? "";
-    });
-
     action("reference")?.addEventListener("click", () => {
       state.activePath = null;
       state.editing = false;
@@ -628,8 +625,6 @@ const hints: Record<string, string> = {
       if (statusDot) statusDot.style.background = "";
       if (terminalOut) terminalOut.textContent = "$ npx @atlante/cli init";
       if (runHint) runHint.textContent = hints.init;
-      const copyOutput = action("copy-output");
-      if (copyOutput) copyOutput.hidden = true;
     });
 
     refreshControls();
@@ -793,6 +788,22 @@ const hints: Record<string, string> = {
     padding-inline: var(--space-3);
   }
 
+  .pane-actions [data-pane-copy] {
+    min-width: var(--control-min);
+    padding-inline: 0;
+  }
+
+  .pane-actions [data-pane-copy] svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .pane-actions [data-pane-copy]:hover:not(:disabled),
+  .pane-actions [data-pane-copy]:focus-visible:not(:disabled) {
+    background: transparent;
+    color: var(--ds-fg);
+  }
+
   pre[data-code-view] {
     min-height: 480px;
     max-height: 640px;
@@ -934,9 +945,13 @@ const hints: Record<string, string> = {
 
   .terminal {
     display: flex;
+    min-width: 0;
+    max-width: 100%;
+    flex: 1 1 320px;
     flex-direction: column;
-    flex: 1;
-    background: var(--ds-code-bg);
+    align-self: stretch;
+    border: 1px solid var(--ds-border-subtle);
+    background: color-mix(in oklab, var(--ds-bg) 96%, var(--ds-fg));
   }
 
   .terminal-head {
@@ -945,9 +960,9 @@ const hints: Record<string, string> = {
     justify-content: space-between;
     gap: var(--space-3);
     min-height: 44px;
-    padding-inline: var(--space-4);
-    border-block-end: 1px solid var(--ds-border);
-    color: var(--ds-code-muted);
+    padding-inline: var(--space-3);
+    border-block-end: 1px solid var(--ds-border-subtle);
+    color: var(--ds-muted);
     font-family: var(--font-ui);
     font-size: var(--text-meta);
     font-weight: 650;
@@ -962,15 +977,16 @@ const hints: Record<string, string> = {
 
   .terminal button {
     min-height: 32px;
-    border-color: color-mix(in oklab, var(--ds-code-fg) 40%, transparent);
-    color: var(--ds-code-fg);
+    padding-inline: var(--space-2);
+    border-color: color-mix(in oklab, var(--ds-fg) 40%, transparent);
+    color: var(--ds-fg);
     font-size: var(--text-meta);
   }
 
   .terminal button:hover:not(:disabled),
   .terminal button:focus-visible:not(:disabled) {
-    background: var(--ds-code-fg);
-    color: var(--ds-code-bg);
+    background: var(--ds-fg);
+    color: var(--ds-bg);
   }
 
   pre[data-terminal-out] {
@@ -978,12 +994,12 @@ const hints: Record<string, string> = {
     min-height: 220px;
     max-height: 320px;
     margin: 0;
-    padding: var(--space-4);
+    padding: var(--space-3);
     overflow: auto;
-    color: var(--ds-code-fg);
+    color: var(--ds-fg);
     font-family: var(--font-mono);
     font-size: var(--text-small);
-    line-height: 1.7;
+    line-height: 1.6;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
@@ -1279,4 +1295,3 @@ const hints: Record<string, string> = {
   }
 
 </style>
-

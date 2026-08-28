@@ -19,23 +19,26 @@ import glyphDark from "../assets/atlante-glyph-reverse.svg";
       <a class="secondary" href="https://docs.atlante.sh">Documentation</a>
     </div>
     <div class="command-row">
-      <code><span class="command-prompt" aria-hidden="true">$ </span>npx @atlante/cli init</code>
-      <button
-        type="button"
-        aria-label="Copy init command"
-        data-copy-text="npx @atlante/cli init"
-      >
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.5"
-          aria-hidden="true"
+      <div class="command-box">
+        <code><span class="command-prompt" aria-hidden="true">$ </span>npx @atlante/cli init</code>
+        <button
+          class="command-copy"
+          type="button"
+          aria-label="Copy init command"
+          data-copy-text="npx @atlante/cli init"
         >
-          <rect x="4" y="4" width="12" height="12" rx="2"></rect>
-          <rect x="8" y="8" width="12" height="12" rx="2"></rect>
-        </svg>
-      </button>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            aria-hidden="true"
+          >
+            <rect x="4" y="4" width="12" height="12" rx="2"></rect>
+            <rect x="8" y="8" width="12" height="12" rx="2"></rect>
+          </svg>
+        </button>
+      </div>
     </div>
   </div>
   <div class="visual">
@@ -136,7 +139,7 @@ import glyphDark from "../assets/atlante-glyph-reverse.svg";
 
   .glyph-caption {
     grid-area: 2 / 1;
-    margin: var(--space-4) 0 0;
+    margin: var(--space-2) 0 0;
     color: var(--ds-muted);
     font-family: var(--font-mono);
     font-size: var(--text-meta);
@@ -195,19 +198,29 @@ import glyphDark from "../assets/atlante-glyph-reverse.svg";
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    justify-content: space-between;
     gap: var(--space-3);
     margin-block-start: var(--space-8);
+    width: fit-content;
     max-width: 100%;
-    padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
-    border: 1px solid var(--ds-border);
-    background: var(--ds-code-bg);
+  }
+
+  .command-box {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+    max-width: 100%;
+    padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3);
+    border: 1px solid var(--ds-border-subtle);
+    background: color-mix(in oklab, var(--ds-bg) 96%, var(--ds-fg));
   }
 
   .command-row code {
+    display: block;
+    flex: 1 1 auto;
     min-width: 0;
     overflow-wrap: anywhere;
-    color: var(--ds-code-fg);
+    color: var(--ds-fg);
     font-family: var(--font-mono);
     font-size: var(--text-small);
     line-height: 1.6;
@@ -217,10 +230,10 @@ import glyphDark from "../assets/atlante-glyph-reverse.svg";
      and never part of data-copy-text. */
   .command-prompt {
     user-select: none;
-    color: var(--ds-code-muted);
+    color: var(--ds-muted);
   }
 
-  .command-row button {
+  .command-copy {
     display: inline-flex;
     flex-shrink: 0;
     align-items: center;
@@ -228,21 +241,21 @@ import glyphDark from "../assets/atlante-glyph-reverse.svg";
     min-width: var(--control-min);
     min-height: var(--control-min);
     padding: 0 var(--space-2);
-    border: 1px solid color-mix(in oklab, var(--ds-code-fg) 40%, transparent);
+    border: 0;
     background: transparent;
-    color: var(--ds-code-fg);
+    color: var(--ds-fg);
     font-family: var(--font-ui);
     font-size: var(--text-meta);
     cursor: pointer;
   }
 
-  .command-row button:hover,
-  .command-row button:focus-visible {
-    background: var(--ds-code-fg);
-    color: var(--ds-code-bg);
+  .command-copy:hover,
+  .command-copy:focus-visible {
+    background: transparent;
+    color: var(--ds-fg);
   }
 
-  .command-row button svg {
+  .command-copy svg {
     width: 18px;
     height: 18px;
   }

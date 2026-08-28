@@ -26,22 +26,51 @@ const description =
 </BaseLayout>
 
 <script>
-  for (const button of document.querySelectorAll<HTMLButtonElement>(
-    "button[data-copy-text]",
-  )) {
-    // Captured once at bind time, so the temporary "Copied" feedback can
-    // never be mistaken for the original content on rapid repeat clicks.
-    const originalChildren = [...button.childNodes];
-    button.addEventListener("click", () => {
-      const text = button.dataset.copyText ?? "";
-      navigator.clipboard.writeText(text).then(() => {
-        button.replaceChildren("Copied");
-        setTimeout(() => {
-          button.replaceChildren(...originalChildren);
-        }, 1600);
-      });
+  const createDoneIcon = () => {
+    const icon = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "svg",
+    );
+    icon.setAttribute("viewBox", "0 0 24 24");
+    icon.setAttribute("fill", "none");
+    icon.setAttribute("stroke", "currentColor");
+    icon.setAttribute("stroke-width", "1.5");
+    icon.setAttribute("stroke-linecap", "round");
+    icon.setAttribute("stroke-linejoin", "round");
+    icon.setAttribute("aria-hidden", "true");
+    icon.classList.add("copy-done-icon");
+
+    const path = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "path",
+    );
+    path.setAttribute("d", "m5 12 4 4L19 6");
+    icon.append(path);
+
+    return icon;
+  };
+
+  // Delegate so buttons added later, or buttons whose copy text changes with
+  // the active pane, use the current control and data attribute.
+  const originalChildrenByButton = new WeakMap<HTMLButtonElement, Node[]>();
+  document.addEventListener("click", (event) => {
+    if (!(event.target instanceof Element)) return;
+    const button = event.target.closest<HTMLButtonElement>(
+      "button[data-copy-text]",
+    );
+    if (!button) return;
+
+    const originalChildren =
+      originalChildrenByButton.get(button) ?? [...button.childNodes];
+    originalChildrenByButton.set(button, originalChildren);
+    const text = button.dataset.copyText ?? "";
+    navigator.clipboard.writeText(text).then(() => {
+      button.replaceChildren(createDoneIcon());
+      setTimeout(() => {
+        button.replaceChildren(...originalChildren);
+      }, 1600);
     });
-  }
+  });
 </script>
 
 <style>
@@ -62,6 +91,11 @@ const description =
       opacity: 1;
       translate: 0 0;
     }
+  }
+
+  :global(button[data-copy-text] .copy-done-icon) {
+    width: 14px;
+    height: 14px;
   }
 </style>
 
