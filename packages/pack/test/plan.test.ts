@@ -63,9 +63,9 @@ describe("plan skill instance", () => {
     const invariants = resolvePackSkill(locator).listText("invariants");
 
     for (const marker of [
-      "Do not expand or weaken the defined scope or acceptance criteria; report any required change as a blocker",
-      "Ground every task and risk in repository evidence you actually inspected; do not invent dependencies or implementation facts",
-      "Keep tasks independently actionable and give each one clear completion evidence",
+      "MUST NOT expand or weaken the defined scope or acceptance criteria; report any required change as a blocker",
+      "Ground every task and risk in repository evidence you actually inspected; MUST NOT invent dependencies or implementation facts",
+      "MUST keep tasks independently actionable and give each one clear completion evidence",
     ])
       expect(invariants).toContain(marker);
   });
@@ -97,7 +97,7 @@ describe("plan skill instance", () => {
       expect(output).toContain(heading);
     expect(output).toContain("smallest independently actionable tasks");
     expect(output).toContain(
-      "- Do not expand or weaken the defined scope or acceptance criteria; report any required change as a blocker.",
+      "- MUST NOT expand or weaken the defined scope or acceptance criteria; report any required change as a blocker.",
     );
     expect(output).not.toContain("## Gotchas");
     expect(output).not.toContain("## Plan record");

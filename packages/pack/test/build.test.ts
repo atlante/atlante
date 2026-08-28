@@ -70,11 +70,11 @@ describe("build skill instance", () => {
     const invariants = resolvePackSkill(locator).listText("invariants");
 
     for (const marker of [
-      "Work on exactly one defined task or correction; do not absorb adjacent scope or weaken the requested outcome",
-      "Do not implement a behavior change until its focused test has produced the expected red evidence",
-      "do not manufacture tests for non-behavior changes",
-      "Preserve unrelated work and keep it distinct from the implemented change",
-      "Do not claim completion until the acceptance criteria and required checks are satisfied with reported evidence",
+      "Work on exactly one defined task or correction; MUST NOT absorb adjacent scope or weaken the requested outcome",
+      "MUST NOT implement a behavior change until its focused test has produced the expected red evidence",
+      "MUST NOT manufacture tests for non-behavior changes",
+      "MUST preserve unrelated work and keep it distinct from the implemented change",
+      "MUST NOT claim completion until the acceptance criteria and required checks are satisfied with reported evidence",
       "stop at the smallest safe point and report the blocker instead of improvising",
     ])
       expect(invariants).toContain(marker);
@@ -109,7 +109,7 @@ describe("build skill instance", () => {
       "Make the smallest implementation that satisfies the focused test",
     );
     expect(output).toContain(
-      "- Do not implement a behavior change until its focused test has produced the expected red evidence",
+      "- MUST NOT implement a behavior change until its focused test has produced the expected red evidence",
     );
     expect(output).not.toContain("## Gotchas");
     expect(output).not.toContain("## Brief record");

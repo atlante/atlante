@@ -108,6 +108,14 @@ describe("first-party package resources as user configurations", () => {
       "review",
     ]);
 
+    const [agent] = artifacts.agents;
+    expect(agent?.prompt).toContain("## Workflow");
+    expect(agent?.prompt).toContain("### 3. Build (mandatory)");
+    expect(agent?.prompt).toContain(
+      "MUST NOT edit project source or configuration files",
+    );
+    expect(agent?.prompt).toContain(".atlante/workflows/<cycle-id>/");
+
     const titleLandmarks: Record<string, string> = {
       brainstorm: "# Brainstorm",
       plan: "# Plan",

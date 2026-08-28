@@ -200,11 +200,11 @@ describe("first-party preset surface", () => {
       expect(output).toContain("### 1. Plan (adaptive)");
       expect(output).toContain("### 2. review (mandatory)");
       for (const phrase of [
-        "An adaptive phase is optional and should add only as much ceremony as the work needs.",
+        "An adaptive phase is optional and SHOULD add only as much ceremony as the work needs.",
         "assess whether it would materially improve the outcome using task complexity, risk, uncertainty, and existing evidence",
         "Skip the phase when the task is already clear, low-risk, and simple enough that the phase would not materially improve the outcome; briefly state why.",
         "Otherwise run the phase with depth proportional to the work, focusing only on material questions and evidence.",
-        "Whenever the phase runs, preserve its required output, approvals, and safety gates.",
+        "Whenever the phase runs, it MUST preserve its required output, approvals, and safety gates.",
         "Reassess later adaptive phases when implementation or review reveals new material evidence.",
         "A non-adaptive phase remains mandatory and runs as written.",
       ])
@@ -236,7 +236,7 @@ describe("first-party preset surface", () => {
       const run =
         "Otherwise run the phase with depth proportional to the work, focusing only on material questions and evidence.";
       const preserve =
-        "Whenever the phase runs, preserve its required output, approvals, and safety gates.";
+        "Whenever the phase runs, it MUST preserve its required output, approvals, and safety gates.";
       const reassess =
         "Reassess later adaptive phases when implementation or review reveals new material evidence.";
       const mandatory =
@@ -358,7 +358,7 @@ describe("first-party preset surface", () => {
         ],
         [
           "### Build: task commits",
-          "Commit task implementation and corrections in separate commits, after the task's focused tests and checks pass; the orchestrator owns all commit authorship and pushing, and never amends or force-pushes.",
+          "Task implementation and corrections MUST be committed in separate commits, after the task's focused tests and checks pass; the orchestrator owns all commit authorship and pushing, and MUST NOT amend or force-push.",
         ],
         [
           "### Build: task review",
@@ -366,7 +366,7 @@ describe("first-party preset surface", () => {
         ],
         [
           "### Build: correction loops",
-          "Limit correction to 2 loops per task.",
+          "Correction MUST be limited to 2 loops per task.",
         ],
       ])
         expect(output).toContain(`${heading}\n\n${body}`);
@@ -382,7 +382,7 @@ describe("first-party preset surface", () => {
           policies: { orchestratorReadOnly: true },
           phases: [{ name: "Plan", instructions: ["Plan the review."] }],
         },
-        "## Policies\n\nPolicies are binding; follow them in every phase.\n\n### Workflow: read-only orchestration\n\nThe orchestrator is read-only and delegates every file edit.",
+        "## Policies\n\nPolicies are binding; they MUST be followed in every phase.\n\n### Workflow: read-only orchestration\n\nThe orchestrator is read-only and delegates every file edit.",
       ],
       [
         "phase-level truthy values",
@@ -396,7 +396,7 @@ describe("first-party preset surface", () => {
             },
           ],
         },
-        "## Policies\n\nPolicies are binding; follow them in every phase.\n\n### Build: task commits\n\nCommit task implementation and corrections in separate commits, after the task's focused tests and checks pass; the orchestrator owns all commit authorship and pushing, and never amends or force-pushes.\n\n### Build: task review\n\nApply task review according to this phase's review criteria.\n\n### Build: correction loops\n\nLimit correction to 2 loops per task.",
+        "## Policies\n\nPolicies are binding; they MUST be followed in every phase.\n\n### Build: task commits\n\nTask implementation and corrections MUST be committed in separate commits, after the task's focused tests and checks pass; the orchestrator owns all commit authorship and pushing, and MUST NOT amend or force-push.\n\n### Build: task review\n\nApply task review according to this phase's review criteria.\n\n### Build: correction loops\n\nCorrection MUST be limited to 2 loops per task.",
       ],
       [
         "no truthy values",
@@ -411,7 +411,7 @@ describe("first-party preset surface", () => {
             },
           ],
         },
-        "## No policies\n\nExecute phases sequentially in the order listed. A phase with a configured subagent is delegated to that agent. Follow each phase's inline instructions in order.",
+        "## No policies\n\nPhases MUST run sequentially in the order listed. A phase with a configured subagent is delegated to that agent. Each phase's inline instructions MUST be followed in order.",
       ],
     ] as const)(
       "preserves the policy rendering compatibility matrix",
@@ -432,7 +432,7 @@ describe("first-party preset surface", () => {
           phases: [{ name: "Plan", instructions: ["Plan the review."] }],
         }),
       ).toBe(
-        "## No policies\n\nExecute phases sequentially in the order listed. A phase with a configured subagent is delegated to that agent. Follow each phase's inline instructions in order.\n\n\n### 1. Plan\n\n1. Plan the review.\n",
+        "## No policies\n\nPhases MUST run sequentially in the order listed. A phase with a configured subagent is delegated to that agent. Each phase's inline instructions MUST be followed in order.\n\n\n### 1. Plan\n\n1. Plan the review.\n",
       );
     });
   });

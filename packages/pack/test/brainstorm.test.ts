@@ -71,9 +71,9 @@ describe("brainstorm skill instance", () => {
     const invariants = resolvePackSkill(locator).listText("invariants");
 
     for (const marker of [
-      "Do not begin implementation before the direction is explicitly approved",
-      "Do not invent answers, hide material uncertainty, or silently expand the agreed scope",
-      "Preserve agreed decisions unless they are explicitly changed",
+      "MUST NOT begin implementation before the direction is explicitly approved",
+      "MUST NOT invent answers, hide material uncertainty, or silently expand the agreed scope",
+      "MUST preserve agreed decisions unless they are explicitly changed",
     ])
       expect(invariants).toContain(marker);
   });
@@ -103,7 +103,7 @@ describe("brainstorm skill instance", () => {
       expect(output).toContain(heading);
     expect(output).toContain("Ask one focused question at a time");
     expect(output).toContain(
-      "- Do not begin implementation before the direction is explicitly approved.",
+      "- MUST NOT begin implementation before the direction is explicitly approved.",
     );
     expect(output).not.toContain("## Gotchas");
     expect(output).not.toContain("## Handoff contract");

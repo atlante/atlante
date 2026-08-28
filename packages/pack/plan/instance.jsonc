@@ -21,9 +21,9 @@
     },
     {
       "invariants": [
-        "Do not expand or weaken the defined scope or acceptance criteria; report any required change as a blocker.",
-        "Ground every task and risk in repository evidence you actually inspected; do not invent dependencies or implementation facts.",
-        "Keep tasks independently actionable and give each one clear completion evidence."
+        "MUST NOT expand or weaken the defined scope or acceptance criteria; report any required change as a blocker.",
+        "Ground every task and risk in repository evidence you actually inspected; MUST NOT invent dependencies or implementation facts.",
+        "MUST keep tasks independently actionable and give each one clear completion evidence."
       ]
     }
   ]

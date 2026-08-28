@@ -4,22 +4,22 @@
 {{description}}
 {{/if}}
 
-Execute phases sequentially in the order listed. A phase with a configured subagent is delegated to that agent. Follow each phase's inline instructions in order.
+Phases MUST run sequentially in the order listed. A phase with a configured subagent is delegated to that agent. Each phase's inline instructions MUST be followed in order.
 {{#if (anyTruthy policies phases "policies")}}
 
 ## Policies
 
-Policies are binding; follow them in every phase.
+Policies are binding; they MUST be followed in every phase.
 
 {{#if (anyEqual phases "policies.adaptive" true)}}### Adaptive phases
 
-An adaptive phase is optional and should add only as much ceremony as the work needs.
+An adaptive phase is optional and SHOULD add only as much ceremony as the work needs.
 
 Before running an adaptive phase, assess whether it would materially improve the outcome using task complexity, risk, uncertainty, and existing evidence.
 
 - Skip the phase when the task is already clear, low-risk, and simple enough that the phase would not materially improve the outcome; briefly state why.
 - Otherwise run the phase with depth proportional to the work, focusing only on material questions and evidence.
-- Whenever the phase runs, preserve its required output, approvals, and safety gates.
+- Whenever the phase runs, it MUST preserve its required output, approvals, and safety gates.
 
 Reassess later adaptive phases when implementation or review reveals new material evidence. A non-adaptive phase remains mandatory and runs as written.
 
@@ -30,7 +30,7 @@ The orchestrator is read-only and delegates every file edit.
 {{/if}}{{#each phases}}{{#if policies.commit~}}
 ### {{#if name}}{{name}}{{else}}{{kind}}{{/if}}: task commits
 
-Commit task implementation and corrections in separate commits, after the task's focused tests and checks pass; the orchestrator owns all commit authorship and pushing, and never amends or force-pushes.
+Task implementation and corrections MUST be committed in separate commits, after the task's focused tests and checks pass; the orchestrator owns all commit authorship and pushing, and MUST NOT amend or force-push.
 
 {{/if}}{{#if policies.review~}}
 ### {{#if name}}{{name}}{{else}}{{kind}}{{/if}}: task review
@@ -40,7 +40,7 @@ Apply task review according to this phase's review criteria.
 {{/if}}{{#if policies.maxLoops~}}
 ### {{#if name}}{{name}}{{else}}{{kind}}{{/if}}: correction loops
 
-Limit correction to {{policies.maxLoops}} loops per task.
+Correction MUST be limited to {{policies.maxLoops}} loops per task.
 {{/if}}{{/each}}{{/if}}
 {{#each phases}}
 
@@ -51,7 +51,7 @@ Limit correction to {{policies.maxLoops}} loops per task.
 {{/if}}
 {{#if subagent}}
 
-The subagent "{{subagent}}" should handle this phase.
+The subagent "{{subagent}}" is responsible for this phase.
 {{/if}}
 {{#each instructions}}
 

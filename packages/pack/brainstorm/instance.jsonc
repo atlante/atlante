@@ -20,9 +20,9 @@
     },
     {
       "invariants": [
-        "Do not begin implementation before the direction is explicitly approved.",
-        "Do not invent answers, hide material uncertainty, or silently expand the agreed scope.",
-        "Preserve agreed decisions unless they are explicitly changed."
+        "MUST NOT begin implementation before the direction is explicitly approved.",
+        "MUST NOT invent answers, hide material uncertainty, or silently expand the agreed scope.",
+        "MUST preserve agreed decisions unless they are explicitly changed."
       ]
     }
   ]
