@@ -1,12 +1,12 @@
 {
   "$template": "@atlante/pack/skill",
-  "description": "Use when a defined task or correction is ready for implementation: make the smallest verified change that satisfies its acceptance criteria.",
+  "description": "Use when a defined task is ready for implementation: make the smallest verified change that satisfies its acceptance criteria.",
   "title": "Build",
-  "overview": "Implement one defined task or correction through focused test feedback and return the change with truthful validation evidence.",
+  "overview": "Implement one defined task through focused test feedback and return the change with truthful validation evidence.",
   "sections": [
     {
       "instructions": [
-        "Read the complete task or correction definition, its acceptance criteria, applicable project instructions, and the relevant source and tests before editing.",
+        "Read the complete task definition, its acceptance criteria, applicable project instructions, and the relevant source and tests before editing.",
         "Identify the observable outcome, affected invariants, and exact scope; if any of them is materially unclear or blocked, stop and report it before changing code.",
         "For a bug or unexpected failure, reproduce it and trace the root cause before proposing a fix; test one hypothesis at a time and fix the source rather than the symptom.",
         "Before writing the test body, name the regression it must catch; exercise observable behavior through real code, using mocks only at unavoidable slow or external boundaries.",
@@ -15,8 +15,8 @@
         "Make the smallest implementation that satisfies the focused test and demonstrates it passing.",
         "Add meaningful boundary and failure cases around the changed behavior, then record what each relevant test proves.",
         "For a change without an observable behavior difference, explain why red-green feedback is not meaningful and use the strongest relevant verification instead of manufacturing an artificial test.",
-        "For a correction, read the complete review context and verify every finding against the actual code and defined scope; if a finding is unclear, technically unsound, or conflicts with the contract, report the evidence instead of implementing it blindly.",
-        "Address every valid required correction within scope, and describe the resulting current state rather than only the correction delta.",
+        "When a task addresses review findings, read the complete review context and verify every finding against the actual code and defined scope; if a finding is unclear, technically unsound, or conflicts with the contract, report the evidence instead of implementing it blindly.",
+        "Address every valid required change within scope, and describe the resulting current state rather than only the latest change.",
         "Immediately before claiming completion, run the full commands that prove each claim, read their complete output and exit status, and report the actual results; stale, partial, or unavailable evidence is not a pass.",
         "Before returning the result, inspect the actual diff and confirm that it matches the defined scope, preserves unrelated changes, satisfies every acceptance criterion, and contains no accidental or unsupported edits.",
         "Return a concise implementation handoff containing the scope, decisions, changed files, acceptance evidence, validation evidence, and any concerns or blockers."
@@ -24,9 +24,10 @@
     },
     {
       "invariants": [
-        "Work on exactly one defined task or correction; MUST NOT absorb adjacent scope or weaken the requested outcome.",
+        "Work on exactly one defined task; MUST NOT absorb adjacent scope or weaken the requested outcome.",
         "MUST NOT implement a behavior change until its focused test has produced the expected red evidence, and MUST NOT manufacture tests for non-behavior changes.",
         "MUST preserve unrelated work and keep it distinct from the implemented change.",
+        "MUST reuse or extend suitable existing code before creating a new implementation, keeping responsibility boundaries intact; extract shared code only for real duplication or multiple concrete consumers, and MUST NOT introduce speculative generalization.",
         "MUST NOT claim completion until the acceptance criteria and required checks are satisfied with reported evidence.",
         "When required context, access, or validation is unavailable, MUST stop at the smallest safe point and report the blocker instead of improvising."
       ]

@@ -62,8 +62,7 @@ const FIRST_PARTY_SKILL_LANDMARKS: Record<
   },
   build: {
     title: "# Build",
-    overview:
-      "Implement one defined task or correction through focused test feedback",
+    overview: "Implement one defined task through focused test feedback",
   },
   review: {
     title: "# Review",

@@ -20,7 +20,7 @@ const descriptiveProhibitionPrefix = /\b(?:that|which)\s+$/i;
 
 const gateLandmarks: Record<string, readonly string[]> = {
   brainstorm: [
-    "MUST NOT begin implementation before the direction is explicitly approved",
+    "MUST stop and expose unresolved doubts instead of continuing without direction when exploration starts drifting, looping, or stalling",
     "MUST preserve agreed decisions unless they are explicitly changed",
   ],
   plan: [
