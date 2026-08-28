@@ -76,7 +76,7 @@ The reusable workflow template supports opt-in phase resizing:
 the phase mandatory. If any phase is adaptive, the rendered workflow emits one
 shared protocol and labels each phase as `adaptive` or `mandatory`.
 
-An adaptive phase is optional and should add only as much ceremony as the work
+An adaptive phase is optional and SHOULD add only as much ceremony as the work
 needs. Before running it, assess whether it would materially improve the
 outcome using task complexity, risk, uncertainty, and existing evidence: skip
 the phase when it would not materially improve the outcome, briefly stating
