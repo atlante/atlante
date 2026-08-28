@@ -1,11 +1,10 @@
 # `@atlante/pack`
 
 Atlante's first-party static pack gives a project a useful default agent and
-skills for deliberate AI-assisted work. It provides the `architect` agent,
-`brainstorm`, `plan`, `build`, and `review` delivery-phase skills alongside
-legacy `brainstorming` and `workflow` entry points, and reusable templates and
-instances for composing your own agents, skills, workflows, and supporting
-prompt content.
+skills for deliberate AI-assisted work. It provides the `architect` agent, the
+four delivery-phase skills `brainstorm`, `plan`, `build`, and `review`, and
+reusable templates and instances for composing your own agents, skills,
+workflows, and supporting prompt content.
 
 ## Default usage
 
@@ -98,23 +97,19 @@ Useful public locators include:
 | --- | --- |
 | Default preset | `@atlante/pack` |
 | Agent instance | `@atlante/pack/architect` |
-| Skill instances | `@atlante/pack/brainstorming`, `@atlante/pack/delivery-workflow`, `@atlante/pack/brainstorm`, `@atlante/pack/plan`, `@atlante/pack/build`, `@atlante/pack/review` |
+| Skill instances | `@atlante/pack/brainstorm`, `@atlante/pack/plan`, `@atlante/pack/build`, `@atlante/pack/review` |
 | Agent and skill templates | `@atlante/pack/agent`, `@atlante/pack/skill` |
 | Supporting templates | `@atlante/pack/workflow`, `@atlante/pack/markdown`, `@atlante/pack/artifact`, `@atlante/pack/gotchas`, `@atlante/pack/instructions`, `@atlante/pack/invariants` |
 
-During the transition from
-[#64](https://github.com/atlante/atlante/issues/64) to
-[#65](https://github.com/atlante/atlante/issues/65), the default preset
-intentionally exposes the `architect` agent plus six skill bindings:
-`brainstorming`, `workflow`, `brainstorm`, `plan`, `build`, and `review`.
-`brainstorming` and `workflow` are legacy entry points (`workflow` binds the
-`delivery-workflow` instance) whose bindings and instances
-[#65](https://github.com/atlante/atlante/issues/65) removes. `brainstorm`,
-`plan`, `build`, and `review` are the durable, agent-agnostic phase contracts.
-The agent template accepts optional top-level `responsibilities` alongside
-`identity` and `mission`. The agent and skill templates support ordered
-`markdown`, `instructions`, `gotchas`, `workflow`, and `invariants` sections.
-Invariants are binding guarantees and approval gates, not suggestions.
+The default preset exposes exactly one agent binding, `architect`, and four
+public skill bindings: `brainstorm`, `plan`, `build`, and `review`. These are
+agent-agnostic phase contracts; the `architect` agent orchestrates them by
+name. The skill bindings are locator-only, so each skill instance owns its
+description. The agent template accepts optional top-level `responsibilities`
+alongside `identity` and `mission`. The agent and skill templates support
+ordered `markdown`, `instructions`, `gotchas`, `workflow`, and `invariants`
+sections. Invariants are binding guarantees and approval gates, not
+suggestions.
 
 ## Pack behavior
 

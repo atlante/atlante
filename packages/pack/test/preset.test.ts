@@ -3,6 +3,7 @@ import {
   interpolateValues,
   type JsonObject,
   loadPresetFacet,
+  ResourceResolutionError,
   renderResolvedTemplate,
   resolveResourceInstance,
   resolveResourceTemplate,
@@ -14,16 +15,7 @@ import {
   packResourceFixture,
 } from "./selection-fixture.js";
 
-const expectedSkillOrder = [
-  "brainstorming",
-  "workflow",
-  "brainstorm",
-  "plan",
-  "build",
-  "review",
-] as const;
-
-const focusedSkillIds = ["brainstorm", "plan", "build", "review"] as const;
+const expectedSkillOrder = ["brainstorm", "plan", "build", "review"] as const;
 
 const focusedSkillLandmarks: Record<string, readonly string[]> = {
   brainstorm: ["Ask one focused question at a time"],
@@ -82,10 +74,10 @@ function renderWorkflowTemplate(workflow: Record<string, unknown>): string {
   });
 }
 
-describe("first-party preset intermediate six-skill surface", () => {
+describe("first-party preset surface", () => {
   afterEach(cleanupPackResourceFixtures);
 
-  test("keeps one architect agent and exposes the skills in the authored intermediate order", () => {
+  test("keeps exactly one architect agent and exposes the four public skills in authored order", () => {
     const { document } = firstPartyPreset();
 
     expect(Object.keys(document.agents)).toEqual(["architect"]);
@@ -108,10 +100,10 @@ describe("first-party preset intermediate six-skill surface", () => {
     expect(result.document).toBeDefined();
   });
 
-  test("keeps the four focused skill bindings as locator-only while each instance owns its description", () => {
+  test("keeps the public skill bindings as locator-only while each instance owns its description", () => {
     const { pack, config, document } = firstPartyPreset();
 
-    for (const id of focusedSkillIds) {
+    for (const id of expectedSkillOrder) {
       const binding = (document.skills?.[id] ?? {}) as JsonObject;
       expect(Object.keys(binding), `binding ${id}`).toEqual(["$instance"]);
       expect(binding.$instance, `binding ${id}`).toBe(`@atlante/pack/${id}`);
@@ -147,23 +139,17 @@ describe("first-party preset intermediate six-skill surface", () => {
     }
   });
 
-  test("leaves legacy brainstorming and workflow resolving and rendering untouched", () => {
-    const { renderBinding } = firstPartyPreset();
+  test("rejects the removed legacy brainstorming and workflow resources", () => {
+    const { pack, config } = firstPartyPreset();
 
-    const brainstorming = renderBinding("brainstorming");
-    expect(brainstorming).toContain("# Brainstorming");
-    expect(brainstorming).toContain("## Instructions");
-    expect(brainstorming).toContain("## Invariants");
-
-    const workflow = renderBinding("workflow");
-    for (const marker of [
-      "# Workflow",
-      "### Workflow: read-only orchestration",
-      "### 1. plan",
-      "### 2. build",
-      "### 3. review",
-    ])
-      expect(workflow).toContain(marker);
+    for (const locator of [
+      "@atlante/pack/brainstorming",
+      "@atlante/pack/delivery-workflow",
+    ]) {
+      expect(() => resolveResourceInstance(pack, locator, config)).toThrow(
+        ResourceResolutionError,
+      );
+    }
   });
 
   describe("concrete workflow template contract", () => {

@@ -220,8 +220,8 @@ test("CLI resolves first-party package resource facets", async () => {
       "agent": { "$template": "@atlante/pack/agent", "description": "Agent", "identity": "Identity", "mission": "Mission" }
     },
     "skills": {
-      "brainstorming": { "$instance": "@atlante/pack/brainstorming", "description": "Brainstorming" },
-      "workflow": { "$instance": "@atlante/pack/delivery-workflow", "description": "Workflow" },
+      "plan": { "$instance": "@atlante/pack/plan", "description": "Plan" },
+      "review": { "$instance": "@atlante/pack/review", "description": "Review" },
       "skill": { "$template": "@atlante/pack/skill", "description": "Skill", "title": "Skill", "overview": "Overview", "sections": [{ "markdown": "Body" }] }
     }
   }`);

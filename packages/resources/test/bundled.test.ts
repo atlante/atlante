@@ -156,11 +156,9 @@ describe("first-party package resources", () => {
     expect(Object.keys(document.bindings.agents)).toEqual(["architect"]);
     expect(Object.keys(document.bindings.skills).sort()).toEqual([
       "brainstorm",
-      "brainstorming",
       "build",
       "plan",
       "review",
-      "workflow",
     ]);
     expect(String(instance.effectiveTemplate.locator)).toBe(
       "@atlante/pack/agent",
@@ -194,16 +192,6 @@ describe("first-party package resources", () => {
       "@atlante/pack/architect",
       config,
     );
-    const brainstorming = resolveResourceInstance(
-      pack,
-      "@atlante/pack/brainstorming",
-      config,
-    );
-    const workflow = resolveResourceInstance(
-      pack,
-      "@atlante/pack/delivery-workflow",
-      config,
-    );
 
     expect(architect.input.responsibilities).toEqual([
       "Clarify ambiguity with the developer and establish the issue's scope, constraints, and acceptance criteria.",
@@ -222,33 +210,13 @@ describe("first-party package resources", () => {
       },
       expect.objectContaining({ instructions: expect.any(Array) }),
     ]);
-    expect(brainstorming.input.sections).toEqual([
-      {
-        invariants: [
-          "Do not begin workflow, implementation, or file modifications until the presented design is approved by the developer.",
-          "Apply this gate even to simple work, including work simple enough to skip a full plan; the design may be brief when the work is simple.",
-          "Surface real complexity honestly; never downplay it to appear confident.",
-        ],
-      },
-      expect.objectContaining({ instructions: expect.any(Array) }),
-    ]);
-    expect(workflow.input.sections?.[0]).toEqual({
-      invariants: [
-        "Do not begin implementation until the developer approves the implementation plan when a full plan is warranted.",
-        "For behavior changes, do not make implementation changes before a focused test demonstrates the planned behavior.",
-        "The orchestrator drives all phases but never edits files directly; it delegates every write, including corrections, to sub-agents, tracks progress, and integrates results.",
-        "The orchestrator may recall a previously dispatched sub-agent when context preservation is valuable, most notably recalling the plan sub-agent to update its own plan. Fresh sub-agents remain the default for execution tasks and the reviewer must always be fresh.",
-      ],
-    });
 
-    for (const instance of [architect, brainstorming, workflow]) {
-      const output = renderResolvedTemplate({
-        template: instance.effectiveTemplate,
-        input: interpolateValues(instance.input, firstPartyValues),
-      });
-      expect(output).toContain("## Invariants");
-      expect(output).not.toContain("## Constraints");
-    }
+    const output = renderResolvedTemplate({
+      template: architect.effectiveTemplate,
+      input: interpolateValues(architect.input, firstPartyValues),
+    });
+    expect(output).toContain("## Invariants");
+    expect(output).not.toContain("## Constraints");
   });
 
   test("renders repeated agent invariant sections in authored order", () => {

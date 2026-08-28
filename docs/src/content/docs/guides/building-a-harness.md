@@ -12,8 +12,9 @@ configuration in the repository so changes can be reviewed alongside code.
 npx @atlante/cli init
 ```
 
-The default preset provides the `architect` agent and the `brainstorming` and
-`workflow` skills. Extend it rather than copying its resources into the project.
+The default preset provides the `architect` agent and the four phase skills
+`brainstorm`, `plan`, `build`, and `review`, which the architect orchestrates.
+Extend it rather than copying its resources into the project.
 
 ## Add an agent
 

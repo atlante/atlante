@@ -12,14 +12,6 @@
     }
   },
   "skills": {
-    "brainstorming": {
-      "$instance": "@atlante/pack/brainstorming",
-      "description": "Use before creative or implementation work to collaboratively clarify intent, requirements, and design, then produce an approved implementation handoff."
-    },
-    "workflow": {
-      "$instance": "@atlante/pack/delivery-workflow",
-      "description": "Use when an approved issue is ready for implementation: deliver a focused, verified change that satisfies its acceptance criteria."
-    },
     "brainstorm": {
       "$instance": "@atlante/pack/brainstorm"
     },

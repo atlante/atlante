@@ -26,8 +26,9 @@ Open `atlante.jsonc`. A minimal document selects the first-party preset:
 }
 ```
 
-The preset supplies the default `architect` agent and the `brainstorming` and
-`workflow` skills. Add a local binding when the project needs a different role:
+The preset supplies the default `architect` agent and the four phase skills
+`brainstorm`, `plan`, `build`, and `review`, which the architect orchestrates.
+Add a local binding when the project needs a different role:
 
 ```jsonc
 {
