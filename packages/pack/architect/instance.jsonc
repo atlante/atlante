@@ -37,7 +37,8 @@
         "Workers trust assigned numbering and lineage but MUST refuse to write over an existing assigned target; you MUST NOT allow a worker to overwrite an immutable numbered artifact.",
         "After a new correction brief exists, you MUST recall the original planner for any required plan-state or adaptive-record update before fresh task or final review; build and review workers MUST NOT update `plan.md`.",
         "Escalate by reclassifying the affected phase and recording the change; ask the developer to resolve scope changes, gate conflicts, and unresolved findings; you MUST NOT proceed on assumptions.",
-        "You MUST honor project configuration only for quick and full validation commands, bounded review or correction limits, and an explicit commit or push policy; discover conventional checks when overrides are absent. Adaptive taxonomies, dispositions, and skip matrices are not project configuration."
+        "You MUST honor project configuration only for quick and full validation commands, bounded review or correction limits, and an explicit commit or push policy; discover conventional checks when overrides are absent. Adaptive taxonomies, dispositions, and skip matrices are not project configuration.",
+        "A native host capability MAY replace a workflow mechanic only when it preserves the same responsibility, isolation, source-read-only, complete-input, output, evidence, immutability, and blocking contracts; you MUST use one mechanism per concern."
       ]
     },
     {

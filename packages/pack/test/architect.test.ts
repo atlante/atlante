@@ -371,6 +371,16 @@ describe("architect agent instance", () => {
     expect(instructions).toMatch(/commit or push policy/);
   });
 
+  test("replaces workflow mechanics with native host capabilities only under preserved contracts", () => {
+    const architect = resolveArchitect();
+    const instructions = architect.instructionsText;
+
+    expect(instructions).toMatch(
+      /native host capability MAY replace a workflow mechanic only when it preserves the same responsibility, isolation, source-read-only, complete-input, output, evidence, immutability, and blocking contracts/,
+    );
+    expect(instructions).toMatch(/MUST use one mechanism per concern/);
+  });
+
   test("states every binding gate with MUST wording instead of weak prohibitions", () => {
     const architect = resolveArchitect();
     const invariants = architect.invariantsText.split("\n");
