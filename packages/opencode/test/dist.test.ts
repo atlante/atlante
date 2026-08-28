@@ -41,6 +41,33 @@ const firstPartyPackRoot = fileURLToPath(
   new URL("../../pack/", import.meta.url),
 );
 
+const FIRST_PARTY_SKILLS = ["brainstorm", "plan", "build", "review"] as const;
+
+const FIRST_PARTY_SKILL_LANDMARKS: Record<
+  (typeof FIRST_PARTY_SKILLS)[number],
+  { title: string; overview: string }
+> = {
+  brainstorm: {
+    title: "# Brainstorm",
+    overview:
+      "Turn an unclear or consequential request into a well-scoped, explicitly approved direction",
+  },
+  plan: {
+    title: "# Plan",
+    overview: "Turn a defined request into the smallest implementation plan",
+  },
+  build: {
+    title: "# Build",
+    overview:
+      "Implement one defined task or correction through focused test feedback",
+  },
+  review: {
+    title: "# Review",
+    overview:
+      "Inspect a focused task change or a complete change set without modifying it",
+  },
+};
+
 const DIST = fileURLToPath(new URL("../dist", import.meta.url));
 const DIST_INDEX = fileURLToPath(new URL("../dist/index.js", import.meta.url));
 const DIST_API = fileURLToPath(new URL("../dist/api.js", import.meta.url));
@@ -118,6 +145,33 @@ function localResourceProject(): string {
   const result = buildProject(root);
   if (result.diagnostics.some(({ severity }) => severity === "error"))
     throw new Error("built plugin resource fixture failed to build");
+  return root;
+}
+
+function firstPartyPackProject(): string {
+  const root = mkdtempSync(join(tmpdir(), "atlante-built-plugin-pack-"));
+  created.push(root);
+  cpSync(firstPartyPackRoot, join(root, "node_modules", "@atlante", "pack"), {
+    recursive: true,
+  });
+  writeFileSync(
+    join(root, "package.json"),
+    `${JSON.stringify({
+      name: "atlante-built-plugin-pack-fixture",
+      version: "1.0.0",
+      devDependencies: { "@atlante/pack": "workspace:0.1.6" },
+    })}\n`,
+  );
+  writeFileSync(
+    join(root, "atlante.jsonc"),
+    `${JSON.stringify({
+      $schema: SCHEMA_URI,
+      extends: "@atlante/pack",
+    })}\n`,
+  );
+  const result = buildProject(root);
+  if (result.diagnostics.some(({ severity }) => severity === "error"))
+    throw new Error("first-party pack fixture failed to build");
   return root;
 }
 
@@ -446,6 +500,54 @@ test("the generated plugin materializes built local-resource artifacts at runtim
   await expect(
     hooks.tool?.atlante_skill?.execute({ name: "testing" }, {} as never),
   ).resolves.toContain("Built skill content.");
+});
+
+// Host-adapter integration coverage: the adapter materializes verified built
+// artifacts into the host config and serves skills through atlante_skill. It
+// brokers no runtime workflow files, so these assertions cover materialization
+// landmarks only.
+test("the generated plugin materializes the first-party architect and serves every phase skill through atlante_skill", async () => {
+  const root = firstPartyPackProject();
+  rmSync(join(root, "atlante.jsonc"));
+  rmSync(join(root, "node_modules"), { recursive: true, force: true });
+
+  const { default: BuiltAtlantePlugin } = await import(DIST_INDEX_URL);
+  const hooks = await BuiltAtlantePlugin({ directory: root } as PluginInput);
+  const config: HostConfig = {};
+
+  await hooks.config?.(config as never);
+
+  expect(Object.keys(config.agent ?? {})).toEqual(["architect"]);
+  expect(config.agent?.architect?.description).toBeTruthy();
+  expect(config.agent?.architect?.prompt).toContain(
+    "You are the lead engineer for",
+  );
+  expect(config.agent?.architect?.prompt).toContain("## Workflow");
+  expect(config.agent?.architect?.prompt).toContain("(adaptive)");
+  expect(config.agent?.architect?.prompt).toContain("### 3. Build (mandatory)");
+
+  const skillTool = hooks.tool?.atlante_skill;
+  if (!skillTool) throw new Error("atlante_skill tool is not exposed");
+
+  const availableSkillIds = skillTool.description
+    .split("\n")
+    .filter((line) => line.startsWith("- "))
+    .map((line) => line.slice(2, line.indexOf(":")));
+  expect(availableSkillIds.sort()).toEqual([...FIRST_PARTY_SKILLS].sort());
+
+  for (const skillId of FIRST_PARTY_SKILLS) {
+    const content = await skillTool.execute({ name: skillId }, {} as never);
+    if (typeof content !== "string")
+      throw new Error(`${skillId} returned a non-string result`);
+    const { title, overview } = FIRST_PARTY_SKILL_LANDMARKS[skillId];
+    expect(content, `${skillId} title`).toContain(title);
+    expect(content, `${skillId} overview heading`).toContain("## Overview");
+    expect(content, `${skillId} overview`).toContain(overview);
+  }
+
+  await expect(
+    skillTool.execute({ name: "brainstorming" }, {} as never),
+  ).rejects.toThrow('unknown Atlante skill "brainstorming"');
 });
 
 test("the generated plugin atomically ignores invalid artifacts without host mutation", async () => {
