@@ -166,7 +166,9 @@ const expectedPackFiles = [
   "artifact/template.jsonc",
   "artifact/template.md",
   "atlante.jsonc",
+  "brainstorm/instance.jsonc",
   "brainstorming/instance.jsonc",
+  "build/instance.jsonc",
   "delivery-workflow/instance.jsonc",
   "gotchas/template.jsonc",
   "gotchas/template.md",
@@ -176,10 +178,18 @@ const expectedPackFiles = [
   "invariants/template.md",
   "markdown/template.jsonc",
   "markdown/template.md",
+  "plan/instance.jsonc",
+  "review/instance.jsonc",
   "skill/template.jsonc",
   "skill/template.md",
   "workflow/template.jsonc",
   "workflow/template.md",
+  "test/brainstorm.test.ts",
+  "test/build.test.ts",
+  "test/plan.test.ts",
+  "test/preset.test.ts",
+  "test/review.test.ts",
+  "test/selection-fixture.ts",
 ] as const;
 
 function readJson(path: string): Record<string, unknown> {
@@ -251,11 +261,17 @@ describe("first-party static pack contract", () => {
     expect(manifest).not.toHaveProperty("scripts");
     expect(
       filesUnder(packRoot)
-        .filter((path) => path !== "package.json")
+        .filter(
+          (path) => path !== "package.json" && !path.includes("node_modules"),
+        )
         .sort(),
     ).toEqual(["LICENSE", "README.md", ...expectedPackFiles].sort());
     expect(
-      filesUnder(packRoot).some((path) => /\.(?:[cm]?ts|[cm]?js)$/.test(path)),
+      filesUnder(packRoot)
+        .filter(
+          (path) => !path.startsWith("test/") && !path.includes("node_modules"),
+        )
+        .some((path) => /\.(?:[cm]?ts|[cm]?js)$/.test(path)),
     ).toBe(false);
   });
 });
@@ -314,8 +330,12 @@ describe("first-party package resolution", () => {
     });
 
     expect(Object.keys(document.bindings.agents)).toEqual(["architect"]);
-    expect(Object.keys(document.bindings.skills)).toEqual([
+    expect(Object.keys(document.bindings.skills).sort()).toEqual([
+      "brainstorm",
       "brainstorming",
+      "build",
+      "plan",
+      "review",
       "workflow",
     ]);
     const descriptionOrigin =

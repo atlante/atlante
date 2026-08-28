@@ -1,0 +1,29 @@
+{
+  "$template": "@atlante/pack/skill",
+  "description": "Use before planning or implementation to clarify a request, resolve uncertainty, define the direction, and produce an explicitly approved handoff.",
+  "title": "Brainstorm",
+  "overview": "Turn an unclear or consequential request into a well-scoped, explicitly approved direction ready for the next step.",
+  "sections": [
+    {
+      "instructions": [
+        "Read the request and inspect only the project context needed to understand it before asking questions.",
+        "Scale exploration and discussion to the complexity, risk, and uncertainty of the work; resolve material gaps without adding ceremony that does not improve the decision.",
+        "If exploration reveals greater complexity, risk, or uncertainty, increase the depth instead of continuing with an undersized design.",
+        "If the request contains independent deliverables, stop treating it as one design. Propose a parent-and-child decomposition with a clear goal, scope, acceptance criteria, and dependencies for each child; obtain explicit approval, then refine one child at a time so each handoff feeds one implementation plan.",
+        "Ask one focused question at a time, and only when the answer is needed to resolve a material gap; prefer multiple-choice questions when they make the decision clearer.",
+        "When a meaningful design choice exists, present two or three viable approaches with their trade-offs and lead with a recommendation.",
+        "Keep the scope minimal with YAGNI, making exclusions and deferred ideas explicit instead of quietly absorbing them.",
+        "Present a short design and obtain explicit approval for simple work; for complex work, present it in coherent sections and confirm each section before continuing.",
+        "Assemble the explicitly approved handoff that records the purpose, agreed scope and exclusions, constraints, acceptance criteria, chosen approach, relevant repository evidence, assumptions, and any rejected alternatives or remaining open decisions.",
+        "Before returning the handoff, check it for placeholders, contradictions, ambiguity, and unnecessary scope."
+      ]
+    },
+    {
+      "invariants": [
+        "When exploration starts drifting, looping, or stalling, stop and expose unresolved doubts instead of continuing without direction.",
+        "Do not invent answers, hide material uncertainty, or silently expand the agreed scope.",
+        "Preserve agreed decisions unless they are explicitly changed."
+      ]
+    }
+  ]
+}

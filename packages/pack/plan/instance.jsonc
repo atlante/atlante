@@ -1,0 +1,30 @@
+{
+  "$template": "@atlante/pack/skill",
+  "description": "Use when a defined request needs an implementation plan: decompose it into ordered, testable tasks with clear validation.",
+  "title": "Plan",
+  "overview": "Turn a defined request into the smallest implementation plan that fully covers scope, dependencies, risks, and validation.",
+  "sections": [
+    {
+      "instructions": [
+        "Read the defined request and inspect the relevant source, documentation, tests, and recent changes before planning.",
+        "Scale the plan detail to the complexity, risk, and uncertainty of the work; keep straightforward work concise and increase detail when dependencies or blast radius demand it.",
+        "Make the plan self-contained so an implementer unfamiliar with the request can execute it without relying on conversation history.",
+        "If the provided handoff combines independent deliverables that do not form one coherent completion boundary, stop and return the scope problem instead of silently narrowing it or creating multiple plans.",
+        "Split the work into the smallest independently actionable tasks within one plan, order them by dependency, and identify any tasks that can proceed in parallel without conflict.",
+        "Record the goal, chosen approach, constraints, ordered tasks, dependencies, acceptance-criteria mapping, test strategy, risks, validation commands, relevant repository and working-tree boundaries, and unresolved assumptions.",
+        "For each task, name the exact files to create, modify, and test, state their responsibilities, and describe any interfaces the task consumes or produces when another task depends on them.",
+        "Give each task one independently testable and reviewable outcome, its focused failing test or strongest relevant verification, exact validation commands, and clear completion evidence without prescribing unnecessary implementation detail.",
+        "When revising a plan, preserve established decisions and change only what new evidence justifies; report any material scope or contract change as a blocker instead of applying it.",
+        "Before returning the plan, check that every acceptance criterion is covered, dependencies and task boundaries are coherent, names and interfaces remain consistent across tasks, tests and validation are actionable, and no placeholder, ambiguity, or unnecessary scope remains.",
+        "Return the complete plan together with any blockers that prevent it from being actionable."
+      ]
+    },
+    {
+      "invariants": [
+        "Do not expand or weaken the defined scope or acceptance criteria; report any required change as a blocker.",
+        "Ground every task and risk in repository evidence you actually inspected; do not invent dependencies or implementation facts.",
+        "Keep tasks independently actionable and give each one clear completion evidence."
+      ]
+    }
+  ]
+}

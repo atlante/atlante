@@ -93,8 +93,12 @@ describe("first-party package resources as user configurations", () => {
     expect(prepared.agents.map(({ hostAgentId }) => hostAgentId)).toEqual([
       "architect",
     ]);
-    expect(prepared.skills.map(({ skillId }) => skillId)).toEqual([
+    expect(prepared.skills.map(({ skillId }) => skillId).sort()).toEqual([
+      "brainstorm",
       "brainstorming",
+      "build",
+      "plan",
+      "review",
       "workflow",
     ]);
 

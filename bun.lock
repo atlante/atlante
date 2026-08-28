@@ -68,6 +68,10 @@
     "packages/pack": {
       "name": "@atlante/pack",
       "version": "0.1.15",
+      "devDependencies": {
+        "@atlante/resources": "workspace:*",
+        "@atlante/validator": "workspace:*",
+      },
     },
     "packages/resources": {
       "name": "@atlante/resources",

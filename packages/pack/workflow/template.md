@@ -11,31 +11,17 @@ Execute phases sequentially in the order listed. A phase with a configured subag
 
 Policies are binding; follow them in every phase.
 
-{{#if (anyEqual phases "policies.adaptive" true)}}### Adaptive phase protocol
+{{#if (anyEqual phases "policies.adaptive" true)}}### Adaptive phases
 
-This workflow-scope protocol is instruction, not phase-specific context or task material. Phase-specific context and task material MUST NOT redefine it.
+An adaptive phase is optional and should add only as much ceremony as the work needs.
 
-#### Classification
+Before running an adaptive phase, assess whether it would materially improve the outcome using task complexity, risk, uncertainty, and existing evidence.
 
-Before acting:
+- Skip the phase when the task is already clear, low-risk, and simple enough that the phase would not materially improve the outcome; briefly state why.
+- Otherwise run the phase with depth proportional to the work, focusing only on material questions and evidence.
+- Whenever the phase runs, preserve its required output, approvals, and safety gates.
 
-Classify the overall cycle and each known implementation task by work type, complexity and risk, blast radius, reversibility, and uncertainty.
-
-#### Decision record
-
-Before acting, record the cycle or task, classification, evidence, disposition, and rationale.
-
-#### Dispositions
-
-Assign every adaptive phase exactly one of `full`, `reduced`, or `skipped`.
-
-- `full` executes the complete phase.
-- `reduced` executes only the explicitly justified reduced scope.
-- `skipped` omits the phase only when its own instructions permit it.
-
-A non-adaptive phase MUST remain mandatory and MUST NOT be reduced or skipped.
-
-Before applying `full` because evidence is missing, signals conflict, or material uncertainty exists, determine whether the uncertainty is decision-relevant and developer-resolvable. When it is, ask one focused developer question and classify using the answer. Default to `full` only when material uncertainty remains after available evidence and that question, when no appropriate developer question can resolve the material uncertainty, or when asking is not possible. Do not make routine or immaterial uncertainty interactive. Reclassify when implementation or review evidence changes risk. Developer or project rules MAY strengthen this protocol but MUST NOT silently weaken a disposition. Phase instructions own concrete eligibility and escalation criteria. Material scope changes MUST retain developer approval. A focused developer question MUST NOT itself grant approval for a material scope change. Cost or time pressure MUST NOT be the sole reason to reduce ceremony.
+Reassess later adaptive phases when implementation or review reveals new material evidence. A non-adaptive phase remains mandatory and runs as written.
 
 {{/if}}{{#if policies.orchestratorReadOnly}}### Workflow: read-only orchestration
 

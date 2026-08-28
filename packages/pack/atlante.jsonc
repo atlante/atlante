@@ -19,6 +19,18 @@
     "workflow": {
       "$instance": "@atlante/pack/delivery-workflow",
       "description": "Use when an approved issue is ready for implementation: deliver a focused, verified change that satisfies its acceptance criteria."
+    },
+    "brainstorm": {
+      "$instance": "@atlante/pack/brainstorm"
+    },
+    "plan": {
+      "$instance": "@atlante/pack/plan"
+    },
+    "build": {
+      "$instance": "@atlante/pack/build"
+    },
+    "review": {
+      "$instance": "@atlante/pack/review"
     }
   }
 }
