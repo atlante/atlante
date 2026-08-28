@@ -1,39 +1,28 @@
 {
   "$template": "@atlante/pack/skill",
+  "description": "Use before planning or implementation to clarify a request, resolve material uncertainty, and produce an explicitly approved handoff.",
   "title": "Brainstorm",
-  "overview": "Run the assigned `full` or `reduced` disposition exactly as routed by the architect and return the complete developer-approved brainstorming handoff.",
+  "overview": "Turn an unclear or consequential request into a well-scoped, explicitly approved direction ready for the next step.",
   "sections": [
     {
-      "markdown": "## Terms\n\n- **The architect** is the coordinating agent that routed this invocation; its assignment fixes your disposition (`full` or `reduced`), supplies the task context, and owns routing decisions.\n- In `full`, you perform complete discovery and design work with the developer. In `reduced`, the task is already approved and you confirm only what the assignment identifies.\n\n## Handoff contract\n\nBoth dispositions produce the identical complete handoff returned through the architect, who updates the external issue or task with it or passes it on verbatim. There is no standalone brainstorming artifact:\n\n- Purpose\n- Approved scope and exclusions\n- Constraints and invariants\n- Acceptance criteria\n- Chosen approach\n- Rejected alternatives\n- Relevant repository evidence\n- Assumptions\n- Remaining open decisions"
-    },
-    {
       "instructions": [
-        "Read the complete assignment before anything else: your assigned disposition, the task context, any identified gaps or assumptions, and every required input referenced by exact path, read in full or supplied verbatim when file sharing is unavailable.",
-        "In `full`, explore the repository first until you can ground every claim in something you actually read: relevant source, documentation, conventions, and recent history.",
-        "When the request spans independent subsystems, decompose it and refine one focused piece at a time.",
-        "Ask exactly one question at a time, waiting for each answer before continuing; prefer multiple-choice questions when they clarify choices.",
-        "In `full`, propose two or three viable approaches with their trade-offs, and lead with a clear recommendation.",
-        "Reduce scope with YAGNI: exclude anything beyond what the work currently requires, recording deferred ideas as explicitly out of scope rather than absorbed quietly.",
-        "Present the design in sections sized to the work, and obtain explicit developer approval after each section before continuing; revise until approved.",
-        "In `reduced`, confirm only the gaps or assumptions on the architect's list within the otherwise approved task: verify just enough to answer them, keep questions one at a time, retain developer approval for anything changed, and state why the narrowed breadth is sufficient.",
-        "Assemble the complete handoff contract above with your disposition's results: preserve previously approved content unchanged and keep unresolved questions explicit rather than resolving them unilaterally.",
-        "Return the finished handoff to the architect through the assigned response path."
-      ]
-    },
-    {
-      "gotchas": [
-        "Unrelated dirty changes in the working tree belong to other in-progress work: preserve them untouched and keep them distinct from your own evidence and outputs.",
-        "Silence is not consent: an unanswered question remains open in the handoff rather than becoming an assumed answer."
+        "Read the request and inspect only the project context needed to understand it before asking questions.",
+        "Scale exploration and discussion to the complexity, risk, and uncertainty of the work; resolve material gaps without adding ceremony that does not improve the decision.",
+        "If exploration reveals greater complexity, risk, or uncertainty, increase the depth instead of continuing with an undersized design.",
+        "If the request contains independent deliverables, stop treating it as one design. Propose a parent-and-child decomposition with a clear goal, scope, acceptance criteria, and dependencies for each child; obtain explicit approval, then refine one child at a time so each handoff feeds one implementation plan.",
+        "Ask one focused question at a time, and only when the answer is needed to resolve a material gap; prefer multiple-choice questions when they make the decision clearer.",
+        "When a meaningful design choice exists, present two or three viable approaches with their trade-offs and lead with a recommendation.",
+        "Keep the scope minimal with YAGNI, making exclusions and deferred ideas explicit instead of quietly absorbing them.",
+        "Present a short design and obtain explicit approval for simple work; for complex work, present it in coherent sections and confirm each section before continuing.",
+        "Assemble the explicitly approved handoff that records the purpose, agreed scope and exclusions, constraints, acceptance criteria, chosen approach, relevant repository evidence, assumptions, and any rejected alternatives or remaining open decisions.",
+        "Before returning the handoff, check it for placeholders, contradictions, ambiguity, and unnecessary scope."
       ]
     },
     {
       "invariants": [
-        "You MUST execute exactly the assigned disposition and its required stages; you MUST NOT reclassify the work, skip a stage of the assigned procedure, or adopt a weaker disposition than assigned.",
-        "Newly discovered scope, risk, uncertainty, dependency, or capability evidence beyond the assignment MUST go back to the architect for decisions; you MUST NOT expand the assignment or decide it yourself.",
-        "You MUST NOT begin implementation, start another workflow phase, or create a standalone brainstorming file; the completed handoff goes back through the architect.",
-        "When a required input, access, or capability is unavailable, you MUST stop the affected work at the smallest safe point and report precisely what is missing; you MUST NOT improvise substitutes.",
-        "You MUST report checks honestly: a check that could not run is reported as unavailable and never as passed; bypassed or partial validation is reported as incomplete or partially validated.",
-        "Presented design content and reduced confirmations MUST reach explicit developer approval before entering the handoff, and previously approved content MUST be carried forward unchanged unless the developer re-approves a change."
+        "Do not begin implementation before the direction is explicitly approved.",
+        "Do not invent answers, hide material uncertainty, or silently expand the agreed scope.",
+        "Preserve agreed decisions unless they are explicitly changed."
       ]
     }
   ]

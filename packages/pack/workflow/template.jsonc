@@ -47,7 +47,7 @@
                 "default": false
               },
               "adaptive": {
-                "description": "Whether this phase may be resized or skipped by the adaptive workflow protocol.",
+                "description": "Whether this phase may be skipped when it would add no material value and otherwise run with depth proportional to the work.",
                 "type": "boolean",
                 "default": false
               },

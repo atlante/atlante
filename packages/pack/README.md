@@ -77,26 +77,14 @@ The reusable workflow template supports opt-in phase resizing:
 the phase mandatory. If any phase is adaptive, the rendered workflow emits one
 shared protocol and labels each phase as `adaptive` or `mandatory`.
 
-The protocol assigns every adaptive phase exactly one disposition:
-
-- `full` executes the complete phase.
-- `reduced` executes only the explicitly justified reduced scope.
-- `skipped` omits the phase only when its own instructions permit it.
-
-Before acting, the protocol MUST record the classification, evidence,
-disposition, and rationale. Before applying `full` because evidence is missing,
-signals conflict, or material uncertainty exists, determine whether the
-uncertainty is decision-relevant and developer-resolvable. When it is, ask one
-focused developer question and classify using the answer. Default to `full` only
-when material uncertainty remains after available evidence and that question,
-when no appropriate developer question can resolve the material
-uncertainty, or when asking is not possible. Do not make routine or immaterial
-uncertainty interactive. Reclassification MUST follow implementation or review
-evidence that changes risk. Phase instructions MUST own concrete eligibility and
-escalation criteria; developer or project rules MAY strengthen the protocol but
-MUST NOT silently weaken a disposition. Material scope changes MUST retain
-developer approval, and a focused developer question MUST NOT itself grant that
-approval.
+An adaptive phase is optional and should add only as much ceremony as the work
+needs. Before running it, assess whether it would materially improve the
+outcome using task complexity, risk, uncertainty, and existing evidence: skip
+the phase when it would not materially improve the outcome, briefly stating
+why, and otherwise run it with depth proportional to the work while preserving
+its required output, approvals, and safety gates. Reassess later adaptive
+phases when implementation or review reveals new material evidence; a
+non-adaptive phase remains mandatory and runs as written.
 
 This is one built-in, prompt-only declarative capability. It does not execute
 phases or maintain runtime state, and it is not a configurable profile,
@@ -122,8 +110,7 @@ intentionally exposes the `architect` agent plus six skill bindings:
 `brainstorming` and `workflow` are legacy entry points (`workflow` binds the
 `delivery-workflow` instance) whose bindings and instances
 [#65](https://github.com/atlante/atlante/issues/65) removes. `brainstorm`,
-`plan`, `build`, and `review` are the durable phase contracts consuming the
-adaptive dispositions from [#75](https://github.com/atlante/atlante/issues/75).
+`plan`, `build`, and `review` are the durable, agent-agnostic phase contracts.
 The agent template accepts optional top-level `responsibilities` alongside
 `identity` and `mission`. The agent and skill templates support ordered
 `markdown`, `instructions`, `gotchas`, `workflow`, and `invariants` sections.

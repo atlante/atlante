@@ -1,46 +1,34 @@
 {
   "$template": "@atlante/pack/skill",
+  "description": "Use when a defined task or correction is ready for implementation: make the smallest verified change that satisfies its acceptance criteria.",
   "title": "Build",
-  "overview": "Implement exactly one architect-assigned initial task or correction as a fresh build worker and return the assigned cumulative brief.",
+  "overview": "Implement one defined task or correction through focused test feedback and return the change with truthful validation evidence.",
   "sections": [
     {
-      "markdown": "## Terms\n\n- **The architect** coordinates the cycle: its assignment scopes your single initial task or correction, fixes the cycle ID, task ID, and the exact assigned `brief-<n>` path, and owns every routing and classification decision.\n- You are a **fresh build worker**, and in addition to your explicitly assigned source/configuration/test changes, the next cumulative brief at `.atlante/workflows/<cycle-id>/tasks/<task-id>/brief-<n>.md` is the only workflow artifact you write; the assigned counter and lineage come from that assignment.\n\n## Brief record\n\nEvery brief records the identical complete contract:\n\n- Scope\n- Current decisions\n- Cumulative changed files\n- Acceptance evidence\n- Validation evidence\n- Concerns and received rulings\n- Revision and working-tree boundary\n\n`brief-1` records the initial implementation alone; each later brief additionally names the previous brief and the triggering report, summarizes the implementation delta, and carries forward the cumulative current state. Numbered briefs and reports are immutable once written. The revision and working-tree boundary states base and head revisions when available, included uncommitted paths, excluded pre-existing dirty paths, and generated check artifacts."
-    },
-    {
       "instructions": [
-        "Read the complete assignment first: the single scoped initial task or correction, your fresh-worker isolation, the assigned cycle ID, task ID, and exact `brief-<n>` path, and every referenced input passed by exact shared path and read in full or supplied verbatim when file sharing is unavailable.",
-        "Trust the assigned identifiers, counter, path, and lineage; when the assigned target already exists or is unusable, refuse the assignment and report instead of overwriting anything or rediscovering numbering.",
-        "Before implementing a behavior change, name the observable behavior and the invariants it affects.",
-        "Write the focused failing test first and run it: observe it fail for the expected reason and record that red evidence.",
-        "When the required test already passes or fails for an unrelated reason, stop: investigate, revise the test, or return evidence that the task assumption is wrong or blocked; never proceed under a false red state.",
+        "Read the complete task or correction definition, its acceptance criteria, applicable project instructions, and the relevant source and tests before editing.",
+        "Identify the observable outcome, affected invariants, and exact scope; if any of them is materially unclear or blocked, stop and report it before changing code.",
+        "For a bug or unexpected failure, reproduce it and trace the root cause before proposing a fix; test one hypothesis at a time and fix the source rather than the symptom.",
+        "Before writing the test body, name the regression it must catch; exercise observable behavior through real code, using mocks only at unavoidable slow or external boundaries.",
+        "For a behavior change, write the smallest focused test that expresses the expected behavior and run it before implementation.",
+        "Confirm that the focused test fails for the expected reason; if it already passes or fails for an unrelated reason, investigate, revise the test, or return evidence that the task assumption is wrong instead of proceeding under a false red state.",
         "Make the smallest implementation that satisfies the focused test and demonstrates it passing.",
-        "Add the meaningful boundary and failure cases around the changed behavior, then record what each relevant test proves.",
-        "For a change without observable behavior difference, record why red-green feedback is not meaningful and use the strongest relevant verification instead of manufacturing artificial tests.",
-        "On a correction, receive the complete previous report and the complete previous brief, satisfy every required finding and ruling, and produce the next cumulative brief without touching earlier numbered artifacts.",
-        "Assemble the Brief record contract above exactly once for your brief, with the revision and working-tree boundary describing the true tree: unrelated dirty changes are preserved untouched and named as excluded pre-existing paths.",
-        "Return the completed-brief notice with validation results and any routed-back evidence through the assigned response path."
-      ]
-    },
-    {
-      "gotchas": [
-        "Execute every verification command yourself and read its real output: a test that never ran, ran in another directory, or flipped between runs leaves you implementing on a false red.",
-        "Unrelated dirty changes in the working tree belong to other in-progress work: preserve them untouched and keep them excluded from your brief's boundary statements.",
-        "Reviewers reconcile your brief against the actual diff, so keep scope statements, review boundaries, and cumulative file lists agreeing with the working tree; a mismatch costs a full correction round.",
-        "Prior numbered briefs and reports are audit history: a well-meant tidy-up rewrite destroys lineage, so leave every existing artifact byte-for-byte unchanged.",
-        "A supplied summary orients and can supplement required content, but findings, rulings, evidence, and acceptance criteria arrive only by reading artifacts in full or receiving them verbatim; a summary never substitutes for either."
+        "Add meaningful boundary and failure cases around the changed behavior, then record what each relevant test proves.",
+        "For a change without an observable behavior difference, explain why red-green feedback is not meaningful and use the strongest relevant verification instead of manufacturing an artificial test.",
+        "For a correction, read the complete review context and verify every finding against the actual code and defined scope; if a finding is unclear, technically unsound, or conflicts with the contract, report the evidence instead of implementing it blindly.",
+        "Address every valid required correction within scope, and describe the resulting current state rather than only the correction delta.",
+        "Immediately before claiming completion, run the full commands that prove each claim, read their complete output and exit status, and report the actual results; stale, partial, or unavailable evidence is not a pass.",
+        "Before returning the result, inspect the actual diff and confirm that it matches the defined scope, preserves unrelated changes, satisfies every acceptance criterion, and contains no accidental or unsupported edits.",
+        "Return a concise implementation handoff containing the scope, decisions, changed files, acceptance evidence, validation evidence, and any concerns or blockers."
       ]
     },
     {
       "invariants": [
-        "You implement exactly the assigned single initial task or correction; you MUST NOT take extra tasks, absorb adjacent scope, or adopt a narrower scope than assigned, and newly discovered risk, uncertainty, dependency, validation, or scope evidence MUST go back to the architect instead of being self-classified.",
-        "Behavior changes MUST follow the chain: name the observable behavior and affected invariants, write the focused test first, observe it fail for a recorded expected reason, and only then implement; on an already-passing or unrelated failure you MUST NOT proceed and instead investigate, revise, or return wrong-assumption or blocked evidence.",
-        "Without an observable behavior change you MUST record why red-green feedback is not meaningful and apply the strongest relevant verification; you MUST NOT manufacture artificial tests.",
-        "Your only workflow-artifact write is the assigned next `brief-<n>` path under `.atlante/workflows/<cycle-id>/tasks/<task-id>/`; an occupied or invalid target MUST be refused and reported rather than overwritten, and the assigned counter and lineage MUST be trusted instead of rediscovered.",
-        "Each correction MUST start from the complete previous report and previous brief, satisfy every required finding and ruling, and yield the next cumulative brief produced as a fresh worker; earlier numbered briefs and reports MUST remain unchanged.",
-        "You never update `plan.md`: after a new brief exists, the architect routes any required plan-state or adaptive-record update through the original planner before fresh review is dispatched.",
-        "You MUST report checks honestly: a check that could not run is reported as unavailable and never as passed; bypassed or partial validation is reported as incomplete or partially validated; worker, validation, and blocked-review failures travel up the assigned workflow path.",
-        "Stay inside the explicitly assigned source, configuration, and commit boundaries; you MUST NOT assume access, permission, or targets beyond the task scope.",
-        "When a required input, access, capability, or assigned path is unavailable, you MUST stop the affected work at the smallest safe point and report precisely what is missing; you MUST NOT improvise substitutes."
+        "Work on exactly one defined task or correction; do not absorb adjacent scope or weaken the requested outcome.",
+        "Do not implement a behavior change until its focused test has produced the expected red evidence, and do not manufacture tests for non-behavior changes.",
+        "Preserve unrelated work and keep it distinct from the implemented change.",
+        "Do not claim completion until the acceptance criteria and required checks are satisfied with reported evidence.",
+        "When required context, access, or validation is unavailable, stop at the smallest safe point and report the blocker instead of improvising."
       ]
     }
   ]

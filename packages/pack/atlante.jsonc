@@ -21,20 +21,16 @@
       "description": "Use when an approved issue is ready for implementation: deliver a focused, verified change that satisfies its acceptance criteria."
     },
     "brainstorm": {
-      "$instance": "@atlante/pack/brainstorm",
-      "description": "Use before planning to refine a request into an approved design contract covering purpose, scope, acceptance criteria, and chosen approach."
+      "$instance": "@atlante/pack/brainstorm"
     },
     "plan": {
-      "$instance": "@atlante/pack/plan",
-      "description": "Use when a delivery cycle is ready to start: decompose it into ordered tasks and write the assigned cycle-local living plan."
+      "$instance": "@atlante/pack/plan"
     },
     "build": {
-      "$instance": "@atlante/pack/build",
-      "description": "Use when a scoped task or correction is assigned: deliver it test-first as a fresh worker and write the next cumulative brief."
+      "$instance": "@atlante/pack/build"
     },
     "review": {
-      "$instance": "@atlante/pack/review",
-      "description": "Use when a completed brief or full cycle needs independent inspection: produce one immutable evidence-based review report at the assigned path."
+      "$instance": "@atlante/pack/review"
     }
   }
 }

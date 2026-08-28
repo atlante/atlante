@@ -5,98 +5,90 @@ import {
 } from "./selection-fixture.js";
 
 const locator = "@atlante/pack/brainstorm";
-const handoffFields = [
-  "Purpose",
-  "Approved scope and exclusions",
-  "Constraints and invariants",
-  "Acceptance criteria",
-  "Chosen approach",
-  "Rejected alternatives",
-  "Relevant repository evidence",
-  "Assumptions",
-  "Remaining open decisions",
-] as const;
 
 describe("brainstorm skill instance", () => {
   afterEach(cleanupPackResourceFixtures);
 
-  test("resolves through the existing skill template with one phase role", () => {
+  test("resolves through the existing skill template as one agent-agnostic skill", () => {
     const skill = resolvePackSkill(locator);
 
     expect(skill.templateLocator).toBe("@atlante/pack/skill");
     expect(skill.title).toBe("Brainstorm");
-    expect(skill.overview).toContain("`full`");
-    expect(skill.overview).toContain("`reduced`");
+    expect(skill.overview).toContain("explicitly approved direction");
     expect(skill.overview).not.toMatch(/\b(MUST|SHOULD|MAY)\b/);
     expect(
-      skill.sections.some(
-        (section) =>
-          !("markdown" in section) &&
-          !("instructions" in section) &&
-          !("gotchas" in section) &&
-          !("invariants" in section),
-      ),
-    ).toBe(false);
+      skill.sections.map((section) => Object.keys(section).sort().join("+")),
+    ).toEqual(["instructions", "invariants"]);
   });
 
-  test("authored instructions carry the full and reduced procedures in order", () => {
+  test("instructions carry the clarification-to-approval lifecycle in order", () => {
     const instructions = resolvePackSkill(locator).listText("instructions");
 
     for (const marker of [
-      "explore the repository",
-      "one focused piece at a time",
-      "exactly one question at a time",
-      "two or three viable approaches",
-      "trade-offs",
-      "clear recommendation",
-      "YAGNI",
-      "approval after each section",
-      "In `reduced`",
-      "only the gaps or assumptions",
-      "narrowed breadth is sufficient",
+      "inspect only the project context needed to understand it before asking questions",
+      "Scale exploration and discussion to the complexity, risk, and uncertainty",
+      "increase the depth instead of continuing with an undersized design",
+      "Propose a parent-and-child decomposition",
+      "refine one child at a time",
+      "Ask one focused question at a time",
+      "prefer multiple-choice questions",
+      "present two or three viable approaches with their trade-offs",
+      "lead with a recommendation",
+      "Keep the scope minimal with YAGNI",
+      "obtain explicit approval for simple work",
+      "confirm each section before continuing",
+      "Assemble the explicitly approved handoff",
+      "check it for placeholders, contradictions, ambiguity, and unnecessary scope",
     ])
       expect(instructions).toContain(marker);
 
-    const indexOfMarker = (marker: string) => instructions.indexOf(marker);
-    expect(indexOfMarker("explore the repository first")).toBeLessThan(
-      indexOfMarker("two or three viable approaches"),
+    const position = (marker: string) => instructions.indexOf(marker);
+    expect(position("inspect only the project context")).toBeLessThan(
+      position("present two or three viable approaches"),
     );
-    expect(indexOfMarker("two or three viable approaches")).toBeLessThan(
-      indexOfMarker("approval after each section"),
-    );
-  });
-
-  test("both dispositions share one identical nine-field handoff contract", () => {
-    const skill = resolvePackSkill(locator);
-    const markdown = skill.markdownText();
-    const everything = skill.everythingText();
-
-    expect(markdown).toContain("Handoff contract");
-    for (const field of handoffFields)
-      expect(everything.split(field).length - 1).toBe(1);
-    expect(markdown).toContain("no standalone brainstorming artifact");
-    expect(skill.listText("invariants")).toContain(
-      "previously approved content",
+    expect(position("present two or three viable approaches")).toBeLessThan(
+      position("Assemble the explicitly approved handoff"),
     );
   });
 
-  test("boundaries route authority up and stop rather than improvise", () => {
-    const skill = resolvePackSkill(locator);
-    const invariants = skill.listText("invariants");
-    const gotchas = skill.listText("gotchas");
+  test("the assembled handoff records the agreed design fields", () => {
+    const instructions = resolvePackSkill(locator).listText("instructions");
+
+    for (const field of [
+      "purpose",
+      "agreed scope and exclusions",
+      "constraints",
+      "acceptance criteria",
+      "chosen approach",
+      "relevant repository evidence",
+      "assumptions",
+      "rejected alternatives or remaining open decisions",
+    ])
+      expect(instructions).toContain(field);
+  });
+
+  test("invariants guard approval, honesty, and decision stability", () => {
+    const invariants = resolvePackSkill(locator).listText("invariants");
 
     for (const marker of [
-      "weaker disposition than assigned",
-      "back to the architect",
-      "standalone brainstorming file",
-      "MUST NOT improvise substitutes",
-      "unavailable and never as passed",
-      "incomplete or partially validated",
+      "Do not begin implementation before the direction is explicitly approved",
+      "Do not invent answers, hide material uncertainty, or silently expand the agreed scope",
+      "Preserve agreed decisions unless they are explicitly changed",
     ])
       expect(invariants).toContain(marker);
-    expect(invariants).toMatch(/\bMUST\b/);
-    for (const marker of ["preserve them untouched", "distinct from"])
-      expect(gotchas).toContain(marker);
+  });
+
+  test("carries no removed disposition or orchestrator semantics", () => {
+    const skill = resolvePackSkill(locator);
+    const everything = skill.everythingText();
+
+    expect(skill.markdownText().trim()).toBe("");
+    expect(everything).not.toContain("`full`");
+    expect(everything).not.toContain("`reduced`");
+    expect(everything).not.toMatch(/\barchitect\b/i);
+    expect(everything).not.toMatch(/disposition|eligib/i);
+    expect(everything).not.toContain(".atlante/");
+    expect(everything).not.toContain("standalone brainstorming artifact");
   });
 
   test("renders structural landmarks in the shared section order", () => {
@@ -105,24 +97,19 @@ describe("brainstorm skill instance", () => {
     for (const heading of [
       "# Brainstorm",
       "## Overview",
-      "## Handoff contract",
       "## Instructions",
-      "## Gotchas",
       "## Invariants",
     ])
       expect(output).toContain(heading);
-    expect(output).toContain("- Approved scope and exclusions");
-    for (const marker of [
-      "exactly one question at a time",
-      "weaker disposition than assigned",
-    ])
-      expect(output).toContain(marker);
+    expect(output).toContain("Ask one focused question at a time");
+    expect(output).toContain(
+      "- Do not begin implementation before the direction is explicitly approved.",
+    );
+    expect(output).not.toContain("## Gotchas");
+    expect(output).not.toContain("## Handoff contract");
 
     const position = (heading: string) => output.indexOf(heading);
-    expect(position("## Handoff contract")).toBeLessThan(
-      position("## Instructions"),
-    );
-    expect(position("## Instructions")).toBeLessThan(position("## Gotchas"));
-    expect(position("## Gotchas")).toBeLessThan(position("## Invariants"));
+    expect(position("## Overview")).toBeLessThan(position("## Instructions"));
+    expect(position("## Instructions")).toBeLessThan(position("## Invariants"));
   });
 });
