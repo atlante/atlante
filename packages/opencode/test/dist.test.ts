@@ -14,7 +14,11 @@ import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildProject } from "@atlante/builder";
 import { SCHEMA_URI } from "@atlante/schema";
-import type { PluginInput } from "@opencode-ai/plugin";
+import type {
+  PluginInput,
+  ToolDefinition,
+  ToolResult,
+} from "@opencode-ai/plugin";
 import { afterEach, beforeAll, expect, test } from "vitest";
 
 type HostConfig = {
@@ -502,11 +506,7 @@ test("the generated plugin materializes built local-resource artifacts at runtim
   ).resolves.toContain("Built skill content.");
 });
 
-// Host-adapter integration coverage: the adapter materializes verified built
-// artifacts into the host config and serves skills through atlante_skill. It
-// brokers no runtime workflow files, so these assertions cover materialization
-// landmarks only.
-test("the generated plugin materializes the first-party architect and serves every phase skill through atlante_skill", async () => {
+async function firstPartyMaterializedPlugin() {
   const root = firstPartyPackProject();
   rmSync(join(root, "atlante.jsonc"));
   rmSync(join(root, "node_modules"), { recursive: true, force: true });
@@ -514,36 +514,68 @@ test("the generated plugin materializes the first-party architect and serves eve
   const { default: BuiltAtlantePlugin } = await import(DIST_INDEX_URL);
   const hooks = await BuiltAtlantePlugin({ directory: root } as PluginInput);
   const config: HostConfig = {};
-
   await hooks.config?.(config as never);
+  return { hooks, config };
+}
 
-  expect(Object.keys(config.agent ?? {})).toEqual(["architect"]);
-  expect(config.agent?.architect?.description).toBeTruthy();
-  expect(config.agent?.architect?.prompt).toContain(
-    "You are the lead engineer for",
-  );
-  expect(config.agent?.architect?.prompt).toContain("## Workflow");
-  expect(config.agent?.architect?.prompt).toContain("(adaptive)");
-  expect(config.agent?.architect?.prompt).toContain("### 3. Build (mandatory)");
+function expectSingleArchitectAgent(config: HostConfig): void {
+  const agents = config.agent ?? {};
+  expect(Object.keys(agents)).toEqual(["architect"]);
+  const architect = agents.architect;
+  expect(architect?.description).toBeTruthy();
+  const prompt = architect?.prompt;
+  expect(prompt).toContain("You are the lead engineer for");
+  expect(prompt).toContain("## Workflow");
+  expect(prompt).toContain("(adaptive)");
+  expect(prompt).toContain("### 3. Build (mandatory)");
+}
 
-  const skillTool = hooks.tool?.atlante_skill;
-  if (!skillTool) throw new Error("atlante_skill tool is not exposed");
-
-  const availableSkillIds = skillTool.description
+function listedSkillIds(description: string): string[] {
+  return description
     .split("\n")
     .filter((line) => line.startsWith("- "))
     .map((line) => line.slice(2, line.indexOf(":")));
-  expect(availableSkillIds.sort()).toEqual([...FIRST_PARTY_SKILLS].sort());
+}
 
+function expectSkillLandmarks(
+  skillId: (typeof FIRST_PARTY_SKILLS)[number],
+  content: ToolResult,
+): void {
+  if (typeof content !== "string")
+    throw new Error(`${skillId} returned a non-string result`);
+  const { title, overview } = FIRST_PARTY_SKILL_LANDMARKS[skillId];
+  expect(content, `${skillId} title`).toContain(title);
+  expect(content, `${skillId} overview heading`).toContain("## Overview");
+  expect(content, `${skillId} overview`).toContain(overview);
+}
+
+async function expectEveryPhaseSkillLandmark(
+  skillTool: ToolDefinition,
+): Promise<void> {
   for (const skillId of FIRST_PARTY_SKILLS) {
-    const content = await skillTool.execute({ name: skillId }, {} as never);
-    if (typeof content !== "string")
-      throw new Error(`${skillId} returned a non-string result`);
-    const { title, overview } = FIRST_PARTY_SKILL_LANDMARKS[skillId];
-    expect(content, `${skillId} title`).toContain(title);
-    expect(content, `${skillId} overview heading`).toContain("## Overview");
-    expect(content, `${skillId} overview`).toContain(overview);
+    expectSkillLandmarks(
+      skillId,
+      await skillTool.execute({ name: skillId }, {} as never),
+    );
   }
+}
+
+// Host-adapter integration coverage: the adapter materializes verified built
+// artifacts into the host config and serves skills through atlante_skill. It
+// brokers no runtime workflow files, so these assertions cover materialization
+// landmarks only.
+test("the generated plugin materializes the first-party architect and serves every phase skill through atlante_skill", async () => {
+  const { hooks, config } = await firstPartyMaterializedPlugin();
+
+  expectSingleArchitectAgent(config);
+
+  const skillTool = hooks.tool?.atlante_skill;
+  if (!skillTool) throw new Error("atlante_skill tool is not exposed");
+  expect(listedSkillIds(skillTool.description).sort()).toEqual(
+    [...FIRST_PARTY_SKILLS].sort(),
+  );
+
+  await expectEveryPhaseSkillLandmark(skillTool);
 
   await expect(
     skillTool.execute({ name: "brainstorming" }, {} as never),
