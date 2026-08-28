@@ -1,11 +1,11 @@
 ---
 type Kind =
-  | "harness"
-  | "stars"
-  | "constellation"
-  | "projection"
-  | "coordinates"
-  | "bearing";
+  | "configuration"
+  | "inputs"
+  | "agent"
+  | "validation"
+  | "adapter"
+  | "runtime";
 
 interface Props {
   kind: Kind;
@@ -16,22 +16,32 @@ const { kind } = Astro.props;
 
 <div class={`identity-symbol ${kind}`} aria-hidden="true">
   {
-    kind === "harness" && (
+    kind === "configuration" && (
       <svg viewBox="0 0 120 120">
-        <circle class="outline" cx="60" cy="60" r="43" />
-        <path class="line" d="M35 70 50 57 67 69 83 41" />
-        <circle class="node" cx="35" cy="70" r="3.2" />
-        <circle class="node" cx="50" cy="57" r="3.2" />
-        <circle class="node" cx="67" cy="69" r="3.2" />
-        <path
-          class="spark"
-          d="m83 31 2.2 7.8 7.8 2.2-7.8 2.2L83 51l-2.2-7.8L73 41l7.8-2.2Z"
-        />
+        <g class="cluster cluster-a">
+          <path d="M15 31 29 23 40 34" />
+          <circle cx="15" cy="31" r="3.2" />
+          <circle cx="29" cy="23" r="3.2" />
+          <circle cx="40" cy="34" r="3.2" />
+        </g>
+        <g class="cluster cluster-b">
+          <path d="M52 55 65 43 80 54 91 43" />
+          <circle cx="52" cy="55" r="3.2" />
+          <circle cx="65" cy="43" r="3.2" />
+          <circle cx="80" cy="54" r="3.2" />
+          <circle cx="91" cy="43" r="3.2" />
+        </g>
+        <g class="cluster cluster-c">
+          <path d="M24 88 37 77 51 91" />
+          <circle cx="24" cy="88" r="3.2" />
+          <circle cx="37" cy="77" r="3.2" />
+          <circle cx="51" cy="91" r="3.2" />
+        </g>
       </svg>
     )
   }
   {
-    kind === "stars" && (
+    kind === "inputs" && (
       <svg viewBox="0 0 120 120">
         <path
           class="star"
@@ -41,7 +51,7 @@ const { kind } = Astro.props;
     )
   }
   {
-    kind === "constellation" && (
+    kind === "agent" && (
       <svg viewBox="0 0 120 120">
         <path class="line" d="M24 83 55 57 91 34" />
         <circle class="node" cx="24" cy="83" r="4" />
@@ -51,7 +61,7 @@ const { kind } = Astro.props;
     )
   }
   {
-    kind === "projection" && (
+    kind === "adapter" && (
       <svg viewBox="0 0 120 120">
         <path class="project" d="M24 96Q30 54 49 27" />
         <path class="project" d="M24 96Q47 51 76 30" />
@@ -61,7 +71,7 @@ const { kind } = Astro.props;
     )
   }
   {
-    kind === "coordinates" && (
+    kind === "validation" && (
       <svg viewBox="0 0 120 120">
         <circle class="outline" cx="60" cy="60" r="25" />
         <path class="line" d="M60 18v25m0 34v25M18 60h25m34 0h25" />
@@ -69,10 +79,17 @@ const { kind } = Astro.props;
     )
   }
   {
-    kind === "bearing" && (
+    kind === "runtime" && (
       <svg viewBox="0 0 120 120">
-        <path class="outline" d="M25 79a35 35 0 0 1 70 0" />
-        <path class="line" d="M17 79h86" />
+        <g class="constellation">
+          <path d="M29 43 46 28 64 39 83 22" />
+          <circle cx="29" cy="43" r="3.2" />
+          <circle cx="46" cy="28" r="3.2" />
+          <circle cx="64" cy="39" r="3.2" />
+          <circle cx="83" cy="22" r="3.2" />
+        </g>
+        <path class="boundary" d="M16 63h88" />
+        <path class="motion-path" d="M20 91c15-16 27 16 42 0s27 16 42 0" />
       </svg>
     )
   }
@@ -92,7 +109,11 @@ const { kind } = Astro.props;
 
   .outline,
   .line,
-  .project {
+  .project,
+  .cluster path,
+  .constellation path,
+  .boundary,
+  .motion-path {
     fill: none;
     stroke: currentColor;
     stroke-linecap: round;
@@ -114,13 +135,24 @@ const { kind } = Astro.props;
 
   .node,
   .spark,
-  .star {
+  .star,
+  .cluster circle,
+  .constellation circle {
     fill: currentColor;
+  }
+
+  .motion-path {
+    stroke-width: 2;
+    stroke-dasharray: 3 8;
   }
 
   @media (prefers-reduced-motion: no-preference) {
     .project {
       animation: project 10s linear infinite;
+    }
+
+    .motion-path {
+      animation: bearing-motion 2.4s linear infinite;
     }
 
     .spark,
@@ -136,11 +168,22 @@ const { kind } = Astro.props;
       }
     }
 
+    @keyframes bearing-motion {
+      to {
+        stroke-dashoffset: -22;
+      }
+    }
+
     @keyframes breathe {
       50% {
         scale: 1.04;
       }
     }
   }
-</style>
 
+  @media (prefers-reduced-motion: reduce) {
+    .motion-path {
+      animation: none;
+    }
+  }
+</style>

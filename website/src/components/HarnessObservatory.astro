@@ -3,63 +3,59 @@ import IdentitySymbol from "./IdentitySymbol.astro";
 
 const observations = [
   {
-    focus: "harness" as const,
-    term: "Complete harness",
-    title: "One configuration, not a folder of fragments",
+    focus: "configuration" as const,
+    term: "Family",
+    title: "One harness, held together",
     code: "atlante.jsonc",
     detail:
-      "Agents, skills, workflows, values, and selected resources stay in one reviewable source.",
+      "Agents, skills, workflows, values, and selected resources live in one versioned configuration beside your code.",
   },
   {
-    focus: "stars" as const,
+    focus: "inputs" as const,
     term: "Stars",
-    title: "Every input is named",
+    title: "Every signal stays visible",
     code: "identity · instructions · constraints · values · policies",
     detail:
-      "Reference points remain visible in diffs and reach templates only as declared inputs.",
+      "Each reference point remains named, diffable, and available to templates only when explicitly declared.",
   },
   {
-    focus: "constellation" as const,
+    focus: "agent" as const,
     term: "Constellations",
-    title: "Agents are composed, not copied",
+    title: "Your stars form an agent",
     code: "agents.<name> + $template",
     detail:
-      "A role binds its identity, mission, responsibilities, and invariants to a reusable template.",
+      "Identity, mission, responsibilities, invariants, and a reusable template combine into one coherent agent.",
   },
   {
-    focus: "coordinates" as const,
+    focus: "validation" as const,
     term: "Coordinates",
-    title: "Invalid input stops here",
+    title: "Validate before you build",
     code: "$schema + template validation",
     detail:
-      "Atlante checks document structure and template semantics before publishing any artifacts.",
+      "Atlante validates the configuration and every selected template before anything can be published.",
   },
   {
-    focus: "projection" as const,
+    focus: "adapter" as const,
     term: "Projection",
-    title: "The build crosses one boundary",
-    code: ".atlante/artifacts/ → @atlante/opencode",
+    title: "Only verified artifacts cross the boundary",
+    code: "configuration → artifacts → adapter",
     detail:
-      "The adapter reads verified output and materializes prompt and description fields in OpenCode.",
+      "Atlante builds host-neutral artifacts, then the adapter verifies them before materializing the harness.",
   },
   {
-    focus: "bearing" as const,
+    focus: "runtime" as const,
     term: "Bearing",
-    title: "Atlante carries structure, not execution",
+    title: "Atlante bears the structure. The host runs it.",
     code: "models · effort · permissions · tools · modes",
 
     detail:
-      "Runtime settings stay with OpenCode, while Atlante keeps the authored harness reproducible.",
+      "Runtime settings and execution remain with the host while Atlante keeps the authored structure reproducible.",
   },
 ];
 ---
 
-<section class="observatory" id="system" data-observatory data-focus="harness">
+<section class="observatory major-divider" id="system" data-observatory data-focus="configuration">
   <div class="inner">
-    <header class="intro">
-      <h2>See the system before the host does</h2>
-    </header>
-
     <div class="instrument">
       <div class="stage-wrap">
         <div class="symbol-stage" aria-hidden="true">
@@ -97,18 +93,45 @@ const observations = [
 </section>
 
 <script>
+  import { isDocumentEnd } from "../lib/scroll";
+
   const observatory = document.querySelector<HTMLElement>("[data-observatory]");
   const observations = observatory?.querySelectorAll<HTMLElement>(
     "[data-observation]",
   );
+  const lastObservation = observations?.[observations.length - 1];
 
   if (observatory && observations) {
     const focus = (element: HTMLElement): void => {
       observatory.dataset.focus = element.dataset.observation;
     };
 
+    const focusFinalObservation = (): boolean => {
+      const atObservatoryEnd =
+        observatory.getBoundingClientRect().bottom <= window.innerHeight + 2;
+
+      if (
+        !lastObservation ||
+        (!isDocumentEnd(
+          window.scrollY,
+          window.innerHeight,
+          Math.max(
+            document.documentElement.scrollHeight,
+            document.body?.scrollHeight ?? 0,
+          ),
+        ) &&
+          !atObservatoryEnd)
+      ) {
+        return false;
+      }
+
+      focus(lastObservation);
+      return true;
+    };
+
     const observer = new IntersectionObserver(
       (entries) => {
+        if (focusFinalObservation()) return;
         const visible = entries.find((entry) => entry.isIntersecting);
         if (visible?.target instanceof HTMLElement) focus(visible.target);
       },
@@ -117,8 +140,18 @@ const observations = [
 
     for (const item of observations) {
       observer.observe(item);
-      item.addEventListener("pointerenter", () => focus(item));
+      item.addEventListener("pointerenter", () => {
+        if (!focusFinalObservation()) focus(item);
+      });
     }
+
+    const syncFinalObservation = (): void => {
+      focusFinalObservation();
+    };
+
+    window.addEventListener("scroll", syncFinalObservation, { passive: true });
+    window.addEventListener("resize", syncFinalObservation);
+    syncFinalObservation();
   }
 </script>
 
@@ -127,40 +160,11 @@ const observations = [
     border-block-start: 0;
   }
 
-  .observatory::before {
-    content: "";
-    display: block;
-    width: min(100% - 2 * var(--space-4), var(--container-wide));
-    margin-inline: auto;
-    background: var(--ds-border);
-    height: 1px;
-  }
-
-
-
   .inner {
     max-width: var(--container-wide);
     margin-inline: auto;
     padding: clamp(var(--space-24), 9vw, 168px) var(--space-4);
   }
-
-  .intro {
-    margin-block-end: var(--space-24);
-  }
-
-  h2 {
-    max-width: 11ch;
-    margin: 0;
-    font-family: var(--font-display);
-    font-optical-sizing: auto;
-    font-size: clamp(44px, 5vw, 84px);
-    font-weight: 500;
-    line-height: 1.04;
-    letter-spacing: -0.015em;
-    text-wrap: balance;
-  }
-
-
 
   .instrument {
     display: grid;
@@ -194,12 +198,12 @@ const observations = [
       rotate 480ms var(--ease-standard);
   }
 
-  .observatory[data-focus="harness"] [data-symbol="harness"],
-  .observatory[data-focus="stars"] [data-symbol="stars"],
-  .observatory[data-focus="constellation"] [data-symbol="constellation"],
-  .observatory[data-focus="coordinates"] [data-symbol="coordinates"],
-  .observatory[data-focus="projection"] [data-symbol="projection"],
-  .observatory[data-focus="bearing"] [data-symbol="bearing"] {
+  .observatory[data-focus="configuration"] [data-symbol="configuration"],
+  .observatory[data-focus="inputs"] [data-symbol="inputs"],
+  .observatory[data-focus="agent"] [data-symbol="agent"],
+  .observatory[data-focus="validation"] [data-symbol="validation"],
+  .observatory[data-focus="adapter"] [data-symbol="adapter"],
+  .observatory[data-focus="runtime"] [data-symbol="runtime"] {
     opacity: 1;
     scale: 1;
     rotate: 0deg;
@@ -227,7 +231,6 @@ const observations = [
     font-size: var(--text-meta);
     font-weight: 700;
     letter-spacing: 0.11em;
-    text-transform: uppercase;
   }
 
   h3 {
@@ -260,11 +263,6 @@ const observations = [
 
 
   @media (max-width: 900px) {
-    .intro {
-      margin-block-end: var(--space-16);
-    }
-
-
     .instrument {
       grid-template-columns: 1fr;
       gap: 0;
@@ -289,16 +287,27 @@ const observations = [
     }
   }
 
-  @media (max-width: 560px) {
+  @media (max-width: 680px) {
     article {
-      grid-template-columns: 68px minmax(0, 1fr);
-      gap: var(--space-4);
+      display: block;
+      text-align: center;
     }
 
     .mobile-symbol {
-      width: 68px;
+      width: 96px;
+      margin-inline: auto;
+      margin-block-end: var(--space-4);
+    }
+
+    h3 {
+      margin-inline: auto;
+    }
+
+    article code,
+    .detail {
+      margin-inline: auto;
+      text-align: center;
     }
 
   }
 </style>
-

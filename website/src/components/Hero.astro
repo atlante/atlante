@@ -10,8 +10,7 @@ import glyphDark from "../assets/atlante-glyph-reverse.svg";
     <div class="stage">
       <h1>Give form to your harness</h1>
       <p class="subtitle">
-        Version agents, skills, and workflows in one repository-owned
-        configuration, then build verified artifacts for OpenCode.
+        Define, share, and evolve your harness through Atlante with your team.
       </p>
     </div>
     <div class="actions">
@@ -46,19 +45,21 @@ import glyphDark from "../assets/atlante-glyph-reverse.svg";
       class="glyph lockup-light"
       src={glyphLight}
       alt="The Atlante celestial sphere mark"
-      width={480}
-      height={480}
+      width={683}
+      height={1024}
+      loading="eager"
       fetchpriority="high"
     />
     <Image
       class="glyph lockup-dark"
       src={glyphDark}
       alt="The Atlante celestial sphere mark"
-      width={480}
-      height={480}
+      width={683}
+      height={1024}
+      loading="eager"
       fetchpriority="high"
     />
-    <p class="glyph-caption">Atlas bearing the celestial sphere</p>
+    <p class="glyph-caption">Atlante bearing the celestial sphere</p>
   </div>
 
 
@@ -139,12 +140,11 @@ import glyphDark from "../assets/atlante-glyph-reverse.svg";
 
   .glyph-caption {
     grid-area: 2 / 1;
-    margin: var(--space-2) 0 0;
+    margin: 0;
     color: var(--ds-muted);
     font-family: var(--font-mono);
     font-size: var(--text-meta);
     letter-spacing: 0.14em;
-    text-transform: uppercase;
     text-align: center;
   }
 
@@ -162,12 +162,10 @@ import glyphDark from "../assets/atlante-glyph-reverse.svg";
     align-items: center;
     min-height: var(--control-min);
     padding-inline: var(--space-8);
-    border-radius: 999px;
     font-family: var(--font-ui);
     font-size: var(--text-small);
     font-weight: 520;
     letter-spacing: 0.09em;
-    text-transform: uppercase;
     text-decoration: none;
   }
 
@@ -269,6 +267,31 @@ import glyphDark from "../assets/atlante-glyph-reverse.svg";
 
     .visual {
       order: 2;
+    }
+  }
+
+  @media (max-width: 680px) {
+    .copy {
+      text-align: center;
+    }
+
+    .subtitle {
+      margin-inline: auto;
+    }
+
+    .actions {
+      justify-content: center;
+    }
+
+    .command-row {
+      width: 100%;
+      justify-content: center;
+    }
+
+    .command-box {
+      width: min(100%, 31rem);
+      box-sizing: border-box;
+      text-align: start;
     }
   }
 </style>

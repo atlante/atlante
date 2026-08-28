@@ -1,0 +1,186 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SiteNav from "../components/SiteNav.astro";
+import SiteFooter from "../components/SiteFooter.astro";
+
+const title = "This star is off the map | Atlante";
+const description = "The page you requested was not found.";
+---
+
+<BaseLayout title={title} description={description}>
+  <SiteNav />
+  <main id="main">
+    <section class="not-found major-divider">
+      <div class="inner">
+        <div class="star-map" aria-hidden="true">
+          <svg viewBox="0 0 120 120">
+            <path class="orbit" d="M20 76c14-34 65-48 81-19" />
+            <path class="trail" d="M21 77c18 17 50 18 77-1" />
+            <circle class="star" cx="31" cy="67" r="5" />
+            <circle class="star" cx="74" cy="32" r="3" />
+            <circle class="star" cx="97" cy="58" r="4" />
+            <path class="lost" d="m57 67 3 8 8 3-8 3-3 8-3-8-8-3 8-3Z" />
+          </svg>
+        </div>
+        <p class="eyebrow">404 · Celestial error</p>
+        <h1>This star is off the map</h1>
+        <p class="explanation">The page you requested was not found.</p>
+        <div class="actions">
+          <a class="primary" href="/">Home</a>
+          <a class="secondary" href="https://docs.atlante.sh">Documentation</a>
+        </div>
+      </div>
+    </section>
+  </main>
+  <SiteFooter />
+</BaseLayout>
+
+<style>
+  .not-found {
+    min-height: calc(100svh - 96px);
+  }
+
+  .inner {
+    display: grid;
+    max-width: var(--container-content);
+    min-height: calc(100svh - 96px);
+    box-sizing: border-box;
+    align-content: center;
+    justify-items: start;
+    margin-inline: auto;
+    padding: var(--space-24) var(--space-4);
+  }
+
+  .star-map {
+    width: clamp(120px, 18vw, 220px);
+    margin-block-end: var(--space-8);
+    color: var(--ds-accent);
+  }
+
+  .star-map svg {
+    display: block;
+    width: 100%;
+    overflow: visible;
+  }
+
+  .orbit,
+  .trail {
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-width: 1.5;
+  }
+
+  .trail {
+    stroke-dasharray: 1 6;
+  }
+
+  .star,
+  .lost {
+    fill: currentColor;
+  }
+
+  .eyebrow {
+    margin: 0 0 var(--space-4);
+    color: var(--ds-muted);
+    font-family: var(--font-mono);
+    font-size: var(--text-meta);
+    letter-spacing: 0.1em;
+  }
+
+  h1 {
+    max-width: 11ch;
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: clamp(48px, 8vw, 112px);
+    font-weight: 500;
+    line-height: 1;
+    text-wrap: balance;
+  }
+
+  .explanation {
+    margin: var(--space-6) 0 0;
+    color: var(--ds-muted);
+    font-family: var(--font-body);
+    font-size: clamp(18px, 2vw, 24px);
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    margin-block-start: var(--space-8);
+  }
+
+  .actions a {
+    display: inline-flex;
+    min-height: var(--control-min);
+    align-items: center;
+    justify-content: center;
+    padding-inline: var(--space-6);
+    border: 1px solid var(--ds-border);
+    border-radius: 0;
+    color: var(--ds-fg);
+    font-family: var(--font-ui);
+    font-size: var(--text-small);
+    font-weight: 650;
+    text-decoration: none;
+  }
+
+  .primary {
+    background: var(--ds-fg);
+    color: var(--ds-bg) !important;
+  }
+
+  .actions a:hover,
+  .actions a:focus-visible {
+    background: var(--ds-fg);
+    color: var(--ds-bg);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .lost {
+      animation: breathe 4s var(--ease-standard) infinite;
+      transform-box: fill-box;
+      transform-origin: center;
+    }
+
+    @keyframes breathe {
+      50% {
+        scale: 1.08;
+        rotate: 8deg;
+      }
+    }
+  }
+
+  @media (max-width: 680px) {
+    .inner,
+    .not-found {
+      min-height: calc(100svh - 72px);
+    }
+
+    .inner {
+      padding-block: var(--space-16);
+      justify-items: center;
+      text-align: center;
+    }
+
+    .star-map,
+    h1,
+    .explanation {
+      margin-inline: auto;
+    }
+
+    .actions {
+      justify-content: center;
+    }
+
+    .actions {
+      width: 100%;
+    }
+
+    .actions a {
+      flex: 1 1 180px;
+    }
+  }
+</style>
