@@ -1,10 +1,28 @@
+import {
+  createProjectResourcePack,
+  resolveResourceInstance,
+} from "@atlante/resources";
 import { afterEach, describe, expect, test } from "vitest";
 import {
   cleanupPackResourceFixtures,
+  packResourceFixture,
   resolvePackSkill,
 } from "./selection-fixture.js";
 
 const locator = "@atlante/pack/brainstorm";
+
+function instanceDescription(): string {
+  const { root, config } = packResourceFixture();
+  const { input } = resolveResourceInstance(
+    createProjectResourcePack(root),
+    locator,
+    config,
+  );
+  const { description } = input;
+  if (typeof description !== "string")
+    throw new Error(`${locator} expects a string description`);
+  return description;
+}
 
 describe("brainstorm skill instance", () => {
   afterEach(cleanupPackResourceFixtures);
@@ -19,6 +37,15 @@ describe("brainstorm skill instance", () => {
     expect(
       skill.sections.map((section) => Object.keys(section).sort().join("+")),
     ).toEqual(["instructions", "invariants"]);
+  });
+
+  test("description resolves uncertainty and defines direction without the material qualifier", () => {
+    const description = instanceDescription();
+
+    expect(description).toContain("uncertainty");
+    expect(description).not.toMatch(/\bmaterial\b/i);
+    expect(description).toMatch(/\bdefin/i);
+    expect(description).toContain("direction");
   });
 
   test("instructions carry the clarification-to-approval lifecycle in order", () => {
@@ -67,15 +94,22 @@ describe("brainstorm skill instance", () => {
       expect(instructions).toContain(field);
   });
 
-  test("invariants guard approval, honesty, and decision stability", () => {
+  test("invariants guard honesty and decision stability without an implementation gate", () => {
     const invariants = resolvePackSkill(locator).listText("invariants");
 
     for (const marker of [
-      "Do not begin implementation before the direction is explicitly approved",
       "Do not invent answers, hide material uncertainty, or silently expand the agreed scope",
       "Preserve agreed decisions unless they are explicitly changed",
     ])
       expect(invariants).toContain(marker);
+    expect(invariants).not.toContain("Do not begin implementation");
+  });
+
+  test("invariants stop drifting, looping, or stalling exploration by exposing unresolved doubts", () => {
+    const invariants = resolvePackSkill(locator).listText("invariants");
+
+    for (const pattern of [/stop/i, /drift/i, /loop/i, /stall/i, /doubt/i])
+      expect(invariants, String(pattern)).toMatch(pattern);
   });
 
   test("carries no removed disposition or orchestrator semantics", () => {
@@ -102,9 +136,11 @@ describe("brainstorm skill instance", () => {
     ])
       expect(output).toContain(heading);
     expect(output).toContain("Ask one focused question at a time");
+    expect(output).toContain("obtain explicit approval for simple work");
     expect(output).toContain(
-      "- Do not begin implementation before the direction is explicitly approved.",
+      "- Preserve agreed decisions unless they are explicitly changed.",
     );
+    expect(output).not.toContain("Do not begin implementation");
     expect(output).not.toContain("## Gotchas");
     expect(output).not.toContain("## Handoff contract");
 
