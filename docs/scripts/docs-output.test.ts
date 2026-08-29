@@ -134,4 +134,43 @@ describe("docs built output", () => {
   it("keeps the root route as a redirect", () => {
     expectStaticRedirect("/", "/introduction");
   });
+
+  it("publishes the branded docs 404 output", () => {
+    const notFoundPath = join(outputRoot, "404.html");
+    expect(
+      existsSync(notFoundPath),
+      "the generated /404 route should exist",
+    ).toBe(true);
+
+    const generated = readFileSync(notFoundPath, "utf8");
+    const styles = [
+      ...generated.matchAll(/<link\b[^>]*rel=["']stylesheet["'][^>]*>/gi),
+    ]
+      .map(([link]) => link.match(/\bhref=["']([^"']+)["']/i)?.[1])
+      .filter((href): href is string => href !== undefined)
+      .map((href) =>
+        readFileSync(join(outputRoot, href.replace(/^\//, "")), "utf8"),
+      )
+      .join("\n");
+    const builtOutput = `${generated}\n${styles}`;
+
+    expect(generated).toContain("data-atlante-404");
+    expect(generated).toContain('data-celestial-marker="star-map"');
+    expect(generated).toContain("This star is off the map");
+    expect(generated).toMatch(/href=["']\/introduction["']/);
+    expect(generated).toMatch(/href=["']\/getting-started["']/);
+    expect(generated).not.toContain(
+      "Page not found. Check the URL or try using the search bar.",
+    );
+
+    expect(builtOutput).toMatch(/--ds-[a-z0-9-]+\s*:/i);
+    expect(builtOutput).toMatch(/--font-[a-z0-9-]+\s*:/i);
+    expect(builtOutput).toMatch(
+      /@media\s*\([^)]*(?:max-width|min-width)[^)]*\)/i,
+    );
+    expect(builtOutput).toMatch(/@media\s*\(\s*prefers-reduced-motion\s*:/i);
+    expect(generated).not.toMatch(
+      /@atlante\/website|(?:[/'"]|^)website(?:[/'"]|$)/i,
+    );
+  });
 });
