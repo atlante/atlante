@@ -50,25 +50,51 @@ function outputPath(route: string): string {
   return join(outputRoot, route.slice(1));
 }
 
+function rawOutputRoute(document: AuthoredDocument): string {
+  return document.sourceRelativePath === "index.md"
+    ? "/introduction.md"
+    : document.route;
+}
+
+function staticOutputPath(route: string): string {
+  return route === "/" ? join(outputRoot, "index.html") : outputPath(route);
+}
+
+function expectStaticRedirect(route: string, destination: string): void {
+  expect(readFileSync(staticOutputPath(route), "utf8")).toBe(
+    [
+      "<!doctype html>",
+      `<title>Redirecting to: ${destination}</title>`,
+      `<meta http-equiv="refresh" content="0;url=${destination}">`,
+      `<meta name="robots" content="noindex">`,
+      `<link rel="canonical" href="https://docs.atlante.sh${destination}">`,
+      "<body>",
+      `\t<a href="${destination}">Redirecting from <code>${route}</code> to <code>${destination}</code></a>`,
+      "</body>",
+    ].join("\n"),
+  );
+}
+
 describe("docs built output", () => {
   const documents = authoredDocuments();
 
   it("publishes exactly the non-draft authored Markdown routes", () => {
     const expectedRoutes = documents
       .filter((document) => !document.draft)
-      .map((document) => document.route)
+      .map(rawOutputRoute)
       .sort();
     const actualRoutes = markdownFiles(outputRoot)
+      .filter((path) => path !== outputPath("/index.md"))
       .map((path) => `/${relative(outputRoot, path).replaceAll("\\", "/")}`)
       .sort();
 
     expect(actualRoutes).toEqual(expectedRoutes);
 
     for (const document of documents) {
-      const companion = outputPath(document.route);
+      const companion = outputPath(rawOutputRoute(document));
       expect(
         existsSync(companion),
-        `${document.route} should ${document.draft ? "not " : ""}be emitted`,
+        `${rawOutputRoute(document)} should ${document.draft ? "not " : ""}be emitted`,
       ).toBe(!document.draft);
 
       if (!document.draft && existsSync(companion)) {
@@ -84,7 +110,7 @@ describe("docs built output", () => {
 
   it("maps the root and a nested route to explicit Markdown companions", () => {
     const expectedRoutes = {
-      "/index.md": "index.md",
+      "/introduction.md": "index.md",
       "/concepts/configuration.md": "concepts/configuration.md",
     } as const;
 
@@ -98,5 +124,13 @@ describe("docs built output", () => {
       ).toBe(false);
       expect(existsSync(outputPath(route)), `${route} should exist`).toBe(true);
     }
+  });
+
+  it("keeps the legacy Markdown route as a redirect", () => {
+    expectStaticRedirect("/index.md", "/introduction.md");
+  });
+
+  it("keeps the root route as a redirect", () => {
+    expectStaticRedirect("/", "/introduction");
   });
 });
