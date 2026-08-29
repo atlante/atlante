@@ -1,57 +1,54 @@
 ---
-title: Give form to your harness
-description: The configuration and build layer for a coding-agent harness.
+title: Introduction
+description: Version and publish a coding-agent harness from static, reviewable source.
 ---
 
-Atlante is the configuration and build layer for your coding-agent harness. It
-turns agents, skills, and workflows into one versioned system in your repository,
-then materializes that system through a host adapter.
+Coding-agent harnesses tend to grow from scattered prompts, one-off skills, and
+host settings that are difficult to review together. Atlante gives that system a
+versioned source in the project repository, so a harness can change alongside the
+code it guides.
 
-The authored source is a JSONC configuration document. Atlante validates the
-document and its selected content, renders deterministic Markdown, and publishes
-verified artifacts under `.atlante/artifacts/`.
+You describe the harness in one configuration document. Atlante validates it,
+resolves the static content it selects, renders deterministic Markdown, and
+publishes verified artifacts for a host adapter. Packs supply reusable presets,
+templates, and instances; your document supplies the values and bindings that
+make them fit your project.
+
+After the first build, you have an `atlante.jsonc` source document and a complete
+host-neutral tree under `.atlante/artifacts/`. The tree contains a manifest and
+the rendered agent and skill payloads. The OpenCode adapter can verify that tree
+before materializing it for the host.
+
+Start with the five-minute [Getting started](/getting-started) path to create
+that first build. Then explore
+[Configuration](/concepts/configuration),
+[Resources](/concepts/resources), [Templates](/concepts/templates),
+[Values](/concepts/values), [Resolution](/concepts/resolution), and
+[Artifacts](/concepts/artifacts).
 
 :::note
-Atlante v0.1 supports OpenCode as its host adapter. Atlante does not execute
-agents, skills, project code, or LLM inference.
+Atlante owns configuration, static content selection, validation, interpolation,
+rendering, and artifact publication. An adapter materializes verified artifacts
+into host configuration; the host executes agents and skills. Atlante does not
+execute agents, skills, project code, or LLM inference.
 :::
 
-## Start with the source
+## Source and output
 
 A project normally contains one `atlante.jsonc` file. It selects a preset, binds
-agents and skills to templates or instances, and provides the values those
-bindings need.
+agents and skills to static resources, and supplies explicit values for those
+bindings. The build output lives under `.atlante/artifacts/` and remains
+host-neutral until an adapter consumes it.
 
 ```jsonc title="atlante.jsonc"
 {
   "$schema": "https://atlante.sh/schema/v0.1/schema.json",
-  "extends": "@atlante/pack",
-  "values": {
-    "project": "my-app"
-  }
+  "extends": "@atlante/pack"
 }
 ```
 
-Run `npx @atlante/cli init` to scaffold this starting point. Continue with the
-[installation guide](/getting-started), or read [your first build](/getting-started/first-build)
-for the complete source-to-artifact path.
-
-## The system boundary
-
-Atlante owns configuration, static content selection, validation, composition,
-interpolation, rendering, and artifact publication. The host adapter owns
-materialization into a host configuration, while the host and prompted model own
-execution.
-
-This separation keeps the authored system reviewable in Git and keeps generated
-output independent from host settings.
-
-## Documentation map
-
-- **Start here** explains installation and the first build.
-- **Concepts** explains documents, packs, templates, values, resolution, and artifacts.
-- **Guides** shows how to build a harness, author a pack, use OpenCode, and watch for changes.
-- **Reference** records the CLI, configuration fields, artifact format, diagnostics, and schema.
-
-If a page and the implementation differ, the shipped implementation, tests, and
-`SPECIFICATION.md` are the authoritative sources for v0.1 behavior.
+Read the [Schema](/reference/schema) for the document contract and the
+[Artifact](/reference/artifact) for the generated output contract. The shipped
+implementation, tests, and
+[`SPECIFICATION.md`](https://github.com/atlante/atlante/blob/main/SPECIFICATION.md)
+remain authoritative for v0.1 behavior.
