@@ -32,10 +32,11 @@ describe("website built output", () => {
       "Built for change. Strict by design",
       "Chart your harness",
       "Presets compose in declaration order. Your local configuration takes precedence.",
-      "Keep the last good build",
-      "Failed configuration or template validation leaves the current artifact tree untouched.",
+      "one template → many roles",
+      "Compose roles, not copies",
+      "Reusable templates give agents shared structure without duplicating prompt definitions.",
       "Run ",
-      ">init</code> to create your configuration and build your first artifacts.",
+      ">init</code> to create your configuration and build your first harness.",
       "Learn",
       "Project",
       "Reference",
@@ -45,6 +46,14 @@ describe("website built output", () => {
       "/brand/horizontal/atlante-horizontal-reverse.svg",
     ]) {
       expect(html).toContain(text);
+    }
+    for (const text of [
+      "invalid → no publication",
+      "Keep the last good build",
+      "Failed configuration or template validation leaves the current artifact tree untouched.",
+      ">init</code> to create your configuration and build your first artifacts.",
+    ]) {
+      expect(html).not.toContain(text);
     }
     for (const href of [
       "https://docs.atlante.sh",

@@ -93,9 +93,10 @@ describe("website content contract", () => {
       "Built for change. Strict by design",
       "Chart your harness",
       "Presets compose in declaration order. Your local configuration takes precedence.",
-      "Keep the last good build",
-      "Failed configuration or template validation leaves the current artifact tree untouched.",
-      "Run <code>init</code> to create your configuration and build your first artifacts.",
+      "one template → many roles",
+      "Compose roles, not copies",
+      "Reusable templates give agents shared structure without duplicating prompt definitions.",
+      "Run <code>init</code> to create your configuration and build your first harness.",
       "Documentation",
       "Getting started",
       "GitHub repo",
@@ -106,7 +107,16 @@ describe("website content contract", () => {
     ]) {
       expect(source).toContain(text);
     }
+    for (const text of [
+      "invalid → no publication",
+      "Keep the last good build",
+      "Failed configuration or template validation leaves the current artifact tree untouched.",
+      "Run <code>init</code> to create your configuration and build your first artifacts.",
+    ]) {
+      expect(source).not.toContain(text);
+    }
     expect(source).not.toContain("Built for change. Strict by design.");
+    expect(source.match(/signal: "/g)).toHaveLength(4);
     for (const href of [
       "https://docs.atlante.sh",
       "https://docs.atlante.sh/getting-started",
@@ -135,7 +145,7 @@ describe("website content contract", () => {
     );
 
     expect(nextStep).toMatch(
-      /<p class="literal">[\s\S]*?Run <code>init<\/code> to create your configuration and build your first artifacts\.[\s\S]*?<\/p>\s*<div class="actions">/,
+      /<p class="literal">[\s\S]*?Run <code>init<\/code> to create your configuration and build your first harness\.[\s\S]*?<\/p>\s*<div class="actions">/,
     );
     expect(nextStep).not.toMatch(
       /<\/div>\s*<div class="actions">[\s\S]*?<\/div>\s*<\/div>\s*$/,
