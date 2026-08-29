@@ -1,19 +1,27 @@
 ---
-title: Templates and instances
-description: Define reusable prompt and skill input contracts with static Markdown renderers.
+title: Templates
+description: Templates, instances, bindings, and template-owned input.
 ---
 
-A template owns the input contract and the Markdown renderer for a resource. It
-is represented by a paired `template.jsonc` schema and `template.md` renderer.
-The schema uses JSON Schema Draft 2020-12.
+How do you reuse prompt structure without putting prompt-specific fields into
+the document schema? Use a template. A template owns an input contract and a
+Markdown renderer. Its resource has two required facets: `template.jsonc`, a
+JSON Schema Draft 2020-12 document, and `template.md`, the renderer. The schema
+owns the names, types, and composition slots of the input that the renderer
+receives.
 
-An instance supplies configured input for one template. It is represented by
-`instance.jsonc` and can be selected from a document with `$instance` or a bare
-resource locator.
+An instance is different: it is reusable configured input for one template. It
+lives in `instance.jsonc` and resolves to exactly one effective template. A
+binding in `agents` or `skills` selects one of these forms:
 
-## Select a template
+- `$template` selects a template and supplies its input in the binding.
+- `$instance` selects a configured instance.
+- A bare resource locator is shorthand for `$instance`.
 
-Use `$template` when the binding supplies template-owned input directly:
+`$template` and `$instance` cannot appear together. Binding metadata is removed
+before the selected template validates its input, so the selected template owns
+all fields beyond `description`, `values`, and the selector. A missing source
+uses the applicable configured default.
 
 ```jsonc
 {
@@ -23,57 +31,38 @@ Use `$template` when the binding supplies template-owned input directly:
       "description": "Reviews the implementation.",
       "identity": "You are a careful reviewer.",
       "mission": "Find defects before merge."
-    }
-  }
-}
-```
-
-Use `$instance` when a reusable configured resource should provide the input:
-
-```jsonc
-{
-  "agents": {
+    },
     "architect": "@atlante/pack/architect"
   }
 }
 ```
 
-`$template` and `$instance` are mutually exclusive. A bare locator is `$instance`
-shorthand. Binding metadata is removed before the effective template validates
-its input.
+## Selector-less bindings
 
-## Compose sections
-
-The first-party agent and skill templates support an ordered `sections` array.
-Section variants include `markdown`, `instructions`, `gotchas`, `workflow`, and
-`invariants`. Each section contributes a distinct part of the rendered output,
-and array order is preserved.
+At the top level of the document's `agents` and `skills` collections, an object
+binding may omit both selectors. Atlante then uses the collection's default
+first-party template: `@atlante/pack/agent` for an agent and
+`@atlante/pack/skill` for a skill. This default applies only to those top-level
+collections; nested resource source objects require `$template` or `$instance`.
 
 ```jsonc
 {
-  "$template": "@atlante/pack/agent",
-  "description": "Implements requested changes.",
-  "identity": "You are a senior implementer.",
-  "mission": "Write tested, production-ready code.",
-  "responsibilities": [
-    "Implement the requested change",
-    "Keep the project checks passing"
-  ],
-  "sections": [
-    { "invariants": ["Every change ships with tests."] },
-    { "instructions": ["Read the relevant source before editing."] }
-  ]
+  "agents": {
+    "reviewer": {
+      "description": "Reviews the implementation.",
+      "identity": "You are a careful reviewer.",
+      "mission": "Find defects before merge."
+    }
+  }
 }
 ```
 
-An invariant is a binding guarantee or approval gate, not a suggestion. Keep
-invariants minimal, concrete, and observable.
-
-## Template composition
-
-A template schema may declare composition slots with `{ "template": "..." }`.
-Every declared slot must resolve to an available template. Circular composition,
-missing slots, invalid schemas, and incompatible input fail before rendering.
-
-Rendered child Markdown is preserved as opaque output. It is not interpreted as
-parent template source.
+This selector-less form is valid. The default template still controls the
+accepted fields and the rendered Markdown. A schema can declare a composition
+slot with `{ "template": "..." }`; every declared slot must resolve, even when
+the current input takes a different schema branch. Missing slots, invalid
+schemas, incompatible input, and circular composition fail before rendering.
+Rendered child Markdown is kept as opaque output rather than interpreted as
+parent template source. See [Resolution](/concepts/resolution) for the stage
+where this graph is checked and the [Artifact](/reference/artifact) reference
+for the resulting output.
