@@ -11,6 +11,7 @@ export default defineConfig({
   },
   integrations: [
     starlight({
+      disable404Route: true,
       title: "Atlante documentation",
       description:
         "Reference documentation for Atlante configuration, validation, builds, artifacts, and host adapters.",
