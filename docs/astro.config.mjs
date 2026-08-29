@@ -5,6 +5,10 @@ import starlight from "@astrojs/starlight";
 export default defineConfig({
   site: "https://docs.atlante.sh",
   trailingSlash: "never",
+  redirects: {
+    "/": "/introduction",
+    "/index.md": "/introduction.md",
+  },
   integrations: [
     starlight({
       title: "Atlante documentation",
@@ -59,7 +63,7 @@ export default defineConfig({
       pagination: true,
       titleDelimiter: "·",
       sidebar: [
-        { slug: "index", label: "Introduction" },
+        { slug: "introduction", label: "Introduction" },
         { slug: "getting-started", label: "Getting started" },
         {
           label: "Concepts",

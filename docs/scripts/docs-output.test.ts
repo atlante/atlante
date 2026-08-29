@@ -51,13 +51,14 @@ function outputPath(route: string): string {
 }
 
 function rawOutputRoute(document: AuthoredDocument): string {
-  return document.sourceRelativePath === "index.md"
-    ? "/introduction.md"
-    : document.route;
+  return document.route;
 }
 
 function staticOutputPath(route: string): string {
-  return route === "/" ? join(outputRoot, "index.html") : outputPath(route);
+  if (route === "/") return join(outputRoot, "index.html");
+  return route.endsWith(".md")
+    ? join(outputRoot, route.slice(1), "index.html")
+    : outputPath(route);
 }
 
 function expectStaticRedirect(route: string, destination: string): void {
@@ -71,7 +72,7 @@ function expectStaticRedirect(route: string, destination: string): void {
       "<body>",
       `\t<a href="${destination}">Redirecting from <code>${route}</code> to <code>${destination}</code></a>`,
       "</body>",
-    ].join("\n"),
+    ].join(""),
   );
 }
 
@@ -110,7 +111,7 @@ describe("docs built output", () => {
 
   it("maps the root and a nested route to explicit Markdown companions", () => {
     const expectedRoutes = {
-      "/introduction.md": "index.md",
+      "/introduction.md": "introduction.md",
       "/concepts/configuration.md": "concepts/configuration.md",
     } as const;
 
