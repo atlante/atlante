@@ -156,15 +156,19 @@ describe("docs built output", () => {
     const anchors = [...generated.matchAll(/<a\b[^>]*>/gi)].map(
       ([anchor]) => anchor,
     );
+    const backAnchors = anchors.filter((anchor) =>
+      /\bdata-atlante-404-back\b/i.test(anchor),
+    );
 
     expect(generated).toContain("data-atlante-404");
     expect(generated).toContain('data-celestial-marker="star-map"');
     expect(generated).toContain("This star is off the map");
-    expect(anchors).toHaveLength(1);
-    expect(anchors[0]).toMatch(/\bhref=["']\/introduction["']/i);
+    expect(generated.match(/\bdata-atlante-navbar\b/gi) ?? []).toHaveLength(1);
+    expect(backAnchors).toHaveLength(1);
+    expect(backAnchors[0]).toMatch(/\bhref=["']\/introduction["']/i);
     expect(generated).not.toContain("/getting-started");
     expect(generated).not.toMatch(
-      /<(?:header|nav|aside)\b|data-has-(?:sidebar|toc|hero)\b|<(?:starlight-menu-button|site-search|starlight-theme-select|starlight-lang-select|mobile-starlight-toc|starlight-toc)\b|data-open-modal\b|id=["']theme-icons["']/i,
+      /<(?:aside|footer)\b|data-has-(?:sidebar|toc|hero)\b|<(?:starlight-menu-button|site-search|starlight-theme-select|starlight-lang-select|mobile-starlight-toc|starlight-toc)\b|data-open-modal\b|id=["']theme-icons["']/i,
     );
     expect(generated).not.toContain("On this page");
     expect(generated).not.toContain(
