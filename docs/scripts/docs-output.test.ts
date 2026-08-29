@@ -153,12 +153,20 @@ describe("docs built output", () => {
       )
       .join("\n");
     const builtOutput = `${generated}\n${styles}`;
+    const anchors = [...generated.matchAll(/<a\b[^>]*>/gi)].map(
+      ([anchor]) => anchor,
+    );
 
     expect(generated).toContain("data-atlante-404");
     expect(generated).toContain('data-celestial-marker="star-map"');
     expect(generated).toContain("This star is off the map");
-    expect(generated).toMatch(/href=["']\/introduction["']/);
-    expect(generated).toMatch(/href=["']\/getting-started["']/);
+    expect(anchors).toHaveLength(1);
+    expect(anchors[0]).toMatch(/\bhref=["']\/introduction["']/i);
+    expect(generated).not.toContain("/getting-started");
+    expect(generated).not.toMatch(
+      /<(?:header|nav|aside)\b|data-has-(?:sidebar|toc|hero)\b|<(?:starlight-menu-button|site-search|starlight-theme-select|starlight-lang-select|mobile-starlight-toc|starlight-toc)\b|data-open-modal\b|id=["']theme-icons["']/i,
+    );
+    expect(generated).not.toContain("On this page");
     expect(generated).not.toContain(
       "Page not found. Check the URL or try using the search bar.",
     );
