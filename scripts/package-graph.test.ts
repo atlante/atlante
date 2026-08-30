@@ -5,7 +5,17 @@ import { fileURLToPath } from "node:url";
 import { expect, test } from "vitest";
 
 const ROOT = join(fileURLToPath(new URL(".", import.meta.url)), "..");
-const PACKAGES = [
+const WORKSPACES = [
+  "schema",
+  "resources",
+  "validator",
+  "builder",
+  "pack",
+  "opencode",
+  "dashboard",
+  "cli",
+] as const;
+const RELEASE_WORKSPACES = [
   "schema",
   "resources",
   "validator",
@@ -42,7 +52,7 @@ test("removes old workspace entries, manifests, imports, scripts, and lock entri
     expect(lockfile).not.toContain(`packages/${name}`);
   }
 
-  const packageSource = PACKAGES.flatMap((name) => {
+  const packageSource = WORKSPACES.flatMap((name) => {
     const packageRoot = join(ROOT, "packages", name);
     return [
       join(packageRoot, "package.json"),
@@ -69,28 +79,57 @@ test("removes old workspace entries, manifests, imports, scripts, and lock entri
   }
 });
 
-test("keeps resources private and synchronizes exactly seven workspaces", () => {
+test("keeps private packages separate and synchronizes release workspaces", () => {
   const resources = readJson(
     join(ROOT, "packages", "resources", "package.json"),
   );
   expect(resources.private).toBe(true);
   expect(resources.publishConfig).toBeUndefined();
 
-  const manifestPaths = PACKAGES.map((name) =>
+  const dashboard = readJson(
+    join(ROOT, "packages", "dashboard", "package.json"),
+  );
+  expect(dashboard.private).toBe(true);
+  expect(dashboard.publishConfig).toBeUndefined();
+  const dashboardDependencies = dashboard.dependencies as Record<
+    string,
+    unknown
+  >;
+  expect(dashboardDependencies["@atlante/builder"]).toBe("workspace:*");
+  expect(dashboardDependencies["@opencode-ai/sdk"]).toBe("1.18.23");
+  expect(dashboardDependencies["@atlante/opencode"]).toBeUndefined();
+
+  const cli = readJson(join(ROOT, "packages", "cli", "package.json"));
+  const cliDependencies = cli.dependencies as Record<string, unknown>;
+  const cliDevDependencies = cli.devDependencies as Record<string, unknown>;
+  expect(cliDependencies["@atlante/dashboard"]).toBeUndefined();
+  expect(cliDevDependencies["@atlante/dashboard"]).toBe("workspace:*");
+
+  const manifestPaths = WORKSPACES.map((name) =>
     join(ROOT, "packages", name, "package.json"),
   );
   expect(manifestPaths.every((path) => existsSync(path))).toBe(true);
-  const versions = manifestPaths.map((path) => readJson(path).version);
+  const releaseManifestPaths = RELEASE_WORKSPACES.map((name) =>
+    join(ROOT, "packages", name, "package.json"),
+  );
+  const versions = releaseManifestPaths.map((path) => readJson(path).version);
   expect(new Set(versions).size).toBe(1);
 
   const release = readFileSync(join(ROOT, "scripts", "release.ts"), "utf8");
-  for (const name of PACKAGES) expect(release).toContain(`"${name}"`);
+  for (const name of RELEASE_WORKSPACES) expect(release).toContain(`"${name}"`);
+  expect(release).not.toContain('"dashboard"');
   expect(release).toContain("const PACKAGES = [");
+
+  const publish = readFileSync(
+    join(ROOT, "scripts", "publish-packages.ts"),
+    "utf8",
+  );
+  expect(publish).not.toContain('"dashboard"');
 });
 
 test("keeps only pack, CLI, and OpenCode publishable", () => {
   const publishable = new Set<string>();
-  for (const name of PACKAGES) {
+  for (const name of WORKSPACES) {
     const manifest = readJson(join(ROOT, "packages", name, "package.json"));
     if (manifest.publishConfig) publishable.add(name);
   }

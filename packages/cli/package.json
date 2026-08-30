@@ -41,6 +41,7 @@
   },
   "devDependencies": {
     "@atlante/builder": "workspace:*",
+    "@atlante/dashboard": "workspace:*",
     "@atlante/resources": "workspace:*",
     "@atlante/schema": "workspace:*",
     "@atlante/validator": "workspace:*",

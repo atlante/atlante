@@ -13,8 +13,13 @@ import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { SCHEMA_URI } from "@atlante/schema";
-import { afterEach, beforeAll, describe, expect, test } from "vitest";
+import { afterEach, beforeAll, describe, expect, test, vi } from "vitest";
+import { createSourceProgram } from "../bin/atlante-source.js";
 import packageJson from "../package.json" with { type: "json" };
+import {
+  type DashboardSignal,
+  registerDashboard,
+} from "../src/commands/dashboard.js";
 import { createProgram, runBuild, runValidate } from "../src/main.js";
 
 const created: string[] = [];
@@ -75,6 +80,9 @@ test("reports the package manifest version", () => {
 // the old launcher simulation, which symlinked bun itself as `node` and never
 // exercised the published bundle.
 const CLI_ENTRY = fileURLToPath(new URL("../bin/atlante.ts", import.meta.url));
+const SOURCE_CLI_ENTRY = fileURLToPath(
+  new URL("../bin/atlante-source.ts", import.meta.url),
+);
 const LAUNCHER = fileURLToPath(
   new URL("../dist/bin/atlante.js", import.meta.url),
 );
@@ -360,6 +368,117 @@ test("registers build, validate, and init, but not resolve", () => {
     "build",
     "init",
   ]);
+});
+
+describe("source dashboard command", () => {
+  test("adds dashboard only to the source launcher", () => {
+    expect(
+      createSourceProgram().commands.map((command) => command.name()),
+    ).toEqual(["validate", "build", "init", "dashboard"]);
+    expect(createProgram().commands.map((command) => command.name())).toEqual([
+      "validate",
+      "build",
+      "init",
+    ]);
+
+    const sourceLauncher = readFileSync(SOURCE_CLI_ENTRY, "utf8");
+    const publicLauncher = readFileSync(CLI_ENTRY, "utf8");
+    const publicBundle = readFileSync(LAUNCHER, "utf8");
+    expect(sourceLauncher).toContain("registerDashboard");
+    expect(publicLauncher).not.toContain("registerDashboard");
+    expect(publicBundle).not.toContain("startDashboardMonitor");
+    expect(publicBundle).not.toContain("startDashboardServer");
+  });
+
+  test("documents dashboard options in source help", () => {
+    const dashboard = createSourceProgram().commands.find(
+      (command) => command.name() === "dashboard",
+    );
+
+    expect(dashboard?.helpInformation()).toContain("[project-directory]");
+    expect(dashboard?.helpInformation()).toContain("--opencode-url <url>");
+    expect(dashboard?.helpInformation()).toContain("--port <port>");
+  });
+
+  test("passes defaults and prints only the tokenless loopback URL", async () => {
+    const lifetime = Promise.resolve();
+    const start = vi.fn(async (options) => ({
+      url: "http://127.0.0.1:4321",
+      lifetime,
+      close: vi.fn(async () => {}),
+      options,
+    }));
+    const printed: string[] = [];
+    const program = createProgram();
+    registerDashboard(program, {
+      start,
+      print: (value) => printed.push(value),
+    });
+
+    await program.parseAsync(["node", "atlante", "dashboard"]);
+
+    expect(start).toHaveBeenCalledWith({
+      projectRoot: process.cwd(),
+      opencodeUrl: "http://127.0.0.1:4096",
+      port: 0,
+    });
+    expect(printed).toEqual(["http://127.0.0.1:4321"]);
+    expect(printed.join("\n")).not.toMatch(/token|auth|[?&][^\s=]+=/iu);
+  });
+
+  test.each([
+    ["--opencode-url", "ftp://127.0.0.1:4096"],
+    ["--opencode-url", "not a url"],
+    ["--port", "-1"],
+    ["--port", "65536"],
+    ["--port", "1.5"],
+    ["--port", "nope"],
+  ])("rejects malformed %s values before startup", async (option, value) => {
+    const start = vi.fn();
+    const program = createProgram();
+    registerDashboard(program, { start });
+    program.exitOverride();
+    program.configureOutput({ writeErr: () => {} });
+    program.commands
+      .find((command) => command.name() === "dashboard")
+      ?.exitOverride();
+
+    await expect(
+      program.parseAsync(["node", "atlante", "dashboard", option, value]),
+    ).rejects.toMatchObject({ code: expect.stringMatching(/commander/iu) });
+    expect(start).not.toHaveBeenCalled();
+  });
+
+  test("uses one idempotent cleanup path for SIGINT and SIGTERM", async () => {
+    let resolveLifetime!: () => void;
+    const lifetime = new Promise<void>((resolve) => {
+      resolveLifetime = resolve;
+    });
+    const close = vi.fn(async () => resolveLifetime());
+    const handlers = new Map<DashboardSignal, () => void>();
+    const removed: DashboardSignal[] = [];
+    const program = createProgram();
+    registerDashboard(program, {
+      start: vi.fn(async () => ({
+        url: "http://127.0.0.1:4321",
+        lifetime,
+        close,
+      })),
+      onSignal: (signal, handler) => {
+        handlers.set(signal, handler);
+        return () => removed.push(signal);
+      },
+    });
+
+    const parsing = program.parseAsync(["node", "atlante", "dashboard"]);
+    await vi.waitFor(() => expect(handlers.size).toBe(2));
+    handlers.get("SIGINT")?.();
+    handlers.get("SIGTERM")?.();
+    await parsing;
+
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(removed).toEqual(["SIGINT", "SIGTERM"]);
+  });
 });
 
 test("the build command exposes a --watch option", () => {

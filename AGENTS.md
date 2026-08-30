@@ -14,15 +14,21 @@ packages/
   validator/       — document discovery/parsing, raw and resolved validation, template-input validation, diagnostics
   builder/         — host-neutral preparation, deterministic artifact publication, verified artifact reader
   opencode/        — OpenCode-specific artifact materialization and skill-tool integration
+  dashboard/       — private local OpenCode dashboard model and runtime projections
   cli/             — user-facing command orchestration (validate, build, init), initialization defaults, host registration
 website/           — private Astro landing site workspace (@atlante/website, not published)
 ```
 
-The seven workspaces are `schema`, `resources`, `validator`, `builder`, `pack`,
-`opencode`, and `cli`. The publishable packages are `pack`, the CLI, and
-the OpenCode adapter; `resources` remains private. The separate `website` workspace hosts the Astro landing site for [atlante.sh](https://atlante.sh); it stays outside the toolchain package graph and is not covered by these constraints.
+The eight toolchain workspaces are `schema`, `resources`, `validator`, `builder`,
+`pack`, `opencode`, `dashboard`, and `cli`. The publishable packages are `pack`,
+the CLI, and the OpenCode adapter; `resources` and `dashboard` remain private.
+The separate `website` workspace hosts the Astro landing site for
+[atlante.sh](https://atlante.sh); it stays outside the toolchain package graph
+and is not covered by these constraints.
 
 Schema changes require building and validating (`atlante validate`, `atlante build`). `atlante init` builds artifacts automatically; run `atlante build` after later source configuration changes. Tests mirror source paths in each package.
+
+The repository-local `bun run cli` uses the source launcher and also exposes the private `dashboard` prototype; the published launcher remains validate/build/init only.
 
 ### Architecture constraints
 
@@ -42,7 +48,7 @@ bun run lint:check              # lint + format check
 bun run build                   # build publishable CLI + adapter artifacts (pack is static)
 bun run quick:check             # type:check + lint:check + test
 bun run full:check              # build + quick:check (CI gate)
-bun run cli                     # run the CLI (packages/cli/bin/atlante.ts)
+bun run cli                     # run the CLI (packages/cli/bin/atlante-source.ts)
 bun run mutation:test <ws>      # regenerate Stryker mutation evidence for schema|resources|validator
 bun run mutation:verify         # verify stored mutation evidence (add --strict to fail on stale sources)
 ```
