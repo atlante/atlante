@@ -81,6 +81,22 @@ jobs:
         with:
           bun-version-file: ".bun-version"
 
+      - name: Wait for the released CLI on npm
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          for attempt in $(seq 1 30); do
+            if npm view "@atlante/cli@$VERSION" version >/dev/null 2>&1; then
+              echo "@atlante/cli@$VERSION is available on npm"
+              exit 0
+            fi
+            echo "Waiting for @atlante/cli@$VERSION on npm (attempt $attempt/30)..."
+            sleep 10
+          done
+          echo "@atlante/cli@$VERSION did not become available in time" >&2
+          exit 1
+
       - name: Install website dependencies
         shell: bash
         run: |
