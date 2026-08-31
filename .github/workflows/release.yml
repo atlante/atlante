@@ -109,16 +109,20 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
-      - name: Deploy to Vercel
-        uses: amondnet/vercel-action@v42.3.0
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          vercel-args: '--prod'
-          vercel-version: 59.3.0
-          prebuilt: true
-          working-directory: website/
+      - name: Bundle pack assets into the playground function
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp -R website/node_modules/@atlante/pack \
+            website/.vercel/output/functions/api/playground.func/website/node_modules/@atlante/pack
+
+      - name: Deploy website to Vercel
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx vercel@59.3.0 deploy --prebuilt --prod website --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
   deploy-docs:
     needs: publish-packages
@@ -164,12 +168,9 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_DOCS_PROJECT_ID }}
 
       - name: Deploy docs to Vercel
-        uses: amondnet/vercel-action@v42.3.0
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_DOCS_PROJECT_ID }}
-          vercel-args: '--prod'
-          vercel-version: 59.3.0
-          prebuilt: true
-          working-directory: docs/
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx vercel@59.3.0 deploy --prebuilt --prod docs --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
