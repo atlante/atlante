@@ -488,7 +488,7 @@ describe("resource resolution", () => {
     );
     expect(
       result.provenance["/agents/architect/description"]?.path as string,
-    ).toBe(`@atlante/pack@${firstPartyPackVersion}/atlante.jsonc`);
+    ).toBe(`@atlante/pack@${firstPartyPackVersion}/architect/instance.jsonc`);
   });
 
   test("merges ordered preset layers left-to-right with winning provenance", () => {

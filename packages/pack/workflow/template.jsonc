@@ -1,74 +1,22 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "Sequential multi-phase workflow with optional semantics, policies, phase delegation, outputs, and final validation.",
+  "description": "Ordered prose workflow composed of named phases with instructions and optional outputs.",
   "type": "object",
   "properties": {
-    "title": { "type": "string", "minLength": 1 },
-    "description": { "type": "string", "minLength": 1 },
-    "policies": {
-      "type": "object",
-      "properties": {
-        "orchestratorReadOnly": {
-          "description": "Whether the orchestrator must delegate every file edit.",
-          "type": "boolean",
-          "default": false
-        }
-      },
-      "additionalProperties": false
-    },
     "phases": {
       "type": "array",
       "items": {
         "type": "object",
         "properties": {
-          "kind": { "enum": ["plan", "build", "review"] },
-          "name": {
-            "description": "Phase name; defaults to the phase kind when absent.",
-            "type": "string",
-            "minLength": 1
-          },
-          "description": { "type": "string", "minLength": 1 },
-          "subagent": {
-            "description": "Configured agent responsible for this phase; omit to keep the phase with the orchestrator.",
-            "type": "string",
-            "minLength": 1
-          },
-          "policies": {
-            "type": "object",
-            "properties": {
-              "commit": {
-                "description": "Whether task implementation and corrections should be committed separately.",
-                "type": "boolean",
-                "default": false
-              },
-              "review": {
-                "description": "Whether task review is enabled according to the phase's review criteria.",
-                "type": "boolean",
-                "default": false
-              },
-              "adaptive": {
-                "description": "Whether this phase may be skipped when it would add no material value and otherwise run with depth proportional to the work.",
-                "type": "boolean",
-                "default": false
-              },
-              "maxLoops": {
-                "description": "Maximum correction loops allowed per task.",
-                "type": "integer",
-                "minimum": 1
-              }
-            },
-            "additionalProperties": false
-          },
-          "output": { "template": "@atlante/pack/artifact" },
+          "name": { "type": "string", "minLength": 1 },
           "instructions": {
             "type": "array",
             "items": { "type": "string", "minLength": 1 },
             "minItems": 1
           },
-          "validation": { "type": "string" }
+          "output": { "template": "@atlante/pack/artifact" }
         },
-        "required": ["instructions"],
-        "anyOf": [{ "required": ["name"] }, { "required": ["kind"] }],
+        "required": ["name", "instructions"],
         "additionalProperties": false
       },
       "minItems": 1

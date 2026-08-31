@@ -56,38 +56,24 @@ Then extend the preset and select a reusable template in `atlante.jsonc`:
 schema defines the remaining fields for that agent or skill. Local
 configuration takes precedence over the inherited preset.
 
-## Adaptive workflow phases
+## Workflow
 
-The reusable workflow template supports opt-in phase resizing:
+`@atlante/pack/workflow` provides a generic ordered prose-workflow template and
+a concrete first-party instance. The generic template accepts only non-empty
+`phases`, each with a `name`, non-empty `instructions`, and an optional
+artifact `output`. It renders the phases in configured order but does not
+execute or enforce them.
 
-```jsonc
-{
-  "phases": [
-    {
-      "name": "Review",
-      "policies": { "adaptive": true },
-      "instructions": ["Review the change."],
-    },
-  ],
-}
-```
-
-`policies.adaptive` defaults to `false`, so an omitted or `false` value leaves
-the phase mandatory. If any phase is adaptive, the rendered workflow emits one
-shared protocol and labels each phase as `adaptive` or `mandatory`.
-
-An adaptive phase is optional and SHOULD add only as much ceremony as the work
-needs. Before running it, assess whether it would materially improve the
-outcome using task complexity, risk, uncertainty, and existing evidence: skip
-the phase when it would not materially improve the outcome, briefly stating
-why, and otherwise run it with depth proportional to the work while preserving
-its required output, approvals, and safety gates. Reassess later adaptive
-phases when implementation or review reveals new material evidence; a
-non-adaptive phase remains mandatory and runs as written.
-
-This is one built-in, prompt-only declarative capability. It does not execute
-phases or maintain runtime state, and it is not a configurable profile,
-taxonomy, enum, or skip matrix.
+The concrete instance defines `Brainstorm`, `Plan`, `Build`, and `Review`. The
+architect decides which phases materially improve the result, preserves the
+order among the selected phases, and treats the phases and skills as guidance.
+`Plan` and `Review` have persistent artifact paths rooted at
+`{{values.workflow-root}}`; the preset default is `.atlante/workflows`, and
+projects may override it. `Brainstorm` and `Build` outputs do not have file
+paths. `Review` explicitly supports task-level and final review boundaries,
+and Build/Review corrections are bounded to five rounds per task by the
+instance prose, not by template or runtime enforcement. Checkpoints are
+project-approved reviewable change boundaries, not automatically Git commits.
 
 ## Contents
 
@@ -102,14 +88,14 @@ Useful public locators include:
 | Supporting templates | `@atlante/pack/workflow`, `@atlante/pack/markdown`, `@atlante/pack/artifact`, `@atlante/pack/gotchas`, `@atlante/pack/instructions`, `@atlante/pack/invariants` |
 
 The default preset exposes exactly one agent binding, `architect`, and four
-public skill bindings: `brainstorm`, `plan`, `build`, and `review`. These are
-agent-agnostic phase contracts; the `architect` agent orchestrates them by
-name. The skill bindings are locator-only, so each skill instance owns its
-description. The agent template accepts optional top-level `responsibilities`
-alongside `identity` and `mission`. The agent and skill templates support
-ordered `markdown`, `instructions`, `gotchas`, `workflow`, and `invariants`
-sections. Invariants are binding guarantees and approval gates, not
-suggestions.
+public skill bindings: `brainstorm`, `plan`, `build`, and `review`. The
+workflow instance's phases reference these skills, and the architect selects
+the phases and skills that materially improve the result. The skill bindings
+are locator-only, so each skill instance owns its description. The agent
+template accepts optional top-level `responsibilities` alongside `identity`
+and `mission`. The agent and skill templates support ordered `markdown`,
+`instructions`, `gotchas`, `workflow`, and `invariants` sections. Invariants
+are binding guarantees and approval gates, not suggestions.
 
 ## Pack behavior
 

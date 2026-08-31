@@ -81,6 +81,30 @@ describe("first-party package resources as user configurations", () => {
     ]);
   });
 
+  test("the inherited workflow-root default interpolates into prepared artifact paths", () => {
+    const dir = projectRoot();
+    writeFileSync(
+      join(dir, "atlante.jsonc"),
+      `{
+        "$schema": "${SCHEMA_URI}",
+        "extends": "@atlante/pack",
+        "values": { "project": "Atlante" }
+      }`,
+    );
+
+    const prepared = prepareProject(dir);
+
+    expect(prepared.diagnostics).toEqual([]);
+    const [agent] = prepared.agents;
+    expect(agent?.prompt).toContain(
+      "The artifact SHOULD be stored at .atlante/workflows/<cycle-id>/plan.md.",
+    );
+    expect(agent?.prompt).toContain(
+      "The artifact SHOULD be stored at .atlante/workflows/<cycle-id>/reviews/<scope>-<n>.md.",
+    );
+    expect(agent?.prompt).not.toContain("{{values.");
+  });
+
   test("the built first-party artifact manifest lists one agent and four loadable skills", () => {
     const dir = projectRoot();
     writeFileSync(
@@ -110,11 +134,10 @@ describe("first-party package resources as user configurations", () => {
 
     const [agent] = artifacts.agents;
     expect(agent?.prompt).toContain("## Workflow");
-    expect(agent?.prompt).toContain("### 3. Build (mandatory)");
-    expect(agent?.prompt).toContain(
-      "MUST NOT edit project source or configuration files",
-    );
-    expect(agent?.prompt).toContain(".atlante/workflows/<cycle-id>/");
+    expect(agent?.prompt).toContain("### 1. Brainstorm");
+    expect(agent?.prompt).toContain("### 3. Build");
+    expect(agent?.prompt).toContain("### 4. Review");
+    expect(agent?.prompt).toContain("MUST preserve unrelated user changes.");
 
     const titleLandmarks: Record<string, string> = {
       brainstorm: "# Brainstorm",

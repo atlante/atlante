@@ -144,7 +144,7 @@ try {
   );
   assert(
     rootManifest.agents[0]?.description ===
-      "Plan, implement, and review Atlante work: clarify scope, delegate execution and reviews, and validate against acceptance criteria. Use for any implementation, review, or workflow session.",
+      "General-purpose Atlante agent for planning, implementing, and reviewing software changes.",
     "root architect description changed",
   );
   const rootContents = await Promise.all(

@@ -38,8 +38,7 @@ const created: string[] = [];
 const packVersion = packageJson.version;
 const firstPartyValues = {
   project: "Atlante",
-  "quick-check": "`bun run quick:check`",
-  "full-check": "`bun run full:check` and fallow mcp",
+  "workflow-root": ".atlante/workflows",
 };
 
 const expectedPackFiles = [
@@ -63,6 +62,7 @@ const expectedPackFiles = [
   "review/instance.jsonc",
   "skill/template.jsonc",
   "skill/template.md",
+  "workflow/instance.jsonc",
   "workflow/template.jsonc",
   "workflow/template.md",
   "test/architect.test.ts",
@@ -223,7 +223,7 @@ describe("first-party package resolution", () => {
       document.provenance["/agents/architect/description"];
     expect(descriptionOrigin?.kind).toBe("package");
     expect(String(descriptionOrigin?.path)).toBe(
-      `@atlante/pack@${packVersion}/atlante.jsonc`,
+      `@atlante/pack@${packVersion}/architect/instance.jsonc`,
     );
   });
 

@@ -2260,9 +2260,12 @@ describe("resource-backed document validation", () => {
           sections: [
             {
               workflow: {
-                title: "Review workflow",
                 phases: [
-                  { kind: "plan", instructions: ["Inspect the change."] },
+                  {
+                    name: "Plan",
+                    instructions: ["Inspect the change."],
+                    output: { description: "The review plan." },
+                  },
                 ],
               },
             },
@@ -2277,13 +2280,56 @@ describe("resource-backed document validation", () => {
     expect(result.document?.agents?.reviewer).toBeDefined();
   });
 
+  const approvedPhase = {
+    name: "Plan",
+    instructions: ["Inspect the change."],
+  };
+
   test.each([
-    ["true", true],
-    ["false", false],
-    ["absent", undefined],
+    ["workflow title", { title: "Review workflow", phases: approvedPhase }],
+    [
+      "workflow description",
+      { description: "The delivery workflow.", phases: approvedPhase },
+    ],
+    [
+      "workflow policies",
+      {
+        policies: { orchestratorReadOnly: true },
+        phases: approvedPhase,
+      },
+    ],
+    [
+      "phase kind",
+      { phases: [{ kind: "plan", instructions: ["Inspect the change."] }] },
+    ],
+    [
+      "phase description",
+      { phases: [{ name: "Plan", description: "Planning." }] },
+    ],
+    ["phase subagent", { phases: [{ name: "Plan", subagent: "planner" }] }],
+    [
+      "phase policies",
+      {
+        phases: [
+          {
+            name: "Plan",
+            policies: {
+              commit: true,
+              review: true,
+              adaptive: true,
+              maxLoops: 5,
+            },
+          },
+        ],
+      },
+    ],
+    [
+      "phase validation",
+      { phases: [{ name: "Plan", validation: "bun test" }] },
+    ],
   ] as const)(
-    "accepts %s adaptive phase policy in a bundled workflow",
-    (_label, adaptive) => {
+    "rejects the removed bundled workflow field: %s",
+    (_label, input) => {
       const { configPath } = project({
         $schema: SCHEMA_URI,
         agents: {
@@ -2292,80 +2338,17 @@ describe("resource-backed document validation", () => {
             description: "Reviews the change.",
             identity: "You review.",
             mission: "Find defects.",
-            sections: [
-              {
-                workflow: {
-                  title: "Review workflow",
-                  phases: [
-                    {
-                      kind: "plan",
-                      instructions: ["Inspect the change."],
-                      ...(adaptive === undefined
-                        ? {}
-                        : { policies: { adaptive } }),
-                    },
-                  ],
-                },
-              },
-            ],
+            sections: [{ workflow: input }],
           },
         },
       });
 
       const result = load(configPath);
-
-      expect(result.diagnostics).toEqual([]);
-    },
-  );
-
-  test.each([
-    ["string", "true"],
-    ["null", null],
-  ] as const)(
-    "rejects non-boolean adaptive phase policy: %s",
-    (_label, adaptive) => {
-      const { root, configPath } = project({
-        $schema: SCHEMA_URI,
-        agents: {
-          reviewer: {
-            $template: "@atlante/pack/agent",
-            description: "Reviews the change.",
-            identity: "You review.",
-            mission: "Find defects.",
-            sections: [
-              {
-                workflow: {
-                  title: "Review workflow",
-                  phases: [
-                    {
-                      kind: "plan",
-                      policies: { adaptive },
-                      instructions: ["Inspect the change."],
-                    },
-                  ],
-                },
-              },
-            ],
-          },
-        },
-      });
-      const path =
-        "/agents/reviewer/sections/0/workflow/phases/0/policies/adaptive";
-
-      const result = load(configPath);
-      const diagnostic = result.diagnostics.find(
-        ({ code, path: diagnosticPath }) =>
-          code === "invalid-prompt-input" && diagnosticPath === path,
-      );
 
       expect(result.document).toBeUndefined();
-      expect(diagnostic).toMatchObject({
-        code: "invalid-prompt-input",
-        path,
-        pointer: path,
-      });
-      expect(diagnostic?.message).toContain("must be boolean");
-      expect(JSON.stringify(result.diagnostics)).not.toContain(root);
+      expect(result.diagnostics).toContainEqual(
+        expect.objectContaining({ code: "invalid-prompt-input" }),
+      );
     },
   );
 
@@ -2382,7 +2365,7 @@ describe("resource-backed document validation", () => {
             {
               workflow: {
                 phases: [
-                  { kind: "build", instructions: [{ description: "old" }] },
+                  { name: "Build", instructions: [{ description: "old" }] },
                 ],
               },
             },

@@ -525,8 +525,8 @@ function expectSingleArchitectAgent(config: HostConfig): void {
   const prompt = architect?.prompt;
   expect(prompt).toContain("You are the lead engineer for");
   expect(prompt).toContain("## Workflow");
-  expect(prompt).toContain("(adaptive)");
-  expect(prompt).toContain("### 3. Build (mandatory)");
+  expect(prompt).toContain("### 1. Brainstorm");
+  expect(prompt).toContain("### 4. Review");
 }
 
 function listedSkillIds(description: string): string[] {

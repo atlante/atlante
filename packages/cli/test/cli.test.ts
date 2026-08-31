@@ -214,7 +214,7 @@ test("CLI validates and builds local shorthand, selectors, and local extends", a
 test("CLI resolves first-party package resource facets", async () => {
   const dir = project(`{
     "$schema": "${SCHEMA_URI}",
-    "values": { "project": "demo", "quick-check": "quick", "full-check": "full" },
+    "values": { "project": "demo", "workflow-root": ".atlante/workflows" },
     "agents": {
       "architect": { "$instance": "@atlante/pack/architect", "description": "Architect" },
       "agent": { "$template": "@atlante/pack/agent", "description": "Agent", "identity": "Identity", "mission": "Mission" }

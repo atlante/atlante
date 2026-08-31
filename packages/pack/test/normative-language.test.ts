@@ -180,52 +180,17 @@ describe("normative authoring convention", () => {
           sections: [{ markdown: "Body." }],
         }),
       ).not.toMatch(normativeKeyword);
-    });
-
-    test("workflow preamble binds sequential execution and inline instruction order", () => {
-      const output = renderPackTemplate("@atlante/pack/workflow", {
-        title: "Workflow",
-        phases: [{ name: "Plan", instructions: ["Plan the work."] }],
-      });
-
-      expect(output).toContain(
-        "Phases MUST run sequentially in the order listed.",
-      );
-      expect(output).toContain(
-        "Each phase's inline instructions MUST be followed in order.",
-      );
-      expect(output).not.toMatch(/\b(SHOULD|MAY)\b/);
-    });
-
-    test("workflow policies bind with MUST and keep the adaptive ceremony default at SHOULD", () => {
-      const output = renderPackTemplate("@atlante/pack/workflow", {
-        title: "Workflow",
-        policies: { orchestratorReadOnly: true },
-        phases: [
-          {
-            name: "Build",
-            policies: { adaptive: true, commit: true, maxLoops: 3 },
-            instructions: ["Build the change."],
-          },
-        ],
-      });
-
-      expect(output).toContain(
-        "Policies are binding; they MUST be followed in every phase.",
-      );
-      expect(output).toContain(
-        "An adaptive phase is optional and SHOULD add only as much ceremony as the work needs.",
-      );
-      expect(output).toContain(
-        "Whenever the phase runs, it MUST preserve its required output, approvals, and safety gates.",
-      );
-      expect(output).toContain(
-        "Task implementation and corrections MUST be committed in separate commits",
-      );
-      expect(output).toContain("MUST NOT amend or force-push");
-      expect(output).toContain(
-        "Correction MUST be limited to 3 loops per task.",
-      );
+      expect(
+        renderPackTemplate("@atlante/pack/workflow", {
+          phases: [
+            {
+              name: "Plan",
+              instructions: ["Plan the work."],
+              output: { description: "The plan record." },
+            },
+          ],
+        }),
+      ).not.toMatch(normativeKeyword);
     });
   });
 

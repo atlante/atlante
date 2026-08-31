@@ -1,3 +1,5 @@
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   createProjectResourcePack,
   interpolateValues,
@@ -5,10 +7,14 @@ import {
   loadPresetFacet,
   ResourceResolutionError,
   renderResolvedTemplate,
+  resolveResourceDocument,
   resolveResourceInstance,
   resolveResourceTemplate,
 } from "@atlante/resources";
-import { validateDocumentText } from "@atlante/validator";
+import {
+  validateDocumentText,
+  validateResolvedDocument,
+} from "@atlante/validator";
 import { afterEach, describe, expect, test } from "vitest";
 import {
   cleanupPackResourceFixtures,
@@ -139,6 +145,15 @@ describe("first-party preset surface", () => {
     }
   });
 
+  test("keeps the pack default values to project and workflow-root", () => {
+    const { document } = firstPartyPreset();
+
+    expect(document.values).toEqual({
+      project: "{{sys.cwd.basename}}",
+      "workflow-root": ".atlante/workflows",
+    });
+  });
+
   test("rejects the removed legacy brainstorming and workflow resources", () => {
     const { pack, config } = firstPartyPreset();
 
@@ -153,12 +168,92 @@ describe("first-party preset surface", () => {
   });
 
   describe("concrete workflow template contract", () => {
+    const approvedWorkflowPhases = [
+      {
+        name: "Brainstorm",
+        instructions: ["Follow the `brainstorm` skill."],
+        output: {
+          description:
+            "The agreed scope, direction, and success criteria when brainstorming is needed.",
+        },
+      },
+      {
+        name: "Plan",
+        instructions: ["Follow the `plan` skill."],
+        output: {
+          description:
+            "An actionable implementation plan when planning is needed.",
+          filePath: "{{values.workflow-root}}/<cycle-id>/plan.md",
+          updateable: true,
+        },
+      },
+      {
+        name: "Build",
+        instructions: [
+          "Follow the `build` skill for each implementation task.",
+          "Keep each task in its own explicit, reviewable change boundary, using a project-approved checkpoint mechanism when available.",
+        ],
+        output: {
+          description:
+            "The requested change with its validation evidence when implementation is needed.",
+        },
+      },
+      {
+        name: "Review",
+        instructions: [
+          "Follow the `review` skill for the boundary being reviewed.",
+          "Use task review after an implementation task when it would materially improve confidence; return valid corrections to Build and stop after at most five Build-Review correction rounds for that task.",
+          "Use final review after all implementation tasks when integration-level inspection would materially improve confidence.",
+        ],
+        output: {
+          description:
+            "An evidence-based verdict for the task or complete change being reviewed.",
+          filePath:
+            "{{values.workflow-root}}/<cycle-id>/reviews/<scope>-<n>.md",
+        },
+      },
+    ] as const;
+
+    function inlineWorkflowDiagnostics(
+      workflow: Record<string, unknown>,
+    ): readonly string[] {
+      const { root, config } = packResourceFixture();
+      writeFileSync(
+        join(root, "atlante.jsonc"),
+        `${JSON.stringify({
+          extends: "@atlante/pack",
+          agents: {
+            reviewer: {
+              $template: "@atlante/pack/agent",
+              description: "Reviews the change.",
+              identity: "You review.",
+              mission: "Find defects.",
+              sections: [{ workflow }],
+            },
+          },
+        })}\n`,
+      );
+      const document = resolveResourceDocument({
+        pack: createProjectResourcePack(root),
+        rootFile: config,
+        bindingCollections: [
+          {
+            key: "agents",
+            subject: "agent",
+            defaultTemplate: "@atlante/pack/agent",
+          },
+        ],
+      });
+      return validateResolvedDocument(document).map(
+        (diagnostic) => diagnostic.code,
+      );
+    }
+
     test("renders the canonical workflow identically in agents and skills", () => {
       const { root, config } = packResourceFixture();
       const pack = createProjectResourcePack(root);
       const workflow = {
-        title: "Review workflow",
-        phases: [{ kind: "plan", instructions: ["Plan the review."] }],
+        phases: [{ name: "Plan", instructions: ["Plan the review."] }],
       };
       const agentOutput = renderResolvedTemplate({
         template: resolveResourceTemplate(pack, "@atlante/pack/agent", config),
@@ -176,264 +271,194 @@ describe("first-party preset surface", () => {
           sections: [{ workflow }],
         },
       });
-      const workflowStart = "## Review workflow";
+      const workflowStart = "## Workflow";
 
       expect(agentOutput.slice(agentOutput.indexOf(workflowStart))).toBe(
         skillOutput.slice(skillOutput.indexOf(workflowStart)),
       );
     });
 
-    test("renders one shared adaptive section and distinguishes mixed phase modes", () => {
+    test("renders the neutral workflow prose with ordered numbered phases", () => {
       const output = renderWorkflowTemplate({
-        title: "Adaptive review",
         phases: [
-          {
-            name: "Plan",
-            policies: { adaptive: true },
-            instructions: ["Plan the review."],
-          },
-          { kind: "review", instructions: ["Review the change."] },
+          { name: "Brainstorm", instructions: ["Ask first.", "Then decide."] },
+          { name: "Build", instructions: ["Build the change."] },
         ],
       });
 
-      expect(output.match(/^### Adaptive phases$/gm)).toHaveLength(1);
-      expect(output).toContain("### 1. Plan (adaptive)");
-      expect(output).toContain("### 2. review (mandatory)");
-      for (const phrase of [
-        "An adaptive phase is optional and SHOULD add only as much ceremony as the work needs.",
-        "assess whether it would materially improve the outcome using task complexity, risk, uncertainty, and existing evidence",
-        "Skip the phase when the task is already clear, low-risk, and simple enough that the phase would not materially improve the outcome; briefly state why.",
-        "Otherwise run the phase with depth proportional to the work, focusing only on material questions and evidence.",
-        "Whenever the phase runs, it MUST preserve its required output, approvals, and safety gates.",
-        "Reassess later adaptive phases when implementation or review reveals new material evidence.",
-        "A non-adaptive phase remains mandatory and runs as written.",
-      ])
-        expect(output).toContain(phrase);
+      expect(output).toContain("## Workflow");
+      expect(output).toContain(
+        "The phases below describe the available workflow in their configured order.",
+      );
+      expect(output).toContain(
+        "### 1. Brainstorm\n\n1. Ask first.\n\n2. Then decide.",
+      );
+      expect(output.indexOf("### 1. Brainstorm")).toBeLessThan(
+        output.indexOf("### 2. Build"),
+      );
+      expect(output).toContain("### 2. Build\n\n1. Build the change.");
       for (const removed of [
-        "Adaptive phase protocol",
-        "`full`",
-        "`reduced`",
-        "`skipped`",
-        "disposition",
+        "## Policies",
+        "(adaptive)",
+        "(mandatory)",
+        "subagent",
+        "Phase validation",
       ])
         expect(output).not.toContain(removed);
     });
 
-    test("renders adaptive guidance from assessment through reassessment in order", () => {
+    test("renders optional phase output through the artifact slot only when present", () => {
       const output = renderWorkflowTemplate({
-        title: "Adaptive review",
-        phases: [
-          {
-            policies: { adaptive: true },
-            instructions: ["Review the change."],
-          },
-        ],
-      });
-      const assess =
-        "Before running an adaptive phase, assess whether it would materially improve the outcome using task complexity, risk, uncertainty, and existing evidence.";
-      const skip =
-        "Skip the phase when the task is already clear, low-risk, and simple enough that the phase would not materially improve the outcome; briefly state why.";
-      const run =
-        "Otherwise run the phase with depth proportional to the work, focusing only on material questions and evidence.";
-      const preserve =
-        "Whenever the phase runs, it MUST preserve its required output, approvals, and safety gates.";
-      const reassess =
-        "Reassess later adaptive phases when implementation or review reveals new material evidence.";
-      const mandatory =
-        "A non-adaptive phase remains mandatory and runs as written.";
-
-      for (const phrase of [assess, skip, run, preserve, reassess, mandatory])
-        expect(output).toContain(phrase);
-      expect(output.indexOf(assess)).toBeLessThan(output.indexOf(skip));
-      expect(output.indexOf(skip)).toBeLessThan(output.indexOf(run));
-      expect(output.indexOf(run)).toBeLessThan(output.indexOf(preserve));
-      expect(output.indexOf(preserve)).toBeLessThan(output.indexOf(reassess));
-      expect(output.indexOf(reassess)).toBeLessThan(output.indexOf(mandatory));
-    });
-
-    test("renders one adaptive section for multiple adaptive phases with name and kind fallbacks", () => {
-      const output = renderWorkflowTemplate({
-        title: "Adaptive delivery",
-        phases: [
-          {
-            name: "Planning",
-            policies: { adaptive: true },
-            instructions: ["Plan the delivery."],
-          },
-          {
-            kind: "build",
-            policies: { adaptive: true },
-            instructions: ["Build the change."],
-          },
-          { kind: "review", instructions: ["Review the change."] },
-        ],
-      });
-
-      expect(output.match(/^### Adaptive phases$/gm)).toHaveLength(1);
-      expect(output).toContain("### 1. Planning (adaptive)");
-      expect(output).toContain("### 2. build (adaptive)");
-      expect(output).toContain("### 3. review (mandatory)");
-    });
-
-    test("uses strict adaptive semantics for phase labels", () => {
-      const output = renderWorkflowTemplate({
-        title: "Adaptive review",
         phases: [
           {
             name: "Plan",
-            policies: { adaptive: true },
-            instructions: ["Plan the review."],
+            instructions: ["Plan the work."],
+            output: {
+              description: "The plan record.",
+              filePath: ".atlante/workflows/c/plan.md",
+              updateable: true,
+            },
           },
-          {
-            name: "Malformed",
-            policies: { adaptive: "false" },
-            instructions: ["Review the change."],
-          },
+          { name: "Build", instructions: ["Build the work."] },
         ],
       });
 
-      expect(output.match(/^### Adaptive phases$/gm)).toHaveLength(1);
-      expect(output).toContain("### 1. Plan (adaptive)");
-      expect(output).toContain("### 2. Malformed (mandatory)");
+      expect(output).toContain(
+        "Phase output: The plan record. The artifact SHOULD be stored at .atlante/workflows/c/plan.md. This output is a living artifact that later phases MAY revisit and update, looping back when needed.",
+      );
+      const tail = output.slice(output.indexOf("### 2. Build"));
+      expect(tail).not.toContain("Phase output");
     });
 
-    test.each([
-      ["omitted", undefined],
-      ["false", { adaptive: false }],
-    ])(
-      "keeps %s adaptive phases mandatory without adaptive labels",
-      (_label, policies) => {
-        const phase = {
-          name: "Plan",
-          ...(policies === undefined ? {} : { policies }),
-          instructions: ["Plan the review."],
-        };
-        const output = renderWorkflowTemplate({
-          title: "Mandatory workflow",
-          phases: [
-            phase,
-            { kind: "review", instructions: ["Review the change."] },
-          ],
-        });
-
-        expect(output).not.toContain("## Adaptive phases");
-        expect(output).not.toContain("disposition");
-        expect(output).toContain("### 1. Plan\n");
-        expect(output).toContain("### 2. review\n");
-        expect(output).not.toContain("(adaptive)");
-        expect(output).not.toContain("(mandatory)");
-      },
-    );
-
-    test("renders policy entries with an explicit heading hierarchy", () => {
-      const output = renderWorkflowTemplate({
-        title: "Structured policies",
-        policies: { orchestratorReadOnly: true },
-        phases: [
-          {
-            name: "Build",
-            policies: {
-              adaptive: true,
-              commit: true,
-              review: true,
-              maxLoops: 2,
-            },
-            instructions: ["Build the change."],
-          },
-        ],
-      });
-
-      const headings = ["## Policies", "### Adaptive phases"];
-
-      let previous = -1;
-      for (const heading of headings) {
-        const position = output.indexOf(heading);
-        expect(position, heading).toBeGreaterThan(previous);
-        previous = position;
-      }
-      for (const [heading, body] of [
-        [
-          "### Workflow: read-only orchestration",
-          "The orchestrator is read-only and delegates every file edit.",
-        ],
-        [
-          "### Build: task commits",
-          "Task implementation and corrections MUST be committed in separate commits, after the task's focused tests and checks pass; the orchestrator owns all commit authorship and pushing, and MUST NOT amend or force-push.",
-        ],
-        [
-          "### Build: task review",
-          "Apply task review according to this phase's review criteria.",
-        ],
-        [
-          "### Build: correction loops",
-          "Correction MUST be limited to 2 loops per task.",
-        ],
-      ])
-        expect(output).toContain(`${heading}\n\n${body}`);
-      expect(output).not.toContain("\n- Workflow:");
-      expect(output).not.toContain("\n- Build:");
-    });
-
-    test.each([
-      [
-        "workflow-level truthy values",
-        {
-          title: "Workflow policies",
-          policies: { orchestratorReadOnly: true },
-          phases: [{ name: "Plan", instructions: ["Plan the review."] }],
-        },
-        "## Policies\n\nPolicies are binding; they MUST be followed in every phase.\n\n### Workflow: read-only orchestration\n\nThe orchestrator is read-only and delegates every file edit.",
-      ],
-      [
-        "phase-level truthy values",
-        {
-          title: "Phase policies",
-          phases: [
-            {
-              name: "Build",
-              policies: { commit: true, review: true, maxLoops: 2 },
-              instructions: ["Build the change."],
-            },
-          ],
-        },
-        "## Policies\n\nPolicies are binding; they MUST be followed in every phase.\n\n### Build: task commits\n\nTask implementation and corrections MUST be committed in separate commits, after the task's focused tests and checks pass; the orchestrator owns all commit authorship and pushing, and MUST NOT amend or force-push.\n\n### Build: task review\n\nApply task review according to this phase's review criteria.\n\n### Build: correction loops\n\nCorrection MUST be limited to 2 loops per task.",
-      ],
-      [
-        "no truthy values",
-        {
-          title: "No policies",
-          policies: { orchestratorReadOnly: false },
+    test("accepts only the approved phase shape", () => {
+      expect(
+        inlineWorkflowDiagnostics({
           phases: [
             {
               name: "Plan",
-              policies: { commit: false, review: false },
               instructions: ["Plan the review."],
+              output: { description: "The plan record." },
+            },
+          ],
+        }),
+      ).toEqual([]);
+    });
+
+    test.each([
+      ["workflow title", { title: "Review workflow" }],
+      ["workflow description", { description: "The delivery workflow." }],
+      ["workflow policies", { policies: { orchestratorReadOnly: true } }],
+      [
+        "phase kind",
+        { phases: [{ kind: "plan", instructions: ["Plan the review."] }] },
+      ],
+      [
+        "phase description",
+        { phases: [{ name: "Plan", description: "Planning." }] },
+      ],
+      ["phase subagent", { phases: [{ name: "Plan", subagent: "planner" }] }],
+      [
+        "phase policies",
+        {
+          phases: [
+            {
+              name: "Plan",
+              policies: {
+                adaptive: true,
+                commit: true,
+                review: true,
+                maxLoops: 5,
+              },
             },
           ],
         },
-        "## No policies\n\nPhases MUST run sequentially in the order listed. A phase with a configured subagent is delegated to that agent. Each phase's inline instructions MUST be followed in order.",
       ],
-    ] as const)(
-      "preserves the policy rendering compatibility matrix",
-      (label, workflow, expected) => {
-        const output = renderWorkflowTemplate(workflow);
+      [
+        "phase validation",
+        { phases: [{ name: "Plan", validation: "bun test" }] },
+      ],
+    ])("rejects the removed workflow field: %s", (_label, extra) => {
+      const workflow = {
+        phases: [{ name: "Plan", instructions: ["Plan the review."] }],
+        ...extra,
+      };
 
-        expect(output, label).toContain(expected);
-        expect(output.match(/^## Policies$/gm) ?? []).toHaveLength(
-          label === "no truthy values" ? 0 : 1,
-        );
-      },
-    );
-
-    test("preserves complete output when no policy is rendered", () => {
-      expect(
-        renderWorkflowTemplate({
-          title: "No policies",
-          phases: [{ name: "Plan", instructions: ["Plan the review."] }],
-        }),
-      ).toBe(
-        "## No policies\n\nPhases MUST run sequentially in the order listed. A phase with a configured subagent is delegated to that agent. Each phase's inline instructions MUST be followed in order.\n\n\n### 1. Plan\n\n1. Plan the review.\n",
+      expect(inlineWorkflowDiagnostics(workflow)).toContain(
+        "invalid-prompt-input",
       );
+    });
+
+    test("resolves the concrete workflow instance with the exact approved phases in order", () => {
+      const { root, config } = packResourceFixture();
+      const instance = resolveResourceInstance(
+        createProjectResourcePack(root),
+        "@atlante/pack/workflow",
+        config,
+      );
+      const phases = ((instance.input as JsonObject).phases ??
+        []) as readonly JsonObject[];
+
+      expect(phases).toEqual(approvedWorkflowPhases);
+
+      const output = renderResolvedTemplate({
+        template: instance.effectiveTemplate,
+        input: instance.input,
+      });
+      const markers = approvedWorkflowPhases.map(
+        (phase, index) => `### ${index + 1}. ${phase.name}`,
+      );
+
+      for (const marker of markers) expect(output, marker).toContain(marker);
+      for (let index = 1; index < markers.length; index++)
+        expect(output.indexOf(markers[index - 1])).toBeLessThan(
+          output.indexOf(markers[index]),
+        );
+    });
+
+    test("keeps filePath only on the Plan and Review outputs", () => {
+      const { root, config } = packResourceFixture();
+      const phases = ((
+        resolveResourceInstance(
+          createProjectResourcePack(root),
+          "@atlante/pack/workflow",
+          config,
+        ).input as JsonObject
+      ).phases ?? []) as readonly JsonObject[];
+
+      for (const phase of phases.slice(0, 3)) {
+        const output = (phase.output ?? {}) as JsonObject;
+        expect("filePath" in output, String(phase.name)).toBe(
+          phase.name === "Plan",
+        );
+      }
+      expect("updateable" in (phases[1]?.output ?? {})).toBe(true);
+      expect("updateable" in (phases[3]?.output ?? {})).toBe(false);
+    });
+
+    test("interpolates the inherited workflow-root default into Plan and Review paths", () => {
+      const { pack, config, document } = firstPartyPreset();
+      const values: Record<string, string> = {};
+      for (const [key, value] of Object.entries(
+        (document.values ?? {}) as JsonObject,
+      ))
+        if (typeof value === "string") values[key] = value;
+      const instance = resolveResourceInstance(
+        pack,
+        "@atlante/pack/workflow",
+        config,
+      );
+      const output = renderResolvedTemplate({
+        template: instance.effectiveTemplate,
+        input: interpolateValues(instance.input, values),
+      });
+
+      expect(output).toContain(
+        "The artifact SHOULD be stored at .atlante/workflows/<cycle-id>/plan.md.",
+      );
+      expect(output).toContain(
+        "The artifact SHOULD be stored at .atlante/workflows/<cycle-id>/reviews/<scope>-<n>.md.",
+      );
+      expect(output).not.toContain("{{values.");
     });
   });
 });
