@@ -1,6 +1,6 @@
 {
   "name": "@atlante/schema",
-  "version": "0.1.15",
+  "version": "0.1.16",
   "type": "module",
   "description": "Atlante document schema and TypeScript types",
   "license": "MIT",
