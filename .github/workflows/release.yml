@@ -130,12 +130,38 @@ jobs:
         with:
           bun-version-file: ".bun-version"
 
+      - name: Install dependencies
+        shell: bash
+        run: bun install --frozen-lockfile
+
       - name: Sync docs brand assets
         shell: bash
         working-directory: docs
         run: |
           set -euo pipefail
           bun run sync:brand
+
+      - name: Pull Vercel project settings
+        shell: bash
+        working-directory: docs
+        run: |
+          set -euo pipefail
+          npx vercel@59.3.0 pull --yes --environment=production --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_DOCS_PROJECT_ID }}
+
+      - name: Build docs artifacts
+        shell: bash
+        working-directory: docs
+        run: |
+          set -euo pipefail
+          npx vercel@59.3.0 build --prod --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_DOCS_PROJECT_ID }}
 
       - name: Deploy docs to Vercel
         uses: amondnet/vercel-action@v42.3.0
@@ -144,4 +170,6 @@ jobs:
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           vercel-project-id: ${{ secrets.VERCEL_DOCS_PROJECT_ID }}
           vercel-args: '--prod'
+          vercel-version: 59.3.0
+          prebuilt: true
           working-directory: docs/
