@@ -19,7 +19,7 @@ describe("website deployment contract", () => {
       buildCommand: string;
       cleanUrls: boolean;
       trailingSlash: boolean;
-      functions: { "api/**": { includeFiles: unknown } };
+      functions: { "api/**": { maxDuration: number } };
       headers: Array<{
         source: string;
         headers: Array<{ key: string; value: string }>;
@@ -43,9 +43,7 @@ describe("website deployment contract", () => {
     expect(vercel.buildCommand).toBe("bun run build");
     expect(vercel.cleanUrls).toBe(true);
     expect(vercel.trailingSlash).toBe(false);
-    expect(vercel.functions["api/**"].includeFiles).toBe(
-      "node_modules/@atlante/**",
-    );
+    expect(vercel.functions["api/**"]).toEqual({ maxDuration: 30 });
 
     const schemaHeader = vercel.headers.find(
       (header) => header.source === "/schema/v0.1/schema.json",
@@ -56,7 +54,13 @@ describe("website deployment contract", () => {
     });
 
     expect(releaseWorkflow).toContain(
-      "working-directory: website\n        run: |\n          set -euo pipefail\n          bun run build",
+      'npx vercel@59.3.0 build --prod --token="$VERCEL_TOKEN"',
+    );
+    expect(releaseWorkflow).toContain(
+      "npx vercel@59.3.0 deploy --prebuilt --prod website",
+    );
+    expect(releaseWorkflow).toContain(
+      "playground.func/website/node_modules/@atlante/pack",
     );
     expect(releaseWorkflow).not.toContain("Copy schema files");
     expect(releaseWorkflow).not.toContain(
@@ -64,14 +68,13 @@ describe("website deployment contract", () => {
     );
     expect(rootIgnore).not.toContain("website/schema/");
 
+    expect(normalizedReadme).toContain("prebuilt Vercel artifacts");
+    expect(normalizedReadme).toContain("npm install --prefix website");
     expect(normalizedReadme).toContain(
-      "Include source files outside of the Root Directory in the Build Step",
+      "vercel deploy --prebuilt --prod website",
     );
-    expect(normalizedReadme).toContain("Root Directory set to `website`");
-    expect(normalizedReadme).toContain("Vercel CLI `20.1.0` or newer");
-    expect(normalizedReadme).toContain(
-      "default for projects created after August 27, 2020",
-    );
+    expect(normalizedReadme).toContain("@atlante/pack");
+    expect(normalizedReadme).toContain("59.3.0");
     expect(normalizedReadme).toContain("../brand");
     expect(normalizedReadme).toContain("../packages/schema");
   });

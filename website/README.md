@@ -50,29 +50,39 @@ to the released version at every release. Locally the workspace install
 links the workspace package instead, so run `bun install` and
 `bun run build` at the repository root to exercise current source
 through the dev playground. The published CLI bundle is self-contained,
-so the lambda only needs the pinned package itself (see `includeFiles`
-in `vercel.json`).
+so the lambda only needs the pinned package itself plus the
+`@atlante/pack` templates it reads from its own installation at
+runtime.
 
 
 
 ## Deployment
 
 
-The site deploys automatically through Vercel:
+The site deploys from the release workflow as prebuilt Vercel artifacts:
 
-1. Import the repository into Vercel with the project root set to `website`.
-2. In the Vercel project settings, keep Root Directory set to `website` and
-   enable **Include source files outside of the Root Directory in the Build
-   Step**. Verify that this option is enabled before relying on deployment
-   builds. Vercel enables it by default for projects created after August 27,
-   2020, but it remains an explicit prerequisite here because the authoritative
-   brand assets and schema live outside `website`, at `../brand` and
-   `../packages/schema`.
-3. Use Vercel CLI `20.1.0` or newer for this monorepo configuration.
-4. Vercel runs `bun run build`, which synchronizes brand assets, synchronizes the
-   schema, and then builds Astro to `dist/`.
-5. Pushes to `main` publish production. Pull requests get preview deployments.
+1. The workflow installs the website dependencies in isolation with
+   `npm install --prefix website`, which resolves the exact `@atlante/cli`
+   version pinned in `website/package.json` from npm. The website build
+   needs files outside `website` — the authoritative brand assets and
+   schema live at `../brand` and `../packages/schema` — so the build runs
+   against the full monorepo checkout instead of an uploaded subtree.
+2. `vercel pull` fetches the project settings, then `vercel build --prod`
+   runs the complete website build and bundles `api/playground.ts` into
+   `.vercel/output`.
+3. The workflow copies `node_modules/@atlante/pack` into the playground
+   function bundle: the published CLI reads the pack templates from its
+   own installation at runtime, and `functions.includeFiles` no longer
+   applies with the pinned Vercel CLI.
+4. `vercel deploy --prebuilt --prod website` runs from the repository
+   root, because the prebuilt deploy resolves function source metadata
+   relative to the invocation directory.
+5. Pushes to a release tag publish production. The same commands serve
+   for a manual deploy.
+
+The Vercel CLI is pinned to `59.3.0`: older releases fail on
+TypeScript 7 with the toolchain's local compiler.
 
 `vercel.json` in this directory holds hosting configuration: clean URLs, no
 trailing slash, the `application/schema+json` content type for the published
-schema, and the `node_modules/@atlante/**` lambda files.
+schema, and the playground function's 30-second timeout.
