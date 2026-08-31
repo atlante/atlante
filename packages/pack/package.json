@@ -1,6 +1,6 @@
 {
   "name": "@atlante/pack",
-  "version": "0.1.16",
+  "version": "0.1.17",
   "type": "module",
   "description": "Atlante's first-party static resource pack",
   "license": "MIT",
