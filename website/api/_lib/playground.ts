@@ -55,6 +55,9 @@ function cliEntry(): string {
       "the @atlante/cli bundle is missing; run `bun run build` at the repository root first",
     );
   }
+  // Literal deep resolve so serverless bundlers trace the CLI bundle into
+  // the deployed function next to the package manifest.
+  require.resolve("@atlante/cli/dist/bin/atlante.js");
   return entry;
 }
 

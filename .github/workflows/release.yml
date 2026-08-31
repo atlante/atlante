@@ -81,16 +81,33 @@ jobs:
         with:
           bun-version-file: ".bun-version"
 
-      - name: Install dependencies
+      - name: Install website dependencies
         shell: bash
-        run: bun install --frozen-lockfile
+        run: |
+          set -euo pipefail
+          npm install --prefix website --no-package-lock --no-audit --no-fund
 
-      - name: Build website
+      - name: Pull Vercel project settings
         shell: bash
         working-directory: website
         run: |
           set -euo pipefail
-          bun run build
+          npx vercel@59.3.0 pull --yes --environment=production --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Build website artifacts
+        shell: bash
+        working-directory: website
+        run: |
+          set -euo pipefail
+          npx vercel@59.3.0 build --prod --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
       - name: Deploy to Vercel
         uses: amondnet/vercel-action@v42.3.0
@@ -99,6 +116,9 @@ jobs:
           vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
           vercel-args: '--prod'
+          vercel-version: 59.3.0
+          prebuilt: true
+          working-directory: website/
 
   deploy-docs:
     needs: publish-packages
