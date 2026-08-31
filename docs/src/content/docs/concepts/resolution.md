@@ -1,59 +1,68 @@
 ---
-title: Resolution and composition
-description: How Atlante loads, merges, validates, and renders a configuration.
+title: Resolution
+description: The deterministic pipeline from authored source to validated input.
 ---
 
-Atlante treats configuration loading as a deterministic pipeline. Each stage
-must succeed before the next stage can publish output.
+What happens between the file you edit and the Markdown an adapter consumes?
+Resolution is the middle of that journey. It combines authored configuration
+with selected Pack content, validates the result, and produces a canonical
+document plus resolved template inputs. The same source and selected content
+produce the same result, apart from the supported system value described in
+[Values](/concepts/values).
 
-## The pipeline
+## Precedence and inheritance
 
-1. **Raw structural validation** parses JSON or JSONC and checks document shape,
-   the schema URI, container types, `extends`, and selector shape.
-2. **Resource resolution** loads selected presets, resources, instances, templates,
-   package metadata, and transitive references.
-3. **Resolved validation** checks the canonical document, values, selectors,
-   composition, effective-template compatibility, and template-owned input.
-4. **Build** renders validated input and atomically publishes the complete artifact tree.
+`extends` accepts one locator or an ordered, non-empty list. Each preset resolves
+its own inheritance first. Atlante merges preset layers from left to right, then
+applies the local document last, so local configuration takes precedence.
 
-`atlante validate` runs the first three stages without rendering. `atlante build`
-runs all four stages.
-
-## Preset inheritance
-
-`extends` accepts one locator or an ordered list. Each layer resolves its own
-inheritance first. Atlante then merges layers from left to right and applies the
-local document last.
-
-Merge behavior is deterministic:
+The merge rules are:
 
 - Objects merge recursively.
-- Arrays replace the inherited array.
-- Scalars replace the inherited scalar.
-- `null` removes an inherited field.
-- Local values always win over inherited values.
+- Arrays replace inherited arrays.
+- Scalars replace inherited scalars.
+- `null` removes an inherited field as a source overlay.
+- Binding-local values override global values for that binding.
 
-```jsonc
-{
-  "extends": [
-    "@acme/base-pack",
-    "@acme/review-pack/strict"
-  ],
-  "agents": {
-    "reviewer": "./resources/reviewer"
-  }
-}
-```
+The result is a canonical document without `extends`, source selectors, or
+unresolved removals. It contains the resolved values, agent bindings, and skill
+bindings that the build will render. [Configuration](/concepts/configuration)
+describes the authored shape; [Resources](/concepts/resources) describes what
+can be loaded.
 
-The second preset sees the resolved first preset. The local `reviewer` binding
-wins over both inherited layers.
+## Interpolation and composition
 
-## Failure behavior
+Atlante resolves supported system values and substitutes explicit value
+references before selected templates render. A template's JSON Schema can also
+declare a composition slot with `{ "template": "..." }`. The referenced child
+template is resolved, and its rendered Markdown is preserved as output rather
+than interpreted as parent source.
 
-Missing targets, invalid locators, malformed schemas, missing value references,
-unsupported fields, incompatible templates, and composition cycles fail before
-rendering. The builder prepares a complete private tree and publishes nothing
-partial when a required step fails.
+Every declared slot must resolve, including slots in schema branches that are
+not selected by current input. Only present slot values contribute output, and
+array order is preserved. Missing slots, incompatible input, invalid schemas,
+and composition cycles fail before rendering. Child Markdown remains opaque
+output; it is not interpreted as parent template source.
 
-Atlante loads only selected content and does not execute JavaScript, install
-packages, consult a registry, load URLs, or execute arbitrary project code.
+## Validation stages
+
+The lifecycle checks the document in order:
+
+1. Raw structural validation parses JSON or JSONC and checks the document shape,
+   schema URI, containers, inheritance, and selectors.
+2. Resource resolution loads selected presets, resources, instances, templates,
+   package metadata, and transitive references.
+3. Resolved validation checks values, effective templates, composition, and
+   template-owned input.
+4. Build renders the validated input and publishes the complete artifact tree.
+
+`validate` runs the first three stages without rendering or publishing. `build`
+runs all four. Missing targets, invalid locators, malformed schemas, missing
+value references, unsupported fields, incompatible templates, and invalid input
+are reported as [Diagnostics](/reference/diagnostics) with stable codes and
+source locations. The resource system fails closed: invalid input produces no
+canonical document and the builder publishes no partial artifact tree.
+
+Resolution does not execute JavaScript, project code, agents, skills, or model
+inference. It does not install packages or load URLs. [Artifacts](/concepts/artifacts)
+describes the host-neutral result of the final stage.

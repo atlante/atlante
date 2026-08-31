@@ -1,0 +1,258 @@
+---
+import logoLight from "../assets/atlante-horizontal.svg";
+import logoDark from "../assets/atlante-horizontal-reverse.svg";
+import "../styles/atlante-tokens.css";
+
+const title = "This star is off the map | Atlante documentation";
+const description = "The page you requested was not found.";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="description" content={description} />
+    <link rel="icon" href="/brand/favicons/atlante-favicon.svg" />
+    <title>{title}</title>
+    <script is:inline>
+      const storedTheme =
+        typeof localStorage !== "undefined"
+          ? localStorage.getItem("starlight-theme")
+          : null;
+      const systemTheme = window.matchMedia("(prefers-color-scheme: light)").matches
+        ? "light"
+        : "dark";
+      const theme =
+        storedTheme === "light" || storedTheme === "dark" ? storedTheme : systemTheme;
+      document.documentElement.dataset.theme = theme;
+    </script>
+  </head>
+  <body>
+    <header class="navbar" data-atlante-navbar>
+      <div class="navbar-inner">
+        <a class="brand" href="/introduction" aria-label="Atlante documentation">
+          <img class="logo logo-light" src={logoLight.src} alt="" width="1200" height="420" />
+          <img
+            class="logo logo-dark"
+            src={logoDark.src}
+            alt=""
+            width="1200"
+            height="420"
+          />
+        </a>
+      </div>
+    </header>
+    <main data-atlante-404 aria-labelledby="not-found-title">
+      <section class="not-found">
+        <div class="star-map" aria-hidden="true">
+          <svg data-celestial-marker="star-map" viewBox="0 0 120 120" focusable="false">
+            <path class="orbit" d="M20 76c14-34 65-48 81-19" />
+            <path class="trail" d="M21 77c18 17 50 18 77-1" />
+            <circle class="star" cx="31" cy="67" r="5" />
+            <circle class="star" cx="74" cy="32" r="3" />
+            <circle class="star" cx="97" cy="58" r="4" />
+            <path class="lost" d="m57 67 3 8 8 3-8 3-3 8-3-8-8-3 8-3Z" />
+          </svg>
+        </div>
+        <p class="eyebrow">404 / CELESTIAL ERROR</p>
+        <h1 id="not-found-title">This star is off the map</h1>
+        <p class="explanation">The page you requested was not found.</p>
+        <a class="recovery" data-atlante-404-back href="/introduction">
+          Go back
+        </a>
+      </section>
+    </main>
+  </body>
+</html>
+
+<style>
+  :global(html),
+  :global(body) {
+    min-height: 100%;
+  }
+
+  :global(body) {
+    margin: 0;
+    background: var(--ds-bg);
+    color: var(--ds-fg);
+    font-family: var(--font-body);
+    line-height: 1.65;
+  }
+
+  .navbar {
+    border-block-end: 1px solid var(--ds-border-subtle);
+    background: var(--ds-bg);
+  }
+
+  .navbar-inner {
+    display: flex;
+    min-height: 72px;
+    box-sizing: border-box;
+    width: min(100% - 2 * var(--space-4), var(--container-wide));
+    align-items: center;
+    justify-content: space-between;
+    margin-inline: auto;
+  }
+
+  .brand {
+    display: flex;
+    min-block-size: var(--control-min);
+    align-items: center;
+    width: clamp(8rem, 13vw, 10rem);
+  }
+
+  .logo {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .logo-dark {
+    display: none;
+  }
+
+  :global([data-theme="dark"]) .logo-light {
+    display: none;
+  }
+
+  :global([data-theme="dark"]) .logo-dark {
+    display: block;
+  }
+
+  .section-label {
+    color: var(--ds-muted);
+    font-family: var(--font-mono);
+    font-size: var(--text-meta);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  main {
+    display: grid;
+    min-height: calc(100svh - 73px);
+    place-items: center;
+    box-sizing: border-box;
+    padding: var(--space-16) var(--space-4);
+  }
+
+  .not-found {
+    width: min(100%, 72ch);
+  }
+
+  .star-map {
+    width: clamp(120px, 18vw, 220px);
+    margin-block-end: var(--space-8);
+    color: var(--ds-accent);
+  }
+
+  .star-map svg {
+    display: block;
+    width: 100%;
+    overflow: visible;
+  }
+
+  .orbit,
+  .trail {
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-width: 1.5;
+  }
+
+  .trail {
+    stroke-dasharray: 1 6;
+  }
+
+  .star,
+  .lost {
+    fill: currentColor;
+  }
+
+  .eyebrow {
+    margin: 0 0 var(--space-4);
+    color: var(--ds-muted);
+    font-family: var(--font-mono);
+    font-size: var(--text-meta);
+    letter-spacing: 0.1em;
+  }
+
+  h1 {
+    max-width: 11ch;
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: clamp(3rem, 8vw, 7rem);
+    font-weight: 500;
+    line-height: 1;
+    text-wrap: balance;
+  }
+
+  .explanation {
+    margin: var(--space-6) 0 0;
+    color: var(--ds-muted);
+    font-size: clamp(1.125rem, 2vw, 1.5rem);
+  }
+
+  .recovery {
+    display: inline-flex;
+    min-block-size: var(--control-min);
+    align-items: center;
+    justify-content: center;
+    margin-block-start: var(--space-8);
+    padding-inline: var(--space-6);
+    border: 1px solid var(--ds-border);
+    background: var(--ds-accent);
+    color: var(--ds-accent-fg);
+    font-family: var(--font-ui);
+    font-weight: 650;
+    text-decoration: none;
+  }
+
+  .recovery:hover {
+    background: var(--ds-fg);
+    color: var(--ds-bg);
+  }
+
+  :global(:focus-visible) {
+    outline: 3px solid var(--ds-fg);
+    outline-offset: 3px;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .lost {
+      animation: breathe 4s var(--ease-standard) infinite;
+      transform-box: fill-box;
+      transform-origin: center;
+    }
+
+    @keyframes breathe {
+      50% {
+        scale: 1.08;
+        rotate: 8deg;
+      }
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .lost {
+      animation: none;
+    }
+  }
+
+  @media (max-width: 50rem) {
+    main {
+      text-align: center;
+    }
+
+    .star-map,
+    h1,
+    .explanation {
+      margin-inline: auto;
+    }
+
+    .recovery {
+      width: 100%;
+      box-sizing: border-box;
+    }
+  }
+</style>

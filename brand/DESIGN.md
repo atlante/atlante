@@ -34,23 +34,24 @@ Never open with schema validation, artifact hashing, mythology, or a future regi
 
 ## Naming and Vocabulary
 
-As analogy, Atlante bears the celestial sphere. The sphere represents the complete harness, given form by the developer. Metaphors explain the product; they never replace its technical vocabulary and never enter schema fields, package names, types, or code identifiers.
+As analogy, Atlante bears the celestial sphere. The celestial sphere represents the broader ecosystem of independently authored harness families. A Family is one complete harness containing related constellations, skills, workflows, values, and supporting configuration. Metaphors explain the product; they never replace its technical vocabulary and never enter schema fields, package names, types, or code identifiers.
 
 | Metaphor | Meaning | Allowed use |
 | --- | --- | --- |
 | Atlante bearing the sphere | Atlante carries the harness structure | Brand story, identity rationale, major narrative moments |
-| Celestial sphere | The complete structured harness | Architecture overview and visual system |
-| Star | A configured reference point such as identity, instruction, constraint, value, or policy | Explanatory diagrams and occasional editorial copy |
-| Constellation | An agent whose reference points form a coherent role and identity | Light explanatory copy and diagrams |
+| Celestial sphere | The broader ecosystem of independently authored harness families | Architecture overview and visual system |
+| Star | A named input, instruction, constraint, value, or policy | Explanatory diagrams and occasional editorial copy |
+| Constellation | One configured agent | Light explanatory copy and diagrams |
+| Family | One complete harness containing related constellations, skills, workflows, values, and supporting configuration | Architecture overview and occasional editorial copy |
 | Projection | Materialization through a host adapter | Architecture explanation paired with the literal term `adapter` |
 | Bearing | Support, load, responsibility, materialization | Brand narrative and graphic devices |
-| Almanac | A possible future name for a reusable-content registry | Reserved; no current behavior is defined |
+| Almanac | A possible future registry for independently authored harness families | Reserved; it is not shipped and has no current behavior |
 
 Skills remain literal skills, reusable guidance rather than stars. Artifacts remain artifacts. Never rename Atlante to Atlas or Atlantis.
 
 Technical vocabulary keeps its required meanings: `configuration` is the primary prose term for the authored system and `config` appears only in compact CLI, argument, or code contexts; `document` names the parsed or validated configuration entity in technical documentation; `preset` names a preconfigured root document used directly or through `extends`; `artifact` names generated output under `.atlante/artifacts/`; `host adapter` is the public phrase for host-specific materialization.
 
-`family` and `PackItem` are retired early discussion terms (decision D4). They are absent from the current brand vocabulary; do not attribute them to this contract.
+`Family` names one complete harness containing related constellations, skills, workflows, values, and supporting configuration. It is explanatory brand vocabulary only and does not name a schema field, package, type, or code identifier. `PackItem` remains a retired early discussion term.
 
 Retired implementation names: `atlante/starter`, `atlante/<resource>`, `@atlante/templates`, `@atlante/presets`, and `resolve` terminology. The current implementation uses `@atlante/pack`, `$template`, `$instance`, and `build`.
 

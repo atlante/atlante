@@ -1,169 +1,170 @@
 ---
-import { Image } from "astro:assets";
-import glyphLight from "../assets/atlante-glyph.svg";
-import glyphDark from "../assets/atlante-glyph-reverse.svg";
-
 const github = "https://github.com/atlante/atlante";
 
-const links = [
-  { label: "Documentation", href: "https://docs.atlante.sh" },
-  { label: "GitHub", href: github },
-  { label: "Specifications", href: `${github}/blob/main/SPECIFICATION.md` },
+const groups = [
+  {
+    label: "Learn",
+    links: [
+      { label: "Documentation", href: "https://docs.atlante.sh" },
+      {
+        label: "Getting started",
+        href: "https://docs.atlante.sh/getting-started",
+      },
+      { label: "Playground", href: "#quick-start" },
+    ],
+  },
+  {
+    label: "Project",
+    links: [
+      { label: "GitHub repo", href: github },
+      { label: "Releases", href: `${github}/releases` },
+      { label: "v0.1", href: `${github}/releases/latest` },
+      { label: "Issues", href: `${github}/issues` },
+    ],
+  },
+  {
+    label: "Reference",
+    links: [
+      {
+        label: "Specification",
+        href: `${github}/blob/main/SPECIFICATION.md`,
+      },
+      { label: "npm", href: "https://www.npmjs.com/package/@atlante/cli" },
+      { label: "Contributing", href: "https://docs.atlante.sh/contributing" },
+      { label: "MIT", href: `${github}/blob/main/LICENSE` },
+    ],
+  },
 ];
 ---
 
-<footer class="site-footer">
+<footer class="site-footer major-divider">
   <div class="inner">
-    <div class="mark">
-      <Image
-        class="mark-figure lockup-light"
-        src={glyphLight}
-        alt=""
-        width={683}
-        height={1024}
-        loading="lazy"
-      />
-      <Image
-        class="mark-figure lockup-dark"
-        src={glyphDark}
-        alt=""
-        width={683}
-        height={1024}
-        loading="lazy"
-      />
-      <span class="wordmark">ATLANTE</span>
+    <div class="footer-main">
+      <div class="mark">
+        <img
+          class="lockup lockup-light"
+          src="/brand/horizontal/atlante-horizontal.svg"
+          alt=""
+          width="1200"
+          height="420"
+          loading="lazy"
+        />
+        <img
+          class="lockup lockup-dark"
+          src="/brand/horizontal/atlante-horizontal-reverse.svg"
+          alt=""
+          width="1200"
+          height="420"
+          loading="lazy"
+        />
+      </div>
+
+      <nav aria-label="Footer">
+        <div class="link-groups">
+          {
+            groups.map((group) => (
+              <section class="link-group">
+                <h2>{group.label}</h2>
+                <ul>
+                  {group.links.map((link) => (
+                    <li>
+                      <a href={link.href}>{link.label}</a>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))
+          }
+        </div>
+      </nav>
     </div>
 
-    <nav aria-label="Footer">
-      <ul>
-        {
-          links.map((link) => (
-            <li>
-              <a href={link.href}>{link.label}</a>
-            </li>
-          ))
-        }
-      </ul>
-    </nav>
-    <p class="license">
-      <a href={`${github}/releases/latest`}>v0.1</a>
-      <span aria-hidden="true">·</span>
-      <a href={`${github}/blob/main/LICENSE`}>MIT</a>
-    </p>
-    <button
-      type="button"
-      class="planet"
-      data-theme-toggle-footer
-      aria-label="Switch theme"
-    >
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <circle
-          cx="12"
-          cy="12"
-          r="8.25"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.5"></circle>
-        <path
-          class="phase"
-          d="M12 3.75 A 8.25 8.25 0 0 1 12 20.25 Z"
-          fill="currentColor"></path>
-        <ellipse
-          cx="12"
-          cy="12"
-          rx="11.25"
-          ry="3.75"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1"
-          transform="rotate(-18 12 12)"></ellipse>
-      </svg>
-    </button>
-
-
-
-
+    <div class="footer-controls">
+      <button
+        type="button"
+        class="planet"
+        data-theme-toggle-footer
+        aria-label="Switch theme"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle
+            cx="12"
+            cy="12"
+            r="8.25"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"></circle>
+          <path
+            class="phase"
+            d="M12 3.75 A 8.25 8.25 0 0 1 12 20.25 Z"
+            fill="currentColor"></path>
+          <ellipse
+            cx="12"
+            cy="12"
+            rx="11.25"
+            ry="3.75"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1"
+            transform="rotate(-18 12 12)"></ellipse>
+        </svg>
+      </button>
+    </div>
   </div>
 </footer>
 
-<script>
-  const button = document.querySelector<HTMLButtonElement>(
-    "[data-theme-toggle-footer]",
-  );
-
-  const sync = (): void => {
-    if (!button) return;
-    const dark = document.documentElement.dataset.theme === "dark";
-    button.setAttribute(
-      "aria-label",
-      dark ? "Switch to the light theme" : "Switch to the dark theme",
-    );
-    const meta = document.querySelector<HTMLMetaElement>(
-      'meta[name="theme-color"]',
-    );
-    if (meta) {
-      meta.content = dark ? "#112135" : "#F4ECE4";
-    }
-  };
-
-  sync();
-
-  button?.addEventListener("click", () => {
-    const next =
-      document.documentElement.dataset.theme === "dark" ? "light" : "dark";
-    document.documentElement.dataset.theme = next;
-    try {
-      localStorage.setItem("atlante-theme", next);
-    } catch {
-      // Storage is unavailable; the theme still applies for this page load.
-    }
-    sync();
-  });
-</script>
-
-
 <style>
   .site-footer {
-    max-width: var(--container-wide);
+    width: min(100%, calc(var(--container-hero) + 2 * var(--space-4)));
+    box-sizing: border-box;
     margin-inline: auto;
     padding: 0 var(--space-4) var(--space-8);
   }
 
   .inner {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    box-sizing: border-box;
+    padding-block: var(--space-12) var(--space-8);
+  }
+
+  .footer-main {
+    display: grid;
+    grid-template-columns: minmax(180px, 0.65fr) minmax(0, 1.35fr);
     gap: clamp(var(--space-8), 5vw, var(--space-24));
-    align-items: center;
-    min-height: 144px;
-    border-block-start: 1px solid var(--ds-border);
+    align-items: start;
   }
 
   .mark {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
+    align-self: start;
     gap: var(--space-3);
   }
 
-  .mark-figure {
-    width: 80px;
+  .lockup {
+    display: block;
+    width: min(220px, 100%);
     height: auto;
   }
 
-  .wordmark {
-    font-family: var(--font-display);
-    font-size: 24px;
-    font-weight: 500;
-    letter-spacing: 0.14em;
+  .link-groups {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-8);
   }
 
   ul {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: var(--space-2) var(--space-8);
     margin: 0;
     padding: 0;
     list-style: none;
+  }
+
+  .link-group h2 {
+    margin: 0 0 var(--space-2);
+    color: var(--ds-muted);
+    font-family: var(--font-ui);
+    font-size: var(--text-meta);
+    font-weight: 650;
   }
 
   nav a {
@@ -175,7 +176,6 @@ const links = [
     font-size: var(--text-small);
     font-weight: 600;
     letter-spacing: 0.06em;
-    text-transform: uppercase;
     text-decoration: none;
   }
 
@@ -188,11 +188,8 @@ const links = [
     text-underline-offset: 0.25em;
   }
 
-  .license {
-    margin: 0;
-    font-family: var(--font-mono);
-    font-size: var(--text-meta);
-    letter-spacing: 0.08em;
+  .footer-controls {
+    display: none;
   }
 
   .planet {
@@ -217,6 +214,14 @@ const links = [
     border-color: var(--ds-fg);
   }
 
+  :global(html:not([data-theme="dark"])) .lockup-dark {
+    display: none !important;
+  }
+
+  :global(html[data-theme="dark"]) .lockup-light {
+    display: none !important;
+  }
+
   @media (prefers-reduced-motion: no-preference) {
     .planet svg {
       transition: rotate var(--duration-editorial) var(--ease-standard);
@@ -227,44 +232,57 @@ const links = [
     rotate: 180deg;
   }
 
+  @media (max-width: 900px) {
+    .footer-main {
+      grid-template-columns: 1fr;
+    }
+
+    .link-groups {
+      text-align: center;
+    }
+
+    .mark {
+      margin-block-end: var(--space-4);
+      justify-content: center;
+    }
+  }
+
   @media (max-width: 700px) {
+    .footer-controls {
+      display: flex;
+      justify-content: center;
+      margin-block-start: var(--space-4);
+    }
+
     .planet {
       display: grid;
     }
-  }
 
-
-
-  .license a {
-    display: inline-flex;
-    align-items: center;
-    min-height: var(--control-min);
-    color: var(--ds-muted);
-    text-decoration: none;
-  }
-
-  .license a:hover,
-  .license a:focus-visible {
-    color: var(--ds-fg);
-    text-decoration: underline;
-    text-decoration-color: var(--ds-border);
-    text-decoration-thickness: 2px;
-    text-underline-offset: 0.25em;
-  }
-
-
-  @media (max-width: 700px) {
-    .inner {
-      grid-template-columns: 1fr;
-      gap: var(--space-4);
-      padding-block: var(--space-8);
-      justify-items: start;
+    .mark {
+      justify-content: center;
     }
 
+    .link-groups {
+      grid-template-columns: 1fr;
+      gap: var(--space-4);
+      text-align: center;
+    }
 
-    ul {
-      justify-content: flex-start;
+    .link-group,
+    .link-group h2,
+    .link-group a {
+      text-align: center;
+    }
+
+    .link-group a {
+      justify-content: center;
+      width: 100%;
+    }
+  }
+
+  @media (max-width: 460px) {
+    .link-groups {
+      grid-template-columns: 1fr;
     }
   }
 </style>
-

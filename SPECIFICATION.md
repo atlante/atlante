@@ -163,11 +163,15 @@ selection remain separate properties.
 
 ### Edge cases
 
-The terms `family`, `constellation`, `star`, and `PackItem` are metaphor or
-discussion terms only. `star` and `constellation` originate in the Atlante
-brand vocabulary; `family` and `PackItem` are early discussion terms recorded
-as retired by [DESIGN.md](brand/DESIGN.md). They MUST NOT become schema fields,
-package names, or implementation types.
+The terms `Star`, `Constellation`, `Family`, and `celestial sphere` are
+explanatory brand vocabulary only. A Star is a named input, instruction,
+constraint, value, or policy. A Constellation is one configured agent. A Family
+is one complete harness containing related constellations, skills, workflows,
+values, and supporting configuration. The celestial sphere is the broader
+ecosystem of independently authored harness families. Almanac remains a
+possible future registry and is not shipped. These metaphors MUST NOT become
+schema fields, package names, implementation types, or other code identifiers.
+`PackItem` remains a retired early discussion term.
 
 ### Rationale
 

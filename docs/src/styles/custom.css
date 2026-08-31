@@ -153,7 +153,9 @@ button,
 input,
 select,
 textarea,
+dialog,
 details,
+.pagination-links a,
 .sl-markdown-content :is(pre, table, blockquote) {
   border-radius: 0;
 }
@@ -184,6 +186,37 @@ details,
 .sl-markdown-content .starlight-aside {
   border-radius: 0;
 }
+.mobile-starlight-toc .toggle {
+  border-radius: 0;
+}
+.site-title,
+.social-icons a,
+starlight-menu-button button,
+site-search button[data-open-modal],
+site-search button[data-close-modal],
+starlight-theme-select select,
+starlight-lang-select select,
+.sidebar-content :is(a, summary),
+.right-sidebar-panel a,
+footer .meta > a {
+  min-block-size: var(--control-min);
+}
+.sidebar-content :is(a, summary),
+.right-sidebar-panel a,
+footer .meta > a,
+.social-icons a,
+.site-title {
+  display: flex;
+  align-items: center;
+}
+starlight-menu-button button,
+site-search button[data-open-modal],
+site-search button[data-close-modal],
+starlight-theme-select select,
+starlight-lang-select select,
+.social-icons a {
+  min-inline-size: var(--control-min);
+}
 :focus-visible {
   outline: 3px solid var(--sl-color-text);
   outline-offset: 2px;
@@ -197,7 +230,17 @@ details,
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-image-pair(*) {
+    animation: none !important;
   }
 }

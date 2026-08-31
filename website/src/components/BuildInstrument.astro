@@ -1,4 +1,6 @@
 ---
+import { getScrollBehavior } from "../lib/scroll";
+
 const config = `{
   "$schema": "https://atlante.sh/schema/v0.1/schema.json",
   "extends": "@atlante/pack",
@@ -52,19 +54,21 @@ const hints: Record<string, string> = {
 };
 ---
 
-<section class="workbench" id="quick-start">
+<section class="workbench major-divider" id="quick-start">
   <div class="inner">
     <header class="intro">
-      <h2>The configuration is the product surface</h2>
+      <h2>Build your constellation</h2>
+      <p>
+        Edit the configuration, run the real CLI, and inspect the generated artifacts.
+      </p>
     </header>
 
     <div class="build-instrument" data-playground data-stage="idle">
       <div class="instrument-bar">
         <p>
           <span class="status-dot" data-status-dot></span>
-          Atlante build instrument
+          Playground · real CLI · isolated sandbox
         </p>
-        <span>real CLI · isolated sandbox</span>
       </div>
 
       <div class="workspace">
@@ -124,9 +128,9 @@ const hints: Record<string, string> = {
 
         <div class="command-pane">
           <div class="command-selector" aria-label="Run a CLI command">
-            <button type="button" data-run="init">Init</button>
-            <button type="button" data-run="validate" disabled>Validate</button>
-            <button type="button" data-run="build" disabled>Build</button>
+            <button type="button" data-run="init">init</button>
+            <button type="button" data-run="validate" disabled>validate</button>
+            <button type="button" data-run="build" disabled>build</button>
           </div>
 
           <p class="run-hint" data-run-hint>
@@ -336,7 +340,12 @@ const hints: Record<string, string> = {
       if (matchMedia("(max-width: 980px)").matches) {
         instrument
           ?.querySelector(".configuration-pane")
-          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+          ?.scrollIntoView({
+            behavior: getScrollBehavior(
+              matchMedia("(prefers-reduced-motion: reduce)").matches,
+            ),
+            block: "start",
+          });
       }
     };
 
@@ -637,18 +646,7 @@ const hints: Record<string, string> = {
     background: color-mix(in oklab, var(--ds-bg) 96%, var(--ds-fg));
   }
 
-  .workbench::before {
-    content: "";
-    display: block;
-    width: min(100% - 2 * var(--space-4), var(--container-playground));
-    margin-inline: auto;
-    background: var(--ds-border);
-    height: 1px;
-  }
-
-
-
-  .inner {
+   .inner {
     max-width: var(--container-playground);
     margin-inline: auto;
     padding: clamp(var(--space-24), 9vw, 168px) var(--space-4);
@@ -656,6 +654,14 @@ const hints: Record<string, string> = {
 
   .intro {
     margin-block-end: var(--space-16);
+  }
+
+  .intro p {
+    max-width: 58ch;
+    margin: var(--space-4) 0 0;
+    color: var(--ds-muted);
+    font-family: var(--font-body);
+    font-size: var(--text-ui);
   }
 
   h2 {
@@ -687,7 +693,6 @@ const hints: Record<string, string> = {
     font-size: var(--text-meta);
     font-weight: 650;
     letter-spacing: 0.1em;
-    text-transform: uppercase;
   }
 
   .instrument-bar p {
@@ -704,7 +709,6 @@ const hints: Record<string, string> = {
   .status-dot {
     width: 8px;
     height: 8px;
-    border-radius: 50%;
     background: var(--ds-muted);
   }
 
@@ -740,7 +744,6 @@ const hints: Record<string, string> = {
     font-size: var(--text-meta);
     font-weight: 650;
     letter-spacing: 0.09em;
-    text-transform: uppercase;
   }
 
   .pane-head strong {
@@ -871,7 +874,7 @@ const hints: Record<string, string> = {
 
   textarea[data-code-editor]:focus-visible {
     outline: 3px solid var(--ds-fg);
-    outline-offset: -3px;
+    outline-offset: 2px;
   }
 
   .field-map {
@@ -967,7 +970,6 @@ const hints: Record<string, string> = {
     font-size: var(--text-meta);
     font-weight: 650;
     letter-spacing: 0.1em;
-    text-transform: uppercase;
   }
 
   .terminal-actions {
@@ -976,7 +978,7 @@ const hints: Record<string, string> = {
   }
 
   .terminal button {
-    min-height: 32px;
+    min-height: var(--control-min);
     padding-inline: var(--space-2);
     border-color: color-mix(in oklab, var(--ds-fg) 40%, transparent);
     color: var(--ds-fg);
@@ -1018,7 +1020,6 @@ const hints: Record<string, string> = {
     font-size: var(--text-meta);
     font-weight: 650;
     letter-spacing: 0.1em;
-    text-transform: uppercase;
   }
 
   [data-tree-list] {
@@ -1061,7 +1062,7 @@ const hints: Record<string, string> = {
     width: 100%;
     min-width: 0;
     max-width: 100%;
-    min-height: 36px;
+    min-height: var(--control-min);
     justify-content: flex-start;
     border: 0;
     padding-inline: 0;
@@ -1149,7 +1150,6 @@ const hints: Record<string, string> = {
     width: 10px;
     height: 10px;
     border: 1px solid var(--ds-border);
-    border-radius: 50%;
     background: var(--ds-bg);
   }
 
@@ -1158,7 +1158,6 @@ const hints: Record<string, string> = {
     font-size: var(--text-meta);
     font-weight: 650;
     letter-spacing: 0.08em;
-    text-transform: uppercase;
   }
 
   .pipeline code {
@@ -1217,16 +1216,73 @@ const hints: Record<string, string> = {
     }
   }
 
-  @media (max-width: 680px) {
+  @media (max-width: 700px) {
+    .intro {
+      text-align: center;
+    }
+
+    .intro h2,
+    .intro p {
+      margin-inline: auto;
+    }
+
+    .instrument-bar {
+      justify-content: center;
+      text-align: center;
+    }
+
+    .instrument-bar p {
+      justify-content: center;
+    }
+
     .pane-head {
       align-items: flex-start;
       flex-direction: column;
       padding-block: var(--space-4);
     }
 
+    .pane-head > div:first-child {
+      align-items: center;
+      width: 100%;
+      text-align: center;
+    }
+
+    .pane-actions {
+      justify-content: center;
+      width: 100%;
+    }
+
+    .run-hint {
+      text-align: center;
+    }
+
+    .terminal-head {
+      justify-content: center;
+      text-align: center;
+    }
+
+    .terminal-actions {
+      justify-content: center;
+    }
+
     .field-map,
     .pipeline {
       grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .field-map dt,
+    .field-map dd,
+    .pipeline small {
+      text-align: center;
+    }
+
+    .pipeline-item {
+      align-items: center;
+    }
+
+    .pipeline code {
+      width: 100%;
+      text-align: start;
     }
 
     .field-map > div:nth-child(2),
@@ -1240,14 +1296,38 @@ const hints: Record<string, string> = {
     }
 
     pre[data-code-view],
+    pre[data-terminal-out],
     textarea[data-code-editor] {
       padding-inline: var(--space-4);
       font-size: clamp(12px, 1.05vw, 16px);
+      text-align: start;
 
     }
 
     .instrument-bar > span {
       display: none;
+    }
+
+    .tree-label {
+      text-align: center;
+    }
+
+    [data-tree-list] {
+      text-align: center;
+    }
+
+    [data-tree-list] :global(.tree-folder) {
+      text-align: center;
+    }
+
+    [data-tree-list] :global(button) {
+      justify-content: center;
+      text-align: center;
+    }
+
+    .docs-link {
+      justify-content: center;
+      text-align: center;
     }
   }
 

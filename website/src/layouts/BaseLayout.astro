@@ -17,6 +17,7 @@ const ogImage = Astro.site ? new URL("og.png", Astro.site) : "/og.png";
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={description} />
+    <meta name="theme-color" content="#F4ECE4" />
     <script is:inline>
       // Apply the stored or system theme before first paint to avoid a flash.
       // Colors mirror --atlante-linen and --atlante-jet from the brand tokens.
@@ -28,11 +29,36 @@ const ogImage = Astro.site ? new URL("og.png", Astro.site) : "/og.png";
       }
       const dark =
         stored === "dark" ||
-        (stored === null &&
+        (stored !== "light" &&
           matchMedia("(prefers-color-scheme: dark)").matches);
       document.documentElement.dataset.theme = dark ? "dark" : "light";
     </script>
-    <meta name="theme-color" content="#F4ECE4" />
+    <script>
+      import {
+        createThemeController,
+        type Theme,
+        type ThemeDocument,
+        type ThemeStorage,
+      } from "../lib/theme";
+
+      let storage: ThemeStorage | null = null;
+      try {
+        storage = localStorage;
+      } catch {
+        // Storage is unavailable; the controller still handles this page load.
+      }
+      const current = document.documentElement.dataset.theme;
+      const initialTheme: Theme | null =
+        current === "dark" || current === "light" ? current : null;
+      const controller = createThemeController(
+        document as unknown as ThemeDocument,
+        storage,
+        initialTheme,
+        matchMedia("(prefers-color-scheme: dark)").matches,
+      );
+      controller.initialize();
+      controller.bind();
+    </script>
     <link
       rel="preload"
       href="/fonts/bodonimoda/bodoni-moda-latin.woff2"

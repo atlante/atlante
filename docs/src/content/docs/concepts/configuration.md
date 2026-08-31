@@ -1,33 +1,36 @@
 ---
 title: Configuration
-description: The authored Atlante document and the fields that define a harness.
+description: The authored document that defines an Atlante harness.
 ---
 
-The configuration document is the authored source for an Atlante harness. It is
-normally stored as `atlante.jsonc`; strict JSON in `atlante.json` is also
-supported.
+What should your project keep under version control, and what should Atlante
+generate? Keep the configuration document: it is the authored, versioned source
+for the harness. It selects presets, defines values, and binds agents and skills
+to static resources. The build turns that source into artifacts; artifacts do
+not replace it.
 
-Only one configuration filename may exist in a project root. If both
-`atlante.jsonc` and `atlante.json` exist, Atlante reports an ambiguity and
-requires an explicit path.
+The source-to-artifact flow is:
 
-## Document shape
+```text
+atlante.jsonc or atlante.json
+        -> validate and resolve
+        -> build
+        -> .atlante/artifacts/
+```
 
-A document must contain the versioned `$schema` URI. The other top-level fields
-are optional:
+## Supported source files
 
-| Field | Purpose |
-| --- | --- |
-| `$schema` | Identifies the v0.1 document contract |
-| `extends` | Selects one preset or an ordered list of presets |
-| `values` | Defines named string values for interpolation |
-| `agents` | Maps host-agent IDs to resource bindings |
-| `skills` | Maps skill IDs to resource bindings |
+The project root may contain exactly one of these source files:
 
-Unknown top-level fields are rejected. Missing `agents` and `skills` maps
-normalize to empty collections after resolution.
+- `atlante.jsonc`, which permits JSONC comments and trailing commas.
+- `atlante.json`, which uses strict JSON.
 
-## Minimal document
+If both files exist, Atlante reports an ambiguity and requires an explicit
+choice. The same document contract applies to either filename.
+
+## Document contract
+
+The document must declare the exact v0.1 schema URI:
 
 ```jsonc title="atlante.jsonc"
 {
@@ -36,46 +39,33 @@ normalize to empty collections after resolution.
 }
 ```
 
-`extends` accepts one non-empty locator or a non-empty ordered array. A local
-configuration is applied after its selected preset layers, so local fields win.
+These are the exact supported top-level fields:
 
-## Bindings
+- `$schema` identifies the document contract.
+- `extends` selects one preset or an ordered, non-empty list of presets.
+- `values` defines global named string values.
+- `agents` maps agent IDs to resource bindings.
+- `skills` maps skill IDs to resource bindings.
 
-Each entry in `agents` or `skills` is either a resource locator or an object
-with a selector and local overlay fields:
+Unknown top-level fields are rejected. `extends` cannot be empty, and missing
+`agents` or `skills` maps become empty collections in the canonical document.
+In a source overlay, `null` can remove an inherited field; it is resolved away
+before the canonical document is used.
 
-```jsonc
-{
-  "agents": {
-    "reviewer": {
-      "$template": "@atlante/pack/agent",
-      "description": "Reviews changes for defects and design issues.",
-      "identity": "You are a careful reviewer.",
-      "mission": "Find defects before changes are merged."
-    }
-  },
-  "skills": {
-    "testing": {
-      "$template": "@atlante/pack/skill",
-      "description": "Testing guidance for this project.",
-      "sections": [
-        { "instructions": ["Run the relevant test suite."] }
-      ]
-    }
-  }
-}
-```
+Within an agent or skill binding, `description`, `$template`, `$instance`, and
+`values` are document metadata. The selected template owns every other field
+and validates it as its input. A binding must have a non-empty description after
+interpolation. See [Templates](/concepts/templates) for selector behavior and
+[Resources](/concepts/resources) for locator behavior.
 
-`description`, `$template`, `$instance`, and `values` are binding metadata.
-The selected template owns every other field. An effective agent or skill must
-have a non-empty description after value interpolation.
+The hosted [Schema](https://atlante.sh/schema/v0.1/schema.json) and the
+[generated schema file](https://github.com/atlante/atlante/blob/main/packages/schema/schema/v0.1/schema.json)
+define the machine-readable contract. Use the [Schema](/reference/schema)
+reference for the complete field and type contract, including binding details.
 
-## Raw and resolved documents
+## Configuration versus a guide
 
-The authored document may contain preset selectors, source overlays, and
-`tombstones` represented by `null`. Resolution turns it into a canonical
-document with no `extends`, source selectors, or unresolved removals. Templates
-then validate the fields they own.
-
-Read [resolution and composition](/concepts/resolution) for the stages and
-[configuration fields](/reference/configuration) for the complete field reference.
+This page explains what the source document means. For the practical sequence of
+adding bindings, values, and selected content, use
+[Build a harness](/guides/building-a-harness). For the shortest executable path,
+start with [Getting started](/getting-started).

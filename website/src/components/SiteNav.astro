@@ -133,39 +133,3 @@
     rotate: 180deg;
   }
 </style>
-
-<script>
-  const button = document.querySelector<HTMLButtonElement>(
-    "[data-theme-toggle]",
-  );
-
-  function sync(): void {
-    if (!button) return;
-    const dark = document.documentElement.dataset.theme === "dark";
-    button.setAttribute(
-      "aria-label",
-      dark ? "Switch to the light theme" : "Switch to the dark theme",
-    );
-    const meta = document.querySelector<HTMLMetaElement>(
-      'meta[name="theme-color"]',
-    );
-    if (meta) {
-      meta.content = dark ? "#112135" : "#F4ECE4";
-    }
-  }
-
-  sync();
-
-  button?.addEventListener("click", () => {
-    const next =
-      document.documentElement.dataset.theme === "dark" ? "light" : "dark";
-    document.documentElement.dataset.theme = next;
-    try {
-      localStorage.setItem("atlante-theme", next);
-    } catch {
-      // Storage is unavailable; the theme still applies for this page load.
-    }
-    sync();
-  });
-
-</script>
