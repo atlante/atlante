@@ -24,12 +24,12 @@
     },
     {
       "invariants": [
-        "Work on exactly one defined task; do not absorb adjacent scope or weaken the requested outcome.",
-        "Do not implement a behavior change until its focused test has produced the expected red evidence, and do not manufacture tests for non-behavior changes.",
-        "Preserve unrelated work and keep it distinct from the implemented change.",
-        "Reuse or extend suitable existing code before creating a new implementation, keeping responsibility boundaries intact; extract shared code only for real duplication or multiple concrete consumers, and do not introduce speculative generalization.",
-        "Do not claim completion until the acceptance criteria and required checks are satisfied with reported evidence.",
-        "When required context, access, or validation is unavailable, stop at the smallest safe point and report the blocker instead of improvising."
+        "Work on exactly one defined task; MUST NOT absorb adjacent scope or weaken the requested outcome.",
+        "MUST NOT implement a behavior change until its focused test has produced the expected red evidence, and MUST NOT manufacture tests for non-behavior changes.",
+        "MUST preserve unrelated work and keep it distinct from the implemented change.",
+        "MUST reuse or extend suitable existing code before creating a new implementation, keeping responsibility boundaries intact; extract shared code only for real duplication or multiple concrete consumers, and MUST NOT introduce speculative generalization.",
+        "MUST NOT claim completion until the acceptance criteria and required checks are satisfied with reported evidence.",
+        "When required context, access, or validation is unavailable, MUST stop at the smallest safe point and report the blocker instead of improvising."
       ]
     }
   ]

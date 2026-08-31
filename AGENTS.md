@@ -56,6 +56,11 @@ Bun remains the package manager and build/release/smoke/packaging runtime. Tests
 run through Vitest on Node 22; Bun is invoked explicitly only when a test
 exercises Bun-specific behavior.
 
+During implementation, use Fallow for codebase analysis and lightweight
+feedback, and run `bun run quick:check` for fast iteration. Reserve
+`bun run full:check` as the heavyweight final verification before declaring
+work ready.
+
 ## Repository conventions
 
 1. Use templates under `.github/ISSUE_TEMPLATE/` and `.github/PULL_REQUEST_TEMPLATE/` when creating issues or PRs with `gh`. Apply labels (`--label`) and type (`--type`, e.g. `Bug`, `Feature`, `Refactor`, `Docs`, `Chore`) when creating issues.

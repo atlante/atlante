@@ -40,6 +40,9 @@ describe("review skill instance", () => {
     expect(instructions).toContain(
       "Inspect outside that boundary only to evaluate a concrete risk you can name, and record both the risk and what you inspected",
     );
+    expect(instructions).toContain(
+      "MUST NOT omit direct source inspection, acceptance verification, or the evidence needed to support the verdict",
+    );
 
     const focused = instructions.indexOf("For a focused task review");
     const whole = instructions.indexOf("for a whole-change review");
@@ -60,7 +63,7 @@ describe("review skill instance", () => {
     expect(instructions).toContain(
       "For a correction re-review, verify each prior finding against the correction boundary",
     );
-    expect(instructions).toContain("do not reopen unaffected code");
+    expect(instructions).toContain("MUST NOT reopen unaffected code");
     expect(instructions).toContain(
       "`ADDRESSED` or `NOT ADDRESSED` verdict with evidence for each prior finding",
     );
@@ -77,7 +80,7 @@ describe("review skill instance", () => {
     );
     expect(instructions).toContain("Run only the focused checks needed");
     expect(instructions).toContain(
-      "do not repeat broad validation when sufficient evidence already exists",
+      "SHOULD NOT repeat broad validation when sufficient evidence already exists",
     );
     expect(instructions).toContain(
       "`critical`, `important`, or `minor` with an exact location, evidence, impact, and required correction",
@@ -97,7 +100,7 @@ describe("review skill instance", () => {
       "the verdict agrees with the findings and check results",
     );
     expect(invariants).toContain(
-      "Any unresolved critical or important finding or failed required check makes the verdict `BLOCKED`",
+      "Any unresolved critical or important finding or failed required check MUST make the verdict `BLOCKED`",
     );
     expect(invariants).toContain(
       "return `PASS` when evidence required to substantiate acceptance is missing",
@@ -108,10 +111,10 @@ describe("review skill instance", () => {
     const invariants = resolvePackSkill(locator).listText("invariants");
 
     for (const marker of [
-      "Do not intentionally modify reviewed source, configuration, or tests, and do not correct findings yourself",
-      "Do not trust summaries or reported validation without reconciling them against the actual change and primary evidence",
-      "Do not report a finding without exact evidence, impact, and a required correction",
-      "Do not present supplied validation as independently verified, claim that an unperformed check passed",
+      "MUST NOT intentionally modify reviewed source, configuration, or tests, and MUST NOT correct findings yourself",
+      "MUST NOT trust summaries or reported validation without reconciling them against the actual change and primary evidence",
+      "MUST NOT report a finding without exact evidence, impact, and a required correction",
+      "MUST NOT present supplied validation as independently verified, claim that an unperformed check passed",
     ])
       expect(invariants).toContain(marker);
   });
@@ -143,7 +146,7 @@ describe("review skill instance", () => {
       expect(output).toContain(heading);
     expect(output).toContain("`PASS` or `BLOCKED` verdict");
     expect(output).toContain(
-      "- Any unresolved critical or important finding or failed required check makes the verdict `BLOCKED`.",
+      "- Any unresolved critical or important finding or failed required check MUST make the verdict `BLOCKED`.",
     );
     expect(output).not.toContain("## Gotchas");
     expect(output).not.toContain("## Report record");

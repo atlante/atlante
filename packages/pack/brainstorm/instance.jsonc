@@ -20,9 +20,9 @@
     },
     {
       "invariants": [
-        "When exploration starts drifting, looping, or stalling, stop and expose unresolved doubts instead of continuing without direction.",
-        "Do not invent answers, hide material uncertainty, or silently expand the agreed scope.",
-        "Preserve agreed decisions unless they are explicitly changed."
+        "MUST stop and expose unresolved doubts instead of continuing without direction when exploration starts drifting, looping, or stalling.",
+        "MUST NOT invent answers, hide material uncertainty, or silently expand the agreed scope.",
+        "MUST preserve agreed decisions unless they are explicitly changed."
       ]
     }
   ]

@@ -35,8 +35,7 @@ const packVersion = JSON.parse(
 const created: string[] = [];
 const firstPartyValues = {
   project: "Atlante",
-  "quick-check": "`bun run quick:check`",
-  "full-check": "`bun run full:check` and fallow mcp",
+  "workflow-root": ".atlante/workflows",
 };
 
 function fixture(): { root: string; config: string } {
@@ -62,38 +61,23 @@ afterEach(() => {
     rmSync(root, { recursive: true, force: true });
 });
 
-const expectedArchitectPrompt = `# Identity
-
-You are the lead engineer for Atlante.
-
-# Mission
-
-Turn each approved issue into a tested, reviewable change that meets its acceptance criteria.
-
-## Responsibilities
-
-- Clarify ambiguity with the developer and establish the issue's scope, constraints, and acceptance criteria.
-- Make focused, maintainable changes that follow established project conventions and preserve clear responsibility boundaries.
-- Validate and review the result against its acceptance criteria, project conventions, and relevant regression, compatibility, and security concerns.
-- Communicate decisions, validation evidence, blockers, and next steps.
-
-## Invariants
-
-The invariants below are binding. Every invariant MUST hold throughout planning, execution, validation, and the final result. You MUST NOT weaken an invariant, invent an exception, or trade temporary violation for progress. If the requested work conflicts with an invariant, you MUST follow a compliant path. If no compliant path can be established, you MUST stop the affected work at the smallest safe point, report the conflict and available evidence, and ask the developer to resolve it. You MUST NOT resume until a compliant path is established.
-
-- Introduce abstractions only when they remove real duplication or improve clarity.
-- Treat the approved issue and its acceptance criteria as the scope of work; MUST ask the developer before expanding or materially changing them.
-- MUST preserve unrelated user changes.
-- MUST NOT claim validation succeeded without reporting the checks run and their results; MUST clearly state any checks that could not run.
-
-## Instructions
-
-These are required actions for completing the work. Perform them in order unless an invariant or explicit developer direction requires otherwise.
-
-1. Ask the developer to choose whether to start brainstorming or workflow; their choice is the approval to begin, regardless of whether an approved issue or task already exists.
-2. Once chosen, load and follow the selected skill. Workflow requires an approved issue or task as its source of truth; if none exists, clarify the task before loading workflow.
-`;
-
+const approvedArchitect = {
+  description:
+    "General-purpose Atlante agent for planning, implementing, and reviewing software changes.",
+  mission:
+    "You are responsible for completing the developer's request with the smallest process that produces a correct, verified result.",
+  invariants: [
+    "Developer directives MUST take precedence over this agent prompt, selected workflow phases, and skill instructions.",
+    "Treat the developer's request as the scope of work; MUST ask before expanding or materially changing it.",
+    "MUST preserve unrelated user changes.",
+    "MUST NOT claim completion or successful validation without reporting the checks run, their results, and any checks that could not run.",
+  ],
+  instructions: [
+    "Choose only the workflow phases and skills that materially improve the result; omitted phases require no classification, placeholder, or artifact.",
+    "Run selected workflow phases in their listed order and scale their depth to the work's complexity, risk, uncertainty, and available evidence while preserving any required output.",
+    "Reassess the remaining workflow phases when new material evidence changes the work.",
+  ],
+} as const;
 describe("first-party package resources", () => {
   test("loads selected default, template, and instance facets through package resolution", () => {
     const { root, config } = fixture();
@@ -156,11 +140,9 @@ describe("first-party package resources", () => {
     expect(Object.keys(document.bindings.agents)).toEqual(["architect"]);
     expect(Object.keys(document.bindings.skills).sort()).toEqual([
       "brainstorm",
-      "brainstorming",
       "build",
       "plan",
       "review",
-      "workflow",
     ]);
     expect(String(instance.effectiveTemplate.locator)).toBe(
       "@atlante/pack/agent",
@@ -171,7 +153,7 @@ describe("first-party package resources", () => {
     });
   });
 
-  test("renders the first-party architect prompt with unchanged payload text", () => {
+  test("renders the first-party architect prompt payload with the approved sections", () => {
     const { root, config } = fixture();
     const instance = resolveResourceInstance(
       createProjectResourcePack(root),
@@ -180,13 +162,22 @@ describe("first-party package resources", () => {
     );
     const output = renderResolvedTemplate({
       template: instance.effectiveTemplate,
-      input: interpolateValues(instance.input, { project: "Atlante" }),
+      input: interpolateValues(instance.input, firstPartyValues),
     });
 
-    expect(output).toBe(expectedArchitectPrompt);
+    expect(instance.input.description).toBe(approvedArchitect.description);
+    expect(output).toContain(
+      `# Identity\n\nYou are the lead engineer for Atlante.\n\n# Mission\n\n${approvedArchitect.mission}`,
+    );
+    expect(output).not.toContain("## Responsibilities");
+    for (const invariant of approvedArchitect.invariants)
+      expect(output).toContain(`- ${invariant}`);
+    for (const [index, instruction] of approvedArchitect.instructions.entries())
+      expect(output).toContain(`${index + 1}. ${instruction}`);
+    expect(output).toContain("## Workflow");
   });
 
-  test("migrates all bundled constraint content to invariant sections", () => {
+  test("keeps the bundled architect content on invariant, instruction, and workflow sections", () => {
     const { root, config } = fixture();
     const pack = createProjectResourcePack(root);
     const architect = resolveResourceInstance(
@@ -194,61 +185,20 @@ describe("first-party package resources", () => {
       "@atlante/pack/architect",
       config,
     );
-    const brainstorming = resolveResourceInstance(
-      pack,
-      "@atlante/pack/brainstorming",
-      config,
-    );
-    const workflow = resolveResourceInstance(
-      pack,
-      "@atlante/pack/delivery-workflow",
-      config,
-    );
 
-    expect(architect.input.responsibilities).toEqual([
-      "Clarify ambiguity with the developer and establish the issue's scope, constraints, and acceptance criteria.",
-      "Make focused, maintainable changes that follow established project conventions and preserve clear responsibility boundaries.",
-      "Validate and review the result against its acceptance criteria, project conventions, and relevant regression, compatibility, and security concerns.",
-      "Communicate decisions, validation evidence, blockers, and next steps.",
-    ]);
+    expect(architect.input.responsibilities).toBeUndefined();
     expect(architect.input.sections).toEqual([
-      {
-        invariants: [
-          "Introduce abstractions only when they remove real duplication or improve clarity.",
-          "Treat the approved issue and its acceptance criteria as the scope of work; MUST ask the developer before expanding or materially changing them.",
-          "MUST preserve unrelated user changes.",
-          "MUST NOT claim validation succeeded without reporting the checks run and their results; MUST clearly state any checks that could not run.",
-        ],
-      },
-      expect.objectContaining({ instructions: expect.any(Array) }),
+      { invariants: approvedArchitect.invariants },
+      { instructions: approvedArchitect.instructions },
+      expect.objectContaining({ workflow: expect.any(Object) }),
     ]);
-    expect(brainstorming.input.sections).toEqual([
-      {
-        invariants: [
-          "Do not begin workflow, implementation, or file modifications until the presented design is approved by the developer.",
-          "Apply this gate even to simple work, including work simple enough to skip a full plan; the design may be brief when the work is simple.",
-          "Surface real complexity honestly; never downplay it to appear confident.",
-        ],
-      },
-      expect.objectContaining({ instructions: expect.any(Array) }),
-    ]);
-    expect(workflow.input.sections?.[0]).toEqual({
-      invariants: [
-        "Do not begin implementation until the developer approves the implementation plan when a full plan is warranted.",
-        "For behavior changes, do not make implementation changes before a focused test demonstrates the planned behavior.",
-        "The orchestrator drives all phases but never edits files directly; it delegates every write, including corrections, to sub-agents, tracks progress, and integrates results.",
-        "The orchestrator may recall a previously dispatched sub-agent when context preservation is valuable, most notably recalling the plan sub-agent to update its own plan. Fresh sub-agents remain the default for execution tasks and the reviewer must always be fresh.",
-      ],
-    });
 
-    for (const instance of [architect, brainstorming, workflow]) {
-      const output = renderResolvedTemplate({
-        template: instance.effectiveTemplate,
-        input: interpolateValues(instance.input, firstPartyValues),
-      });
-      expect(output).toContain("## Invariants");
-      expect(output).not.toContain("## Constraints");
-    }
+    const output = renderResolvedTemplate({
+      template: architect.effectiveTemplate,
+      input: interpolateValues(architect.input, firstPartyValues),
+    });
+    expect(output).toContain("## Invariants");
+    expect(output).not.toContain("## Constraints");
   });
 
   test("renders repeated agent invariant sections in authored order", () => {
@@ -267,8 +217,7 @@ describe("first-party package resources", () => {
           { invariants: ["Before workflow"] },
           {
             workflow: {
-              title: "Review workflow",
-              phases: [{ kind: "plan", instructions: ["Plan the review."] }],
+              phases: [{ name: "Plan", instructions: ["Plan the review."] }],
             },
           },
           { invariants: ["After workflow"] },
@@ -276,12 +225,12 @@ describe("first-party package resources", () => {
       },
     });
 
-    const markers = ["Before workflow", "## Review workflow", "After workflow"];
+    const markers = ["Before workflow", "## Workflow", "After workflow"];
     for (const marker of markers) expect(output).toContain(marker);
     expect(output.indexOf(markers[0])).toBeLessThan(output.indexOf(markers[1]));
     expect(output.indexOf(markers[1])).toBeLessThan(output.indexOf(markers[2]));
     expect(output).toContain(
-      "Execute phases sequentially in the order listed.",
+      "The phases below describe the available workflow in their configured order.",
     );
   });
 

@@ -1,0 +1,43 @@
+{
+  "$template": "@atlante/pack/workflow",
+  "phases": [
+    {
+      "name": "Brainstorm",
+      "instructions": ["Follow the `brainstorm` skill."],
+      "output": {
+        "description": "The agreed scope, direction, and success criteria when brainstorming is needed."
+      }
+    },
+    {
+      "name": "Plan",
+      "instructions": ["Follow the `plan` skill."],
+      "output": {
+        "description": "An actionable implementation plan when planning is needed.",
+        "filePath": "{{values.workflow-root}}/<cycle-id>/plan.md",
+        "updateable": true
+      }
+    },
+    {
+      "name": "Build",
+      "instructions": [
+        "Follow the `build` skill for each implementation task.",
+        "Keep each task in its own explicit, reviewable change boundary, using a project-approved checkpoint mechanism when available."
+      ],
+      "output": {
+        "description": "The requested change with its validation evidence when implementation is needed."
+      }
+    },
+    {
+      "name": "Review",
+      "instructions": [
+        "Follow the `review` skill for the boundary being reviewed.",
+        "Use task review after an implementation task when it would materially improve confidence; return valid corrections to Build and stop after at most five Build-Review correction rounds for that task.",
+        "Use final review after all implementation tasks when integration-level inspection would materially improve confidence."
+      ],
+      "output": {
+        "description": "An evidence-based verdict for the task or complete change being reviewed.",
+        "filePath": "{{values.workflow-root}}/<cycle-id>/reviews/<scope>-<n>.md"
+      }
+    }
+  ]
+}
