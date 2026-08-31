@@ -47,6 +47,7 @@ body {
   translate: 0 calc(-100% - var(--space-2));
   display: inline-flex;
   align-items: center;
+  min-height: var(--control-min);
   padding-inline: var(--space-4);
   background: var(--ds-bg);
   color: var(--ds-fg);
@@ -68,6 +69,7 @@ body {
   --container-wide: 1440px;
   --container-hero: 1280px;
   --container-playground: 1760px;
+  --container-divider: 1200px;
   --container-content: 86ch;
 }
 
@@ -101,6 +103,15 @@ main section[id] {
   scroll-margin-top: 96px;
 }
 
+.major-divider::before {
+  content: "";
+  display: block;
+  width: min(calc(100% - 2 * var(--space-4)), var(--container-divider));
+  height: 1px;
+  margin-inline: auto;
+  background: var(--ds-border);
+}
+
 @media (prefers-reduced-motion: no-preference) {
   body,
   header,
@@ -124,7 +135,6 @@ main section[id] {
 /* Text-and-image sections read better with a shared content cap on big
    screens; app-like surfaces (the build instrument panel) stay wide. */
 @media (min-width: 1200px) {
-  .observatory .intro,
   .observatory .instrument,
   .review-close .intro,
   .review-close .guarantees,

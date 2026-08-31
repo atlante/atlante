@@ -1,15 +1,16 @@
 ---
 title: Extension boundary
-description: Understand the supported static-pack extension path and the limits of v0.1.
+description: Understand the supported static-Pack extension path and the limits of v0.1.
 ---
 
-Atlante v0.1 extends through static packs. It does not provide a plugin runtime,
-registration hook, lifecycle API, or remote registry.
+In v0.1, the supported extension path is a static Pack. This gives projects
+reusable Atlante content without adding executable code to the loader or host
+boundary.
 
 ## Publish static content
 
-Use a pack when several projects need the same preset, template, instance, or
-supporting Markdown. A pack declares its format in `package.json`:
+Use a Pack when several projects need the same preset, template, instance, or
+supporting Markdown. Declare its format in `package.json`:
 
 ```json
 {
@@ -19,7 +20,8 @@ supporting Markdown. A pack declares its format in `package.json`:
 }
 ```
 
-Expose a preset through `atlante.jsonc` and keep resources under the package root:
+Expose a preset through `atlante.jsonc` and keep resources under the package
+root:
 
 ```jsonc title="atlante.jsonc"
 {
@@ -30,23 +32,31 @@ Expose a preset through `atlante.jsonc` and keep resources under the package roo
 }
 ```
 
-The consuming project declares and installs the pack, then selects it with
-`--preset`. Atlante reads only the selected static resources and their
-transitive dependencies.
+The consuming project declares and installs a custom Pack, then selects it with
+`--preset`. The published CLI resolves the first-party `@atlante/pack` from its
+bundled content, so the default Pack does not need a separate installation.
+Atlante reads only selected static resources and their transitive dependencies.
 
-## What v0.1 does not load
+## Know what is public
 
-Atlante does not load JavaScript from a pack, call package registration hooks,
+The publishable packages are `@atlante/pack`, `@atlante/cli`, and
+`@atlante/opencode`. The `@atlante/resources`, `@atlante/validator`,
+`@atlante/schema`, and `@atlante/builder` workspaces are private implementation
+packages, not public installation targets.
+
+## Know the runtime boundary
+
+Atlante does not load JavaScript from a Pack, call package registration hooks,
 install dependencies, consult a registry, load URLs, or execute project code.
-The OpenCode adapter also reads verified artifacts instead of source packs.
+The [OpenCode](https://opencode.ai/) adapter reads verified artifacts instead of
+source Packs.
 
-## Future extension work
+There is no plugin runtime, registration hook, lifecycle API, or remote registry
+in v0.1. Do not depend on internal loader, resolver, validator, builder, or
+adapter modules as an extension surface. A future version must define and version
+its extension contract while preserving the boundary between static content
+selection, artifact publication, and host execution.
 
-There is no plugin API to implement against in v0.1. Do not depend on internal
-loader, resolver, validator, builder, or adapter modules as an extension surface.
-When a future version defines an extension contract, it must be versioned and
-must preserve the boundary between static content selection, artifact
-publication, and host execution.
-
-For the supported authoring workflow, read [Author a pack](/guides/authoring-packs)
-and [Resources and packs](/concepts/resources).
+For the authoring workflow, read [Author a pack](/guides/authoring-packs) and
+[Resources](/concepts/resources). For the host boundary, read
+[Artifacts](/concepts/artifacts) and [Use OpenCode](/guides/opencode).

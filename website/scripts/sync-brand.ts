@@ -16,11 +16,11 @@ const publicDir = join(websiteRoot, "public");
 const stylesDir = join(websiteRoot, "src", "styles");
 
 // Static brand exports served verbatim. Only the sets the site references are
-// copied: favicons, the hero glyph, and the social image for opengraph.
+// copied: favicons, horizontal and glyph lockups, and the social image.
 rmSync(join(publicDir, "brand"), { recursive: true, force: true });
 mkdirSync(join(publicDir, "brand"), { recursive: true });
 
-for (const set of ["favicons", "social", "glyph"]) {
+for (const set of ["favicons", "social", "glyph", "horizontal"]) {
   cpSync(join(exportsDir, set), join(publicDir, "brand", set), {
     recursive: true,
   });

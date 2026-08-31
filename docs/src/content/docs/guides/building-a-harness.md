@@ -1,24 +1,29 @@
 ---
 title: Build a harness
-description: Organize agents, skills, workflows, and project values in one configuration.
+description: Customize a versioned harness with project-specific agents, skills, and values.
 ---
 
-A harness starts with a small set of roles and reusable guidance. Keep the
-configuration in the repository so changes can be reviewed alongside code.
+You do not need to design the whole harness before you start. Add one useful
+role, keep the source beside your code, and let each change go through the same
+validate-and-build loop.
 
-## Start from the first-party pack
+## Start with the generated source
 
-```sh
-npx @atlante/cli init
-```
+If you have not initialized the project yet, begin with [Getting
+started](/getting-started). `init` creates `atlante.jsonc`, registers the
+[OpenCode](https://opencode.ai/) adapter, and builds the initial artifacts. The
+published CLI bundles the first-party `@atlante/pack`, so the default setup does
+not require a separate pack installation.
 
 The default preset provides the `architect` agent and the four phase skills
-`brainstorm`, `plan`, `build`, and `review`, which the architect orchestrates.
-Extend it rather than copying its resources into the project.
+`brainstorm`, `plan`, `build`, and `review`. The architect selects only the
+workflow phases and skills that materially improve the result. Open
+`atlante.jsonc` and extend that source instead of copying the preset's
+resources into the project.
 
 ## Add an agent
 
-Use the `@atlante/pack/agent` template when a project needs a local role:
+Add project values and a reviewer to the generated document:
 
 ```jsonc
 {
@@ -30,7 +35,6 @@ Use the `@atlante/pack/agent` template when a project needs a local role:
   },
   "agents": {
     "reviewer": {
-      "$template": "@atlante/pack/agent",
       "description": "Reviews changes for defects and design risks.",
       "identity": "You are a senior {{values.language}} reviewer on {{values.project}}.",
       "mission": "Find defects before changes are merged.",
@@ -51,20 +55,28 @@ Use the `@atlante/pack/agent` template when a project needs a local role:
 }
 ```
 
-The template owns the prompt fields. Read [templates and instances](/concepts/templates)
-for the supported section variants and composition rules.
+This binding intentionally omits a selector. A top-level agent or skill binding
+without `$template` or `$instance` uses the applicable first-party default
+template. You can select `@atlante/pack/agent` explicitly when you want that
+choice visible in the source. The selected template owns the remaining fields;
+see [Templates](/concepts/templates) for the selection rules.
 
-## Add reusable skills
+Values are strings substituted into descriptions and template-owned prompt
+fields. The only supported system value is `{{sys.cwd.basename}}`, which resolves
+to the current working directory's basename. Atlante does not provide arbitrary
+filesystem or environment access.
 
-Skills are reusable Markdown guidance. They are addressed by `skillId` and are
-not host-agent IDs:
+## Add a skill
+
+Skills are reusable Markdown guidance addressed by `skillId`, not host-agent IDs:
 
 ```jsonc
 {
   "skills": {
     "release-check": {
-      "$template": "@atlante/pack/skill",
       "description": "Release checks for this project.",
+      "title": "Release checks",
+      "overview": "Prepare a safe release.",
       "sections": [
         {
           "instructions": [
@@ -77,11 +89,29 @@ not host-agent IDs:
 }
 ```
 
-The OpenCode adapter exposes resolved content through `atlante_skill`. Atlante
-renders the skill but does not execute it.
+This selector-less skill uses the first-party skill template. The OpenCode
+adapter exposes its resolved content through `atlante_skill`; Atlante renders
+the skill but does not execute it.
 
-## Version the change
+## Validate and publish
 
-Commit `atlante.jsonc` with the project code. Build artifacts are derived output
-and should remain local. In review, inspect the source document and the command
-results rather than committing `.atlante/`.
+After editing `atlante.jsonc` or selected resources, validate first and then
+publish a new artifact tree:
+
+```sh
+npx @atlante/cli validate
+npx @atlante/cli build
+```
+
+Both commands report the resolved filesystem path they used. For example:
+
+```text
+validated /Users/example/billing-api/atlante.jsonc
+built /Users/example/billing-api/.atlante/artifacts
+```
+
+Inspect `<project>/.atlante/artifacts/` when checking the result. Artifacts are
+host-neutral derived output and may contain rendered project values, so keep
+`.atlante/` local. For continuous editing, use `build --watch` as documented in
+the [CLI](/reference/cli). Continue to [Use OpenCode](/guides/opencode) when the
+artifact tree is ready for the host adapter.

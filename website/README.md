@@ -12,18 +12,25 @@ Sans 3 for interface text, and JetBrains Mono for code and diagnostics.
 
 ```sh
 bun run dev      # sync brand assets, then start the dev server on port 4321
-bun run build    # sync brand assets, then build to dist/
+bun run build    # sync brand assets and schema, then build to dist/
 bun run preview  # serve the built site locally
 ```
 
 ## Brand assets
 
-`bun scripts/sync-brand.ts` copies the favicon, glyph, and social exports from
-[`brand/assets/exports/`](../brand/assets/exports/) into `public/brand/`, the
-approved social image to `public/og.png`, the used font families into
+`bun scripts/sync-brand.ts` copies the favicons, glyph, social, and horizontal
+lockup exports from [`brand/assets/exports/`](../brand/assets/exports/) into
+`public/brand/`; the horizontal lockups are used by the footer. It also copies
+the approved social image to `public/og.png`, the used font families into
 `public/fonts/`, and generates `src/styles/atlante-tokens.css` from the brand
 tokens with root-relative font URLs. All generated files are git-ignored or
 rebuilt on every `dev` or `build` run; never edit them directly.
+
+`bun run sync:schema` copies the authoritative generated schema from
+[`packages/schema/schema/v0.1/schema.json`](../packages/schema/schema/v0.1/schema.json)
+to `public/schema/v0.1/schema.json`, after verifying its `$id`. The public copy
+is ignored and is included in `dist/` by the complete website build. The deployed
+`/schema/v0.1/schema.json` response uses `application/schema+json`.
 
 ## Playground
 
@@ -54,10 +61,18 @@ in `vercel.json`).
 The site deploys automatically through Vercel:
 
 1. Import the repository into Vercel with the project root set to `website`.
-2. Vercel detects Astro; keep the suggested build command and output directory.
-3. Pushes to `main` publish production. Pull requests get preview deployments.
+2. In the Vercel project settings, keep Root Directory set to `website` and
+   enable **Include source files outside of the Root Directory in the Build
+   Step**. Verify that this option is enabled before relying on deployment
+   builds. Vercel enables it by default for projects created after August 27,
+   2020, but it remains an explicit prerequisite here because the authoritative
+   brand assets and schema live outside `website`, at `../brand` and
+   `../packages/schema`.
+3. Use Vercel CLI `20.1.0` or newer for this monorepo configuration.
+4. Vercel runs `bun run build`, which synchronizes brand assets, synchronizes the
+   schema, and then builds Astro to `dist/`.
+5. Pushes to `main` publish production. Pull requests get preview deployments.
 
 `vercel.json` in this directory holds hosting configuration: clean URLs, no
-trailing slash, and the `application/schema+json` content type for JSON
-responses.
-
+trailing slash, the `application/schema+json` content type for the published
+schema, and the `node_modules/@atlante/**` lambda files.

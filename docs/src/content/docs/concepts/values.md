@@ -1,61 +1,67 @@
 ---
-title: Values and interpolation
-description: Share explicit string inputs across descriptions and rendered prompt definitions.
+title: Values
+description: Explicit string values and interpolation in an Atlante document.
 ---
 
-Values are named string inputs. Define them at document level when several
-bindings share the same input, or override them inside one binding when that
-binding needs a different value.
+Which pieces of your prompt should change from one project or binding to
+another? Values give those pieces names. They are explicit string inputs: a
+document can define global values for all bindings, and a binding can define
+local values that override matching global keys for that binding only.
 
 ```jsonc
 {
   "$schema": "https://atlante.sh/schema/v0.1/schema.json",
   "values": {
-    "project": "my-app",
+    "project": "billing-api",
     "language": "TypeScript"
-  },
-  "agents": {
-    "implementer": {
-      "$template": "@atlante/pack/agent",
-      "description": "Implements changes in {{values.project}}.",
-      "identity": "You are a {{values.language}} implementer on {{values.project}}.",
-      "mission": "Write clean, tested code."
-    }
-  }
-}
-```
-
-Use `{{values.key}}` in authored descriptions and prompt definitions. Atlante
-replaces references before template rendering. A missing reference is a
-diagnostic; it is not left as unresolved text.
-
-## Local overrides
-
-A binding can provide its own `values` map. Local values override global values
-by key for that binding only:
-
-```jsonc
-{
-  "values": {
-    "project": "shared-project",
-    "tone": "concise"
   },
   "agents": {
     "reviewer": {
       "$template": "@atlante/pack/agent",
       "description": "Reviews {{values.project}}.",
-      "values": {
-        "project": "api-service"
-      },
-      "identity": "You review {{values.project}} in a {{values.tone}} style.",
+      "identity": "You are a {{values.language}} reviewer.",
       "mission": "Find defects before merge."
     }
   }
 }
 ```
 
-Global and local values are strings in the canonical document. Source overlays
-may use `null` to remove an inherited value before canonical validation.
+Interpolation replaces `{{values.key}}` references in binding descriptions and
+template-owned prompt definitions before rendering. A binding-local value wins
+over the global value with the same key only within that binding. Missing value
+references produce structured diagnostics instead of remaining unresolved.
 
-The values dictionary is not passed to a template as an undeclared input object.
-Templates receive only the fields declared by their own input schema.
+For example, a shared project name can be overridden for one binding:
+
+```jsonc
+{
+  "values": { "project": "shared-project" },
+  "agents": {
+    "reviewer": {
+      "description": "Reviews {{values.project}}.",
+      "values": { "project": "billing-api" }
+    }
+  }
+}
+```
+
+Source overlays may use `null` to remove an inherited value. After resolution,
+global and local values are strings. The values dictionary itself is not passed
+to a template as undeclared input; a template receives only fields its own
+schema declares.
+
+The v0.1 system namespace supports the current working directory basename:
+
+```jsonc
+{
+  "values": {
+    "project": "{{sys.cwd.basename}}"
+  }
+}
+```
+
+`{{sys.cwd.basename}}` resolves to the basename of the process's current working
+directory. It is the only supported system value. Atlante does not provide
+arbitrary filesystem or environment access. Read [Resolution](/concepts/resolution)
+for the stage where interpolation occurs and [Schema](/reference/schema) for the
+document field contract.

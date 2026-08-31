@@ -5,8 +5,13 @@ import starlight from "@astrojs/starlight";
 export default defineConfig({
   site: "https://docs.atlante.sh",
   trailingSlash: "never",
+  redirects: {
+    "/": "/introduction",
+    "/index.md": "/introduction.md",
+  },
   integrations: [
     starlight({
+      disable404Route: true,
       title: "Atlante documentation",
       description:
         "Reference documentation for Atlante configuration, validation, builds, artifacts, and host adapters.",
@@ -59,44 +64,38 @@ export default defineConfig({
       pagination: true,
       titleDelimiter: "·",
       sidebar: [
-        { slug: "index", label: "Introduction" },
-        {
-          label: "Start here",
-          items: [
-            { slug: "getting-started", label: "Getting started" },
-            { slug: "getting-started/installation", label: "Installation" },
-            { slug: "getting-started/first-build", label: "Your first build" },
-          ],
-        },
+        { slug: "introduction", label: "Introduction" },
+        { slug: "getting-started", label: "Getting started" },
         {
           label: "Concepts",
           items: [
             { slug: "concepts/configuration", label: "Configuration" },
-            { slug: "concepts/resources", label: "Resources and packs" },
-            { slug: "concepts/templates", label: "Templates and instances" },
-            { slug: "concepts/values", label: "Values and interpolation" },
-            { slug: "concepts/resolution", label: "Resolution and composition" },
+            { slug: "concepts/resources", label: "Resources" },
+            { slug: "concepts/templates", label: "Templates" },
+            { slug: "concepts/values", label: "Values" },
+            { slug: "concepts/resolution", label: "Resolution" },
             { slug: "concepts/artifacts", label: "Artifacts" },
           ],
         },
         {
           label: "Guides",
           items: [
-            { slug: "guides/building-a-harness", label: "Build a harness" },
+            {
+              slug: "guides/building-a-harness",
+              label: "Build a harness",
+            },
+            { slug: "guides/opencode", label: "Use OpenCode" },
             { slug: "guides/authoring-packs", label: "Author a pack" },
             { slug: "guides/extensions", label: "Extension boundary" },
-            { slug: "guides/opencode", label: "Use OpenCode" },
-            { slug: "guides/watch-mode", label: "Watch for changes" },
           ],
         },
         {
           label: "Reference",
           items: [
             { slug: "reference/cli", label: "CLI" },
-            { slug: "reference/configuration", label: "Configuration fields" },
-            { slug: "reference/artifacts", label: "Artifact format" },
-            { slug: "reference/diagnostics", label: "Diagnostics" },
             { slug: "reference/schema", label: "Schema" },
+            { slug: "reference/artifact", label: "Artifact" },
+            { slug: "reference/diagnostics", label: "Diagnostics" },
           ],
         },
         { slug: "troubleshooting", label: "Troubleshooting" },

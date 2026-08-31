@@ -3,7 +3,6 @@ dist/
 *.tsbuildinfo
 .DS_Store
 .fallow/
-website/schema/
 .worktrees/
 .atlante/
 mutation/

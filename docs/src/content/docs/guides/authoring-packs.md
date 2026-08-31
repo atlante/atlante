@@ -3,12 +3,12 @@ title: Author a pack
 description: Create reusable static presets, templates, instances, and supporting content.
 ---
 
-A pack distributes static Atlante content. Use a pack when several projects need
-the same preset, template, or configured instance.
+Create a Pack when several projects need the same preset, template, instance, or
+supporting Markdown. A Pack is Atlante static content, not a JavaScript plugin.
 
-## Pack structure
+## Create the package root
 
-A package pack has one trusted root and declares `atlante.format: 1` in its
+Give the Pack one trusted root and declare `atlante.format: 1` in its
 `package.json`:
 
 ```text
@@ -28,7 +28,7 @@ review-pack/
 }
 ```
 
-The package can expose a preset root through `atlante.jsonc`:
+Expose a preset root through `atlante.jsonc`:
 
 ```jsonc title="atlante.jsonc"
 {
@@ -39,13 +39,16 @@ The package can expose a preset root through `atlante.jsonc`:
 }
 ```
 
+Keep resources under the Pack root. The [Resources](/concepts/resources) page
+explains how Pack roots and resource locators constrain what Atlante can load.
+
 ## Define a template
 
-`template.jsonc` contains a JSON Schema Draft 2020-12 input contract. The
-paired `template.md` renders the validated input as Markdown. Keep input fields
-specific to the resource and document their intended use in the template.
+`template.jsonc` contains a JSON Schema Draft 2020-12 input contract. The paired
+`template.md` renders validated input as Markdown. Keep fields specific to the
+resource and explain their intended use in the template.
 
-A resource may contain an instance as well:
+A resource can contain an instance as well:
 
 ```text
 reviewer/
@@ -54,22 +57,24 @@ reviewer/
 └── instance.jsonc
 ```
 
-An instance supplies input for exactly one effective template. It can be
-selected from a project by its package locator.
+An instance supplies input for exactly one effective template. A project can
+select it with a package locator. A binding can also select a template directly,
+or a top-level agent or skill collection can use the first-party default template
+by omitting a selector. See [Templates](/concepts/templates) for the binding
+choices.
 
-## Keep packs static
+## Keep the Pack static
 
 Atlante reads selected metadata, resources, and transitive dependencies. It does
-not load JavaScript from a pack, call registration hooks, install dependencies,
-or enumerate unrelated package directories.
+not load JavaScript from a Pack, call registration hooks, install dependencies,
+or enumerate unrelated package directories. Version 0.1 has no plugin runtime or
+remote registry.
 
-Version 0.1 has no plugin runtime or remote registry. A future extension may
-introduce additional distribution behavior, but it must preserve the separation
-between static prompt content and host execution.
+## Test a Pack locally
 
-## Test a pack locally
-
-Declare and install the pack in a consuming project, then select it explicitly:
+The published CLI bundles the default first-party `@atlante/pack`, so it needs no
+separate installation. For a custom Pack, declare and install it in the consuming
+project, then select it explicitly:
 
 ```sh
 npm install --save-dev @acme/review-pack
@@ -78,5 +83,7 @@ npx @atlante/cli validate
 npx @atlante/cli build
 ```
 
-Use [resources and packs](/concepts/resources) and [resolution and composition](/concepts/resolution)
-for locator and inheritance rules.
+The selected package must already be declared and installed. Atlante does not
+install packages or load remote content. Use [Configuration](/concepts/configuration)
+for source-document rules and [Resolution](/concepts/resolution) for inheritance
+and composition behavior.
