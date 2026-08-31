@@ -22,6 +22,7 @@ const approved = {
   mission:
     "You are responsible for completing the developer's request with the smallest process that produces a correct, verified result.",
   invariants: [
+    "Developer directives MUST take precedence over this agent prompt, selected workflow phases, and skill instructions.",
     "Treat the developer's request as the scope of work; MUST ask before expanding or materially changing it.",
     "MUST preserve unrelated user changes.",
     "MUST NOT claim completion or successful validation without reporting the checks run, their results, and any checks that could not run.",
@@ -144,7 +145,7 @@ describe("architect agent instance", () => {
     expect(architect.renderedOutput()).not.toContain("## Responsibilities");
   });
 
-  test("owns exactly the three approved invariants in order", () => {
+  test("owns exactly the four approved invariants in order", () => {
     const architect = resolveArchitect();
     const sections = (architect.input.sections ?? []) as readonly JsonObject[];
 
