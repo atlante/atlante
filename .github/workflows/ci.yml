@@ -21,3 +21,10 @@ jobs:
       # pass the suite and still ship a CLI that does not run. The smoke test
       # exercises the binary as a user does.
       - run: bun run full:check
+
+      # The OpenCode host drops plugins that expose no target silently, so
+      # the unit suite cannot catch a manifest regression. Boot the real
+      # OpenCode CLI against the built adapter and assert the plugin's
+      # architect agent registers.
+      - name: OpenCode plugin smoke
+        run: bun scripts/opencode-smoke.ts
