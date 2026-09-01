@@ -434,6 +434,46 @@ test("the built bundle preserves the explicit api entry surface", async () => {
   }
 });
 
+// OpenCode's server-plugin loader resolves a server target from
+// exports["./server"], falling back to a non-empty string "main". A package
+// exposing neither installs into the host's plugin cache but is dropped
+// silently: the loader's report.missing is a no-op, so the plugin never boots
+// and no error is logged (issue #106).
+test("the published manifest exposes a server target OpenCode can discover", () => {
+  const manifest = JSON.parse(
+    readFileSync(join(ROOT, "packages", "opencode", "package.json"), "utf8"),
+  ) as { main?: unknown; exports?: Record<string, unknown> };
+
+  // The loader's default-server predicate: typeof main === "string" && main.trim().
+  expect(typeof manifest.main, "package.json main must be a string").toBe(
+    "string",
+  );
+  expect(
+    (manifest.main as string).trim().length,
+    "package.json main must be non-empty",
+  ).toBeGreaterThan(0);
+
+  // The explicit ./server convention takes precedence in the loader.
+  const server = manifest.exports?.["./server"];
+  expect(typeof server, 'exports["./server"] must be a string').toBe("string");
+  expect((server as string).trim().length).toBeGreaterThan(0);
+
+  // Both targets must point into dist/ — the only directory the "files"
+  // field ships — and resolve to files produced by the build.
+  const packageRoot = join(ROOT, "packages", "opencode");
+  for (const target of [manifest.main as string, server as string]) {
+    const shipped = target.replace(/^\.\//, "");
+    expect(
+      shipped.startsWith("dist/"),
+      `server target ${target} is outside the published dist/ directory`,
+    ).toBe(true);
+    expect(
+      existsSync(join(packageRoot, shipped)),
+      `server target ${target} does not exist`,
+    ).toBe(true);
+  }
+});
+
 test("the built bundle inlines @atlante/builder and keeps @opencode-ai/plugin external", () => {
   const specifiers = moduleSpecifiers(bundleSource());
   const hasAtlanteSpecifier = specifiers.some((name) =>
