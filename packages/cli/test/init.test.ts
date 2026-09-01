@@ -128,11 +128,13 @@ type FakePackSpec = {
 type FakePackageManagerOptions = {
   failAdd?: boolean;
   failPlainInstall?: boolean;
+  /** Installs packages into another root's node_modules (npm-style hoisting). */
+  hoistNodeModulesTo?: string;
 };
 
 type FakePackageManager = {
   runner: PackageManagerRunner;
-  runs: Array<{ manager: string; args: string[] }>;
+  runs: Array<{ manager: string; args: string[]; cwd: string }>;
 };
 
 /**
@@ -149,7 +151,8 @@ function fakePackageManager(
   const runs: FakePackageManager["runs"] = [];
 
   const writePack = (name: string, spec: FakePackSpec): void => {
-    const root = join(directory, "node_modules", ...name.split("/"));
+    const nodeModulesRoot = options.hoistNodeModulesTo ?? directory;
+    const root = join(nodeModulesRoot, "node_modules", ...name.split("/"));
     mkdirSync(root, { recursive: true });
     writeFileSync(
       join(root, "package.json"),
@@ -182,60 +185,69 @@ function fakePackageManager(
     return false;
   };
 
-  const runner: PackageManagerRunner = (manager, args) => {
-    runs.push({ manager, args: [...args] });
+  const declareDevDependency = (name: string, range: string): void => {
+    const manifest = JSON.parse(
+      readFileSync(join(directory, "package.json"), "utf8"),
+    ) as Record<string, unknown>;
+    manifest.devDependencies = {
+      ...(typeof manifest.devDependencies === "object" &&
+      manifest.devDependencies !== null
+        ? manifest.devDependencies
+        : {}),
+      [name]: range,
+    };
+    writeFileSync(
+      join(directory, "package.json"),
+      `${JSON.stringify(manifest, null, 2)}\n`,
+    );
+    writeFileSync(
+      join(directory, "package-lock.json"),
+      `${JSON.stringify({ lockfileVersion: 3, name: "fixture" }, null, 2)}\n`,
+    );
+  };
+
+  /** Handles `npm install --save-dev <pkg>` and `add --dev <pkg>`. */
+  const handleAdd = (name: string): PackageManagerRun => {
+    if (options.failAdd) return { ok: false, status: 1 };
+    const spec = registry[name];
+    if (!spec) return { ok: false, status: 1 };
+    declareDevDependency(name, spec.declaredRange ?? "1.2.3");
+    writePack(name, spec);
+    return { ok: true, status: 0 };
+  };
+
+  /** Removes undeclared registry packs, installs declared ones. */
+  const handlePlainInstall = (): PackageManagerRun => {
+    if (options.failPlainInstall) return { ok: false, status: 1 };
+    for (const [name, spec] of Object.entries(registry)) {
+      const root = join(directory, "node_modules", ...name.split("/"));
+      if (isDeclared(name)) writePack(name, spec);
+      else {
+        rmSync(root, { recursive: true, force: true });
+        const scopeRoot = name.split("/")[0];
+        const scope = scopeRoot
+          ? join(directory, "node_modules", scopeRoot)
+          : root;
+        try {
+          if (readdirSync(scope).length === 0)
+            rmSync(scope, { recursive: true, force: true });
+        } catch {
+          // The scope directory is already gone.
+        }
+      }
+    }
+    return { ok: true, status: 0 };
+  };
+
+  const runner: PackageManagerRunner = (manager, args, cwd) => {
+    runs.push({ manager, args: [...args], cwd });
     const [verb, second, third] = args;
     // npm: install --save-dev <pkg>; pnpm: add --save-dev <pkg>;
     // yarn/bun: add --dev <pkg>.
     const isAdd =
       (verb === "install" && second === "--save-dev") || verb === "add";
-    if (isAdd) {
-      if (options.failAdd) return { ok: false, status: 1 };
-      const name = third as string;
-      const spec = registry[name];
-      if (!spec) return { ok: false, status: 1 };
-      const manifest = JSON.parse(
-        readFileSync(join(directory, "package.json"), "utf8"),
-      ) as Record<string, unknown>;
-      manifest.devDependencies = {
-        ...(typeof manifest.devDependencies === "object" &&
-        manifest.devDependencies !== null
-          ? manifest.devDependencies
-          : {}),
-        [name]: spec.declaredRange ?? "1.2.3",
-      };
-      writeFileSync(
-        join(directory, "package.json"),
-        `${JSON.stringify(manifest, null, 2)}\n`,
-      );
-      writeFileSync(
-        join(directory, "package-lock.json"),
-        `${JSON.stringify({ lockfileVersion: 3, name: "fixture" }, null, 2)}\n`,
-      );
-      writePack(name, spec);
-      return { ok: true, status: 0 };
-    }
-    if (verb === "install") {
-      if (options.failPlainInstall) return { ok: false, status: 1 };
-      for (const [name, spec] of Object.entries(registry)) {
-        const root = join(directory, "node_modules", ...name.split("/"));
-        if (isDeclared(name)) writePack(name, spec);
-        else {
-          rmSync(root, { recursive: true, force: true });
-          const scopeRoot = name.split("/")[0];
-          const scope = scopeRoot
-            ? join(directory, "node_modules", scopeRoot)
-            : root;
-          try {
-            if (readdirSync(scope).length === 0)
-              rmSync(scope, { recursive: true, force: true });
-          } catch {
-            // The scope directory is already gone.
-          }
-        }
-      }
-      return { ok: true, status: 0 };
-    }
+    if (isAdd) return handleAdd(third as string);
+    if (verb === "install") return handlePlainInstall();
     return { ok: true, status: 0 };
   };
 
@@ -615,7 +627,11 @@ describe("runInit", () => {
     ).toBe(true);
     expect(await runValidate(dir)).toBe(0);
     expect(packManager.runs).toEqual([
-      { manager: "npm", args: ["install", "--save-dev", EXTERNAL_PACK] },
+      {
+        manager: "npm",
+        args: ["install", "--save-dev", EXTERNAL_PACK],
+        cwd: dir,
+      },
     ]);
   });
 
@@ -787,7 +803,11 @@ describe("runInit", () => {
       ),
     ).toBe(0);
     expect(packManager.runs).toEqual([
-      { manager: "npm", args: ["install", "--save-dev", EXTERNAL_PACK] },
+      {
+        manager: "npm",
+        args: ["install", "--save-dev", EXTERNAL_PACK],
+        cwd: dir,
+      },
     ]);
     const manifest = JSON.parse(
       readFileSync(join(dir, "package.json"), "utf8"),
@@ -812,7 +832,9 @@ describe("runInit", () => {
         { runPackageManager: packManager.runner },
       ),
     ).toBe(0);
-    expect(packManager.runs).toEqual([{ manager: "npm", args: ["install"] }]);
+    expect(packManager.runs).toEqual([
+      { manager: "npm", args: ["install"], cwd: dir },
+    ]);
     const manifest = JSON.parse(
       readFileSync(join(dir, "package.json"), "utf8"),
     ) as Record<string, Record<string, string>>;
@@ -884,11 +906,170 @@ describe("runInit", () => {
 
     expect(result.result).toBe(1);
     expect(result.errors.join("\n")).toContain("pack-installation-failed");
-    // The failed add is followed by the post-rollback reconciliation install.
+    // A failed add never mutated the manifest, so no post-rollback
+    // reconciliation install runs.
     expect(packManager.runs).toEqual([
-      { manager: "npm", args: ["install", "--save-dev", "starter"] },
-      { manager: "npm", args: ["install"] },
+      {
+        manager: "npm",
+        args: ["install", "--save-dev", "starter"],
+        cwd: dir,
+      },
     ]);
+  });
+
+  test("detects the manager from the nearest ancestor lockfile", async () => {
+    // A pnpm workspace: the shared lockfile lives at the root, while the
+    // project init runs in is the `app` workspace member.
+    const workspace = tempDirWithoutUserPack();
+    const app = join(workspace, "packages", "app");
+    mkdirSync(app, { recursive: true });
+    writeFileSync(join(workspace, "pnpm-lock.yaml"), "lockfileVersion: '9'\n");
+    writeFileSync(
+      join(app, "package.json"),
+      `${JSON.stringify({ name: "app", version: "1.0.0" }, null, 2)}\n`,
+    );
+    const packManager = fakePackageManager(app, { [EXTERNAL_PACK]: {} });
+
+    const result = await captureErrors(() =>
+      runInitWithDependencies(
+        app,
+        { pack: EXTERNAL_PACK },
+        {
+          runPackageManager: packManager.runner,
+          isInteractive: () => false,
+        },
+      ),
+    );
+
+    expect(result.result).toBe(0);
+    // The manager is detected from the ancestor lockfile, but the package
+    // manager still runs in the project directory, where the declaration
+    // belongs.
+    expect(packManager.runs).toEqual([
+      {
+        manager: "pnpm",
+        args: ["add", "--save-dev", EXTERNAL_PACK],
+        cwd: app,
+      },
+    ]);
+    const manifest = JSON.parse(
+      readFileSync(join(app, "package.json"), "utf8"),
+    ) as Record<string, Record<string, string>>;
+    expect(manifest.devDependencies?.[EXTERNAL_PACK]).toBe("1.2.3");
+    expect(readFileSync(join(app, "atlante.jsonc"), "utf8")).toContain(
+      `"extends": "${EXTERNAL_PACK}"`,
+    );
+  });
+
+  test("restores the workspace root lockfile when init fails after the install", async () => {
+    const workspace = tempDirWithoutUserPack();
+    const app = join(workspace, "packages", "app");
+    mkdirSync(app, { recursive: true });
+    const rootLockfile = join(workspace, "pnpm-lock.yaml");
+    const originalLockfile = "lockfileVersion: '9'\n";
+    writeFileSync(rootLockfile, originalLockfile);
+    writeFileSync(
+      join(app, "package.json"),
+      `${JSON.stringify({ name: "app", version: "1.0.0" }, null, 2)}\n`,
+    );
+    const packManager = fakePackageManager(app, {
+      [EXTERNAL_PACK]: { presets: ["minimal", "strict"] },
+    });
+
+    const result = await captureErrors(() =>
+      runInitWithDependencies(
+        app,
+        { pack: EXTERNAL_PACK },
+        {
+          runPackageManager: (manager, args, cwd) => {
+            const run = packManager.runner(manager, args, cwd);
+            // Model the package manager rewriting the shared root lockfile
+            // on the add; the post-rollback reconcile must not re-mutate it.
+            if (run.ok && args.includes("--save-dev"))
+              writeFileSync(
+                rootLockfile,
+                "lockfileVersion: '9.0'\n\nnew: true\n",
+              );
+            return run;
+          },
+          isInteractive: () => false,
+        },
+      ),
+    );
+
+    expect(result.result).toBe(1);
+    expect(result.errors.join("\n")).toContain("pack-prompt-required");
+    // The rollback restores the root lockfile and the member manifest.
+    expect(readFileSync(rootLockfile, "utf8")).toBe(originalLockfile);
+    const manifest = JSON.parse(
+      readFileSync(join(app, "package.json"), "utf8"),
+    ) as Record<string, Record<string, unknown>>;
+    expect(manifest.devDependencies).toBeUndefined();
+    expect(existsSync(join(app, "atlante.jsonc"))).toBe(false);
+  });
+
+  test("rejects an install hoisted above the project's node_modules and rolls it back", async () => {
+    // A pack resolves only from the project root's own node_modules, matching
+    // @atlante/resources. npm/bun workspace hoisting to a shared root is not
+    // resolvable from a member, so init fails honestly and restores state.
+    const workspace = tempDirWithoutUserPack();
+    const app = join(workspace, "packages", "app");
+    mkdirSync(app, { recursive: true });
+    const rootLockfile = join(workspace, "pnpm-lock.yaml");
+    const originalLockfile = "lockfileVersion: '9'\n";
+    writeFileSync(rootLockfile, originalLockfile);
+    writeFileSync(
+      join(app, "package.json"),
+      `${JSON.stringify({ name: "app", version: "1.0.0" }, null, 2)}\n`,
+    );
+    const packManager = fakePackageManager(
+      app,
+      { [EXTERNAL_PACK]: {} },
+      { hoistNodeModulesTo: workspace },
+    );
+
+    const result = await captureErrors(() =>
+      runInitWithDependencies(
+        app,
+        { pack: EXTERNAL_PACK },
+        {
+          runPackageManager: packManager.runner,
+          isInteractive: () => false,
+        },
+      ),
+    );
+
+    expect(result.result).toBe(1);
+    expect(result.errors.join("\n")).toContain("pack-not-installed");
+    // The hoisted install is not accepted, and the transaction still restores
+    // the member manifest and the shared root lockfile.
+    const manifest = JSON.parse(
+      readFileSync(join(app, "package.json"), "utf8"),
+    ) as Record<string, Record<string, unknown>>;
+    expect(manifest.devDependencies).toBeUndefined();
+    expect(readFileSync(rootLockfile, "utf8")).toBe(originalLockfile);
+    expect(existsSync(join(app, "atlante.jsonc"))).toBe(false);
+  });
+
+  test("surfaces the spawn error when the package manager binary is missing", async () => {
+    const dir = tempDirWithoutUserPack();
+
+    const result = await captureErrors(() =>
+      runInitWithDependencies(
+        dir,
+        { pack: EXTERNAL_PACK },
+        {
+          runPackageManager: () => ({
+            ok: false,
+            status: null,
+            error: "spawn npm ENOENT",
+          }),
+        },
+      ),
+    );
+
+    expect(result.result).toBe(1);
+    expect(result.errors.join("\n")).toContain("spawn npm ENOENT");
   });
 
   test("requires a package.json manifest for pack selection", async () => {
@@ -1105,7 +1286,7 @@ describe("runInit", () => {
     expect(result.result).toBe(1);
     const errors = result.errors.join("\n");
     expect(errors).toContain("rollback-failed");
-    expect(errors).toContain("run `npm install` in the project directory");
+    expect(errors).toContain("run `npm install` in the project root");
   });
 
   test("--pack @atlante/pack uses the bundled first-party pack without installing", async () => {

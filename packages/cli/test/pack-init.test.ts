@@ -19,6 +19,7 @@ import {
   packageManagerCommand,
   packageManagerInstallArgs,
   packageManagerLockfiles,
+  resolveDependencyRoot,
 } from "../src/commands/package-manager.js";
 
 const created: string[] = [];
@@ -93,6 +94,59 @@ describe("detectPackageManager", () => {
 
   test("defaults to npm without a lockfile", () => {
     expect(detectPackageManager(tempDir())).toBe("npm");
+  });
+
+  test("prefers an explicit packageManager hint over lockfiles", () => {
+    const dir = tempDir();
+    writeFileSync(join(dir, "pnpm-lock.yaml"), "");
+    expect(detectPackageManager(dir, undefined, "bun@1.2.0")).toBe("bun");
+  });
+
+  test("resolves the manager from a packageManager hint without a lockfile", () => {
+    expect(detectPackageManager(tempDir(), undefined, "yarn@4.0.0")).toBe(
+      "yarn",
+    );
+  });
+
+  test("ignores unknown or malformed packageManager hints", () => {
+    const dir = tempDir();
+    expect(detectPackageManager(dir, undefined, "deno@2.0.0")).toBe("npm");
+    expect(detectPackageManager(dir, undefined, "not-a-version")).toBe("npm");
+    expect(detectPackageManager(dir, undefined, "")).toBe("npm");
+  });
+});
+
+describe("resolveDependencyRoot", () => {
+  test("returns the directory itself when it holds the lockfile", () => {
+    const dir = tempDir();
+    writeFileSync(join(dir, "pnpm-lock.yaml"), "");
+    expect(resolveDependencyRoot(dir)).toBe(dir);
+  });
+
+  test("walks up to the nearest ancestor lockfile", () => {
+    const root = tempDir();
+    const app = join(root, "packages", "app");
+    mkdirSync(app, { recursive: true });
+    writeFileSync(join(root, "pnpm-lock.yaml"), "");
+    expect(resolveDependencyRoot(app)).toBe(root);
+  });
+
+  test("prefers the nearest ancestor over a farther lockfile", () => {
+    const root = tempDir();
+    const workspace = join(root, "packages", "outer", "inner");
+    mkdirSync(workspace, { recursive: true });
+    writeFileSync(join(root, "package-lock.json"), "");
+    writeFileSync(join(root, "packages", "outer", "yarn.lock"), "");
+    expect(resolveDependencyRoot(workspace)).toBe(
+      join(root, "packages", "outer"),
+    );
+  });
+
+  test("returns the directory itself without any lockfile up the tree", () => {
+    const root = tempDir();
+    const app = join(root, "packages", "app");
+    mkdirSync(app, { recursive: true });
+    expect(resolveDependencyRoot(app)).toBe(app);
   });
 });
 

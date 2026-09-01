@@ -47,6 +47,7 @@ import {
   packageManagerCommand,
   packageManagerInstallArgs,
   packageManagerLockfiles,
+  resolveDependencyRoot,
   runPackageManagerDefault,
 } from "./package-manager.js";
 
@@ -340,7 +341,7 @@ function reportRollbackFailures(
         "could not reconcile dependencies after rolling back initialization",
       ...(state.reconciler
         ? {
-            next: `run \`${state.reconciler.command}\` in the project directory, then fix the reported error and run \`atlante init\` again`,
+            next: `run \`${state.reconciler.command}\` in the project root, then fix the reported error and run \`atlante init\` again`,
           }
         : {}),
       cause: error,
@@ -556,24 +557,34 @@ function exitStatus(status: number | null): string {
 
 /**
  * Snapshots package.json and every lockfile the detected package manager may
- * read or create, before any package manager command runs.
+ * read or create, before any package manager command runs. Run from a
+ * workspace member, a package manager mutates the member manifest but writes
+ * the shared lockfile at the dependency root, so both locations are covered.
  */
 function snapshotDependencyFiles(
   state: DependencyMutationState,
   manifestPath: string,
   manager: PackageManager,
   directory: string,
+  dependencyRoot: string,
   fileSystem: InitFileSystem,
 ): void {
   state.changes.push({
     path: manifestPath,
     before: snapshot(manifestPath, fileSystem),
   });
-  for (const lockfile of packageManagerLockfiles(manager, directory)) {
-    state.changes.push({
-      path: lockfile,
-      before: snapshot(lockfile, fileSystem),
-    });
+  const lockfileDirectories =
+    dependencyRoot === directory ? [directory] : [directory, dependencyRoot];
+  for (const lockfileDirectory of lockfileDirectories) {
+    for (const lockfile of packageManagerLockfiles(
+      manager,
+      lockfileDirectory,
+    )) {
+      state.changes.push({
+        path: lockfile,
+        before: snapshot(lockfile, fileSystem),
+      });
+    }
   }
 }
 
@@ -581,6 +592,7 @@ function packInstallFailure(
   command: string,
   status: number | null,
   packageName: string,
+  spawnError?: string,
 ): { error: string } {
   return {
     error: formatInitError(
@@ -588,7 +600,9 @@ function packInstallFailure(
       `could not install ${packageName}`,
       {
         next: "fix the package manager error and run `atlante init` again",
-        cause: `\`${command}\` failed ${exitStatus(status)}`,
+        cause: spawnError
+          ? `\`${command}\` failed: ${spawnError}`
+          : `\`${command}\` failed ${exitStatus(status)}`,
       },
     ),
   };
@@ -614,7 +628,7 @@ function packMissingEntryFailure(
 
 /**
  * Runs one package manager step (add or reconcile install) and verifies the
- * pack is present in node_modules afterwards.
+ * pack is present in the project's node_modules afterwards.
  */
 function runPackageManagerStep(
   manager: PackageManager,
@@ -627,8 +641,10 @@ function runPackageManagerStep(
   fileSystem: InitFileSystem,
 ): { error?: string } {
   const command = packageManagerCommand(manager, args);
+  console.log(`installing ${pack.packageName} with ${manager}`);
   const run = runPackageManager(manager, [...args], directory);
-  if (!run.ok) return packInstallFailure(command, run.status, pack.packageName);
+  if (!run.ok)
+    return packInstallFailure(command, run.status, pack.packageName, run.error);
   if (!fileSystem.existsSync(entry)) {
     return packMissingEntryFailure(
       entry,
@@ -641,13 +657,32 @@ function runPackageManagerStep(
 }
 
 /**
- * Ensures the selected third-party pack is declared and installed. Packs that
- * are not declared yet are installed with the detected package manager, which
- * places them in devDependencies; declared packs missing from node_modules
- * are reconciled with a plain install; packs that are already declared and
- * installed are left untouched, so existing declarations are never moved
- * between dependency groups or replaced. Every file the package manager may
- * touch is snapshotted before anything runs.
+ * Reads corepack's `packageManager` field from the manifest, e.g.
+ * `"pnpm@9.1.2"`, so explicit project configuration wins over lockfile
+ * inference.
+ */
+function packageManagerHint(
+  manifest: Record<string, unknown>,
+): string | undefined {
+  const value = manifest.packageManager;
+  return typeof value === "string" ? value : undefined;
+}
+
+/**
+ * Ensures the selected third-party pack is declared and installed. The
+ * transaction is rooted where init runs: the project manifest is read and
+ * snapshotted there and the package manager runs there, while the detected
+ * manager comes from the nearest ancestor lockfile (`resolveDependencyRoot`)
+ * — package managers scope workspaces from that lockfile, so run from a
+ * workspace member they write the shared root lockfile while declaring the
+ * dependency in the member manifest. The installed pack is verified where
+ * @atlante/resources resolves a project dependency: the project root's own
+ * node_modules. Packs that are not declared yet are installed with the
+ * detected package manager, which places them in devDependencies; declared
+ * packs missing from node_modules are reconciled with a plain install; packs
+ * that are already declared and installed are left untouched, so existing
+ * declarations are never moved between dependency groups or replaced. Every
+ * file the package manager may touch is snapshotted before anything runs.
  */
 function ensurePackInstalled(
   directory: string,
@@ -655,32 +690,41 @@ function ensurePackInstalled(
   state: DependencyMutationState,
   fileSystem: InitFileSystem,
   runPackageManager: PackageManagerRunner,
-): { manager: PackageManager } | { error: string } {
+): { root: string; entry: string } | { error: string } {
+  const dependencyRoot = resolveDependencyRoot(
+    directory,
+    fileSystem.existsSync,
+  );
   const manifestEntry = projectManifestEntry(directory, fileSystem);
   if ("error" in manifestEntry) return manifestEntry;
 
-  const manager = detectPackageManager(directory, fileSystem.existsSync);
+  const manager = detectPackageManager(
+    dependencyRoot,
+    fileSystem.existsSync,
+    packageManagerHint(manifestEntry.manifest),
+  );
   snapshotDependencyFiles(
     state,
     manifestEntry.path,
     manager,
     directory,
+    dependencyRoot,
     fileSystem,
   );
 
+  // The pack must resolve exactly like @atlante/resources resolves a project
+  // dependency: from the project root's own node_modules. Installs hoisted
+  // above it (npm/bun workspace roots) are not resolvable from here, so the
+  // check rejects them.
   const entry = nodeModulesEntry(directory, pack.packageName);
   const declared = isPackDeclared(manifestEntry.manifest, pack.packageName);
-  if (declared && fileSystem.existsSync(entry)) return { manager };
+  if (declared && fileSystem.existsSync(entry))
+    return { root: dependencyRoot, entry };
 
   const installCommand = packageManagerCommand(
     manager,
     packageManagerInstallArgs(manager),
   );
-  // Only the add path mutates the project manifest, so only it needs the
-  // post-rollback reconciliation of node_modules.
-  if (!declared) {
-    state.reconciler = { manager, command: installCommand, directory };
-  }
   const args = declared
     ? packageManagerInstallArgs(manager)
     : packageManagerAddArgs(manager, pack.packageName);
@@ -696,7 +740,12 @@ function ensurePackInstalled(
     fileSystem,
   );
   if (step.error) return { error: step.error };
-  return { manager };
+  // Only the add path mutates a manifest and it succeeded, so only it records
+  // the post-rollback reconciliation of node_modules.
+  if (!declared) {
+    state.reconciler = { manager, command: installCommand, directory };
+  }
+  return { root: dependencyRoot, entry };
 }
 
 /**
@@ -704,11 +753,10 @@ function ensurePackInstalled(
  * before any preset is selected.
  */
 function locateInstalledPack(
-  directory: string,
+  entry: string,
   pack: SelectedPack,
   fileSystem: InitFileSystem,
 ): { root: string } | { error: string } {
-  const entry = nodeModulesEntry(directory, pack.packageName);
   if (!fileSystem.existsSync(entry)) {
     return {
       error: formatInitError(
@@ -792,7 +840,7 @@ function thirdPartyPackRoot(
     runPackageManager,
   );
   if ("error" in ensured) return ensured;
-  return locateInstalledPack(directory, pack, fileSystem);
+  return locateInstalledPack(ensured.entry, pack, fileSystem);
 }
 
 /**

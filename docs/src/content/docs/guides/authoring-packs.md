@@ -84,7 +84,14 @@ npx @atlante/cli@latest build
 ```
 
 `--pack @acme/review-pack/<preset>` selects a named preset explicitly without
-prompting, which suits CI and scripts. Atlante does not load remote content or
-execute package code; use [Configuration](/concepts/configuration) for
-source-document rules and [Resolution](/concepts/resolution) for inheritance
-and composition behavior.
+prompting, which suits CI and scripts. Locators accept package names only: the
+first install pins the version in the lockfile, so later runs stay
+reproducible. The installed pack must sit in the init directory's own
+`node_modules` — the one place its presets resolve from — so in a workspace
+with npm- or bun-style hoisting to a shared root, run `atlante init` at the
+workspace root. Installing a pack delegates to the project's package manager,
+which may execute registry install scripts — Atlante's own runtime remains
+static and never loads remote content or executes package code; use
+[Configuration](/concepts/configuration) for source-document rules
+and [Resolution](/concepts/resolution) for inheritance and composition
+behavior.
