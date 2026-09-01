@@ -88,6 +88,40 @@ test("keeps resources private and synchronizes exactly seven workspaces", () => 
   expect(release).toContain("const PACKAGES = [");
 });
 
+// bun.lock is machine-generated JSONC (trailing commas); normalize them and
+// parse strictly. A malformed strip fails loudly below instead of silently
+// letting stale lockfile bookkeeping strand into an unrelated PR.
+function readLockfile(): {
+  workspaces: Record<
+    string,
+    { version?: string; dependencies?: Record<string, string> }
+  >;
+} {
+  return JSON.parse(
+    readFileSync(join(ROOT, "bun.lock"), "utf8").replace(/,(\s*[}\]])/g, "$1"),
+  );
+}
+
+// The release flow refreshes bun.lock, but nothing else asserted lockfile
+// consistency, so v0.1.19 stranded 0.1.18 workspace entries and a stale
+// website pin until an unrelated PR reconciled them.
+test("keeps bun.lock synchronized with the workspace manifests", () => {
+  const lock = readLockfile();
+
+  for (const name of PACKAGES) {
+    expect(
+      lock.workspaces[`packages/${name}`]?.version,
+      `bun.lock workspace entry for packages/${name} is stale`,
+    ).toBe(readJson(join(ROOT, "packages", name, "package.json")).version);
+  }
+
+  const website = readJson(join(ROOT, "website", "package.json"));
+  expect(
+    lock.workspaces.website?.dependencies?.["@atlante/cli"],
+    "bun.lock website @atlante/cli pin is stale",
+  ).toBe((website.dependencies as Record<string, string>)["@atlante/cli"]);
+});
+
 test("keeps only pack, CLI, and OpenCode publishable", () => {
   const publishable = new Set<string>();
   for (const name of PACKAGES) {

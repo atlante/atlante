@@ -30,11 +30,11 @@ jobs:
 
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          ZHIPU_API_KEY: ${{ secrets.ZHIPU_API_KEY }}
         with:
-          model: opencode/x-preview-f-free
+          model: zai-coding-plan/glm-5.3-flash
           use_github_token: false
           share: false
-          variant: max
           prompt: |
             Act as a senior engineer doing final PR review. Focus on:
 
