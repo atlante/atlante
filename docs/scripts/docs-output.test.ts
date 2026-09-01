@@ -76,7 +76,9 @@ function expectStaticRedirect(route: string, destination: string): void {
   );
 }
 
-describe.skipIf(!existsSync(outputRoot))("docs built output", () => {
+const runOutputTests = process.env.ATLANTE_BUILT_OUTPUT_TESTS === "1";
+
+describe.skipIf(!runOutputTests)("docs built output", () => {
   const documents = authoredDocuments();
 
   it("publishes exactly the non-draft authored Markdown routes", () => {

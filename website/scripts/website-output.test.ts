@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const websiteRoot = join(import.meta.dirname, "..");
@@ -17,7 +17,7 @@ const observatoryKeys = [
   "runtime",
 ] as const;
 
-describe.skipIf(!existsSync(join(websiteRoot, "dist")))(
+describe.skipIf(process.env.ATLANTE_BUILT_OUTPUT_TESTS !== "1")(
   "website built output",
   () => {
     it("keeps approved copy and links in built HTML", () => {
