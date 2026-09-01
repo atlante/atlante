@@ -192,6 +192,40 @@ test("keeps publishArtifacts callers pinned to the builder orchestration", () =>
   ]);
 });
 
+// The artifacts root entry also exports createArtifacts and publishArtifacts;
+// the adapter enforces the read-only boundary at runtime (#108), but nothing
+// structural stops a future CLI import of creation or publication helpers,
+// leaving that invariant as convention. Pin every @atlante/artifacts
+// specifier under packages/cli — src and test — to the read-only subpath;
+// revisit this gate if the CLI ever legitimately needs the full contract.
+// The manifest cannot share the pin: resolvers reject a subpath dependency
+// key (@atlante/artifacts/read-only@workspace:* fails to resolve), so the
+// devDependency stays on the package name and this gate is what keeps that
+// declaration read-only in practice.
+test("keeps CLI imports of @atlante/artifacts pinned to the read-only subpath", () => {
+  const cli = readJson(join(ROOT, "packages", "cli", "package.json"));
+  expect(
+    (cli.devDependencies as Record<string, string>)["@atlante/artifacts"],
+  ).toBe("workspace:*");
+
+  const offenders: string[] = [];
+  for (const dir of ["src", "test"]) {
+    for (const file of filesUnder(join(ROOT, "packages", "cli", dir))) {
+      const specifiers = [
+        ...readFileSync(file, "utf8").matchAll(
+          /(["'])(@atlante\/artifacts[^"']*)\1/g,
+        ),
+      ].map((match) => match[2]);
+      for (const specifier of specifiers) {
+        if (specifier !== "@atlante/artifacts/read-only") {
+          offenders.push(`${file}: ${specifier}`);
+        }
+      }
+    }
+  }
+  expect(offenders).toEqual([]);
+});
+
 test("orders release packages pack, CLI, then OpenCode adapter", () => {
   const publish = readFileSync(
     join(ROOT, "scripts", "publish-packages.ts"),
