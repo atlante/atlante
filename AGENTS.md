@@ -43,14 +43,7 @@ bun run build                   # build publishable CLI + adapter artifacts (pac
 bun run quick:check             # type:check + lint:check + test
 bun run full:check              # build + quick:check (CI gate)
 bun run cli                     # run the CLI (packages/cli/bin/atlante.ts)
-bun run mutation:test <ws>      # regenerate Stryker mutation evidence for schema|resources|validator
-bun run mutation:verify         # verify stored mutation evidence (add --strict to fail on stale sources)
 ```
-
-Mutation testing is fully separate from `bun run test` and never runs in
-CI gates. Evidence under `mutation-evidence/` may lag source changes; a
-scheduled workflow verifies it monthly and `mutation:verify --strict`
-fails when evidence or score ratchets are stale.
 
 Bun remains the package manager and build/release/smoke/packaging runtime. Tests
 run through Vitest on Node 22; Bun is invoked explicitly only when a test

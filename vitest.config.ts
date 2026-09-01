@@ -11,10 +11,8 @@ export default defineConfig({
       "**/dist/**",
       "**/.worktrees/**",
       ".atlante/**",
-      "**/mutation/**",
       "**/reports/**",
       "**/coverage/**",
-      ".stryker-tmp/**",
       // Built-output assertions require a freshly built website dist tree.
       "website/scripts/website-output.test.ts",
       // Built-output assertions require a freshly built docs dist tree.

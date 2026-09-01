@@ -674,7 +674,6 @@ function compositionBranchPath(
   path: readonly string[],
 ): readonly string[] | undefined {
   let branch: readonly string[] | undefined;
-  // Stryker disable next-line UpdateOperator -- exact mutant: index++ -> index--; this scan must advance toward termination.
   for (let index = 0; index + 1 < path.length; index++) {
     const keyword = path[index];
     if (
