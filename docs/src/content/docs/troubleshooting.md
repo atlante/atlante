@@ -93,7 +93,8 @@ npx @atlante/cli validate
 npx @atlante/cli build
 ```
 
-Then confirm that `opencode.jsonc` registers `@atlante/opencode`. The adapter
+Then confirm that your OpenCode config (`opencode.jsonc`, or an existing
+`opencode.json`) registers `@atlante/opencode`. The adapter
 reads only `<project>/.atlante/artifacts/`; it does not load the source
 configuration, local resources, or installed Packs.
 

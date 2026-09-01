@@ -9,8 +9,8 @@ artifact tree and leaves host-owned settings under OpenCode's control.
 
 ## Register the adapter
 
-`atlante init` creates or updates `opencode.jsonc` while preserving existing
-settings. The registration has this shape:
+`atlante init` creates or updates `opencode.jsonc` (reusing an existing
+`opencode.json` when present) while preserving existing settings. The registration has this shape:
 
 ```jsonc title="opencode.jsonc"
 {

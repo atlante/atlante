@@ -91,7 +91,7 @@ npx @atlante/cli validate
 npx @atlante/cli build
 ```
 
-`init` writes `atlante.jsonc`, builds the initial `.atlante/artifacts/` tree, and registers `@atlante/opencode` in `opencode.jsonc`. This preserves the existing host settings.
+`init` writes `atlante.jsonc`, builds the initial `.atlante/artifacts/` tree, and registers `@atlante/opencode` in `opencode.jsonc` (or an existing `opencode.json`). This preserves the existing host settings.
 
 You can edit the authored configuration and then run `npx @atlante/cli build` again, or use `npx @atlante/cli build --watch` during active editing.
 
