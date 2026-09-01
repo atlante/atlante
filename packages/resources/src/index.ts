@@ -76,6 +76,7 @@ export type {
 export {
   createPackageResolutionCache,
   createPackageResourcePack,
+  isPackageDeclared,
   resolvePackageResourcePack,
 } from "./package-resolution.js";
 export type { ResourceProvenance } from "./provenance.js";

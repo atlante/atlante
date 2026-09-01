@@ -13,7 +13,10 @@ import {
   buildProject as buildProjectDefault,
   type ProjectContext,
 } from "@atlante/builder";
-import { createPackageResourcePack } from "@atlante/resources";
+import {
+  createPackageResourcePack,
+  isPackageDeclared,
+} from "@atlante/resources";
 import { SCHEMA_URI } from "@atlante/schema";
 import { hasErrors, validateDocumentText } from "@atlante/validator";
 import {
@@ -526,27 +529,6 @@ function projectManifestEntry(
   return { path, manifest };
 }
 
-/**
- * Mirrors the declared-package check in `@atlante/resources` package
- * resolution: `peerDependencies` is deliberately excluded because a
- * peer-only declaration does not resolve there, so the pack must be added to
- * `devDependencies` for the selected preset to work.
- */
-function isPackDeclared(
-  manifest: Record<string, unknown>,
-  packageName: string,
-): boolean {
-  for (const group of [
-    "dependencies",
-    "optionalDependencies",
-    "devDependencies",
-  ]) {
-    const value = manifest[group];
-    if (isObject(value) && Object.hasOwn(value, packageName)) return true;
-  }
-  return false;
-}
-
 function nodeModulesEntry(directory: string, packageName: string): string {
   return join(directory, "node_modules", ...packageName.split("/"));
 }
@@ -717,7 +699,7 @@ function ensurePackInstalled(
   // above it (npm/bun workspace roots) are not resolvable from here, so the
   // check rejects them.
   const entry = nodeModulesEntry(directory, pack.packageName);
-  const declared = isPackDeclared(manifestEntry.manifest, pack.packageName);
+  const declared = isPackageDeclared(manifestEntry.manifest, pack.packageName);
   if (declared && fileSystem.existsSync(entry))
     return { root: dependencyRoot, entry };
 
