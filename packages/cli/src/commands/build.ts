@@ -1,11 +1,11 @@
 import type { ProjectContext } from "@atlante/builder";
 import { buildProject } from "@atlante/builder";
-import { hasErrors, type ResourceWatchContext } from "@atlante/validator";
+import type { ResourceWatchContext } from "@atlante/validator";
 import { firstPartyProjectContext } from "../first-party-pack.js";
 import {
   diagnosticPath,
   printDiagnostic,
-  printDiagnostics,
+  reportBuildResult,
 } from "../report.js";
 
 export type BuildOutcome = Readonly<{
@@ -19,18 +19,9 @@ export function runBuildWithContext(
 ): BuildOutcome {
   try {
     const built = buildProject(target, context);
-    printDiagnostics(built.diagnostics);
-    if (hasErrors(built.diagnostics))
+    if (!reportBuildResult(built))
       return { code: 1, resourceWatch: built.resourceWatch };
-
     console.log(`built ${built.artifactsPath}`);
-    for (const warning of built.warnings)
-      printDiagnostic({
-        severity: "warning",
-        code: warning.code,
-        message: warning.message,
-        source: diagnosticPath(warning.path),
-      });
     return { code: 0, resourceWatch: built.resourceWatch };
   } catch (cause) {
     printDiagnostic({

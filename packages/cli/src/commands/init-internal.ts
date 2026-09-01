@@ -23,6 +23,7 @@ import {
   diagnosticPath,
   printDiagnostic,
   printDiagnostics,
+  reportBuildResult,
 } from "../report.js";
 
 export type InitOptions = { preset?: string; force?: boolean };
@@ -349,6 +350,8 @@ function buildAndReport(
     return 1;
   }
 
+  // Rollback runs before any diagnostic is printed: even if the diagnostic
+  // reporter itself throws, the filesystem is already restored.
   if (hasErrors(built.diagnostics)) {
     const rollbackErrors = rollback(changes, fileSystem);
     printDiagnostics(built.diagnostics);
@@ -363,16 +366,9 @@ function buildAndReport(
     }
     return 1;
   }
-  printDiagnostics(built.diagnostics);
-  for (const warning of built.warnings)
-    printDiagnostic({
-      severity: "warning",
-      code: warning.code,
-      message: warning.message,
-      source: diagnosticPath(warning.path),
-    });
-
+  reportBuildResult(built);
   console.log(`created ${target}`);
+  console.log(`built ${built.artifactsPath}`);
   return 0;
 }
 

@@ -1,6 +1,7 @@
 import { relative, resolve } from "node:path";
+import type { BuildResult } from "@atlante/builder";
 import type { Diagnostic } from "@atlante/validator";
-import { formatDiagnostic } from "@atlante/validator";
+import { formatDiagnostic, hasErrors } from "@atlante/validator";
 
 export { formatDiagnostic } from "@atlante/validator";
 
@@ -14,4 +15,24 @@ export function printDiagnostic(diagnostic: Diagnostic): void {
 
 export function printDiagnostics(diagnostics: Diagnostic[]): void {
   for (const diagnostic of diagnostics) printDiagnostic(diagnostic);
+}
+
+/**
+ * Reports a build result: its diagnostics, and — only when the build
+ * succeeded — its publication warnings. Returns whether the build succeeded,
+ * so each command can keep its own failure and success handling.
+ */
+export function reportBuildResult(
+  built: Pick<BuildResult, "diagnostics" | "warnings">,
+): boolean {
+  printDiagnostics(built.diagnostics);
+  if (hasErrors(built.diagnostics)) return false;
+  for (const warning of built.warnings)
+    printDiagnostic({
+      severity: "warning",
+      code: warning.code,
+      message: warning.message,
+      source: diagnosticPath(warning.path),
+    });
+  return true;
 }

@@ -830,6 +830,10 @@ describe("runInit", () => {
       console.log = original;
     }
     expect(written.join("\n")).toContain("registered @atlante/opencode");
+    expect(written.join("\n")).toContain(
+      `created ${join(dir, "atlante.jsonc")}`,
+    );
+    expect(written.join("\n")).toContain(join(dir, ".atlante", "artifacts"));
   });
 
   test("reports that the plugin was already registered, rather than claiming a fresh registration", async () => {
