@@ -170,6 +170,26 @@ test("keeps the first-party pack as a CLI runtime dependency in source", () => {
   expect(dependencies["@atlante/pack"]).toBe("workspace:*");
 });
 
+// build.ts deliberately documents itself as the only caller of the
+// publisher: bypassing it would skip the fail-closed prepare-then-publish
+// ordering. publishArtifacts escaping into a package entry turned that
+// invariant into a convention, so pin it structurally.
+test("keeps publishArtifacts callers pinned to the builder orchestration", () => {
+  const offenders: string[] = [];
+  for (const name of PACKAGES) {
+    if (name === "artifacts") continue; // owns the implementation
+    const packageRoot = join(ROOT, "packages", name);
+    for (const file of filesUnder(join(packageRoot, "src"))) {
+      if (readFileSync(file, "utf8").includes("publishArtifacts")) {
+        offenders.push(file);
+      }
+    }
+  }
+  expect(offenders).toEqual([
+    join(ROOT, "packages", "builder", "src", "build.ts"),
+  ]);
+});
+
 test("orders release packages pack, CLI, then OpenCode adapter", () => {
   const publish = readFileSync(
     join(ROOT, "scripts", "publish-packages.ts"),

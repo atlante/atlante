@@ -52,7 +52,10 @@ Bun is the package manager and the build/release/smoke/packaging/test runtime.
 During implementation, use Fallow for codebase analysis and lightweight
 feedback, and run `bun run quick:check` for fast iteration. Reserve
 `bun run full:check` as the heavyweight final verification before declaring
-work ready.
+work ready. The `smoke:opencode` step inside `full:check` is load-bearing:
+opencode unit tests craft artifact fixtures via `@atlante/artifacts`, so the
+smoke is the only automated check of the real pack → build → publish →
+adapter flow and must never be downgraded to a manual step.
 
 ## Repository conventions
 
