@@ -73,17 +73,25 @@ remote registry.
 ## Test a Pack locally
 
 The published CLI bundles the default first-party `@atlante/pack`, so it needs no
-separate installation. For a custom Pack, declare and install it in the consuming
-project, then select it explicitly:
+separate installation. For a custom Pack, select it with `--pack`: the CLI
+installs it with the project's package manager, declares it in
+`devDependencies`, and discovers the presets it provides:
 
 ```sh
-npm install --save-dev @acme/review-pack
-npx @atlante/cli@latest init --preset @acme/review-pack
+npx @atlante/cli@latest init --pack @acme/review-pack
 npx @atlante/cli@latest validate
 npx @atlante/cli@latest build
 ```
 
-The selected package must already be declared and installed. Atlante does not
-install packages or load remote content. Use [Configuration](/concepts/configuration)
-for source-document rules and [Resolution](/concepts/resolution) for inheritance
-and composition behavior.
+`--pack @acme/review-pack/<preset>` selects a named preset explicitly without
+prompting, which suits CI and scripts. Locators accept package names only: the
+first install pins the version in the lockfile, so later runs stay
+reproducible. The installed pack must sit in the init directory's own
+`node_modules` — the one place its presets resolve from — so in a workspace
+with npm- or bun-style hoisting to a shared root, run `atlante init` at the
+workspace root. Installing a pack delegates to the project's package manager,
+which may execute registry install scripts — Atlante's own runtime remains
+static and never loads remote content or executes package code; use
+[Configuration](/concepts/configuration) for source-document rules
+and [Resolution](/concepts/resolution) for inheritance and composition
+behavior.
