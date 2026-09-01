@@ -15,6 +15,7 @@ import {
   createPackageResolutionCache,
   createPackageResourcePack,
   createProjectResourcePack,
+  isPackageDeclared,
   loadInstanceFacet,
   loadPresetFacet,
   loadTemplateFacet,
@@ -201,6 +202,41 @@ describe("package locators", () => {
           expect(error.failure.code).toBe("invalid-locator");
       }
     }
+  });
+});
+
+describe("isPackageDeclared", () => {
+  const name = "acme-review-pack";
+
+  test("accepts declarations in the dependency groups resolution reads", () => {
+    expect(isPackageDeclared({ dependencies: { [name]: "1.2.3" } }, name)).toBe(
+      true,
+    );
+    expect(
+      isPackageDeclared({ optionalDependencies: { [name]: "1.2.3" } }, name),
+    ).toBe(true);
+    expect(
+      isPackageDeclared({ devDependencies: { [name]: "1.2.3" } }, name),
+    ).toBe(true);
+  });
+
+  test("excludes peerDependencies, because peer-only declarations do not resolve", () => {
+    expect(
+      isPackageDeclared({ peerDependencies: { [name]: "1.2.3" } }, name),
+    ).toBe(false);
+  });
+
+  test("rejects undeclared packages and entries without a string version", () => {
+    expect(isPackageDeclared({}, name)).toBe(false);
+    expect(isPackageDeclared({ dependencies: { other: "1.2.3" } }, name)).toBe(
+      false,
+    );
+    expect(
+      isPackageDeclared(
+        { dependencies: { [name]: 1 } } as Record<string, unknown>,
+        name,
+      ),
+    ).toBe(false);
   });
 });
 

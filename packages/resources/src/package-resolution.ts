@@ -120,9 +120,25 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/**
+ * Dependency groups package resolution reads when checking declarations.
+ * `peerDependencies` is deliberately excluded: a peer-only declaration does
+ * not resolve, so packages must be declared in a group that installs them.
+ */
+type DeclaredDependencyGroup =
+  | "dependencies"
+  | "optionalDependencies"
+  | "devDependencies";
+
+const DECLARED_DEPENDENCY_GROUPS: readonly DeclaredDependencyGroup[] = [
+  "dependencies",
+  "optionalDependencies",
+  "devDependencies",
+];
+
 function dependencyMap(
   manifest: Record<string, unknown>,
-  key: "dependencies" | "optionalDependencies" | "devDependencies",
+  key: DeclaredDependencyGroup,
 ): Readonly<Record<string, string>> {
   const value = manifest[key];
   if (!isObject(value)) return {};
@@ -131,6 +147,22 @@ function dependencyMap(
     if (typeof version === "string") output[name] = version;
   }
   return Object.freeze(output);
+}
+
+/**
+ * Whether a raw project manifest declares the package in a dependency group
+ * package resolution reads: `dependencies`, `optionalDependencies`, or
+ * `devDependencies` — never `peerDependencies`, because a peer-only
+ * declaration does not resolve. Entries are normalized exactly like
+ * `projectManifest`, so declaration checks cannot drift from resolution.
+ */
+export function isPackageDeclared(
+  manifest: Record<string, unknown>,
+  packageName: string,
+): boolean {
+  return DECLARED_DEPENDENCY_GROUPS.some((group) =>
+    Object.hasOwn(dependencyMap(manifest, group), packageName),
+  );
 }
 
 function metadataPaths(pack: ResourcePack, manifestPath: string): string[] {
@@ -431,10 +463,8 @@ function projectManifest(
 }
 
 function isDeclared(name: string, manifest: ProjectManifest): boolean {
-  return (
-    Object.hasOwn(manifest.dependencies, name) ||
-    Object.hasOwn(manifest.optionalDependencies, name) ||
-    Object.hasOwn(manifest.devDependencies, name)
+  return DECLARED_DEPENDENCY_GROUPS.some((group) =>
+    Object.hasOwn(manifest[group], name),
   );
 }
 
