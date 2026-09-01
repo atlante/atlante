@@ -50,7 +50,7 @@ that package as a runtime dependency and resolves it from the CLI installation,
 so a global-style installation does not depend on the project current directory.
 The pack has `atlante.format: 1` and no executable API.
 
-`init` creates or updates `opencode.jsonc` while preserving existing settings.
+`init` creates or updates `opencode.jsonc` (reusing an existing `opencode.json` when present) while preserving existing settings.
 
 The OpenCode adapter is an artifact-only boundary: it never reads the source
 configuration or installed packs. The artifact format and its verification rules

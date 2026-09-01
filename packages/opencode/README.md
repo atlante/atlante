@@ -16,7 +16,7 @@ OpenCode installation provides it.
 The package exposes two entries:
 
 - `@atlante/opencode` — the default export (`AtlantePlugin`) registered
-  in `opencode.jsonc`
+  in `opencode.jsonc` (or an existing `opencode.json`)
 - `@atlante/opencode/api` — the explicit programmatic entry, exporting
   `injectAgents`, `createAtlantePlugin`, `AtlantePlugin`, `createSkillTool`,
   and the adapter's artifact and host configuration types
@@ -26,7 +26,8 @@ Import from the `./api` entry with
 
 ## Usage
 
-Register the OpenCode adapter package in `opencode.jsonc`:
+Register the OpenCode adapter package in your OpenCode config
+(`opencode.jsonc`, or an existing `opencode.json`):
 
 ```jsonc
 {

@@ -592,6 +592,36 @@ describe("runInit", () => {
     expect(opencode.plugin).toContain("@atlante/opencode");
   });
 
+  test("registers the plugin in an existing opencode.json", async () => {
+    const dir = tempDir();
+    const path = join(dir, "opencode.json");
+    writeFileSync(path, `{ "model": "anthropic/claude-sonnet-5" }`);
+
+    expect(await runInit(dir, {})).toBe(0);
+
+    const opencode = JSON.parse(readFileSync(path, "utf8"));
+    expect(opencode.model).toBe("anthropic/claude-sonnet-5");
+    expect(opencode.plugin).toContain("@atlante/opencode");
+    expect(existsSync(join(dir, "opencode.jsonc"))).toBe(false);
+  });
+
+  test("prefers opencode.jsonc when both config files exist", async () => {
+    const dir = tempDir();
+    const jsonc = join(dir, "opencode.jsonc");
+    writeFileSync(jsonc, `{ "model": "anthropic/claude-sonnet-5" }`);
+    const json = join(dir, "opencode.json");
+    writeFileSync(json, `{ "model": "google/gemini-3-pro" }`);
+
+    expect(await runInit(dir, {})).toBe(0);
+
+    expect(JSON.parse(readFileSync(jsonc, "utf8")).plugin).toContain(
+      "@atlante/opencode",
+    );
+    expect(readFileSync(json, "utf8")).toBe(
+      `{ "model": "google/gemini-3-pro" }`,
+    );
+  });
+
   test("rejects malformed opencode JSONC without modifying it", async () => {
     const dir = tempDir();
     const path = join(dir, "opencode.jsonc");

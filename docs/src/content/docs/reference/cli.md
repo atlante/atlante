@@ -28,7 +28,8 @@ npx @atlante/cli init [path] --force
 - `--force` overwrites an existing `atlante.jsonc` and removes the alternate `atlante.json`.
 
 `init` validates the selected preset before changing files. It creates or updates
-`opencode.jsonc` without replacing existing host settings and runs a build. A
+`opencode.jsonc` (reusing an existing `opencode.json` when present) without
+replacing existing host settings and runs a build. A
 custom preset must be declared and installed in the project before it can be
 resolved.
 

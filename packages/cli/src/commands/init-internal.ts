@@ -171,11 +171,28 @@ function parsePluginEntries(
   return Array.isArray(plugin) ? plugin : [];
 }
 
+/**
+ * Resolves the OpenCode config file to register the plugin in. Prefers an
+ * existing `opencode.jsonc`, falls back to an existing `opencode.json`
+ * (OpenCode discovers both, and JSON is valid JSONC), and only defaults to
+ * creating `opencode.jsonc` when neither exists.
+ */
+function opencodeConfigPath(
+  directory: string,
+  fileSystem: InitFileSystem,
+): string {
+  const jsonc = join(directory, "opencode.jsonc");
+  if (fileSystem.existsSync(jsonc)) return jsonc;
+  const json = join(directory, "opencode.json");
+  if (fileSystem.existsSync(json)) return json;
+  return jsonc;
+}
+
 function preparePlugin(
   directory: string,
   fileSystem: InitFileSystem,
 ): PluginPlan | { error: string } {
-  const path = join(directory, "opencode.jsonc");
+  const path = opencodeConfigPath(directory, fileSystem);
   const previous = snapshot(path, fileSystem);
 
   const text = previous.exists
@@ -371,7 +388,7 @@ export async function runInitWithDependencies(
   const context = dependencies.context ?? {};
   const target = join(directory, "atlante.jsonc");
   const alternate = join(directory, "atlante.json");
-  const opencode = join(directory, "opencode.jsonc");
+  const opencode = opencodeConfigPath(directory, fileSystem);
 
   try {
     assertRealProjectRoot(directory);

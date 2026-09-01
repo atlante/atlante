@@ -29,8 +29,8 @@ npx atlante init
 ## 2. See what `init` creates
 
 `init` scaffolds `atlante.jsonc`, registers `@atlante/opencode` in
-`opencode.jsonc`, and builds the initial state. It is both the starting scaffold
-and the first build. Existing host settings in `opencode.jsonc` are preserved.
+`opencode.jsonc` (or an existing `opencode.json`), and builds the initial state. It is both the starting scaffold
+and the first build. Existing host settings in the OpenCode config are preserved.
 You do not need to create a second onboarding configuration.
 
 The generated source selects the default first-party preset:
