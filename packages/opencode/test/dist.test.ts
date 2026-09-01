@@ -40,7 +40,13 @@ const READ_ONLY_ENTRY = Bun.resolveSync(
   PLUGIN_SOURCE_ROOT,
 );
 
-const FIRST_PARTY_SKILLS = ["brainstorm", "plan", "build", "review"] as const;
+const FIRST_PARTY_SKILLS = [
+  "brainstorm",
+  "plan",
+  "build",
+  "review",
+  "harness",
+] as const;
 
 const FIRST_PARTY_SKILL_LANDMARKS: Record<
   (typeof FIRST_PARTY_SKILLS)[number],
@@ -63,6 +69,10 @@ const FIRST_PARTY_SKILL_LANDMARKS: Record<
     title: "# Review",
     overview:
       "Inspect a focused task change or a complete change set without modifying it",
+  },
+  harness: {
+    title: "# Harness",
+    overview: "Operate an Atlante harness with evidence",
   },
 };
 
@@ -550,7 +560,7 @@ function expectSkillLandmarks(
   expect(content, `${skillId} overview`).toContain(overview);
 }
 
-async function expectEveryPhaseSkillLandmark(
+async function expectEverySkillLandmark(
   skillTool: ToolDefinition,
 ): Promise<void> {
   for (const skillId of FIRST_PARTY_SKILLS) {
@@ -578,7 +588,7 @@ test("the generated plugin materializes a multi-skill publication and serves eve
     [...FIRST_PARTY_SKILLS].sort(),
   );
 
-  await expectEveryPhaseSkillLandmark(skillTool);
+  await expectEverySkillLandmark(skillTool);
 
   await expect(
     skillTool.execute({ name: "brainstorming" }, {} as never),
