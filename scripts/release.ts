@@ -7,11 +7,13 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 // All eight manifests stay synchronized and version-bumped together; the five
 // internal packages plus the static pack are covered by the release graph.
 // Publishing is the separate scripts/publish-packages.ts step.
+// Packages are listed in architectural layer order, lowest layer first — the
+// same order as AGENTS.md and scripts/package-graph.test.ts.
 const PACKAGES = [
   "schema",
   "resources",
-  "artifacts",
   "validator",
+  "artifacts",
   "builder",
   "pack",
   "opencode",
