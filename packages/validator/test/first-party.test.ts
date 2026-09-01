@@ -62,7 +62,7 @@ afterEach(() => {
 });
 
 describe("first-party pack integration", () => {
-  test("resolves exactly one architect agent binding and the four phase-skill bindings", () => {
+  test("resolves exactly one architect agent binding, the four phase skills, and the harness skill", () => {
     const result = loadFirstPartyProject();
 
     expect(result.diagnostics).toEqual([]);
@@ -72,6 +72,7 @@ describe("first-party pack integration", () => {
     expect(Object.keys(result.document?.skills ?? {}).sort()).toEqual([
       "brainstorm",
       "build",
+      "harness",
       "plan",
       "review",
     ]);
@@ -85,7 +86,7 @@ describe("first-party pack integration", () => {
     expect(architect?.description).toBeTruthy();
   });
 
-  test.each(["brainstorm", "plan", "build", "review"] as const)(
+  test.each(["brainstorm", "plan", "build", "review", "harness"] as const)(
     "resolves %s through the generic skill template with a non-empty instance-owned description",
     (id) => {
       const result = loadFirstPartyProject();

@@ -54,7 +54,7 @@ describe("first-party package resources as user configurations", () => {
     expect(result.document).toBeDefined();
   });
 
-  test("the first-party preset prepares one architect agent and the four phase skills", () => {
+  test("the first-party preset prepares one architect agent, the four phase skills, and the harness skill", () => {
     const dir = projectRoot();
     writeFileSync(
       join(dir, "atlante.jsonc"),
@@ -76,6 +76,7 @@ describe("first-party package resources as user configurations", () => {
     expect(prepared.skills.map(({ skillId }) => skillId).sort()).toEqual([
       "brainstorm",
       "build",
+      "harness",
       "plan",
       "review",
     ]);
@@ -105,7 +106,7 @@ describe("first-party package resources as user configurations", () => {
     expect(agent?.prompt).not.toContain("{{values.");
   });
 
-  test("the built first-party artifact manifest lists one agent and four loadable skills", () => {
+  test("the built first-party artifact manifest lists one agent and five loadable skills", () => {
     const dir = projectRoot();
     writeFileSync(
       join(dir, "atlante.jsonc"),
@@ -128,6 +129,7 @@ describe("first-party package resources as user configurations", () => {
     expect(artifacts.skills.map(({ skillId }) => skillId).sort()).toEqual([
       "brainstorm",
       "build",
+      "harness",
       "plan",
       "review",
     ]);
@@ -144,6 +146,7 @@ describe("first-party package resources as user configurations", () => {
       plan: "# Plan",
       build: "# Build",
       review: "# Review",
+      harness: "# Harness",
     };
     for (const skill of artifacts.skills) {
       expect(

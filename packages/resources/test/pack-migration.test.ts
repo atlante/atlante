@@ -52,6 +52,7 @@ const expectedPackFiles = [
   "build/instance.jsonc",
   "gotchas/template.jsonc",
   "gotchas/template.md",
+  "harness/instance.jsonc",
   "instructions/template.jsonc",
   "instructions/template.md",
   "invariants/template.jsonc",
@@ -68,6 +69,7 @@ const expectedPackFiles = [
   "test/architect.test.ts",
   "test/brainstorm.test.ts",
   "test/build.test.ts",
+  "test/harness.test.ts",
   "test/normative-language.test.ts",
   "test/plan.test.ts",
   "test/preset.test.ts",
@@ -216,6 +218,7 @@ describe("first-party package resolution", () => {
     expect(Object.keys(document.bindings.skills).sort()).toEqual([
       "brainstorm",
       "build",
+      "harness",
       "plan",
       "review",
     ]);
