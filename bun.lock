@@ -22,10 +22,15 @@
         "typescript": "^6.0.0",
       },
     },
+    "packages/artifacts": {
+      "name": "@atlante/artifacts",
+      "version": "0.1.20",
+    },
     "packages/builder": {
       "name": "@atlante/builder",
       "version": "0.1.20",
       "dependencies": {
+        "@atlante/artifacts": "workspace:*",
         "@atlante/resources": "workspace:*",
         "@atlante/schema": "workspace:*",
         "@atlante/validator": "workspace:*",
@@ -43,6 +48,7 @@
         "jsonc-parser": "^3.3.1",
       },
       "devDependencies": {
+        "@atlante/artifacts": "workspace:*",
         "@atlante/builder": "workspace:*",
         "@atlante/resources": "workspace:*",
         "@atlante/schema": "workspace:*",
@@ -54,8 +60,7 @@
       "name": "@atlante/opencode",
       "version": "0.1.20",
       "devDependencies": {
-        "@atlante/builder": "workspace:*",
-        "@atlante/schema": "workspace:*",
+        "@atlante/artifacts": "workspace:*",
         "@opencode-ai/plugin": "^1.18.4",
       },
       "peerDependencies": {
@@ -130,6 +135,8 @@
     "@astrojs/telemetry": ["@astrojs/telemetry@3.3.0", "", { "dependencies": { "ci-info": "^4.2.0", "debug": "^4.4.0", "dlv": "^1.1.3", "dset": "^3.1.4", "is-docker": "^3.0.0", "is-wsl": "^3.1.0", "which-pm-runs": "^1.1.0" } }, "sha512-UFBgfeldP06qu6khs/yY+q1cDAaArM2/7AEIqQ9Cuvf7B1hNLq0xDrZkct+QoIGyjq56y8IaE2I3CTvG99mlhQ=="],
 
     "@astrojs/yaml2ts": ["@astrojs/yaml2ts@0.2.4", "", { "dependencies": { "yaml": "^2.8.3" } }, "sha512-8oddpOae35pJsXPQXhTkM0ypfKPskVsh2bCxRtbf7e+/Epw2nReakFYpLKjZMEr75CsoF203PMnCocpfz0s69A=="],
+
+    "@atlante/artifacts": ["@atlante/artifacts@workspace:packages/artifacts"],
 
     "@atlante/builder": ["@atlante/builder@workspace:packages/builder"],
 

@@ -11,7 +11,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import * as publicArtifacts from "@atlante/builder/artifacts";
+import * as publicArtifacts from "@atlante/artifacts/read-only";
 import { createArtifacts } from "../src/artifacts.js";
 import type {
   ArtifactManifest,
@@ -21,12 +21,12 @@ import type {
 // These compile-time assertions keep the adapter subpath free of build-only
 // manifest, payload, and source metadata.
 // @ts-expect-error Build-only manifest details are not public adapter types.
-export type PAM = import("@atlante/builder/artifacts").ArtifactManifest;
+export type PAM = import("@atlante/artifacts/read-only").ArtifactManifest;
 // @ts-expect-error Build-only manifest details are not public adapter types.
-export type PAME = import("@atlante/builder/artifacts").ArtifactManifestEntry;
+export type PAME = import("@atlante/artifacts/read-only").ArtifactManifestEntry;
 
 const created: string[] = [];
-const builderPackage = join(import.meta.dirname, "..");
+const artifactsPackage = join(import.meta.dirname, "..");
 
 type ArtifactInput = Parameters<typeof createArtifacts>[0];
 
@@ -527,7 +527,7 @@ describe("readArtifacts", () => {
 const target = ${JSON.stringify(target)};
 const fifo = ${JSON.stringify(fifo)};
 let swapped = false;
-const { readArtifacts } = await import("@atlante/builder/artifacts");
+const { readArtifacts } = await import("@atlante/artifacts/read-only");
 try {
   readArtifacts(${JSON.stringify(root)}, {
     afterPreflight(path) {
@@ -542,7 +542,7 @@ try {
   process.exit(swapped && error?.name === "ArtifactReadError" ? 0 : 4);
 }`,
       ],
-      { cwd: builderPackage, stdio: "ignore" },
+      { cwd: artifactsPackage, stdio: "ignore" },
     );
     const exited = new Promise<number>((resolve) =>
       child.once("exit", (code) => resolve(code ?? -1)),
@@ -590,7 +590,7 @@ const agents = ${JSON.stringify(agents)};
 const agentsBackup = ${JSON.stringify(agentsBackup)};
 const outside = ${JSON.stringify(outside)};
 let swapped = false;
-const { readArtifacts } = await import("@atlante/builder/artifacts");
+const { readArtifacts } = await import("@atlante/artifacts/read-only");
 try {
   readArtifacts(${JSON.stringify(root)}, {
     afterPreflight(path) {
@@ -606,7 +606,7 @@ try {
   process.exit(swapped && error?.name === "ArtifactReadError" ? 0 : 4);
 }`,
       ],
-      { cwd: builderPackage, stdio: "ignore" },
+      { cwd: artifactsPackage, stdio: "ignore" },
     );
     const exited = new Promise<number>((resolve) =>
       child.once("exit", (code) => resolve(code ?? -1)),

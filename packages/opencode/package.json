@@ -47,8 +47,7 @@
     "@opencode-ai/plugin": "^1.18.4"
   },
   "devDependencies": {
-    "@atlante/builder": "workspace:*",
-    "@atlante/schema": "workspace:*",
+    "@atlante/artifacts": "workspace:*",
     "@opencode-ai/plugin": "^1.18.4"
   }
 }

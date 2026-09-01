@@ -81,9 +81,9 @@ files, host configuration, dependency mutation, and the initial build:
 The OpenCode adapter is an artifact-only boundary: it never reads the source
 configuration or installed packs. The artifact format and its verification rules
 are documented in
-[`SPECIFICATION.md`](../../SPECIFICATION.md) §9.1; the builder's fail-closed
+[`SPECIFICATION.md`](../../SPECIFICATION.md) §9.1; the fail-closed
 `readArtifacts` reader contract is in
-[`@atlante/builder`'s README](../builder/README.md#reading-artifacts). Artifact
+[`@atlante/artifacts`'s README](../artifacts/README.md#reading-artifacts). Artifact
 format/version is distinct from the document schema version. Artifacts contain
 rendered values and may be sensitive; keep `.atlante/` local and do not publish
 it.

@@ -1,6 +1,7 @@
-// These plugin-owned public types intentionally mirror the builder's verified
-// artifact shapes so the published plugin declarations stay self-contained and
-// consumers do not need the private, unpublished @atlante/builder package.
+// These plugin-owned public types intentionally mirror the verified artifact
+// shapes owned by @atlante/artifacts so the published plugin declarations stay
+// self-contained and consumers do not need the private, unpublished
+// @atlante/artifacts package.
 // Compatibility is checked through the readArtifacts assignment in plugin.ts.
 
 export type PluginAgentArtifact = {

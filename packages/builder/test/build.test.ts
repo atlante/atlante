@@ -15,9 +15,9 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readArtifacts } from "@atlante/artifacts/read-only";
 import { resourceTemplateSelection } from "@atlante/resources";
 import { SCHEMA_URI } from "@atlante/schema";
-import { readArtifacts } from "../src/artifacts.js";
 import {
   buildProject,
   type PublishOperation,

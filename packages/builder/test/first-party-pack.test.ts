@@ -3,8 +3,8 @@ import { cpSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readArtifacts } from "@atlante/artifacts/read-only";
 import { SCHEMA_URI } from "@atlante/schema";
-import { readArtifacts } from "../src/artifacts-public.js";
 import { buildProject } from "../src/index.js";
 
 const created: string[] = [];

@@ -14,9 +14,9 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readArtifacts } from "@atlante/artifacts/read-only";
 import type { BuildResult } from "@atlante/builder";
 import { buildProject } from "@atlante/builder";
-import { readArtifacts } from "@atlante/builder/artifacts";
 import { SCHEMA_URI } from "@atlante/schema";
 import {
   type InitDependencies,
