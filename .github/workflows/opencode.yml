@@ -29,7 +29,6 @@ jobs:
         uses: anomalyco/opencode/github@latest
 
         env:
-          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
           ZHIPU_API_KEY: ${{ secrets.ZHIPU_API_KEY }}
         with:
           model: zai-coding-plan/glm-5.3-flash
