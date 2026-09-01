@@ -15,7 +15,20 @@
       "mode": "primary",
       "permission": {
         "*": "allow",
-        "edit": "deny"
+        "external_directory": "ask",
+        "doom_loop": "ask",
+        "read": {
+          "*": "allow",
+          "*.env": "deny",
+          "*.env.*": "deny",
+          "*.env.example": "allow"
+        },
+        "bash": {
+          "*": "allow",
+          "git push*": "ask",
+          "git push --force*": "deny",
+          "bun publish*": "ask"
+        }
       }
     }
   }
