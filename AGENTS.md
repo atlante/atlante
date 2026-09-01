@@ -22,7 +22,7 @@ The seven workspaces are `schema`, `resources`, `validator`, `builder`, `pack`,
 `opencode`, and `cli`. The publishable packages are `pack`, the CLI, and
 the OpenCode adapter; `resources` remains private. The separate `website` workspace hosts the Astro landing site for [atlante.sh](https://atlante.sh); it stays outside the toolchain package graph and is not covered by these constraints.
 
-Schema changes require building and validating (`atlante validate`, `atlante build`). `atlante init` builds artifacts automatically; run `atlante build` after later source configuration changes. Tests mirror source paths in each package.
+Schema changes require building and validating (`atlante validate`, `atlante build`). `atlante init` builds artifacts automatically; run `atlante build` after later source configuration changes. Tests live next to the code they test: `packages/<workspace>/test/` mirrors `src/`, `scripts/*.test.ts` files sit beside their scripts, and `website` and `docs` own their tests internally. Do not add tests in ad-hoc locations outside these trees.
 
 ### Architecture constraints
 
@@ -45,6 +45,7 @@ bun run full:check              # build + quick:check (CI gate)
 bun run cli                     # run the CLI (packages/cli/bin/atlante.ts)
 bun run mutation:test <ws>      # regenerate Stryker mutation evidence for schema|resources|validator
 bun run mutation:verify         # verify stored mutation evidence (add --strict to fail on stale sources)
+bun run worktree <issue>        # create + bootstrap an isolated worktree (.worktrees/issue-<n>); omit <issue> for a random one
 ```
 
 Mutation testing is fully separate from `bun run test` and never runs in
@@ -64,3 +65,4 @@ work ready.
 ## Repository conventions
 
 1. Use templates under `.github/ISSUE_TEMPLATE/` and `.github/PULL_REQUEST_TEMPLATE/` when creating issues or PRs with `gh`. Apply labels (`--label`) and type (`--type`, e.g. `Bug`, `Feature`, `Refactor`, `Docs`, `Chore`) when creating issues.
+2. While working on an issue inside its `.worktrees/` worktree, all work MUST stay inside that worktree: edits, git commands, and checks run there and nowhere else. The root checkout is off-limits during issue work; its only permitted operation is updating `main` after the issue's PR has merged.
