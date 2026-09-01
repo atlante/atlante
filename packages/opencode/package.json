@@ -1,8 +1,9 @@
 {
   "name": "@atlante/opencode",
-  "version": "0.1.19",
+  "version": "0.1.20",
   "type": "module",
   "description": "Atlante OpenCode host adapter",
+  "main": "dist/index.js",
   "license": "MIT",
   "contributors": [
     {
@@ -39,7 +40,8 @@
     "./api": {
       "types": "./dist/api.d.ts",
       "default": "./dist/api.js"
-    }
+    },
+    "./server": "./dist/index.js"
   },
   "peerDependencies": {
     "@opencode-ai/plugin": "^1.18.4"

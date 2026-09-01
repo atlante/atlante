@@ -25,6 +25,7 @@
     "lint:check": "biome check .",
     "cli": "bun packages/cli/bin/atlante.ts",
     "smoke:test": "bun scripts/smoke-test.ts",
+    "smoke:opencode": "bun scripts/opencode-smoke.ts",
     "fallow": "fallow",
     "build": "bun scripts/build.ts",
     "docs:build": "bun run --cwd docs build",
