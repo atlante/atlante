@@ -11,6 +11,18 @@ import { $ } from "bun";
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const issue = process.argv[2];
 
+type Stream = { isTTY?: boolean };
+
+function paint(stream: Stream, text: string, ...codes: number[]): string {
+  if (!stream.isTTY || process.env.NO_COLOR) {
+    return text;
+  }
+  return `\x1b[${codes.join(";")}m${text}\x1b[0m`;
+}
+
+const out = process.stdout;
+const err = process.stderr;
+
 async function maybeAdjustModels(target: string): Promise<void> {
   if (!process.stdin.isTTY) {
     return;
@@ -24,7 +36,9 @@ async function maybeAdjustModels(target: string): Promise<void> {
       const editor = process.env.EDITOR || "vi";
       const result = spawnSync(editor, [target], { stdio: "inherit" });
       if (result.status !== 0) {
-        console.warn(`Could not open ${editor}; edit ${target} manually.`);
+        console.warn(
+          paint(err, `Could not open ${editor}; edit ${target} manually.`, 33),
+        );
       }
     }
   } finally {
@@ -41,7 +55,8 @@ if (issue) {
     .cwd(root);
   if (view.exitCode !== 0) {
     const reason = view.stderr.toString().trim();
-    console.error(`Issue #${issue} not found${reason ? `: ${reason}` : ""}`);
+    const detail = reason ? paint(err, `: ${reason}`, 2) : "";
+    console.error(`${paint(err, `Issue #${issue} not found`, 1, 31)}${detail}`);
     process.exit(1);
   }
   title = view.stdout.toString().trim();
@@ -78,5 +93,8 @@ if (!existsSync(worktree)) {
 }
 
 const suffix = title ? ` for issue #${issue} (${title})` : "";
-console.log(`Worktree ready${suffix}: ${worktree} (branch ${slug})`);
-console.log(`Next: cd .worktrees/${slug} && opencode`);
+const ready = paint(out, "Worktree ready", 1, 32);
+const branchLabel = paint(out, `(branch ${slug})`, 2);
+console.log(`${ready}${suffix}: ${paint(out, worktree, 36)} ${branchLabel}`);
+const next = paint(out, `cd .worktrees/${slug} && opencode`, 36);
+console.log(`${paint(out, "Next:", 1)} ${next}`);
