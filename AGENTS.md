@@ -36,7 +36,7 @@ Schema changes require building and validating (`atlante validate`, `atlante bui
 ## Common commands
 
 ```sh
-bun run test                    # run all tests through Vitest on Node 22
+bun run test                    # run all tests (bun:test)
 bun run type:check              # type-check all packages
 bun run lint:check              # lint + format check
 bun run build                   # build publishable CLI + adapter artifacts (pack is static)
@@ -45,9 +45,7 @@ bun run full:check              # build + quick:check (CI gate)
 bun run cli                     # run the CLI (packages/cli/bin/atlante.ts)
 ```
 
-Bun remains the package manager and build/release/smoke/packaging runtime. Tests
-run through Vitest on Node 22; Bun is invoked explicitly only when a test
-exercises Bun-specific behavior.
+Bun is the package manager and the build/release/smoke/packaging/test runtime.
 
 During implementation, use Fallow for codebase analysis and lightweight
 feedback, and run `bun run quick:check` for fast iteration. Reserve

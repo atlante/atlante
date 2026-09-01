@@ -1,3 +1,4 @@
+import { afterEach, describe, expect, test } from "bun:test";
 import {
   cpSync,
   existsSync,
@@ -16,7 +17,6 @@ import type { BuildResult } from "@atlante/builder";
 import { buildProject } from "@atlante/builder";
 import { readArtifacts } from "@atlante/builder/artifacts";
 import { SCHEMA_URI } from "@atlante/schema";
-import { afterEach, describe, expect, test } from "vitest";
 import {
   type InitDependencies,
   runInitWithDependencies,

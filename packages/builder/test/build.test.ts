@@ -1,3 +1,4 @@
+import { afterEach, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import {
   cpSync,
@@ -16,7 +17,6 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { resourceTemplateSelection } from "@atlante/resources";
 import { SCHEMA_URI } from "@atlante/schema";
-import { afterEach, describe, expect, test } from "vitest";
 import { readArtifacts } from "../src/artifacts.js";
 import {
   buildProject,

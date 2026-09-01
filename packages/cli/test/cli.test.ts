@@ -1,3 +1,4 @@
+import { afterEach, beforeAll, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
 import {
   cpSync,
@@ -13,7 +14,6 @@ import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { SCHEMA_URI } from "@atlante/schema";
-import { afterEach, beforeAll, describe, expect, test } from "vitest";
 import packageJson from "../package.json" with { type: "json" };
 import { createProgram, runBuild, runValidate } from "../src/main.js";
 

@@ -1,6 +1,6 @@
+import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
 
 const websiteRoot = join(import.meta.dirname, "..");
 const repoRoot = join(websiteRoot, "..");
@@ -34,7 +34,7 @@ describe("website deployment contract", () => {
       "bun run sync:brand && bun run sync:schema && astro build",
     );
     expect(websitePackage.scripts.check).toBe(
-      "bun run build && vitest run scripts/website-output.test.ts",
+      "bun run build && bun test scripts/website-output.test.ts",
     );
     expect(websitePackage.scripts["sync:schema"]).toBe(
       "bun scripts/sync-schema.ts",

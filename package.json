@@ -20,7 +20,7 @@
     "docs"
   ],
   "scripts": {
-    "test": "vitest run",
+    "test": "bun test",
     "type:check": "tsc --build packages/*/tsconfig.json",
     "lint:check": "biome check .",
     "cli": "bun packages/cli/bin/atlante.ts",
@@ -39,7 +39,6 @@
     "@types/bun": "1.3.14",
     "@types/node": "^26.0.0",
     "fallow": "^3.8.0",
-    "typescript": "^7.0.2",
-    "vitest": "^4.0.0"
+    "typescript": "^7.0.2"
   }
 }

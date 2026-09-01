@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import { buildDocumentJsonSchema } from "../scripts/generate.js";
 import { documentJsonSchema, SCHEMA_URI } from "../src/index.js";
 

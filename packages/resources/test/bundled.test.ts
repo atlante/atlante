@@ -1,3 +1,4 @@
+import { afterEach, describe, expect, test } from "bun:test";
 import {
   mkdirSync,
   mkdtempSync,
@@ -8,7 +9,6 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, test } from "vitest";
 import {
   createProjectResourcePack,
   interpolateValues,

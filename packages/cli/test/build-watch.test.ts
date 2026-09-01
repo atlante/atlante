@@ -1,3 +1,4 @@
+import { afterEach, describe, expect, test } from "bun:test";
 import { spawn } from "node:child_process";
 import {
   existsSync,
@@ -19,7 +20,6 @@ import {
   type ResourcePack,
 } from "@atlante/resources";
 import { SCHEMA_URI } from "@atlante/schema";
-import { afterEach, describe, expect, test } from "vitest";
 import { runBuild, runBuildWithContext } from "../src/commands/build.js";
 import {
   runBuildWatchWithDependencies,

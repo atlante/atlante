@@ -1,8 +1,8 @@
+import { afterEach, describe, expect, test } from "bun:test";
 import {
   createProjectResourcePack,
   resolveResourceInstance,
 } from "@atlante/resources";
-import { afterEach, describe, expect, test } from "vitest";
 import {
   cleanupPackResourceFixtures,
   packResourceFixture,

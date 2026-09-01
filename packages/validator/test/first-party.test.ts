@@ -1,9 +1,9 @@
+import { afterEach, describe, expect, test } from "bun:test";
 import { cpSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { SCHEMA_URI } from "@atlante/schema";
-import { afterEach, describe, expect, test } from "vitest";
 import { loadDocument } from "../src/index.js";
 
 const created: string[] = [];
