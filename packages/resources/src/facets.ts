@@ -1,4 +1,5 @@
 import { relative } from "node:path";
+import { CONFIG_FILENAMES } from "./config.js";
 import {
   type ResourcePack,
   resourcePackMetadataPaths,
@@ -69,7 +70,7 @@ export function facetCandidateNames(
     ? ["template.jsonc", "template.md"]
     : kind === "instance"
       ? ["instance.jsonc"]
-      : ["atlante.jsonc", "atlante.json"];
+      : CONFIG_FILENAMES;
 }
 
 function inspectResourceFileWithContext(
