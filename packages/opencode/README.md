@@ -36,9 +36,9 @@ Register the OpenCode adapter package in your OpenCode config
 }
 ```
 
-Running `npx @atlante/cli init` creates this registration and builds artifacts
+Running `npx @atlante/cli@latest init` creates this registration and builds artifacts
 automatically while preserving existing OpenCode settings. Run
-`npx @atlante/cli build` after changing the source configuration.
+`npx @atlante/cli@latest build` after changing the source configuration.
 
 `atlante_skill` accepts exactly `{ "name": "skill-id" }` and looks up the
 resolved root `skills` map by that name. A successful lookup returns the skill's

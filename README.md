@@ -86,14 +86,14 @@ Run `bun run build` after CLI source changes. The linked `atlante` command uses 
 The CLI requires [Node.js](https://nodejs.org) 22 or newer. Run the published package directly with `npx`:
 
 ```bash
-npx @atlante/cli init
-npx @atlante/cli validate
-npx @atlante/cli build
+npx @atlante/cli@latest init
+npx @atlante/cli@latest validate
+npx @atlante/cli@latest build
 ```
 
 `init` writes `atlante.jsonc`, builds the initial `.atlante/artifacts/` tree, and registers `@atlante/opencode` in `opencode.jsonc` (or an existing `opencode.json`). This preserves the existing host settings.
 
-You can edit the authored configuration and then run `npx @atlante/cli build` again, or use `npx @atlante/cli build --watch` during active editing.
+You can edit the authored configuration and then run `npx @atlante/cli@latest build` again, or use `npx @atlante/cli@latest build --watch` during active editing.
 
 To use the bare `atlante` command, install the CLI first:
 
@@ -198,8 +198,8 @@ A pack is static Atlante content. It can contain presets, templates, and instanc
 
 ```bash
 npm install --save-dev @acme/review-pack
-npx @atlante/cli init --preset @acme/review-pack
-npx @atlante/cli init --preset @acme/review-pack/strict
+npx @atlante/cli@latest init --preset @acme/review-pack
+npx @atlante/cli@latest init --preset @acme/review-pack/strict
 ```
 
 Use an ordered `extends` array when a configuration needs multiple preset layers. Local configuration wins after the selected layers are merged.

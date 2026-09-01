@@ -27,8 +27,8 @@ the environment that runs OpenCode.
 Run validation and build from the project directory:
 
 ```sh
-npx @atlante/cli validate
-npx @atlante/cli build
+npx @atlante/cli@latest validate
+npx @atlante/cli@latest build
 ```
 
 The adapter reads

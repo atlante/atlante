@@ -11,7 +11,7 @@ the source or location, and often the next recovery action.
 Run the command from the project root or pass the explicit configuration path:
 
 ```sh
-npx @atlante/cli validate ./path/to/atlante.jsonc
+npx @atlante/cli@latest validate ./path/to/atlante.jsonc
 ```
 
 The supported filenames are exactly `atlante.jsonc` and `atlante.json`.
@@ -38,7 +38,7 @@ installed before the CLI can resolve it:
 
 ```sh
 npm install --save-dev @acme/review-pack
-npx @atlante/cli validate
+npx @atlante/cli@latest validate
 ```
 
 ## A locator is rejected
@@ -68,8 +68,8 @@ not available.
 Fix the first actionable `error` diagnostic, then run validation again:
 
 ```sh
-npx @atlante/cli validate
-npx @atlante/cli build
+npx @atlante/cli@latest validate
+npx @atlante/cli@latest build
 ```
 
 `validate` checks source and selected content without rendering. `build` repeats
@@ -89,8 +89,8 @@ complete artifact tree in place and exits with status `0` when stopped with
 Run a successful build first:
 
 ```sh
-npx @atlante/cli validate
-npx @atlante/cli build
+npx @atlante/cli@latest validate
+npx @atlante/cli@latest build
 ```
 
 Then confirm that your OpenCode config (`opencode.jsonc`, or an existing
@@ -102,13 +102,13 @@ configuration, local resources, or installed Packs.
 
 A missing artifact tree means the project has not completed a build. A malformed
 or changed tree is rejected by the fail-closed reader. Re-run
-`npx @atlante/cli build` after fixing the source. The reader also rejects unsafe
+`npx @atlante/cli@latest build` after fixing the source. The reader also rejects unsafe
 paths, symlinks, non-regular files, invalid UTF-8, missing payloads, duplicate
 entries, and digest mismatches. Keep `.atlante/` local because rendered values
 may contain sensitive content.
 
 ## The output is stale after an edit
 
-Run `npx @atlante/cli build` after changing `atlante.jsonc`, local resources, or
-selected Pack content. Use `npx @atlante/cli build --watch` during active editing
+Run `npx @atlante/cli@latest build` after changing `atlante.jsonc`, local resources, or
+selected Pack content. Use `npx @atlante/cli@latest build --watch` during active editing
 when you want selected changes rebuilt automatically.

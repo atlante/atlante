@@ -78,9 +78,9 @@ project, then select it explicitly:
 
 ```sh
 npm install --save-dev @acme/review-pack
-npx @atlante/cli init --preset @acme/review-pack
-npx @atlante/cli validate
-npx @atlante/cli build
+npx @atlante/cli@latest init --preset @acme/review-pack
+npx @atlante/cli@latest validate
+npx @atlante/cli@latest build
 ```
 
 The selected package must already be declared and installed. Atlante does not

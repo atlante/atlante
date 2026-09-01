@@ -146,7 +146,7 @@ const hints: Record<string, string> = {
                 <button type="button" data-action="reset">Reset</button>
               </span>
             </div>
-            <pre data-terminal-out>$ npx @atlante/cli init</pre>
+            <pre data-terminal-out>$ npx @atlante/cli@latest init</pre>
           </div>
 
           <div class="file-tree" data-file-tree hidden>
@@ -429,7 +429,7 @@ const hints: Record<string, string> = {
       timedOut: boolean,
     ): void => {
       if (!terminalOut || !exitLabel || !statusDot) return;
-      terminalOut.textContent = `$ npx @atlante/cli ${command}\n${output}`;
+      terminalOut.textContent = `$ npx @atlante/cli@latest ${command}\n${output}`;
       exitLabel.hidden = false;
       exitLabel.textContent = timedOut
         ? "timed out"
@@ -511,7 +511,7 @@ const hints: Record<string, string> = {
       refreshControls();
       if (runHint) runHint.textContent = hints[step] ?? "";
       if (terminalOut) {
-        terminalOut.textContent = `$ npx @atlante/cli ${step}\nRunning…`;
+        terminalOut.textContent = `$ npx @atlante/cli@latest ${step}\nRunning…`;
       }
       try {
         const response = await fetch("/api/playground", {
@@ -632,7 +632,7 @@ const hints: Record<string, string> = {
       refreshControls();
       if (exitLabel) exitLabel.hidden = true;
       if (statusDot) statusDot.style.background = "";
-      if (terminalOut) terminalOut.textContent = "$ npx @atlante/cli init";
+      if (terminalOut) terminalOut.textContent = "$ npx @atlante/cli@latest init";
       if (runHint) runHint.textContent = hints.init;
     });
 

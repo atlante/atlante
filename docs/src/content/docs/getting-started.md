@@ -15,7 +15,7 @@ host-neutral artifact tree that an adapter can hand to your coding-agent host.
 For a one-off first build, use `npx` from your project directory:
 
 ```sh
-npx @atlante/cli init
+npx @atlante/cli@latest init
 ```
 
 If the project should pin the CLI version, install it as a development
@@ -51,7 +51,7 @@ Read the file, then add `values`, `agents`, or `skills` as the harness grows. Se
 After changing `atlante.jsonc` or selected resources, validate the source first:
 
 ```sh
-npx @atlante/cli validate
+npx @atlante/cli@latest validate
 ```
 
 Validation parses the document, resolves selected content, and checks values,
@@ -62,7 +62,7 @@ locations; see [Diagnostics](/reference/diagnostics).
 When validation passes, build the new artifact tree:
 
 ```sh
-npx @atlante/cli build
+npx @atlante/cli@latest build
 ```
 
 Build repeats validation, renders deterministic Markdown, and atomically

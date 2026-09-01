@@ -9,9 +9,9 @@ later.
 Run the CLI directly from npm:
 
 ```bash
-npx @atlante/cli init
-npx @atlante/cli validate
-npx @atlante/cli build
+npx @atlante/cli@latest init
+npx @atlante/cli@latest validate
+npx @atlante/cli@latest build
 ```
 
 For a global `atlante` command:

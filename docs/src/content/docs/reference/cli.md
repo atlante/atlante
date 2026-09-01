@@ -8,8 +8,8 @@ The published package is `@atlante/cli`. It requires [Node.js](https://nodejs.or
 not need to install that Pack separately for the default preset.
 
 ```sh
-npx @atlante/cli --help
-npx @atlante/cli --version
+npx @atlante/cli@latest --help
+npx @atlante/cli@latest --version
 ```
 
 ## `atlante init`
@@ -18,9 +18,9 @@ Scaffold a project configuration, register the [OpenCode](https://opencode.ai/)
 adapter, and build the initial artifacts.
 
 ```sh
-npx @atlante/cli init [path]
-npx @atlante/cli init [path] --preset <package-locator>
-npx @atlante/cli init [path] --force
+npx @atlante/cli@latest init [path]
+npx @atlante/cli@latest init [path] --preset <package-locator>
+npx @atlante/cli@latest init [path] --force
 ```
 
 - `path` is a project directory and defaults to the current directory.
@@ -39,7 +39,7 @@ Validate the source document, selected resources, template schemas, values, and
 template-owned input without rendering or publishing artifacts.
 
 ```sh
-npx @atlante/cli validate [path]
+npx @atlante/cli@latest validate [path]
 ```
 
 `path` can be a project directory or an explicit `atlante.jsonc` or
@@ -57,8 +57,8 @@ Validate, render, and atomically publish host-neutral artifacts under
 `<project>/.atlante/artifacts/`.
 
 ```sh
-npx @atlante/cli build [path]
-npx @atlante/cli build [path] --watch
+npx @atlante/cli@latest build [path]
+npx @atlante/cli@latest build [path] --watch
 ```
 
 A successful one-shot command prints the resolved artifact directory:

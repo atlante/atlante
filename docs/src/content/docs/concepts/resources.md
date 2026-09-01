@@ -17,7 +17,7 @@ The Pack itself is still the static content inside that package.
 ## First-party and custom Packs
 
 The published CLI bundles and resolves Atlante's first-party Pack for the
-default setup. Running `npx @atlante/cli init` therefore does not require a
+default setup. Running `npx @atlante/cli@latest init` therefore does not require a
 separate `@atlante/pack` installation. The default preset selection and
 first-party ownership are separate ideas: `init` can select another preset
 explicitly. The generated source can extend the default preset with:

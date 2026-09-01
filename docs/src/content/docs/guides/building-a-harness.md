@@ -99,8 +99,8 @@ After editing `atlante.jsonc` or selected resources, validate first and then
 publish a new artifact tree:
 
 ```sh
-npx @atlante/cli validate
-npx @atlante/cli build
+npx @atlante/cli@latest validate
+npx @atlante/cli@latest build
 ```
 
 Both commands report the resolved filesystem path they used. For example:
