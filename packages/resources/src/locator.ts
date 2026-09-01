@@ -1,3 +1,4 @@
+import { CONFIG_FILENAMES } from "./config.js";
 import { failResource } from "./errors.js";
 import type {
   RawResourceLocator,
@@ -11,8 +12,7 @@ const FACET_FILENAMES = new Set([
   "template.jsonc",
   "template.md",
   "instance.jsonc",
-  "atlante.jsonc",
-  "atlante.json",
+  ...CONFIG_FILENAMES,
 ]);
 
 export type ParsedResourceLocator =

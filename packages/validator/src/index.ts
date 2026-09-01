@@ -7,6 +7,7 @@ export {
   sortDiagnostics,
   warning,
 } from "./diagnostic.js";
+export type { ConfigFilename } from "./discover.js";
 export {
   CONFIG_FILENAMES,
   discoverConfigPath,

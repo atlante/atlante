@@ -5,6 +5,7 @@ export type {
 export { authoredValueLayerIssues } from "./authored-values.js";
 export type { Slot } from "./composition.js";
 export { isCompositionMarker, slotsOf } from "./composition.js";
+export { CONFIG_FILENAMES, type ConfigFilename } from "./config.js";
 export type {
   ResourcePack,
   ResourcePackKind,

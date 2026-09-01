@@ -1,9 +1,11 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
+import { CONFIG_FILENAMES } from "@atlante/resources";
 import type { Diagnostic } from "./diagnostic.js";
 import { error } from "./diagnostic.js";
 
-export const CONFIG_FILENAMES = ["atlante.jsonc", "atlante.json"] as const;
+export type { ConfigFilename } from "@atlante/resources";
+export { CONFIG_FILENAMES };
 
 /**
  * SPECIFICATION.md §4: when both filenames exist the implementation must report

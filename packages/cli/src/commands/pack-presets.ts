@@ -1,6 +1,7 @@
 import type { Dirent } from "node:fs";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
+import { CONFIG_FILENAMES } from "@atlante/resources";
 import { formatInitError } from "./init-error.js";
 
 export type PackPreset = Readonly<{
@@ -10,7 +11,7 @@ export type PackPreset = Readonly<{
   relpath: string;
 }>;
 
-const PRESET_MANIFESTS = new Set(["atlante.jsonc", "atlante.json"]);
+const PRESET_MANIFESTS = new Set<string>(CONFIG_FILENAMES);
 
 /**
  * Enumerates the presets a pack provides by convention: every directory in
