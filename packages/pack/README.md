@@ -2,9 +2,10 @@
 
 Atlante's first-party static pack gives a project a useful default agent and
 skills for deliberate AI-assisted work. It provides the `architect` agent, the
-four delivery-phase skills `brainstorm`, `plan`, `build`, and `review`, and
-reusable templates and instances for composing your own agents, skills,
-workflows, and supporting prompt content.
+four delivery-phase skills `brainstorm`, `plan`, `build`, and `review`, the
+additional non-phase `harness` stewardship skill, and reusable templates and
+instances for composing your own agents, skills, workflows, and supporting
+prompt content.
 
 ## Default usage
 
@@ -83,19 +84,34 @@ Useful public locators include:
 | --- | --- |
 | Default preset | `@atlante/pack` |
 | Agent instance | `@atlante/pack/architect` |
-| Skill instances | `@atlante/pack/brainstorm`, `@atlante/pack/plan`, `@atlante/pack/build`, `@atlante/pack/review` |
+| Phase skill instances | `@atlante/pack/brainstorm`, `@atlante/pack/plan`, `@atlante/pack/build`, `@atlante/pack/review` |
+| Stewardship skill instance | `@atlante/pack/harness` |
 | Agent and skill templates | `@atlante/pack/agent`, `@atlante/pack/skill` |
 | Supporting templates | `@atlante/pack/workflow`, `@atlante/pack/markdown`, `@atlante/pack/artifact`, `@atlante/pack/gotchas`, `@atlante/pack/instructions`, `@atlante/pack/invariants` |
 
-The default preset exposes exactly one agent binding, `architect`, and four
-public skill bindings: `brainstorm`, `plan`, `build`, and `review`. The
-workflow instance's phases reference these skills, and the architect selects
-the phases and skills that materially improve the result. The skill bindings
-are locator-only, so each skill instance owns its description. The agent
-template accepts optional top-level `responsibilities` alongside `identity`
-and `mission`. The agent and skill templates support ordered `markdown`,
-`instructions`, `gotchas`, `workflow`, and `invariants` sections. Invariants
-are binding guarantees and approval gates, not suggestions.
+The default preset exposes exactly one agent binding, `architect`, and five
+public skill bindings: the four delivery-phase skills `brainstorm`, `plan`,
+`build`, and `review`, plus the non-phase `harness` stewardship skill. The
+workflow instance's phases reference the four phase skills, and the architect
+selects the phases and skills that materially improve the result. The skill
+bindings are locator-only, so each skill instance owns its description. The
+agent template accepts optional top-level `responsibilities` alongside
+`identity` and `mission`. The agent and skill templates support ordered
+`markdown`, `instructions`, `gotchas`, `workflow`, and `invariants` sections.
+Invariants are binding guarantees and approval gates, not suggestions.
+
+## Harness stewardship
+
+`@atlante/pack/harness` is not a workflow phase. It carries the conditional
+operational guidance for initializing, configuring, validating, building,
+troubleshooting, and improving an Atlante harness, and the architect prompt
+routes harness-touching work to it alongside the active phase skills — it
+supplements them rather than replacing them. The skill keeps permanent policy
+(concepts, resource selection, the source-versus-generated boundary, and the
+separately approved harness-improvement cycle) authoritative and treats
+command-level mechanics as provisional, so deterministic tools can absorb the
+mechanics later without changing the policy. Harness changes always require
+explicit developer approval and run as their own delivery cycle.
 
 ## Pack behavior
 

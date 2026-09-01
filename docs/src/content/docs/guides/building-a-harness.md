@@ -15,9 +15,11 @@ started](/getting-started). `init` creates `atlante.jsonc`, registers the
 published CLI bundles the first-party `@atlante/pack`, so the default setup does
 not require a separate pack installation.
 
-The default preset provides the `architect` agent and the four phase skills
-`brainstorm`, `plan`, `build`, and `review`. The architect selects only the
-workflow phases and skills that materially improve the result. Open
+The default preset provides the `architect` agent, the four phase skills
+`brainstorm`, `plan`, `build`, and `review`, and the additional `harness`
+stewardship skill for initializing, configuring, validating, building,
+troubleshooting, or improving the harness itself. The architect selects only
+the workflow phases and skills that materially improve the result. Open
 `atlante.jsonc` and extend that source instead of copying the preset's
 resources into the project.
 
