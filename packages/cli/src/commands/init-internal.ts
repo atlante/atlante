@@ -1,17 +1,21 @@
-import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  readFileSync,
+  realpathSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
+import { createInterface } from "node:readline/promises";
 import {
   assertRealProjectRoot,
   type BuildResult,
   buildProject as buildProjectDefault,
   type ProjectContext,
 } from "@atlante/builder";
+import { createPackageResourcePack } from "@atlante/resources";
 import { SCHEMA_URI } from "@atlante/schema";
-import {
-  formatDiagnostic,
-  hasErrors,
-  validateDocumentText,
-} from "@atlante/validator";
+import { hasErrors, validateDocumentText } from "@atlante/validator";
 import {
   applyEdits,
   modify,
@@ -20,19 +24,40 @@ import {
   printParseErrorCode,
 } from "jsonc-parser";
 import {
-  diagnosticPath,
+  FIRST_PARTY_PACKAGE,
+  resolveFirstPartyPack,
+} from "../first-party-pack.js";
+import {
   printDiagnostic,
   printDiagnostics,
   reportBuildResult,
 } from "../report.js";
+import { formatInitError } from "./init-error.js";
+import { parsePackLocator, type SelectedPack } from "./pack-locator.js";
+import {
+  discoverPackPresets,
+  type PackPresetSelection,
+  selectPackPreset,
+} from "./pack-presets.js";
+import {
+  detectPackageManager,
+  type PackageManager,
+  type PackageManagerRunner,
+  packageManagerAddArgs,
+  packageManagerCommand,
+  packageManagerInstallArgs,
+  packageManagerLockfiles,
+  runPackageManagerDefault,
+} from "./package-manager.js";
 
-export type InitOptions = { preset?: string; force?: boolean };
+export type InitOptions = { pack?: string; force?: boolean };
 
 type InitFileSystem = {
   existsSync: (path: string) => boolean;
   readFileSync: (path: string, encoding: "utf8") => string;
   writeFileSync: (path: string, contents: string) => void;
   unlinkSync: (path: string) => void;
+  realpathSync: (path: string) => string;
 };
 
 type BuildFunction = (target: string, context: ProjectContext) => BuildResult;
@@ -40,6 +65,9 @@ type BuildFunction = (target: string, context: ProjectContext) => BuildResult;
 export type InitDependencies = Partial<InitFileSystem> & {
   buildProject?: BuildFunction;
   context?: ProjectContext;
+  runPackageManager?: PackageManagerRunner;
+  isInteractive?: () => boolean;
+  prompt?: (query: string) => Promise<string>;
 };
 
 const defaultFileSystem: InitFileSystem = {
@@ -47,7 +75,22 @@ const defaultFileSystem: InitFileSystem = {
   readFileSync: (path, encoding) => readFileSync(path, encoding),
   writeFileSync: (path, contents) => writeFileSync(path, contents),
   unlinkSync,
+  realpathSync,
 };
+
+const defaultIsInteractive = (): boolean => Boolean(process.stdin.isTTY);
+
+async function defaultPrompt(query: string): Promise<string> {
+  const readline = createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+  try {
+    return await readline.question(query);
+  } finally {
+    readline.close();
+  }
+}
 
 type Snapshot = { exists: boolean; contents?: string };
 
@@ -59,12 +102,16 @@ type PluginPlan = {
   registered: boolean;
 };
 
-function bareConfig(preset = "@atlante/pack"): string {
+function bareConfig(preset: string, firstParty = true): string {
+  const comment = firstParty
+    ? `// Extend the first-party package preset. You can override any value or agent
+  // below; your local configuration takes precedence over the inherited one.`
+    : `// Extend the selected pack preset. You can override any value or agent below;
+  // your local configuration takes precedence over the inherited one.`;
   return `{
   "$schema": "${SCHEMA_URI}",
 
-  // Extend the first-party package preset. You can override any value or agent
-  // below; your local configuration takes precedence over the inherited one.
+  ${comment}
   "extends": ${JSON.stringify(preset)},
 }
 `;
@@ -95,25 +142,6 @@ function parseErrorSummary(text: string, errors: ParseError[]): string {
       return `${printParseErrorCode(parseError.error)} at line ${line}`;
     })
     .join(", ");
-}
-
-function formatInitError(
-  code: string,
-  message: string,
-  extra: {
-    source?: string;
-    expected?: string;
-    next?: string;
-    cause?: string;
-  } = {},
-): string {
-  return formatDiagnostic({
-    severity: "error",
-    code,
-    message,
-    ...extra,
-    source: extra.source ? diagnosticPath(extra.source) : undefined,
-  });
 }
 
 function snapshot(path: string, fileSystem: InitFileSystem): Snapshot {
@@ -231,8 +259,10 @@ function restore(
   return undefined;
 }
 
+type Change = { path: string; before: Snapshot };
+
 function rollback(
-  changes: Array<{ path: string; before: Snapshot }>,
+  changes: readonly Change[],
   fileSystem: InitFileSystem,
 ): string[] {
   const errors: string[] = [];
@@ -243,19 +273,98 @@ function rollback(
   return errors;
 }
 
-function mutationErrorMessage(
-  message: string,
-  cause: unknown,
-  rollbackErrors: string[],
-): string {
-  const rollbackMessage =
-    rollbackErrors.length > 0
-      ? `; rollback failed for ${rollbackErrors.join(", ")}`
-      : "";
+function mutationErrorMessage(message: string, cause: unknown): string {
   return formatInitError("initialization-failed", message, {
     next: "fix the reported error and run `atlante init` again",
-    cause: [String(cause), rollbackMessage].filter(Boolean).join(""),
+    cause: String(cause),
   });
+}
+
+/**
+ * The plain package manager install that reconciles node_modules with the
+ * restored package.json and lockfile after a rollback. Defined only when a
+ * dependency mutation ran.
+ */
+type DependencyReconciler = Readonly<{
+  manager: PackageManager;
+  command: string;
+  directory: string;
+}>;
+
+/**
+ * Dependency-mutation state shared across the init flow: every file the
+ * package manager may have touched is snapshotted here alongside the
+ * configuration files, so one rollback restores the whole pre-init state.
+ */
+type DependencyMutationState = {
+  changes: Change[];
+  reconciler?: DependencyReconciler;
+};
+
+function reconcileDependencies(
+  state: DependencyMutationState,
+  runPackageManager: PackageManagerRunner,
+): string[] {
+  const reconciler = state.reconciler;
+  if (!reconciler) return [];
+  const run = runPackageManager(
+    reconciler.manager,
+    packageManagerInstallArgs(reconciler.manager),
+    reconciler.directory,
+  );
+  if (run.ok) return [];
+  return [
+    `\`${reconciler.command}\` failed; node_modules may not match the restored package.json and lockfile`,
+  ];
+}
+
+function reportRollbackFailures(
+  rollbackErrors: readonly string[],
+  reconcileErrors: readonly string[],
+  state: DependencyMutationState,
+): void {
+  if (rollbackErrors.length > 0) {
+    printDiagnostic({
+      severity: "error",
+      code: "rollback-failed",
+      message: "could not restore initialization files",
+      next: "restore the listed files manually before retrying `atlante init`",
+      cause: rollbackErrors.join(", "),
+    });
+  }
+  for (const error of reconcileErrors) {
+    printDiagnostic({
+      severity: "error",
+      code: "rollback-failed",
+      message:
+        "could not reconcile dependencies after rolling back initialization",
+      ...(state.reconciler
+        ? {
+            next: `run \`${state.reconciler.command}\` in the project directory, then fix the reported error and run \`atlante init\` again`,
+          }
+        : {}),
+      cause: error,
+    });
+  }
+}
+
+/**
+ * Restores every snapshotted file (configuration, host configuration,
+ * package.json, lockfile) and re-runs the detected package manager install
+ * when a dependency mutation happened. Failure diagnostics are printed after
+ * the filesystem is restored.
+ */
+function abortWithRestore(
+  state: DependencyMutationState,
+  fileSystem: InitFileSystem,
+  runPackageManager: PackageManagerRunner,
+  mainError?: string,
+): number {
+  const rollbackErrors = rollback(state.changes, fileSystem);
+  const reconcileErrors = reconcileDependencies(state, runPackageManager);
+  if (mainError) console.error(mainError);
+  reportRollbackFailures(rollbackErrors, reconcileErrors, state);
+  return 1;
 }
 
 function commitInitFiles(
@@ -265,9 +374,10 @@ function commitInitFiles(
   opencode: string,
   before: { target: Snapshot; alternate: Snapshot },
   plugin: PluginPlan,
+  state: DependencyMutationState,
   fileSystem: InitFileSystem,
-): { changes: Array<{ path: string; before: Snapshot }>; error?: string } {
-  const changes: Array<{ path: string; before: Snapshot }> = [];
+): { error?: string } {
+  const { changes } = state;
   try {
     changes.push({ path: target, before: before.target });
     fileSystem.writeFileSync(target, contents);
@@ -283,15 +393,10 @@ function commitInitFiles(
     }
   } catch (cause) {
     return {
-      changes: [],
-      error: mutationErrorMessage(
-        "could not complete initialization",
-        cause,
-        rollback(changes, fileSystem),
-      ),
+      error: mutationErrorMessage("could not complete initialization", cause),
     };
   }
-  return { changes };
+  return {};
 }
 
 function initPreflightError(
@@ -331,8 +436,9 @@ function preflightPreset(
 function buildAndReport(
   directory: string,
   target: string,
-  changes: Array<{ path: string; before: Snapshot }>,
+  state: DependencyMutationState,
   fileSystem: InitFileSystem,
+  runPackageManager: PackageManagerRunner,
   buildProject: BuildFunction,
   context: ProjectContext,
 ): number {
@@ -340,36 +446,490 @@ function buildAndReport(
   try {
     built = buildProject(directory, context);
   } catch (cause) {
+    const rollbackErrors = rollback(state.changes, fileSystem);
+    const reconcileErrors = reconcileDependencies(state, runPackageManager);
     console.error(
-      mutationErrorMessage(
-        "could not complete initialization",
-        cause,
-        rollback(changes, fileSystem),
-      ),
+      mutationErrorMessage("could not complete initialization", cause),
     );
+    reportRollbackFailures(rollbackErrors, reconcileErrors, state);
     return 1;
   }
 
   // Rollback runs before any diagnostic is printed: even if the diagnostic
   // reporter itself throws, the filesystem is already restored.
   if (hasErrors(built.diagnostics)) {
-    const rollbackErrors = rollback(changes, fileSystem);
+    const rollbackErrors = rollback(state.changes, fileSystem);
+    const reconcileErrors = reconcileDependencies(state, runPackageManager);
     printDiagnostics(built.diagnostics);
-    if (rollbackErrors.length > 0) {
-      printDiagnostic({
-        severity: "error",
-        code: "rollback-failed",
-        message: "could not restore initialization files",
-        next: "restore the listed files manually before retrying `atlante init`",
-        cause: rollbackErrors.join(", "),
-      });
-    }
+    reportRollbackFailures(rollbackErrors, reconcileErrors, state);
     return 1;
   }
   reportBuildResult(built);
   console.log(`created ${target}`);
   console.log(`built ${built.artifactsPath}`);
   return 0;
+}
+
+type ProjectManifestEntry = Readonly<{
+  path: string;
+  manifest: Record<string, unknown>;
+}>;
+
+function projectManifestEntry(
+  directory: string,
+  fileSystem: InitFileSystem,
+): ProjectManifestEntry | { error: string } {
+  const path = join(directory, "package.json");
+  if (!fileSystem.existsSync(path)) {
+    return {
+      error: formatInitError(
+        "pack-manifest-required",
+        "selecting a pack requires a package.json manifest in the project",
+        {
+          source: path,
+          expected: "a package.json manifest declaring project dependencies",
+          next: "create a package.json with your package manager's init command and run `atlante init` again",
+        },
+      ),
+    };
+  }
+  let manifest: unknown;
+  try {
+    manifest = JSON.parse(fileSystem.readFileSync(path, "utf8"));
+  } catch (cause) {
+    return {
+      error: formatInitError(
+        "invalid-pack-manifest",
+        "package.json is not valid JSON",
+        {
+          source: path,
+          next: "fix package.json and run `atlante init` again",
+          cause: cause instanceof Error ? cause.message : String(cause),
+        },
+      ),
+    };
+  }
+  if (!isObject(manifest)) {
+    return {
+      error: formatInitError(
+        "invalid-pack-manifest",
+        "package.json is not valid JSON",
+        {
+          source: path,
+          next: "fix package.json and run `atlante init` again",
+          cause: "the document is not a JSON object",
+        },
+      ),
+    };
+  }
+  return { path, manifest };
+}
+
+/**
+ * Mirrors the declared-package check in `@atlante/resources` package
+ * resolution: `peerDependencies` is deliberately excluded because a
+ * peer-only declaration does not resolve there, so the pack must be added to
+ * `devDependencies` for the selected preset to work.
+ */
+function isPackDeclared(
+  manifest: Record<string, unknown>,
+  packageName: string,
+): boolean {
+  for (const group of [
+    "dependencies",
+    "optionalDependencies",
+    "devDependencies",
+  ]) {
+    const value = manifest[group];
+    if (isObject(value) && Object.hasOwn(value, packageName)) return true;
+  }
+  return false;
+}
+
+function nodeModulesEntry(directory: string, packageName: string): string {
+  return join(directory, "node_modules", ...packageName.split("/"));
+}
+
+function exitStatus(status: number | null): string {
+  return status === null ? "without a status" : `with exit code ${status}`;
+}
+
+/**
+ * Snapshots package.json and every lockfile the detected package manager may
+ * read or create, before any package manager command runs.
+ */
+function snapshotDependencyFiles(
+  state: DependencyMutationState,
+  manifestPath: string,
+  manager: PackageManager,
+  directory: string,
+  fileSystem: InitFileSystem,
+): void {
+  state.changes.push({
+    path: manifestPath,
+    before: snapshot(manifestPath, fileSystem),
+  });
+  for (const lockfile of packageManagerLockfiles(manager, directory)) {
+    state.changes.push({
+      path: lockfile,
+      before: snapshot(lockfile, fileSystem),
+    });
+  }
+}
+
+function packInstallFailure(
+  command: string,
+  status: number | null,
+  packageName: string,
+): { error: string } {
+  return {
+    error: formatInitError(
+      "pack-installation-failed",
+      `could not install ${packageName}`,
+      {
+        next: "fix the package manager error and run `atlante init` again",
+        cause: `\`${command}\` failed ${exitStatus(status)}`,
+      },
+    ),
+  };
+}
+
+function packMissingEntryFailure(
+  entry: string,
+  installCommand: string,
+  command: string,
+  packageName: string,
+): { error: string } {
+  return {
+    error: formatInitError(
+      "pack-not-installed",
+      `${packageName} is not installed after \`${command}\``,
+      {
+        expected: `${entry} to exist after the package manager run`,
+        next: `run \`${installCommand}\` manually and run \`atlante init\` again`,
+      },
+    ),
+  };
+}
+
+/**
+ * Runs one package manager step (add or reconcile install) and verifies the
+ * pack is present in node_modules afterwards.
+ */
+function runPackageManagerStep(
+  manager: PackageManager,
+  args: readonly string[],
+  directory: string,
+  pack: SelectedPack,
+  entry: string,
+  installCommand: string,
+  runPackageManager: PackageManagerRunner,
+  fileSystem: InitFileSystem,
+): { error?: string } {
+  const command = packageManagerCommand(manager, args);
+  const run = runPackageManager(manager, [...args], directory);
+  if (!run.ok) return packInstallFailure(command, run.status, pack.packageName);
+  if (!fileSystem.existsSync(entry)) {
+    return packMissingEntryFailure(
+      entry,
+      installCommand,
+      command,
+      pack.packageName,
+    );
+  }
+  return {};
+}
+
+/**
+ * Ensures the selected third-party pack is declared and installed. Packs that
+ * are not declared yet are installed with the detected package manager, which
+ * places them in devDependencies; declared packs missing from node_modules
+ * are reconciled with a plain install; packs that are already declared and
+ * installed are left untouched, so existing declarations are never moved
+ * between dependency groups or replaced. Every file the package manager may
+ * touch is snapshotted before anything runs.
+ */
+function ensurePackInstalled(
+  directory: string,
+  pack: SelectedPack,
+  state: DependencyMutationState,
+  fileSystem: InitFileSystem,
+  runPackageManager: PackageManagerRunner,
+): { manager: PackageManager } | { error: string } {
+  const manifestEntry = projectManifestEntry(directory, fileSystem);
+  if ("error" in manifestEntry) return manifestEntry;
+
+  const manager = detectPackageManager(directory, fileSystem.existsSync);
+  snapshotDependencyFiles(
+    state,
+    manifestEntry.path,
+    manager,
+    directory,
+    fileSystem,
+  );
+
+  const entry = nodeModulesEntry(directory, pack.packageName);
+  const declared = isPackDeclared(manifestEntry.manifest, pack.packageName);
+  if (declared && fileSystem.existsSync(entry)) return { manager };
+
+  const installCommand = packageManagerCommand(
+    manager,
+    packageManagerInstallArgs(manager),
+  );
+  // Only the add path mutates the project manifest, so only it needs the
+  // post-rollback reconciliation of node_modules.
+  if (!declared) {
+    state.reconciler = { manager, command: installCommand, directory };
+  }
+  const args = declared
+    ? packageManagerInstallArgs(manager)
+    : packageManagerAddArgs(manager, pack.packageName);
+
+  const step = runPackageManagerStep(
+    manager,
+    args,
+    directory,
+    pack,
+    entry,
+    installCommand,
+    runPackageManager,
+    fileSystem,
+  );
+  if (step.error) return { error: step.error };
+  return { manager };
+}
+
+/**
+ * Locates the installed pack inside node_modules and validates its manifest
+ * before any preset is selected.
+ */
+function locateInstalledPack(
+  directory: string,
+  pack: SelectedPack,
+  fileSystem: InitFileSystem,
+): { root: string } | { error: string } {
+  const entry = nodeModulesEntry(directory, pack.packageName);
+  if (!fileSystem.existsSync(entry)) {
+    return {
+      error: formatInitError(
+        "pack-not-installed",
+        `${pack.packageName} is declared but not installed`,
+        {
+          expected: `${entry} to exist`,
+          next: "run your package manager's install command and run `atlante init` again",
+        },
+      ),
+    };
+  }
+  let root: string;
+  try {
+    root = fileSystem.realpathSync(entry);
+  } catch (cause) {
+    return {
+      error: formatInitError(
+        "pack-not-installed",
+        `could not resolve the installed ${pack.packageName}`,
+        {
+          expected: `${entry} to be a readable package directory`,
+          next: "run your package manager's install command and run `atlante init` again",
+          cause: String(cause),
+        },
+      ),
+    };
+  }
+  try {
+    createPackageResourcePack(root, pack.packageName);
+  } catch (cause) {
+    return {
+      error: formatInitError(
+        "invalid-pack",
+        `the installed ${pack.packageName} is not a valid Atlante pack`,
+        {
+          expected:
+            "a pack manifest declaring its own name and numeric atlante.format 1",
+          next: "fix the installed pack and run `atlante init` again",
+          cause: cause instanceof Error ? cause.message : String(cause),
+        },
+      ),
+    };
+  }
+  return { root };
+}
+
+/** Resolves the bundled first-party pack root used for preset discovery. */
+function firstPartyPackRoot(): { root: string } | { error: string } {
+  try {
+    return { root: resolveFirstPartyPack().root };
+  } catch (cause) {
+    return {
+      error: formatInitError(
+        "invalid-pack",
+        `could not resolve the bundled ${FIRST_PARTY_PACKAGE}`,
+        {
+          next: "reinstall the Atlante CLI and run `atlante init` again",
+          cause: cause instanceof Error ? cause.message : String(cause),
+        },
+      ),
+    };
+  }
+}
+
+/**
+ * Ensures a third-party pack is installed and resolves its pack root.
+ */
+function thirdPartyPackRoot(
+  directory: string,
+  pack: SelectedPack,
+  state: DependencyMutationState,
+  fileSystem: InitFileSystem,
+  runPackageManager: PackageManagerRunner,
+): { root: string } | { error: string } {
+  const ensured = ensurePackInstalled(
+    directory,
+    pack,
+    state,
+    fileSystem,
+    runPackageManager,
+  );
+  if ("error" in ensured) return ensured;
+  return locateInstalledPack(directory, pack, fileSystem);
+}
+
+/**
+ * Prepares the pack-selected preset: installs the pack when needed,
+ * discovers the presets it provides, and selects one. Dependency-mutation
+ * state is snapshotted into `state` so any later failure can be rolled back.
+ */
+async function preparePack(
+  directory: string,
+  pack: SelectedPack,
+  state: DependencyMutationState,
+  fileSystem: InitFileSystem,
+  runPackageManager: PackageManagerRunner,
+  selection: PackPresetSelection,
+): Promise<{ presetLocator: string } | { error: string }> {
+  const located =
+    pack.packageName === FIRST_PARTY_PACKAGE
+      ? // The first-party pack ships with the CLI: no manifest, no install.
+        firstPartyPackRoot()
+      : thirdPartyPackRoot(
+          directory,
+          pack,
+          state,
+          fileSystem,
+          runPackageManager,
+        );
+  if ("error" in located) return located;
+
+  const presets = discoverPackPresets(pack.packageName, located.root);
+  const selected = await selectPackPreset(
+    pack.packageName,
+    presets,
+    pack.presetName,
+    selection,
+  );
+  if ("error" in selected) return selected;
+  return { presetLocator: selected.locator };
+}
+
+/** Everything one init run needs, resolved once up front. */
+type InitFlow = Readonly<{
+  directory: string;
+  target: string;
+  alternate: string;
+  opencode: string;
+  fileSystem: InitFileSystem;
+  context: ProjectContext;
+  runPackageManager: PackageManagerRunner;
+  buildProject: BuildFunction;
+  selection: PackPresetSelection;
+  state: DependencyMutationState;
+}>;
+
+type Abort = (mainError?: string) => number;
+
+/**
+ * Resolves the pack option, runs the preflight checks, ensures the selected
+ * pack is installed, and selects its preset. Returns the generated
+ * configuration contents, or a terminal exit code after reporting.
+ */
+async function prepareConfiguration(
+  flow: InitFlow,
+  options: InitOptions,
+  abort: Abort,
+): Promise<number | { contents: string }> {
+  assertRealProjectRoot(flow.directory);
+
+  let pack: SelectedPack | undefined;
+  if (options.pack !== undefined) {
+    const parsed = parsePackLocator(options.pack);
+    if ("error" in parsed) {
+      console.error(parsed.error);
+      return 1;
+    }
+    pack = parsed;
+  }
+
+  const preflightError = initPreflightError(
+    flow.target,
+    flow.alternate,
+    options,
+    flow.fileSystem,
+  );
+  if (preflightError) {
+    console.error(preflightError);
+    return 1;
+  }
+
+  let presetLocator = FIRST_PARTY_PACKAGE;
+  if (pack) {
+    const prepared = await preparePack(
+      flow.directory,
+      pack,
+      flow.state,
+      flow.fileSystem,
+      flow.runPackageManager,
+      flow.selection,
+    );
+    if ("error" in prepared) return abort(prepared.error);
+    presetLocator = prepared.presetLocator;
+    console.log(`selected ${presetLocator}`);
+  }
+
+  const contents = bareConfig(presetLocator, !pack);
+  if (!preflightPreset(flow.target, contents, flow.context)) return abort();
+  return { contents };
+}
+
+/**
+ * Snapshots the configuration targets, prepares the host plugin edit, and
+ * commits the configuration files. Every snapshotted file is recorded in the
+ * shared state, so a later failure restores the whole pre-init state.
+ */
+function commitConfiguration(
+  flow: InitFlow,
+  contents: string,
+  abort: Abort,
+): number | { plugin: PluginPlan } {
+  const before = {
+    target: snapshot(flow.target, flow.fileSystem),
+    alternate: snapshot(flow.alternate, flow.fileSystem),
+  };
+  const plugin = preparePlugin(flow.directory, flow.fileSystem);
+  if ("error" in plugin) return abort(plugin.error);
+
+  const committed = commitInitFiles(
+    flow.target,
+    contents,
+    flow.alternate,
+    flow.opencode,
+    before,
+    plugin,
+    flow.state,
+    flow.fileSystem,
+  );
+  if (committed.error) return abort(committed.error);
+  return { plugin };
 }
 
 export async function runInitWithDependencies(
@@ -381,74 +941,59 @@ export async function runInitWithDependencies(
     ...defaultFileSystem,
     ...dependencies,
   };
-  const context = dependencies.context ?? {};
-  const target = join(directory, "atlante.jsonc");
-  const alternate = join(directory, "atlante.json");
-  const opencode = opencodeConfigPath(directory, fileSystem);
+  const flow: InitFlow = {
+    directory,
+    target: join(directory, "atlante.jsonc"),
+    alternate: join(directory, "atlante.json"),
+    opencode: opencodeConfigPath(directory, fileSystem),
+    fileSystem,
+    context: dependencies.context ?? {},
+    runPackageManager:
+      dependencies.runPackageManager ?? runPackageManagerDefault,
+    buildProject: dependencies.buildProject ?? buildProjectDefault,
+    selection: {
+      isInteractive: dependencies.isInteractive ?? defaultIsInteractive,
+      prompt: dependencies.prompt ?? defaultPrompt,
+    },
+    state: { changes: [] },
+  };
+  const abort: Abort = (mainError?: string) =>
+    abortWithRestore(flow.state, fileSystem, flow.runPackageManager, mainError);
 
   try {
-    assertRealProjectRoot(directory);
-    const preflightError = initPreflightError(
-      target,
-      alternate,
-      options,
-      fileSystem,
-    );
-    if (preflightError) {
-      console.error(preflightError);
-      return 1;
-    }
-    const contents = bareConfig(options.preset);
-    if (!preflightPreset(target, contents, context)) return 1;
+    const prepared = await prepareConfiguration(flow, options, abort);
+    if (typeof prepared === "number") return prepared;
 
-    const before = {
-      target: snapshot(target, fileSystem),
-      alternate: snapshot(alternate, fileSystem),
-    };
-    const plugin = preparePlugin(directory, fileSystem);
-    if ("error" in plugin) {
-      console.error(`error: ${plugin.error}`);
-      return 1;
-    }
-
-    const committed = commitInitFiles(
-      target,
-      contents,
-      alternate,
-      opencode,
-      before,
-      plugin,
-      fileSystem,
-    );
-    if (committed.error) {
-      console.error(committed.error);
-      return 1;
-    }
+    const committed = commitConfiguration(flow, prepared.contents, abort);
+    if (typeof committed === "number") return committed;
 
     const result = buildAndReport(
-      directory,
-      target,
-      committed.changes,
+      flow.directory,
+      flow.target,
+      flow.state,
       fileSystem,
-      dependencies.buildProject ?? buildProjectDefault,
-      context,
+      flow.runPackageManager,
+      flow.buildProject,
+      flow.context,
     );
     if (result !== 0) return result;
     console.log(
-      plugin.registered
-        ? `registered @atlante/opencode in ${opencode}`
-        : `@atlante/opencode is already registered in ${opencode}`,
+      committed.plugin.registered
+        ? `registered @atlante/opencode in ${flow.opencode}`
+        : `@atlante/opencode is already registered in ${flow.opencode}`,
     );
     return 0;
   } catch (cause) {
-    printDiagnostic({
-      severity: "error",
-      code: "initialization-failed",
-      message: "could not initialize the project",
-      source: directory,
-      next: "fix the reported error and run `atlante init` again",
-      cause: cause instanceof Error ? cause.message : String(cause),
-    });
-    return 1;
+    return abort(
+      formatInitError(
+        "initialization-failed",
+        "could not initialize the project",
+        {
+          source: directory,
+          next: "fix the reported error and run `atlante init` again",
+          cause: cause instanceof Error ? cause.message : String(cause),
+        },
+      ),
+    );
   }
 }

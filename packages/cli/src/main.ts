@@ -42,11 +42,14 @@ export function createProgram(): Command {
   program
     .command("init")
     .argument("[path]", "project directory", process.cwd())
-    .option("--preset <locator>", "package locator preset to extend")
+    .option(
+      "--pack <locator>",
+      "pack locator to install and extend; use <pack>/<preset> to select a preset explicitly",
+    )
     .option("--force", "overwrite an existing Atlante config")
     .description("scaffold an Atlante configuration")
     .action(
-      async (path: string, options: { preset?: string; force?: boolean }) => {
+      async (path: string, options: { pack?: string; force?: boolean }) => {
         process.exitCode = await runInit(path, options);
       },
     );

@@ -8,7 +8,8 @@ import {
 
 type FirstPartyPackManifest = typeof import("@atlante/pack/package.json");
 
-const FIRST_PARTY_PACKAGE: FirstPartyPackManifest["name"] = "@atlante/pack";
+export const FIRST_PARTY_PACKAGE: FirstPartyPackManifest["name"] =
+  "@atlante/pack";
 
 /** Resolves and validates the static pack installed with this CLI. */
 export function resolveFirstPartyPack(): ResourcePack {
