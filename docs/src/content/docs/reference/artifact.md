@@ -51,7 +51,7 @@ a complete new tree, or no usable tree, never a partial tree.
 ## Verification
 
 The adapter-facing `readArtifacts` reader is provided by the private
-`@atlante/builder` workspace. It returns no descriptors until every manifest
+`@atlante/artifacts` workspace. It returns no descriptors until every manifest
 entry and payload passes its checks; users of the published CLI do not install
 that private workspace separately.
 

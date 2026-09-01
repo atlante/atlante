@@ -1,4 +1,4 @@
-import { readArtifacts } from "@atlante/builder/artifacts";
+import { readArtifacts } from "@atlante/artifacts/read-only";
 import type { Plugin } from "@opencode-ai/plugin";
 import type { PluginArtifacts, PluginArtifactsReader } from "./artifacts.js";
 import {

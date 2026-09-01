@@ -4,12 +4,13 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-// All seven manifests stay synchronized and version-bumped together; the four
+// All eight manifests stay synchronized and version-bumped together; the five
 // internal packages plus the static pack are covered by the release graph.
 // Publishing is the separate scripts/publish-packages.ts step.
 const PACKAGES = [
   "schema",
   "resources",
+  "artifacts",
   "validator",
   "builder",
   "pack",

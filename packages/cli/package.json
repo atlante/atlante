@@ -40,6 +40,7 @@
     "jsonc-parser": "^3.3.1"
   },
   "devDependencies": {
+    "@atlante/artifacts": "workspace:*",
     "@atlante/builder": "workspace:*",
     "@atlante/resources": "workspace:*",
     "@atlante/schema": "workspace:*",

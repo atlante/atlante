@@ -9,6 +9,7 @@ const PACKAGES = [
   "schema",
   "resources",
   "validator",
+  "artifacts",
   "builder",
   "pack",
   "opencode",
@@ -69,7 +70,7 @@ test("removes old workspace entries, manifests, imports, scripts, and lock entri
   }
 });
 
-test("keeps resources private and synchronizes exactly seven workspaces", () => {
+test("keeps resources private and synchronizes exactly eight workspaces", () => {
   const resources = readJson(
     join(ROOT, "packages", "resources", "package.json"),
   );
@@ -167,6 +168,26 @@ test("keeps the first-party pack as a CLI runtime dependency in source", () => {
   const cli = readJson(join(ROOT, "packages", "cli", "package.json"));
   const dependencies = cli.dependencies as Record<string, unknown>;
   expect(dependencies["@atlante/pack"]).toBe("workspace:*");
+});
+
+// build.ts deliberately documents itself as the only caller of the
+// publisher: bypassing it would skip the fail-closed prepare-then-publish
+// ordering. publishArtifacts escaping into a package entry turned that
+// invariant into a convention, so pin it structurally.
+test("keeps publishArtifacts callers pinned to the builder orchestration", () => {
+  const offenders: string[] = [];
+  for (const name of PACKAGES) {
+    if (name === "artifacts") continue; // owns the implementation
+    const packageRoot = join(ROOT, "packages", name);
+    for (const file of filesUnder(join(packageRoot, "src"))) {
+      if (readFileSync(file, "utf8").includes("publishArtifacts")) {
+        offenders.push(file);
+      }
+    }
+  }
+  expect(offenders).toEqual([
+    join(ROOT, "packages", "builder", "src", "build.ts"),
+  ]);
 });
 
 test("orders release packages pack, CLI, then OpenCode adapter", () => {

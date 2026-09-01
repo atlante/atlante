@@ -1,14 +1,14 @@
 import { lstatSync } from "node:fs";
 import { resolve } from "node:path";
-import type { Diagnostic, ResourceWatchContext } from "@atlante/validator";
-import { hasErrors } from "@atlante/validator";
-import { createArtifacts } from "./artifacts.js";
-import { loadProject, type ProjectContext } from "./project.js";
 import {
   type ArtifactPublicationWarning,
+  createArtifacts,
   type PublishDependencies,
   publishArtifacts,
-} from "./publish.js";
+} from "@atlante/artifacts";
+import type { Diagnostic, ResourceWatchContext } from "@atlante/validator";
+import { hasErrors } from "@atlante/validator";
+import { loadProject, type ProjectContext } from "./project.js";
 import { prepareResolvedDocument } from "./resource-prepare.js";
 
 export type BuildDependencies = PublishDependencies;

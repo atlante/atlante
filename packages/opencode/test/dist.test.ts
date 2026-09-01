@@ -1,9 +1,7 @@
 import { afterEach, beforeAll, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
 import {
-  cpSync,
   existsSync,
-  mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
@@ -13,13 +11,13 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildProject } from "@atlante/builder";
-import { SCHEMA_URI } from "@atlante/schema";
+import type { ArtifactInputs } from "@atlante/artifacts";
 import type {
   PluginInput,
   ToolDefinition,
   ToolResult,
 } from "@opencode-ai/plugin";
+import { writeArtifactTree } from "./artifact-fixture.js";
 
 type HostConfig = {
   agent?: Record<string, Record<string, unknown>>;
@@ -29,20 +27,17 @@ type HostConfig = {
 const created: string[] = [];
 const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
 const PLUGIN_SOURCE_ROOT = join(ROOT, "packages", "opencode", "src");
-const BUILDER_SOURCE_ROOT = join(ROOT, "packages", "builder", "src");
+const ARTIFACTS_SOURCE_ROOT = join(ROOT, "packages", "artifacts", "src");
 const PRODUCTION_ENTRYPOINTS = [
   join(PLUGIN_SOURCE_ROOT, "index.ts"),
   join(PLUGIN_SOURCE_ROOT, "api.ts"),
 ];
-const ARTIFACT_READER = join(BUILDER_SOURCE_ROOT, "artifacts-public.ts");
-const ALLOWED_ARTIFACT_SOURCES = new Set([
-  ARTIFACT_READER,
-  join(BUILDER_SOURCE_ROOT, "artifacts.ts"),
-  join(BUILDER_SOURCE_ROOT, "artifact-names.ts"),
-  join(BUILDER_SOURCE_ROOT, "artifacts-internal.ts"),
-]);
-const firstPartyPackRoot = fileURLToPath(
-  new URL("../../pack/", import.meta.url),
+// The adapter's declared @atlante/artifacts dependency resolves through its
+// package exports like any workspace package; the reader entry is the import
+// the plugin uses.
+const READ_ONLY_ENTRY = Bun.resolveSync(
+  "@atlante/artifacts/read-only",
+  PLUGIN_SOURCE_ROOT,
 );
 
 const FIRST_PARTY_SKILLS = ["brainstorm", "plan", "build", "review"] as const;
@@ -94,88 +89,28 @@ afterEach(() => {
     rmSync(directory, { recursive: true, force: true });
 });
 
-function localResourceProject(): string {
+function craftedProject(inputs: ArtifactInputs): string {
   const root = mkdtempSync(join(tmpdir(), "atlante-built-plugin-"));
   created.push(root);
-  cpSync(firstPartyPackRoot, join(root, "node_modules", "@atlante", "pack"), {
-    recursive: true,
-  });
-  writeFileSync(
-    join(root, "package.json"),
-    `${JSON.stringify({
-      name: "atlante-built-plugin-fixture",
-      version: "1.0.0",
-      devDependencies: { "@atlante/pack": "workspace:0.1.6" },
-    })}\n`,
-  );
-  writeFileSync(
-    join(root, "atlante.jsonc"),
-    `${JSON.stringify({
-      $schema: SCHEMA_URI,
-      agents: {
-        reviewer: {
-          $instance: "./resources/reviewer",
-          description: "A locally authored reviewer.",
-        },
-      },
-      skills: {
-        testing: {
-          $instance: "./resources/testing",
-          description: "A locally authored testing skill.",
-        },
-      },
-    })}\n`,
-  );
-  mkdirSync(join(root, "resources", "reviewer"), { recursive: true });
-  mkdirSync(join(root, "resources", "testing"), { recursive: true });
-  writeFileSync(
-    join(root, "resources", "reviewer", "instance.jsonc"),
-    JSON.stringify({
-      $template: "@atlante/pack/agent",
-      identity: "You are a built-path reviewer.",
-      mission: "Verify the generated plugin runtime.",
-    }),
-  );
-  writeFileSync(
-    join(root, "resources", "testing", "instance.jsonc"),
-    JSON.stringify({
-      $template: "@atlante/pack/skill",
-      title: "Built testing",
-      overview: "A skill materialized by the generated plugin.",
-      sections: [{ markdown: "Built skill content." }],
-    }),
-  );
-  const result = buildProject(root);
-  if (result.diagnostics.some(({ severity }) => severity === "error"))
-    throw new Error("built plugin resource fixture failed to build");
+  writeArtifactTree(root, inputs);
   return root;
 }
 
-function firstPartyPackProject(): string {
-  const root = mkdtempSync(join(tmpdir(), "atlante-built-plugin-pack-"));
-  created.push(root);
-  cpSync(firstPartyPackRoot, join(root, "node_modules", "@atlante", "pack"), {
-    recursive: true,
+function craftedFirstPartyProject(): string {
+  return craftedProject({
+    agents: [
+      {
+        hostAgentId: "architect",
+        description: "The Atlante lead engineer",
+        prompt: `# Identity\n\nYou are the lead engineer for Atlante.\n\n## Workflow\n\n### 1. Brainstorm\n\n### 2. Plan\n\n### 3. Build\n\n### 4. Review\n`,
+      },
+    ],
+    skills: FIRST_PARTY_SKILLS.map((skillId) => ({
+      skillId,
+      description: `${skillId}: workflow phase skill`,
+      content: `${FIRST_PARTY_SKILL_LANDMARKS[skillId].title}\n\n## Overview\n\n${FIRST_PARTY_SKILL_LANDMARKS[skillId].overview}\n`,
+    })),
   });
-  writeFileSync(
-    join(root, "package.json"),
-    `${JSON.stringify({
-      name: "atlante-built-plugin-pack-fixture",
-      version: "1.0.0",
-      devDependencies: { "@atlante/pack": "workspace:0.1.6" },
-    })}\n`,
-  );
-  writeFileSync(
-    join(root, "atlante.jsonc"),
-    `${JSON.stringify({
-      $schema: SCHEMA_URI,
-      extends: "@atlante/pack",
-    })}\n`,
-  );
-  const result = buildProject(root);
-  if (result.diagnostics.some(({ severity }) => severity === "error"))
-    throw new Error("first-party pack fixture failed to build");
-  return root;
 }
 
 // Bun splitting emits shared chunk-*.js files next to the entries, so the
@@ -232,7 +167,7 @@ function resolveSourceImport(
 function isAllowedSourcePath(path: string): boolean {
   return (
     path.startsWith(`${PLUGIN_SOURCE_ROOT}/`) ||
-    ALLOWED_ARTIFACT_SOURCES.has(path)
+    path.startsWith(`${ARTIFACTS_SOURCE_ROOT}/`)
   );
 }
 
@@ -241,13 +176,21 @@ function isForbiddenSourcePath(path: string): boolean {
   return (
     normalized.includes("/packages/resources/src/") ||
     normalized.includes("/packages/validator/src/") ||
+    normalized.includes("/packages/builder/src/") ||
     /\/(?:package-resolution|resolver|resolve)\.[^/]+$/.test(normalized)
   );
 }
 
+function isArtifactsSpecifier(specifier: string): boolean {
+  // Exactly the adapter-facing reader entry, mirroring the previous exact
+  // @atlante/builder/artifacts special case: importing the artifacts root
+  // would pull creation and publication helpers into the adapter bundle.
+  return specifier === "@atlante/artifacts/read-only";
+}
+
 function isForbiddenSpecifier(specifier: string): boolean {
   if (
-    specifier === "@atlante/builder/artifacts" ||
+    isArtifactsSpecifier(specifier) ||
     specifier === "@opencode-ai/plugin" ||
     specifier.startsWith("node:")
   ) {
@@ -260,8 +203,16 @@ function sourceImportTarget(
   from: string,
   specifier: string,
 ): string | undefined {
-  if (specifier === "@atlante/builder/artifacts") return ARTIFACT_READER;
-  return resolveSourceImport(from, specifier);
+  if (specifier.startsWith(".")) return resolveSourceImport(from, specifier);
+  // Other bare specifiers are externals (for example @opencode-ai/plugin) and
+  // are not followed; the declared artifacts dependency resolves ordinarily
+  // through its package exports.
+  if (!isArtifactsSpecifier(specifier)) return undefined;
+  try {
+    return Bun.resolveSync(specifier, dirname(from));
+  } catch {
+    return undefined;
+  }
 }
 
 function collectSourceImports(
@@ -286,7 +237,7 @@ function productionSourceGraph(): SourceGraph {
     edges: [],
     unresolved: [],
   };
-  const pending = [...PRODUCTION_ENTRYPOINTS, ARTIFACT_READER];
+  const pending = [...PRODUCTION_ENTRYPOINTS];
 
   while (pending.length > 0) {
     const current = pending.pop();
@@ -353,7 +304,7 @@ function metadataGraph(metafile: Bun.BuildMetafile): MetadataGraph {
     forbiddenImports: [],
     unresolved: [],
   };
-  const pending = [...PRODUCTION_ENTRYPOINTS, ARTIFACT_READER];
+  const pending = [...PRODUCTION_ENTRYPOINTS];
 
   while (pending.length > 0) {
     const current = pending.pop();
@@ -474,7 +425,7 @@ test("the published manifest exposes a server target OpenCode can discover", () 
   }
 });
 
-test("the built bundle inlines @atlante/builder and keeps @opencode-ai/plugin external", () => {
+test("the built bundle inlines @atlante/artifacts and keeps @opencode-ai/plugin external", () => {
   const specifiers = moduleSpecifiers(bundleSource());
   const hasAtlanteSpecifier = specifiers.some((name) =>
     name.startsWith("@atlante/"),
@@ -493,7 +444,7 @@ test("the recursive production graph and bundle inputs remain artifact-only", as
   );
 
   expect(sourceGraph.unresolved).toEqual([]);
-  expect(sourceGraph.nodes).toContain(ARTIFACT_READER);
+  expect(sourceGraph.nodes).toContain(READ_ONLY_ENTRY);
   expect(
     [...sourceGraph.nodes].filter((path) => !isAllowedSourcePath(path)),
   ).toEqual([]);
@@ -513,11 +464,11 @@ test("the recursive production graph and bundle inputs remain artifact-only", as
 
   expect(metadata.unresolved).toEqual([]);
   expect(metadata.forbiddenImports).toEqual([]);
-  expect(metadata.reachable).toContain(ARTIFACT_READER);
+  expect(metadata.reachable).toContain(READ_ONLY_ENTRY);
   expect(
     [...metadata.reachable].filter((path) => !isAllowedSourcePath(path)),
   ).toEqual([]);
-  expect(allInputs).toContain(ARTIFACT_READER);
+  expect(allInputs).toContain(READ_ONLY_ENTRY);
   expect(allInputs.filter((path) => !isAllowedSourcePath(path))).toEqual([]);
   expect(
     [...bundledInputs].filter((path) => !isAllowedSourcePath(path)),
@@ -525,10 +476,23 @@ test("the recursive production graph and bundle inputs remain artifact-only", as
   expect([...bundledInputs].filter(isForbiddenSourcePath)).toEqual([]);
 });
 
-test("the generated plugin materializes built local-resource artifacts at runtime", async () => {
-  const root = localResourceProject();
-  rmSync(join(root, "atlante.jsonc"));
-  rmSync(join(root, "resources"), { recursive: true, force: true });
+test("the generated plugin materializes verified published artifacts at runtime", async () => {
+  const root = craftedProject({
+    agents: [
+      {
+        hostAgentId: "reviewer",
+        description: "A locally authored reviewer.",
+        prompt: "You are a built-path reviewer.\n",
+      },
+    ],
+    skills: [
+      {
+        skillId: "testing",
+        description: "A skill materialized by the generated plugin.",
+        content: "Built skill content.\n",
+      },
+    ],
+  });
 
   const { default: BuiltAtlantePlugin } = await import(DIST_INDEX_URL);
   const hooks = await BuiltAtlantePlugin({ directory: root } as PluginInput);
@@ -546,9 +510,7 @@ test("the generated plugin materializes built local-resource artifacts at runtim
 });
 
 async function firstPartyMaterializedPlugin() {
-  const root = firstPartyPackProject();
-  rmSync(join(root, "atlante.jsonc"));
-  rmSync(join(root, "node_modules"), { recursive: true, force: true });
+  const root = craftedFirstPartyProject();
 
   const { default: BuiltAtlantePlugin } = await import(DIST_INDEX_URL);
   const hooks = await BuiltAtlantePlugin({ directory: root } as PluginInput);
@@ -599,11 +561,13 @@ async function expectEveryPhaseSkillLandmark(
   }
 }
 
-// Host-adapter integration coverage: the adapter materializes verified built
+// Host-adapter integration coverage: the adapter materializes verified
 // artifacts into the host config and serves skills through atlante_skill. It
 // brokers no runtime workflow files, so these assertions cover materialization
-// landmarks only.
-test("the generated plugin materializes the first-party architect and serves every phase skill through atlante_skill", async () => {
+// landmarks only. The fixture crafts a multi-skill publication whose content
+// matches the landmarks below; real pack rendering is covered by the builder
+// tests and the smoke test.
+test("the generated plugin materializes a multi-skill publication and serves every skill through atlante_skill", async () => {
   const { hooks, config } = await firstPartyMaterializedPlugin();
 
   expectSingleArchitectAgent(config);
@@ -622,7 +586,22 @@ test("the generated plugin materializes the first-party architect and serves eve
 });
 
 test("the generated plugin atomically ignores invalid artifacts without host mutation", async () => {
-  const root = localResourceProject();
+  const root = craftedProject({
+    agents: [
+      {
+        hostAgentId: "reviewer",
+        description: "A locally authored reviewer.",
+        prompt: "You are a built-path reviewer.\n",
+      },
+    ],
+    skills: [
+      {
+        skillId: "testing",
+        description: "A skill materialized by the generated plugin.",
+        content: "Built skill content.\n",
+      },
+    ],
+  });
   writeFileSync(join(root, ".atlante", "artifacts", "manifest.json"), "{");
 
   const { default: BuiltAtlantePlugin } = await import(DIST_INDEX_URL);
@@ -641,11 +620,10 @@ test("the generated plugin atomically ignores invalid artifacts without host mut
 
 // ET1b: the published declarations are a consumer-facing contract. They may
 // import only the plugin's own modules and @opencode-ai/plugin — never the
-// private @atlante/builder/artifacts, which a consumer's node_modules would
-// not contain. Plugin-owned structural types replace the builder types in
-// public signatures; the ET1b source refactor ships them via
-// src/artifacts.ts (emitted as dist/artifacts.d.ts) and re-exports them from
-// the ./api entry.
+// private @atlante/artifacts package, which a consumer's node_modules would
+// not contain. Plugin-owned structural types replace the artifacts types in
+// public signatures; they ship via src/artifacts.ts (emitted as
+// dist/artifacts.d.ts) and are re-exported from the ./api entry.
 function declarationSources(): { file: string; source: string }[] {
   return readdirSync(DIST)
     .filter((file) => file.endsWith(".d.ts"))
