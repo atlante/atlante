@@ -369,12 +369,19 @@ test("the build command exposes a --watch option", () => {
   expect(build?.options.map((option) => option.long)).toContain("--watch");
 });
 
-test("init preset help describes a package locator rather than starter", () => {
+test("init pack help describes a pack locator rather than starter", () => {
   const init = createProgram().commands.find(
     (command) => command.name() === "init",
   );
-  const preset = init?.options.find((option) => option.long === "--preset");
+  const pack = init?.options.find((option) => option.long === "--pack");
 
-  expect(preset?.description).toContain("package locator");
-  expect(preset?.description).not.toContain("starter");
+  expect(pack?.description).toContain("pack locator");
+  expect(pack?.description).not.toContain("starter");
+});
+
+test("init no longer exposes the removed --preset option", () => {
+  const init = createProgram().commands.find(
+    (command) => command.name() === "init",
+  );
+  expect(init?.options.map((option) => option.long)).not.toContain("--preset");
 });

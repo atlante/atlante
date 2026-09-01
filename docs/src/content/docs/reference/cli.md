@@ -19,19 +19,45 @@ adapter, and build the initial artifacts.
 
 ```sh
 npx @atlante/cli@latest init [path]
-npx @atlante/cli@latest init [path] --preset <package-locator>
+npx @atlante/cli@latest init [path] --pack <pack-locator>
+npx @atlante/cli@latest init [path] --pack <pack>/<preset>
 npx @atlante/cli@latest init [path] --force
 ```
 
 - `path` is a project directory and defaults to the current directory.
-- `--preset <locator>` selects a resolvable preset instead of the bundled default `@atlante/pack`.
+- `--pack <locator>` selects a pack to install and extend instead of the bundled default `@atlante/pack`. The locator subpath names a preset explicitly, e.g. `@acme/review-pack/strict`.
 - `--force` overwrites an existing `atlante.jsonc` and removes the alternate `atlante.json`.
 
 `init` validates the selected preset before changing files. It creates or updates
 `opencode.jsonc` (reusing an existing `opencode.json` when present) without
-replacing existing host settings and runs a build. A
-custom preset must be declared and installed in the project before it can be
-resolved.
+replacing existing host settings and runs a build.
+
+### Pack installation
+
+With `--pack`, installation is part of initialization:
+
+- A pack that is not declared yet is installed with the project's package
+  manager, detected from the lockfile (`bun.lockb`/`bun.lock` → bun,
+  `pnpm-lock.yaml` → pnpm, `yarn.lock` → yarn, `package-lock.json` → npm; npm
+  is the fallback when no lockfile exists), and declared in `devDependencies`.
+- Installation is skipped for the bundled first-party pack and for packs that
+  are already declared in `dependencies`, `optionalDependencies`, or
+  `devDependencies` (`peerDependencies` does not resolve and always gains a
+  dev dependency). Existing declarations are never moved between dependency
+  groups or replaced; a declared-but-uninstalled pack is reconciled with a
+  plain package manager install.
+- The pack's presets are discovered by convention: the pack root is the
+  default preset, and any directory below it that contains `atlante.jsonc` or
+  `atlante.json` is a named preset. Selecting `--pack @acme/pack` picks the
+  only preset automatically and prompts when the pack provides several;
+  non-interactive terminals must pass the preset explicitly as
+  `--pack @acme/pack/<preset>`.
+- Initialization is transactional: a failure after the snapshot — including an
+  aborted prompt — rolls back the configuration files and restores
+  `package.json` and the lockfile. When the pack was newly added, the detected
+  package manager install is re-run to reconcile `node_modules` (a plain
+  install leaves the state already reconciled). If that reconciliation fails,
+  `init` reports `rollback-failed` with manual instructions.
 
 ## `atlante validate`
 

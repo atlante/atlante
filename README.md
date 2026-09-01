@@ -194,13 +194,20 @@ Atlante validates and renders deterministic artifacts; OpenCode consumes only ve
 
 A pack is static Atlante content. It can contain presets, templates, and instances, but it has no JavaScript entry point, registration hook, or executable API.
 
-`@atlante/pack` is the first-party pack. `atlante init` uses its default preset unless you provide another preset locator:
+`@atlante/pack` is the first-party pack. `atlante init` uses its default preset unless you select another pack with `--pack`:
 
 ```bash
-npm install --save-dev @acme/review-pack
-npx @atlante/cli@latest init --preset @acme/review-pack
-npx @atlante/cli@latest init --preset @acme/review-pack/strict
+npx @atlante/cli@latest init --pack @acme/review-pack
+npx @atlante/cli@latest init --pack @acme/review-pack/strict
 ```
+
+`--pack` installs the pack with the project's package manager (detected from the
+lockfile) and declares it in `devDependencies`, unless it is already declared.
+Selecting a pack without a preset picks its only preset automatically and
+prompts when it provides several; in non-interactive terminals, pass the preset
+explicitly as `<pack>/<preset>`. Initialization is transactional: a failure
+restores the configuration files, `package.json`, and the lockfile, and — when
+the pack was newly added — reconciles `node_modules`.
 
 Use an ordered `extends` array when a configuration needs multiple preset layers. Local configuration wins after the selected layers are merged.
 

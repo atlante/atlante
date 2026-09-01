@@ -10,7 +10,11 @@ import {
 } from "node:fs";
 import { join, resolve } from "node:path";
 import { TextDecoder, TextEncoder } from "node:util";
-import { type ArtifactNamespace, artifactPath } from "./artifact-names.js";
+import {
+  type ArtifactNamespace,
+  artifactPath,
+  HASH_PATTERN,
+} from "./artifact-names.js";
 import type {
   ArtifactInputs,
   ArtifactManifest,
@@ -22,7 +26,6 @@ import type {
 const ARTIFACT_FORMAT = "atlante-artifacts" as const;
 const ARTIFACT_VERSION = 1 as const;
 
-const HASH_PATTERN = /^[0-9a-f]{64}$/;
 const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 const manifestDecoder = new TextDecoder("utf-8", { fatal: true });
 const encoder = new TextEncoder();

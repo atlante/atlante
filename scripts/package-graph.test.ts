@@ -5,6 +5,8 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(fileURLToPath(new URL(".", import.meta.url)), "..");
+// Packages are listed in architectural layer order, lowest layer first; keep
+// this list in the same order as AGENTS.md and scripts/release.ts.
 const PACKAGES = [
   "schema",
   "resources",

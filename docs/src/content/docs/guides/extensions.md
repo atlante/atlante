@@ -32,8 +32,9 @@ root:
 }
 ```
 
-The consuming project declares and installs a custom Pack, then selects it with
-`--preset`. The published CLI resolves the first-party `@atlante/pack` from its
+The consuming project selects a custom Pack with `--pack`, which installs it
+with the project's package manager and declares it in `devDependencies`. The
+published CLI resolves the first-party `@atlante/pack` from its
 bundled content, so the default Pack does not need a separate installation.
 Atlante reads only selected static resources and their transitive dependencies.
 

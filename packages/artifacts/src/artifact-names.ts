@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 
 export type ArtifactNamespace = "agents" | "skills";
 
-const HASH_PATTERN = /^[0-9a-f]{64}$/;
+export const HASH_PATTERN = /^[0-9a-f]{64}$/;
 const FILENAME_PATTERN =
   /^(?:[a-z0-9]+(?:-[a-z0-9]+)*|artifact)-[0-9a-f]{64}-[0-9a-f]{64}\.md$/;
 const encoder = new TextEncoder();
