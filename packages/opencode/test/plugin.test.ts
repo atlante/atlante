@@ -1,30 +1,22 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import {
-  cpSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
   rmSync,
   symlinkSync,
-  unlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { buildProject } from "@atlante/builder";
-import { SCHEMA_URI } from "@atlante/schema";
+import type { ArtifactInputs } from "@atlante/artifacts";
 import type { Config, PluginInput } from "@opencode-ai/plugin";
-import {
-  EXTERNAL_AGENT_PROMPT,
-  EXTERNAL_SKILL_CONTENT,
-  writeExternalPack,
-} from "../../builder/test/external-pack-fixture.js";
 import type { HostConfig } from "../src/api.js";
 import { injectAgents } from "../src/inject.js";
 import { AtlantePlugin, createAtlantePlugin } from "../src/plugin.js";
+import { writeArtifactTree } from "./artifact-fixture.js";
 
 type ArtifactManifestEntry = {
   id: string;
@@ -40,106 +32,101 @@ type ArtifactManifest = {
   skills: ArtifactManifestEntry[];
 };
 
+// Rendered-content constants kept local: the adapter tests exercise
+// materialization from a verified tree, not pack rendering, which the builder
+// tests own.
+const EXTERNAL_AGENT_PROMPT = `# External Review
+
+You review external packs.
+
+## Mission
+
+Review the strict artifact.
+
+Detail: Relative detail from the external pack.
+`;
+
+const EXTERNAL_SKILL_CONTENT = `# External Testing
+
+Use the external pack.
+
+Strict external body.
+`;
+
 const created: string[] = [];
-const firstPartyPackRoot = fileURLToPath(
-  new URL("../../pack/", import.meta.url),
-);
+
 function tempDir(prefix = "atlante-plugin-"): string {
   const dir = mkdtempSync(join(tmpdir(), prefix));
   created.push(dir);
   return dir;
 }
 
-function project(config: string): string {
+const reviewerAgent: ArtifactInputs["agents"] = [
+  {
+    hostAgentId: "reviewer",
+    description: "Reviews changes.",
+    prompt: "You review.\nFind defects.\n",
+  },
+];
+
+const testingSkill: ArtifactInputs["skills"] = [
+  {
+    skillId: "testing",
+    description: "Testing guidance",
+    content: "Run tests.\n",
+  },
+];
+
+const agentOnly: ArtifactInputs = { agents: reviewerAgent, skills: [] };
+const agentWithSkill: ArtifactInputs = {
+  agents: reviewerAgent,
+  skills: testingSkill,
+};
+
+function craftedProject(inputs: ArtifactInputs = agentWithSkill): string {
   const dir = tempDir();
-  writeFileSync(join(dir, "atlante.jsonc"), config);
-  cpSync(firstPartyPackRoot, join(dir, "node_modules", "@atlante", "pack"), {
-    recursive: true,
-  });
-  writeFileSync(
-    join(dir, "package.json"),
-    `${JSON.stringify({
-      name: "atlante-plugin-fixture",
-      version: "1.0.0",
-      devDependencies: { "@atlante/pack": "workspace:0.1.6" },
-    })}\n`,
-  );
+  writeArtifactTree(dir, inputs);
   return dir;
 }
 
-function builtProject(config = validWithSkill): string {
-  const dir = project(config);
-  const result = buildProject(dir);
-  if (result.diagnostics.some((diagnostic) => diagnostic.severity === "error"))
-    throw new Error("test fixture failed to build");
-  return dir;
-}
-
-function builtLocalResourceProject(): string {
-  const dir = project(`{
-    "$schema": "${SCHEMA_URI}",
-    "agents": {
-      "reviewer": {
-        "$instance": "./resources/reviewer",
-        "description": "A locally authored reviewer."
-      }
-    },
-    "skills": {
-      "testing": {
-        "$instance": "./resources/testing",
-        "description": "A locally authored testing skill."
-      }
-    }
-  }`);
-  mkdirSync(join(dir, "resources", "reviewer"), { recursive: true });
-  mkdirSync(join(dir, "resources", "testing"), { recursive: true });
-  writeFileSync(
-    join(dir, "resources", "reviewer", "instance.jsonc"),
-    `{
-      "$template": "@atlante/pack/agent",
-      "identity": "You are a locally authored reviewer.",
-      "mission": "Prove that local resources were built before source removal."
-    }`,
-  );
-  writeFileSync(
-    join(dir, "resources", "testing", "instance.jsonc"),
-    `{
-      "$template": "@atlante/pack/skill",
-      "title": "Local testing",
-      "overview": "A locally authored skill.",
-      "sections": [{ "markdown": "This content came from a local resource." }]
-    }`,
-  );
-
-  const result = buildProject(dir);
-  if (result.diagnostics.some((diagnostic) => diagnostic.severity === "error"))
-    throw new Error("local resource fixture failed to build");
-  return dir;
-}
-
-function builtExternalPackProject(): { directory: string; packRoot: string } {
-  const directory = project(`{
-    "$schema": "${SCHEMA_URI}",
-    "extends": "@acme/review-pack/strict"
-  }`);
-  const packRoot = join(directory, "node_modules", "@acme", "review-pack");
-  mkdirSync(packRoot, { recursive: true });
-  writeExternalPack(packRoot);
-  writeFileSync(
-    join(directory, "package.json"),
-    `${JSON.stringify({
-      name: "atlante-plugin-external-pack-fixture",
-      version: "1.0.0",
-      devDependencies: {
-        "@atlante/pack": "workspace:0.1.6",
-        "@acme/review-pack": "1.2.3",
+function craftedLocalResourceProject(): string {
+  return craftedProject({
+    agents: [
+      {
+        hostAgentId: "reviewer",
+        description: "A locally authored reviewer.",
+        prompt: "You are a locally authored reviewer.\n",
       },
-    })}\n`,
-  );
-  const result = buildProject(directory);
-  if (result.diagnostics.some(({ severity }) => severity === "error"))
-    throw new Error("external pack fixture failed to build");
-  return { directory, packRoot };
+    ],
+    skills: [
+      {
+        skillId: "testing",
+        description: "A locally authored skill.",
+        content: "This content came from a local resource.\n",
+      },
+    ],
+  });
+}
+
+function craftedExternalProject(): { directory: string } {
+  return {
+    directory: craftedProject({
+      agents: [
+        {
+          hostAgentId: "reviewer",
+          description: "External reviewer for strict-project.",
+          prompt: EXTERNAL_AGENT_PROMPT,
+        },
+      ],
+      skills: [
+        {
+          skillId: "testing",
+          description: "Strict external testing for strict-project.",
+          content: EXTERNAL_SKILL_CONTENT,
+        },
+      ],
+    }),
+  };
 }
 
 function digest(value: Uint8Array | string): string {
@@ -196,25 +183,12 @@ afterEach(() => {
     rmSync(dir, { recursive: true, force: true });
 });
 
+// Source-config fixtures the adapter must ignore. They are plain documents
+// without a schema URI: the plugin never reads source configuration, so the
+// content only needs to be a plausible file on disk.
 const valid = `{
-  "$schema": "${SCHEMA_URI}",
   "agents": {
     "reviewer": { "description": "Reviews changes.", "identity": "You review.", "mission": "Find defects." }
-  }
-}`;
-
-const validWithSkill = `{
-  "$schema": "${SCHEMA_URI}",
-  "agents": {
-    "reviewer": { "description": "Reviews changes.", "identity": "You review.", "mission": "Find defects." }
-  },
-  "skills": {
-    "testing": {
-      "description": "Testing guidance",
-      "title": "Testing",
-      "overview": "Testing guidance",
-      "sections": [{ "markdown": "Run tests." }]
-    }
   }
 }`;
 
@@ -251,10 +225,8 @@ async function capturedPluginConfig(
 }
 
 describe("AtlantePlugin", () => {
-  test("materializes local-resource artifacts after source files are removed", async () => {
-    const dir = builtLocalResourceProject();
-    rmSync(join(dir, "atlante.jsonc"));
-    rmSync(join(dir, "resources"), { recursive: true, force: true });
+  test("materializes a verified publication-only directory without any source inputs", async () => {
+    const dir = craftedLocalResourceProject();
 
     const config: HostConfig = {};
     const { hooks, errors } = await capturedPluginConfig(dir, config);
@@ -269,8 +241,8 @@ describe("AtlantePlugin", () => {
     ).resolves.toContain("This content came from a local resource.");
   });
 
-  test("materializes an external-pack build after all source inputs are removed", async () => {
-    const { directory, packRoot } = builtExternalPackProject();
+  test("materializes a verified external publication and leaves the tree untouched", async () => {
+    const { directory } = craftedExternalProject();
     const before = artifactTreeBytes(directory);
     const manifest = manifestAt(directory);
     const agent = manifest.agents[0];
@@ -306,10 +278,6 @@ describe("AtlantePlugin", () => {
       ),
     ).toBe(EXTERNAL_SKILL_CONTENT);
 
-    rmSync(join(directory, "atlante.jsonc"));
-    rmSync(packRoot, { recursive: true, force: true });
-    rmSync(join(directory, "package.json"), { force: true });
-
     const config: HostConfig = {};
     const { hooks, errors } = await capturedPluginConfig(directory, config);
 
@@ -325,11 +293,9 @@ describe("AtlantePlugin", () => {
     expect(artifactTreeBytes(directory)).toEqual(before);
   });
 
-  test("ignores malformed unavailable external source without diagnostics or partial host mutation", async () => {
-    const { directory, packRoot } = builtExternalPackProject();
+  test("ignores a malformed source file without diagnostics or partial host mutation", async () => {
+    const { directory } = craftedExternalProject();
     const before = artifactTreeBytes(directory);
-    rmSync(packRoot, { recursive: true, force: true });
-    rmSync(join(directory, "package.json"), { force: true });
     writeFileSync(join(directory, "atlante.jsonc"), "{ malformed source");
 
     const config: HostConfig = {
@@ -355,9 +321,8 @@ describe("AtlantePlugin", () => {
     expect(artifactTreeBytes(directory)).toEqual(before);
   });
 
-  test("uses verified built artifacts after the source config is removed", async () => {
-    const dir = builtProject();
-    unlinkSync(join(dir, "atlante.jsonc"));
+  test("uses verified artifacts without consulting any source config", async () => {
+    const dir = craftedProject();
 
     let hooks: PluginHooks | undefined;
     const factoryErrors = await capturedErrors(async () => {
@@ -400,7 +365,7 @@ describe("AtlantePlugin", () => {
   ] as const)(
     "does not consult source config after a %s",
     async (_name, alter) => {
-      const dir = builtProject();
+      const dir = craftedProject();
       alter(dir);
 
       const config: HostConfig = {};
@@ -419,7 +384,7 @@ describe("AtlantePlugin", () => {
   });
 
   test("fails open for corrupt artifacts", async () => {
-    const dir = builtProject(validWithSkill);
+    const dir = craftedProject();
     writeFileSync(join(dir, ".atlante", "artifacts", "manifest.json"), "{");
     await expectPluginFailsOpen(dir);
   });
@@ -427,7 +392,7 @@ describe("AtlantePlugin", () => {
   test.each(["format", "version"] as const)(
     "fails open for unsupported manifest %s",
     async (field) => {
-      const dir = builtProject(validWithSkill);
+      const dir = craftedProject();
       const manifest = manifestAt(dir);
       writeManifest(dir, {
         ...manifest,
@@ -441,7 +406,7 @@ describe("AtlantePlugin", () => {
   test.each(["id", "path"] as const)(
     "fails open for duplicate manifest %s",
     async (field) => {
-      const dir = builtProject(validWithSkill);
+      const dir = craftedProject();
       const manifest = manifestAt(dir);
       const agent = manifest.agents[0];
       if (!agent) throw new Error("test fixture has no agent");
@@ -465,7 +430,7 @@ describe("AtlantePlugin", () => {
   test.each(["missing", "corrupt"] as const)(
     "fails open for %s payload",
     async (kind) => {
-      const dir = builtProject(validWithSkill);
+      const dir = craftedProject();
       const manifest = manifestAt(dir);
       const agent = manifest.agents[0];
       if (!agent) throw new Error("test fixture has no agent");
@@ -483,7 +448,7 @@ describe("AtlantePlugin", () => {
   );
 
   test("fails open for invalid-UTF-8 payload", async () => {
-    const dir = builtProject(validWithSkill);
+    const dir = craftedProject();
     const manifest = manifestAt(dir);
     const agent = manifest.agents[0];
     if (!agent) throw new Error("test fixture has no agent");
@@ -505,7 +470,7 @@ describe("AtlantePlugin", () => {
   });
 
   test("fails open for a digest-mismatched payload", async () => {
-    const dir = builtProject(validWithSkill);
+    const dir = craftedProject();
     const agent = manifestAt(dir).agents[0];
     if (!agent) throw new Error("test fixture has no agent");
     writeFileSync(
@@ -517,7 +482,7 @@ describe("AtlantePlugin", () => {
   });
 
   test("fails open for unsafe artifacts", async () => {
-    const dir = builtProject(valid);
+    const dir = craftedProject(agentOnly);
     const manifestPath = join(dir, ".atlante", "artifacts", "manifest.json");
     const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as {
       agents: [{ path: string }];
@@ -528,7 +493,7 @@ describe("AtlantePlugin", () => {
   });
 
   test("fails open for symlinked payloads", async () => {
-    const dir = builtProject(validWithSkill);
+    const dir = craftedProject();
     const agent = manifestAt(dir).agents[0];
     if (!agent) throw new Error("test fixture has no agent");
     const payload = join(
@@ -544,7 +509,7 @@ describe("AtlantePlugin", () => {
   });
 
   test("injects through the plugin with a replacement warning and preserves host fields", async () => {
-    const dir = builtProject(valid);
+    const dir = craftedProject(agentOnly);
     const hooks = await AtlantePlugin(pluginInput(dir));
     const config: HostConfig = {
       agent: {
@@ -575,7 +540,7 @@ describe("AtlantePlugin", () => {
   });
 
   test("stages injection so an adapter failure cannot partially mutate config", async () => {
-    const dir = builtProject(validWithSkill);
+    const dir = craftedProject();
     const config: HostConfig = { agent: { existing: { model: "x" } } };
     const before = structuredClone(config);
     const plugin = createAtlantePlugin({
@@ -597,18 +562,7 @@ describe("AtlantePlugin", () => {
   });
 
   test("preserves host-owned fields and exposes skill-only projects", async () => {
-    const dir = builtProject(`{
-      "$schema": "${SCHEMA_URI}",
-      "agents": {},
-      "skills": {
-        "testing": {
-          "description": "Testing guidance",
-          "title": "Testing",
-          "overview": "Testing guidance",
-          "sections": [{ "markdown": "Run tests." }]
-        }
-      }
-    }`);
+    const dir = craftedProject({ agents: [], skills: testingSkill });
     const hooks = await AtlantePlugin(pluginInput(dir));
     const config: HostConfig = {
       agent: { existing: { model: "x" } },
@@ -622,7 +576,7 @@ describe("AtlantePlugin", () => {
   });
 
   test("leaves the host configuration untouched when commit assignment fails", async () => {
-    const dir = builtProject(validWithSkill);
+    const dir = craftedProject();
     const hooks = await AtlantePlugin(pluginInput(dir));
     const config = { first: "old" } as HostConfig;
     Object.defineProperty(config, "second", {
@@ -646,7 +600,7 @@ describe("AtlantePlugin", () => {
   });
 
   test("recovers when a later config hook follows a failed materialization", async () => {
-    const dir = builtProject(validWithSkill);
+    const dir = craftedProject();
     let attempts = 0;
     const plugin = createAtlantePlugin({
       injectAgents: (staged, artifacts) => {
@@ -675,7 +629,7 @@ describe("AtlantePlugin", () => {
   });
 
   test("rolls back host changes when warning reporting throws", async () => {
-    const dir = builtProject(validWithSkill);
+    const dir = craftedProject();
     const hooks = await AtlantePlugin(pluginInput(dir));
     const config: HostConfig = {
       agent: {

@@ -9,6 +9,7 @@ const PACKAGES = [
   "schema",
   "resources",
   "validator",
+  "artifacts",
   "builder",
   "pack",
   "opencode",
@@ -69,7 +70,7 @@ test("removes old workspace entries, manifests, imports, scripts, and lock entri
   }
 });
 
-test("keeps resources private and synchronizes exactly seven workspaces", () => {
+test("keeps resources private and synchronizes exactly eight workspaces", () => {
   const resources = readJson(
     join(ROOT, "packages", "resources", "package.json"),
   );

@@ -1,3 +1,4 @@
+import type { PublishOperation } from "@atlante/artifacts";
 import {
   type LoadedProject,
   loadProject,
@@ -20,9 +21,9 @@ export type {
   ProjectContext,
 } from "./project.js";
 export { loadProject } from "./project.js";
-export type { PublishOperation } from "./publish.js";
 export { prepareResolvedDocument } from "./resource-prepare.js";
 export { mergeValues } from "./values.js";
+export type { PublishOperation };
 
 export function validateProject(
   target: string,

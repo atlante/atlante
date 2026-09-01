@@ -50,8 +50,8 @@ every payload before returning descriptors. It rejects unknown manifest fields,
 unsupported formats or versions, absolute/traversal/backslash or otherwise
 unsafe paths, duplicate IDs or paths, missing payloads, digest mismatches,
 invalid UTF-8, symlinks, and non-regular files. The reader is the boundary
-between the private builder workspace and host adapters; users do not install
-that private implementation package.
+between the private `@atlante/artifacts` workspace and host adapters; users do
+not install that private implementation package.
 
 In v0.1, the [OpenCode](https://opencode.ai/) adapter consumes only this
 verified tree and materializes Atlante-owned descriptions and prompts. It

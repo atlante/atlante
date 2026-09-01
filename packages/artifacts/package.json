@@ -1,8 +1,8 @@
 {
-  "name": "@atlante/builder",
+  "name": "@atlante/artifacts",
   "version": "0.1.20",
   "type": "module",
-  "description": "Atlante project loading, validation, and preparation",
+  "description": "Atlante artifact-tree contract: deterministic naming, hashing, serialization, atomic publication, and fail-closed verification",
   "license": "MIT",
   "contributors": [
     {
@@ -19,19 +19,14 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/atlante/atlante.git",
-    "directory": "packages/builder"
+    "directory": "packages/artifacts"
   },
   "engines": {
     "node": ">=22"
   },
   "private": true,
   "exports": {
-    ".": "./src/index.ts"
-  },
-  "dependencies": {
-    "@atlante/artifacts": "workspace:*",
-    "@atlante/resources": "workspace:*",
-    "@atlante/schema": "workspace:*",
-    "@atlante/validator": "workspace:*"
+    ".": "./src/index.ts",
+    "./read-only": "./src/read-only.ts"
   }
 }
