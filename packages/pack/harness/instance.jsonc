@@ -1,0 +1,37 @@
+{
+  "$template": "@atlante/pack/skill",
+  "description": "Use when initializing, configuring, validating, building, troubleshooting, or improving an Atlante harness.",
+  "title": "Harness",
+  "overview": "Operate an Atlante harness with evidence: initialize and configure it from repository facts, run harness-related delivery alongside the active workflow phases, and route observed friction into a separately approved improvement cycle. This is a stewardship capability, not a workflow phase.",
+  "sections": [
+    {
+      "markdown": "## Operating context\n\nTreat this skill as a supplement to the active workflow phases (`brainstorm`, `plan`, `build`, `review`); it operates alongside them rather than replacing them or adding a fifth phase. Keep permanent policy authoritative and command-level mechanics provisional: mechanics are the first content shed when verified deterministic tools (such as a future Atlante MCP server) provide the same operations, and exact tool schemas, effects, and diagnostics belong in tool descriptions rather than here.\n\n### Atlante concepts\n\nAn Atlante harness is defined by authored source configuration and realized through built artifacts:\n\n- `atlante.jsonc` is the project's root source configuration. It declares values, agents, skills, and other bindings; `extends` inherits a preset such as `@atlante/pack`.\n- Values are named interpolations resolved into documents and rendered output; the first-party preset defines `project` and `workflow-root`.\n- Agents are rendered prompts that own a workflow; skills are project-global Markdown guidance an agent loads on demand through the host adapter's skill tool.\n- Templates define input structure and rendering; instances bind a template to concrete input. Versioned presets and packs are installable bundles of templates and instances.\n- Bindings connect named configuration entries to templates or instances.\n- Built artifacts are the deterministic rendered outputs published under the artifact tree and verified before a host adapter materializes them.\n\nDistinguish authoritative source configuration from generated output at all times: source configuration and project sources are the editable surface, and generated output is reproduced through validated build or materialization.\n\n### Coverage areas\n\n| Coverage area | Disposition |\n| --- | --- |\n| Atlante concepts and document structure, including the source-versus-generated boundary | Permanent policy |\n| Choosing suitable first-party, local, or package resources without inventing unavailable ones | Permanent policy |\n| Recognizing recurring workflow friction and proposing a separately approved harness-improvement cycle | Permanent policy |\n| Initializing Atlante and creating or updating `atlante.jsonc` from repository evidence | Provisional mechanics |\n| Running validation and build or materialization commands and interpreting common diagnostics | Provisional mechanics |\n| Integrating and troubleshooting the OpenCode adapter from repository evidence | Provisional mechanics |"
+    },
+    {
+      "instructions": [
+        "Establish from repository evidence whether Atlante is initialized and which version and capabilities are available before recommending anything; when Atlante is absent or its version or capabilities cannot be established, report that plainly and proceed from what is verified.",
+        "Treat the CLI as the universal cold-start bootstrap path; an Atlante-materialized skill becomes available only after the harness and host expose it, so bootstrap guidance starts from the CLI rather than from a materialized skill.",
+        "Inspect repository structure, conventions, installed packs, existing resources, project instructions, and desired workflows before recommending configuration; explain suitable choices and help the developer define an approved initialization or configuration task.",
+        "Recommend only commands, keys, locators, and resources verified as available to the project; distinguish verified recommendations from unverified suggestions.",
+        "Treat current Atlante source configuration and built artifacts as part of the operating environment, distinguishing authoritative source configuration from generated output.",
+        "Validate and build or materialize through capabilities verified from the project, reporting diagnostics and unavailable checks truthfully and separating evidenced outcomes from assumptions.",
+        "Preserve the phase boundaries and workflow invariants already in force; harness stewardship runs alongside the active phases rather than inside them.",
+        "Record material harness friction without silently expanding the current task.",
+        "Turn observed workflow friction into an evidence-based suggestion that names the expected benefit and the affected configuration or resources.",
+        "Ask the developer before beginning any harness change, and run an accepted improvement as a separate workflow cycle using the normal adaptive brainstorm, plan, build, review, approval, and validation policy.",
+        "Present unapproved suggestions as suggestions; an improvement discussed during unrelated work remains unimplemented until its own cycle completes with evidence."
+      ]
+    },
+    {
+      "invariants": [
+        "MUST NOT direct edits to generated artifacts; direct all changes to authoritative source configuration and reproduce generated output through validated build or materialization.",
+        "MUST NOT invent unavailable resources, configuration keys, commands, tool capabilities, or host behavior; report what is verified and what is unavailable.",
+        "MUST obtain explicit developer approval before changing the harness or expanding an unrelated task into harness work, and MUST run an accepted improvement as its own delivery cycle.",
+        "MUST NOT report an initialization, validation, build, or materialization outcome without command or tool evidence for it."
+      ]
+    },
+    {
+      "markdown": "## Resources\n\nStable entry points for orientation. The guidance above stands alone without network access; these links are supplementary for humans and web-capable agents:\n\n- Documentation root: <https://docs.atlante.sh>\n- Getting-started guide: <https://docs.atlante.sh/getting-started>\n- Specification: <https://github.com/atlante/atlante/blob/main/SPECIFICATION.md>\n- JSON Schema: <https://atlante.sh/schema/v0.1/schema.json>"
+    }
+  ]
+}

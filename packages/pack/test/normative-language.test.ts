@@ -13,6 +13,7 @@ import {
 } from "./selection-fixture.js";
 
 const phaseSkills = ["brainstorm", "plan", "build", "review"] as const;
+const normativeSkills = [...phaseSkills, "harness"] as const;
 const normativeKeyword = /\b(MUST|SHOULD|MAY)\b/;
 const gateKeyword = /\bMUST( NOT)?\b/;
 const weakProhibitionForm = /\b(?:never|do not)\b/gi;
@@ -34,6 +35,10 @@ const gateLandmarks: Record<string, readonly string[]> = {
   review: [
     "MUST NOT intentionally modify reviewed source, configuration, or tests",
     "failed required check MUST make the verdict `BLOCKED`",
+  ],
+  harness: [
+    "MUST NOT direct edits to generated artifacts",
+    "MUST obtain explicit developer approval before changing the harness or expanding an unrelated task into harness work",
   ],
 };
 
@@ -65,8 +70,8 @@ function instanceDescription(locator: string): string {
 describe("normative authoring convention", () => {
   afterEach(cleanupPackResourceFixtures);
 
-  describe("phase skill instances", () => {
-    test.each(phaseSkills)("%s states every invariant as a gate", (id) => {
+  describe("first-party skill instances", () => {
+    test.each(normativeSkills)("%s states every invariant as a gate", (id) => {
       const skill = resolvePackSkill(`@atlante/pack/${id}`);
       const invariants = skill.listText("invariants").split("\n");
 
@@ -81,7 +86,7 @@ describe("normative authoring convention", () => {
         expect(skill.listText("invariants"), id).toContain(landmark);
     });
 
-    test.each(phaseSkills)(
+    test.each(normativeSkills)(
       "%s keeps descriptive prose free of normative keywords",
       (id) => {
         const skill = resolvePackSkill(`@atlante/pack/${id}`);
