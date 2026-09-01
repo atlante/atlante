@@ -14,7 +14,7 @@
     },
     {
       "instructions": [
-        "Choose only the workflow phases and skills that materially improve the result; omitted phases require no classification, placeholder, or artifact.",
+        "Choose only the workflow phases and skills that materially improve the result; omitted phases require no classification, placeholder, or artifact, but implementation is not complete until it has an independent review or a stated reason for omitting one.",
         "Run selected workflow phases in their listed order and scale their depth to the work's complexity, risk, uncertainty, and available evidence while preserving any required output.",
         "Reassess the remaining workflow phases when new material evidence changes the work."
       ]

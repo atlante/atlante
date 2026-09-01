@@ -31,8 +31,8 @@
       "name": "Review",
       "instructions": [
         "Follow the `review` skill for the boundary being reviewed.",
-        "Use task review after an implementation task when it would materially improve confidence; return valid corrections to Build and stop after at most five Build-Review correction rounds for that task.",
-        "Use final review after all implementation tasks when integration-level inspection would materially improve confidence."
+        "Use task review after each implementation task; review is the default after implementation, run with independent judgment in a fresh context (a sub-agent when the host supports delegation) rather than as self-review by the implementing agent. Omit it only for a change that is trivially mechanical with no behavioral risk, and state the omission reason explicitly. Return valid corrections to Build and stop after at most five Build-Review correction rounds for that task.",
+        "Use final review after all implementation tasks when the change set spans multiple tasks, touches integration boundaries between tasks, or any task review was omitted."
       ],
       "output": {
         "description": "An evidence-based verdict for the task or complete change being reviewed.",
