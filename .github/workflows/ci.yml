@@ -15,7 +15,7 @@ jobs:
           bun-version-file: ".bun-version"
       - run: bun install --frozen-lockfile
 
-      # full:check ends with a CLI smoke test. Every other test calls the
+      # full:check runs a CLI smoke test. Every other test calls the
       # command handlers as functions, so a broken shebang, a mis-wired
       # Commander option, or an import that only fails at process start would
       # pass the suite and still ship a CLI that does not run. The smoke test

@@ -69,7 +69,7 @@ bun run type:check
 bun run test
 ```
 
-The repository uses Bun for package management and build commands. Tests run through Vitest on Node.js 22.
+The repository uses Bun for package management, build commands, and tests (bun:test).
 
 Run the CLI directly from source with `bun run cli <command>`:
 

@@ -1,10 +1,10 @@
+import { describe, expect, test, vi } from "bun:test";
 import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as resources from "@atlante/resources";
 import { SCHEMA_URI } from "@atlante/schema";
-import { describe, expect, test, vi } from "vitest";
 import {
   formatDiagnostic,
   loadDocument,

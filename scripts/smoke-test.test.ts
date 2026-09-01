@@ -1,7 +1,7 @@
+import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { expect, test } from "vitest";
 
 const ROOT = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 

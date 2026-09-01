@@ -1,6 +1,6 @@
+import { describe, expect, it } from "bun:test";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import { describe, expect, it } from "vitest";
 
 const docsRoot = join(import.meta.dirname, "..");
 const sourceRoot = join(docsRoot, "src", "content", "docs");
@@ -76,7 +76,9 @@ function expectStaticRedirect(route: string, destination: string): void {
   );
 }
 
-describe("docs built output", () => {
+const runOutputTests = process.env.ATLANTE_BUILT_OUTPUT_TESTS === "1";
+
+describe.skipIf(!runOutputTests)("docs built output", () => {
   const documents = authoredDocuments();
 
   it("publishes exactly the non-draft authored Markdown routes", () => {

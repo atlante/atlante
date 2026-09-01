@@ -1,3 +1,4 @@
+import { afterEach, describe, expect, test } from "bun:test";
 import {
   createProjectResourcePack,
   loadPresetFacet,
@@ -5,7 +6,6 @@ import {
   resolveResourceInstance,
   resolveResourceTemplate,
 } from "@atlante/resources";
-import { afterEach, describe, expect, test } from "vitest";
 import {
   cleanupPackResourceFixtures,
   packResourceFixture,

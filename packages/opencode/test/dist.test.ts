@@ -1,3 +1,4 @@
+import { afterEach, beforeAll, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
 import {
   cpSync,
@@ -19,7 +20,6 @@ import type {
   ToolDefinition,
   ToolResult,
 } from "@opencode-ai/plugin";
-import { afterEach, beforeAll, expect, test } from "vitest";
 
 type HostConfig = {
   agent?: Record<string, Record<string, unknown>>;

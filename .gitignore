@@ -5,6 +5,4 @@ dist/
 .fallow/
 .worktrees/
 .atlante/
-mutation/
-.stryker-tmp/
 .opencode/models.json

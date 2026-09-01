@@ -1,3 +1,4 @@
+import { afterEach, describe, expect, test } from "bun:test";
 import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
@@ -11,7 +12,6 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import * as publicArtifacts from "@atlante/builder/artifacts";
-import { afterEach, describe, expect, test } from "vitest";
 import { createArtifacts } from "../src/artifacts.js";
 import type {
   ArtifactManifest,

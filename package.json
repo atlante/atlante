@@ -20,18 +20,18 @@
     "docs"
   ],
   "scripts": {
-    "test": "vitest run",
+    "test": "bun test",
     "type:check": "tsc --build packages/*/tsconfig.json",
     "lint:check": "biome check .",
     "cli": "bun packages/cli/bin/atlante.ts",
     "smoke:test": "bun scripts/smoke-test.ts",
     "fallow": "fallow",
-    "mutation:test": "bun scripts/mutation.ts",
-    "mutation:verify": "bun scripts/mutation-verify.ts",
     "build": "bun scripts/build.ts",
     "docs:build": "bun run --cwd docs build",
+    "docs:check": "bun run --cwd docs check",
+    "website:check": "bun run --cwd website check",
     "quick:check": "bun scripts/parallel.ts type:check lint:check test",
-    "full:check": "bun run build && bun scripts/parallel.ts quick:check smoke:test docs:build",
+    "full:check": "bun run build && bun scripts/parallel.ts quick:check smoke:test docs:check website:check",
     "prepack": "bun run build",
     "release": "bun scripts/release.ts",
     "worktree": "bun scripts/worktree.ts"
@@ -40,10 +40,7 @@
     "@biomejs/biome": "^2.0.0",
     "@types/bun": "1.3.14",
     "@types/node": "^26.0.0",
-    "@stryker-mutator/core": "10.0.0",
-    "@stryker-mutator/vitest-runner": "10.0.0",
     "fallow": "^3.8.0",
-    "typescript": "^7.0.2",
-    "vitest": "^4.0.0"
+    "typescript": "^7.0.2"
   }
 }

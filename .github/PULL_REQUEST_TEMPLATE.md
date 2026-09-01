@@ -11,7 +11,7 @@
 - [ ] Branch name follows the naming convention
 - [ ] `biome check .` passes
 - [ ] `bun run type:check` passes
-- [ ] `bun run test` passes (Vitest on Node.js 22)
+- [ ] `bun run test` passes (bun:test)
 
 ## Testing
 

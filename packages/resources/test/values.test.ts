@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from "vitest";
+import { describe, expect, mock, test } from "bun:test";
 import {
   analyzeValueReferences,
   isValidValueKey,
@@ -153,7 +153,7 @@ describe("value reference analysis", () => {
   });
 
   test("does not walk null, primitive, or empty containers", () => {
-    const visit = vi.fn();
+    const visit = mock();
 
     walkValueReferences(null, visit);
     walkValueReferences([], visit);

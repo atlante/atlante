@@ -1,3 +1,4 @@
+import { afterEach, describe, expect, test } from "bun:test";
 import {
   cpSync,
   mkdirSync,
@@ -11,7 +12,6 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { resourceTemplateSelection } from "@atlante/resources";
 import { SCHEMA_URI } from "@atlante/schema";
-import { afterEach, describe, expect, test } from "vitest";
 import { loadDocument } from "../src/index.js";
 
 const DRAFT_URI = "https://json-schema.org/draft/2020-12/schema";

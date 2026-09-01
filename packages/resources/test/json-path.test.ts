@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test } from "bun:test";
 import { jsonValueAtPath } from "../src/index.js";
 
 describe("JSON path traversal", () => {

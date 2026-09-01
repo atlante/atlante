@@ -1,3 +1,4 @@
+import { afterEach, describe, expect, test } from "bun:test";
 import {
   createProjectResourcePack,
   interpolateValues,
@@ -7,7 +8,6 @@ import {
   resolveResourceInstance,
 } from "@atlante/resources";
 import { validateResolvedDocument } from "@atlante/validator";
-import { afterEach, describe, expect, test } from "vitest";
 import {
   cleanupPackResourceFixtures,
   packResourceFixture,

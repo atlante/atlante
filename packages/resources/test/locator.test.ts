@@ -1,3 +1,4 @@
+import { afterEach, describe, expect, test } from "bun:test";
 import {
   mkdirSync,
   mkdtempSync,
@@ -7,7 +8,6 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, sep } from "node:path";
-import { afterEach, describe, expect, test } from "vitest";
 import type { ResourceFailureCode } from "../src/index.js";
 import {
   createProjectResourcePack,
