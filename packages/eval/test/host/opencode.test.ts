@@ -179,6 +179,9 @@ describe("runTrial", () => {
     expect(trial.modelVersion).toBe("model-x");
   });
 
+  // Both abort tests spawn real processes whose kill path includes a 5s
+  // grace escalation; bun's default 5s per-test timeout is too tight under
+  // parallel full:check load, so give them explicit headroom.
   test("aborts in-flight past maxTokens with a budget-exceeded verdict", async () => {
     const stub = writeStub(
       tempDir("eval-stub-budget-"),
@@ -206,7 +209,7 @@ sleep 30`,
     // parallel CI load can stretch both. The assertion only guards against
     // the 30s sleep completing, i.e. the kill never happening.
     expect(Date.now() - started).toBeLessThan(20_000);
-  });
+  }, 30_000);
 
   test("aborts past the timeout", async () => {
     const stub = writeStub(tempDir("eval-stub-slow-"), `sleep 30`);
@@ -225,7 +228,7 @@ sleep 30`,
       maxTokens: 400_000,
     });
     expect(trial.outcome).toBe("timeout");
-  });
+  }, 30_000);
 
   test("non-zero exit is an infra error with stderr evidence", async () => {
     const stub = writeStub(tempDir("eval-stub-fail-"), `echo boom >&2; exit 3`);
