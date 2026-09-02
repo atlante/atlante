@@ -84,30 +84,20 @@ describe("harness skill instance", () => {
   });
 
   test("keeps the thin-first scope and the deterministic-tools boundary", () => {
-    const skill = resolvePackSkill(locator);
-    const context = skill.markdownText();
+    const instructions = resolvePackSkill(locator).listText("instructions");
 
-    expect(context).toContain("provisional");
-    expect(context.toLowerCase()).toContain("mcp");
-    expect(context).toContain("tool descriptions");
+    expect(instructions).toContain("provisional");
+    expect(instructions.toLowerCase()).toContain("mcp");
+    expect(instructions).toContain("tool descriptions");
   });
 
-  test("explains the Atlante concepts and the source-versus-generated boundary", () => {
+  test("routes concept and structure orientation through the Specification reference", () => {
     const skill = resolvePackSkill(locator);
-    const context = skill.markdownText();
 
-    for (const concept of [
-      "values",
-      "agents",
-      "skills",
-      "templates",
-      "presets",
-      "bindings",
-      "built artifacts",
-    ])
-      expect(context, concept).toContain(concept);
-    expect(context).toContain("authoritative source configuration");
-    expect(context).toContain("generated output");
+    expect(skill.referencesText()).toContain(
+      "Orienting in Atlante concepts, document structure, and configuration semantics",
+    );
+    expect(skill.markdownText()).not.toContain("named interpolations");
   });
 
   test("instructions cover the three stewardship contexts in order", () => {
@@ -179,11 +169,11 @@ describe("harness skill instance", () => {
     expect(urls.sort()).toEqual([...verifiedResources].sort());
   });
 
-  test("stands alone offline without directing network access or copying documentation", () => {
+  test("states its reliance on web references without directing fetch mechanics", () => {
     const skill = resolvePackSkill(locator);
     const everything = skill.everythingText();
 
-    expect(everything).toContain("stands alone without network access");
+    expect(everything).toContain("requires web access");
     expect(everything).not.toMatch(/\b(fetch|download|curl|wget)\b/i);
     expect(everything).not.toMatch(/\bcopy (the|this) documentation\b/i);
   });

@@ -12,35 +12,8 @@
             "block": [
               {
                 "p": [
-                  "Treat this skill as a supplement to the active workflow phases (`brainstorm`, `plan`, `build`, `review`); it operates alongside them rather than replacing them or adding a fifth phase. Keep permanent policy authoritative and command-level mechanics provisional: mechanics are the first content shed when verified deterministic tools (such as a future Atlante MCP server) provide the same operations, and exact tool schemas, effects, and diagnostics belong in tool descriptions rather than here. The guidance in this skill stands alone without network access; references supplement it for humans and web-capable agents."
+                  "Treat this skill as a supplement to the active workflow phases (`brainstorm`, `plan`, `build`, `review`); it operates alongside them rather than replacing them or adding a fifth phase. Using this skill effectively requires web access: Atlante concepts, document structure, and configuration semantics are supplied on demand through the references below rather than restated here."
                 ]
-              },
-              {
-                "h3": {
-                  "title": "Atlante concepts",
-                  "block": [
-                    {
-                      "p": [
-                        "An Atlante harness is defined by authored source configuration and realized through built artifacts:"
-                      ]
-                    },
-                    {
-                      "ul": [
-                        "`atlante.jsonc` is the project's root source configuration. It declares values, agents, skills, and other bindings; `extends` inherits a preset such as `@atlante/pack`.",
-                        "Values are named interpolations resolved into documents and rendered output; the first-party preset defines `project` and `workflow-root`.",
-                        "Agents are rendered prompts that own a workflow; skills are project-global Markdown guidance an agent loads on demand through the host adapter's skill tool.",
-                        "Templates define input structure and rendering; instances bind a template to concrete input. Versioned presets and packs are installable bundles of templates and instances.",
-                        "Bindings connect named configuration entries to templates or instances.",
-                        "Built artifacts are the deterministic rendered outputs published under the artifact tree and verified before a host adapter materializes them."
-                      ]
-                    },
-                    {
-                      "p": [
-                        "Distinguish authoritative source configuration from generated output at all times: source configuration and project sources are the editable surface, and generated output is reproduced through validated build or materialization."
-                      ]
-                    }
-                  ]
-                }
               },
               {
                 "h3": {
@@ -72,7 +45,8 @@
         "Validate, build, and materialize through capabilities verified from the project, reporting diagnostics truthfully.",
         "Preserve the phase boundaries and workflow invariants already in force, and record material harness friction without expanding the current task.",
         "Turn observed workflow friction into an evidence-based suggestion that names the expected benefit and the affected configuration or resources.",
-        "Run an accepted harness improvement as its own workflow cycle using the normal adaptive brainstorm, plan, build, review, approval, and validation policy; an improvement stays a suggestion until its own cycle is approved."
+        "Run an accepted harness improvement as its own workflow cycle using the normal adaptive brainstorm, plan, build, review, approval, and validation policy; an improvement stays a suggestion until its own cycle is approved.",
+        "Keep permanent policy authoritative and command-level mechanics provisional: mechanics are the first content shed when verified deterministic tools (such as a future Atlante MCP server) provide the same operations, and exact tool schemas, effects, and diagnostics belong in tool descriptions rather than in this skill."
       ]
     },
     {
@@ -98,7 +72,7 @@
         {
           "name": "Specification",
           "location": "https://github.com/atlante/atlante/blob/main/SPECIFICATION.md",
-          "readWhen": "Checking document structure and configuration semantics."
+          "readWhen": "Orienting in Atlante concepts, document structure, and configuration semantics."
         },
         {
           "name": "JSON Schema",
