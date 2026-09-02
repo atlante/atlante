@@ -28,6 +28,7 @@ import {
   prepareProject,
   validateProject,
 } from "../src/index.js";
+import { removeLegacyArtifactTree } from "../src/legacy-artifacts.js";
 import {
   EXTERNAL_AGENT_PROMPT,
   EXTERNAL_SKILL_CONTENT,
@@ -1261,6 +1262,45 @@ describe("buildProject", () => {
 });
 
 describe("legacy artifact-tree migration", () => {
+  test("removal refuses a tree with a file added after the preflight", () => {
+    const { root } = project(oneAgent("reviewer", "Review the change."));
+    const { tree, manifest } = writeLegacyArtifacts(root, {
+      agents: [
+        {
+          id: "architect",
+          description: "Legacy architect",
+          content: "Legacy prompt.\n",
+        },
+      ],
+    });
+    const declared = manifest.agents[0] as { path: string };
+    writeFileSync(join(tree, "notes.txt"), "added during materialization\n");
+
+    const removal = removeLegacyArtifactTree({
+      treePath: tree,
+      entries: [
+        {
+          id: "architect",
+          path: declared.path as string,
+          sha256: digest("Legacy prompt.\n"),
+        },
+      ],
+    });
+
+    expect(removal.state).toBe("blocked");
+    if (removal.state === "blocked")
+      expect(removal.diagnostics[0]?.message).toContain(
+        "not declared by manifest.json",
+      );
+    expect(existsSync(tree)).toBe(true);
+    expect(readFileSync(join(tree, "notes.txt"), "utf8")).toBe(
+      "added during materialization\n",
+    );
+    expect(readFileSync(join(tree, ...declared.path.split("/")), "utf8")).toBe(
+      "Legacy prompt.\n",
+    );
+  });
+
   test("removes a manifest-valid legacy tree after successful materialization", () => {
     const { root } = project(oneAgent("reviewer", "Review the change."));
     const { tree } = writeLegacyArtifacts(root, {

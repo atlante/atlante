@@ -266,13 +266,35 @@ function payloadDigest(
 }
 
 /**
- * Re-verifies every declared payload against its manifest digest and removes
- * the whole tree. Called only after every materialization succeeded; any
- * re-verification failure leaves the tree untouched.
+ * Re-verifies the tree's accounting and every declared payload against its
+ * manifest digest, then removes the whole tree. Called only after every
+ * materialization succeeded; any re-verification failure leaves the tree
+ * untouched.
  */
 export function removeLegacyArtifactTree(
   tree: LegacyArtifactTree,
 ): LegacyRemoval {
+  const scanned = treeFiles(tree.treePath);
+  if ("error" in scanned)
+    return {
+      state: "blocked",
+      diagnostics: [migrationDiagnostic(scanned.error, ".atlante/artifacts")],
+    };
+  const declared = new Set(tree.entries.map((entry) => entry.path));
+  const undeclared = scanned.files.find(
+    (file) => file !== MANIFEST_ENTRY && !declared.has(file),
+  );
+  if (undeclared) {
+    return {
+      state: "blocked",
+      diagnostics: [
+        migrationDiagnostic(
+          `the file is not declared by manifest.json: ${undeclared}`,
+          `.atlante/artifacts/${undeclared}`,
+        ),
+      ],
+    };
+  }
   for (const entry of tree.entries) {
     if (payloadDigest(tree.treePath, entry) !== entry.sha256)
       return {
