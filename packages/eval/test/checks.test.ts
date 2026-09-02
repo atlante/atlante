@@ -275,6 +275,34 @@ describe("runChecks", () => {
     expect(result?.evidence.unexpected).toContain("ignored-after.ts");
   });
 
+  test("diff-allowlist: matches non-ASCII paths literally", async () => {
+    const root = mkdtempSync(join(tmpdir(), "eval-diff-unicode-"));
+    cleanup.push(root);
+    const git = async (argv: string[]) => {
+      await Bun.$`git ${argv}`.cwd(root).quiet();
+    };
+    await git(["init"]);
+    await git([
+      "-c",
+      "user.name=t",
+      "-c",
+      "user.email=t@t",
+      "commit",
+      "--allow-empty",
+      "-m",
+      "base",
+    ]);
+    writeFileSync(join(root, "allowed.ts"), "ok\n");
+    // Without core.quotePath=false git C-quotes non-ASCII paths, which would
+    // both false-fail the allowlist and leak quoted evidence into the report.
+    writeFileSync(join(root, "案результат.txt"), "scope creep\n");
+    const [result] = await runChecks({ root, snapshot: [], keep: false }, [
+      { type: "diff-allowlist", allow: ["allowed.ts", "案результат.txt"] },
+    ]);
+    // Passes only if the literal (unquoted) path matched the allowlist.
+    expect(result?.verdict).toBe("pass");
+  });
+
   test("all checks run even after one fails", async () => {
     const sandbox = sandboxOf({});
     const results = await runChecks(sandbox, [

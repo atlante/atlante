@@ -44,6 +44,11 @@ export type TrialResult = {
   tokens?: number;
   /** Cumulative cost when the host exposes it. */
   cost?: number;
+  /**
+   * No usage event was ever seen, so `maxTokens` was not actually enforced
+   * and only the timeout bounded the run.
+   */
+  budgetUnmonitored?: boolean;
   /** Complete per-check evidence; present for executed trials. */
   checks?: CheckResult[];
   /** Sandbox diff evidence for executed trials. */
@@ -71,6 +76,10 @@ export type RunMeta = {
     timeoutMs: number;
     maxSessions: number;
     maxTokens: number;
+    /** Setup-command in-flight budget; recorded for report comparability. */
+    setupTimeoutMs: number;
+    /** Per-check default in-flight budget; recorded for comparability. */
+    checkTimeoutMs: number;
   };
 };
 

@@ -13,7 +13,7 @@ export {
   normalizeTokens,
   OPENCODE_BINARY,
 } from "./host/opencode.js";
-export { createRunId } from "./run-id.js";
+export { createRunId, rollRunId } from "./run-id.js";
 export type {
   EvalProgress,
   HostRunner,

@@ -42,10 +42,14 @@ function defaultAuthPath(): string {
 }
 
 /**
- * Containment guarantees, identical for every compared variant: the model can
- * never route around the sandbox via the network or host directories.
- * opencode enforces agent-level permission rules over top-level config, so
- * these must live inside each agent's permission block.
+ * Containment is opencode tool-level policy, NOT OS-level isolation, and it
+ * is identical for every compared variant. The forced denials below close the
+ * host's own web/search/external-directory tools and the most destructive
+ * bash prefixes, but the bash tool still runs with ordinary user access to
+ * the network and host filesystem. Fixture content is exactly the
+ * prompt-injection surface eval grades, so the child environment is
+ * allowlisted separately (see ENV_ALLOWLIST): model-controlled bash can read
+ * its own process env, and it must not be able to read the host's secrets.
  */
 const FORCED_DENIALS = Object.freeze({
   webfetch: "deny",
@@ -74,6 +78,36 @@ const BASELINE_DEFAULTS = Object.freeze({
   doom_loop: "allow",
 } as const);
 const PERMISSION_ACTIONS = new Set(["allow", "deny", "ask"]);
+
+/**
+ * Host environment variables the spawned `opencode run` may inherit. The
+ * credentials the host needs travel via the injected auth.json, not env
+ * vars, so the allowlist covers execution basics and proxies only. A
+ * prompt-injected `env | curl …` inside the sandbox then finds nothing of
+ * the caller's shell environment to exfiltrate.
+ */
+const ENV_ALLOWLIST = Object.freeze([
+  "PATH",
+  "HOME",
+  "LANG",
+  "LC_ALL",
+  "TMPDIR",
+  "HTTP_PROXY",
+  "HTTPS_PROXY",
+  "NO_PROXY",
+  "http_proxy",
+  "https_proxy",
+  "no_proxy",
+] as const);
+
+function pickAllowedEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const picked: NodeJS.ProcessEnv = {};
+  for (const key of ENV_ALLOWLIST) {
+    const value = env[key];
+    if (value !== undefined) picked[key] = value;
+  }
+  return picked;
+}
 const PERMISSION_KEYS = [
   ...Object.keys(BASELINE_DEFAULTS),
   ...Object.keys(FORCED_DENIALS),
@@ -376,8 +410,11 @@ export function createOpenCodeRunner(
         ...(input.model ? ["--model", input.model] : []),
         input.prompt,
       ];
+      // Allowlisted inheritance only: the rest of the host environment
+      // (API keys, tokens, shell state) never reaches the child process,
+      // whose env the model can read through its bash tool.
       const env: NodeJS.ProcessEnv = {
-        ...baseEnv,
+        ...pickAllowedEnv(baseEnv),
         XDG_CONFIG_HOME: join(input.sandbox.stateDir, "config"),
         XDG_DATA_HOME: join(input.sandbox.stateDir, "data"),
         XDG_CACHE_HOME: join(input.sandbox.stateDir, "cache"),
@@ -399,6 +436,15 @@ export function createOpenCodeRunner(
       if (result.modelVersion !== undefined)
         trial.modelVersion = result.modelVersion;
       if (result.error !== undefined) trial.error = result.error;
+      // Fail-open guard: the maxTokens budget only binds when the stream
+      // carries usage events. A host that stopped emitting them would
+      // otherwise silently disable the budget behind the timeout.
+      if (
+        result.tokens === undefined &&
+        (result.outcome === "completed" || result.outcome === "timeout")
+      ) {
+        trial.budgetUnmonitored = true;
+      }
       return trial;
     },
   };
@@ -534,6 +580,10 @@ function spawnHost(
         (part ? normalizeTokens(part.tokens) : undefined) ??
         normalizeTokens(event.tokens);
       if (eventTokens !== undefined) tokens = eventTokens;
+      // Cost is taken as the latest cumulative value: real 1.18.x streams
+      // report per-session cumulative cost on step_finish. A host version
+      // emitting per-message cost would under-count reported spend — the
+      // same trust assumption as the token total above.
       const eventCost =
         (part && typeof part.cost === "number" ? part.cost : undefined) ??
         (typeof event.cost === "number" ? event.cost : undefined);

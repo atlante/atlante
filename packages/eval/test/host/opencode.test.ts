@@ -413,6 +413,8 @@ describe("runTrial", () => {
     expect(trial.cost).toBe(0.02);
     expect(trial.model).toBe("acme/model-x");
     expect(trial.modelVersion).toBe("model-x");
+    // Usage events were seen, so the budget was monitored.
+    expect(trial.budgetUnmonitored).toBeUndefined();
   });
 
   // Both abort tests spawn real processes whose kill path includes a 5s
@@ -494,10 +496,12 @@ sleep 30`,
     const capture = join(project, "captured-env.txt");
     const stub = writeStub(
       tempDir("eval-stub-env-"),
-      `printenv XDG_CONFIG_HOME > "$CAPTURE_FILE"
-printenv XDG_DATA_HOME >> "$CAPTURE_FILE"
-printenv XDG_CACHE_HOME >> "$CAPTURE_FILE"
-for arg do printf '%s\\n' "$arg" >> "$CAPTURE_FILE"; done
+      `printenv XDG_CONFIG_HOME > '${capture}'
+printenv XDG_DATA_HOME >> '${capture}'
+printenv XDG_CACHE_HOME >> '${capture}'
+printenv PATH >> '${capture}'
+printenv EVAL_SECRET_MARKER >> '${capture}' || true
+for arg do printf '%s\\n' "$arg" >> '${capture}'; done
 test -f "$XDG_DATA_HOME/opencode/auth.json" || exit 9
 exit 0`,
     );
@@ -505,7 +509,12 @@ exit 0`,
       projectRoot,
       binaryPath: stub,
       authPath: authFile,
-      baseEnv: { CAPTURE_FILE: capture, PATH: process.env.PATH },
+      // Only PATH is on the allowlist: any other host variable must stay with
+      // the host instead of reaching the model-controlled process.
+      baseEnv: {
+        EVAL_SECRET_MARKER: "host-secret-exfiltrated",
+        PATH: process.env.PATH ?? "",
+      },
     });
     const trial = await runner.runTrial({
       sandbox: sandboxFor(project, state),
@@ -519,10 +528,35 @@ exit 0`,
     expect(captured).toContain(join(state, "config"));
     expect(captured).toContain(join(state, "data"));
     expect(captured).toContain(join(state, "cache"));
+    // Allowlisted vars reach the child; everything else stays with the host.
+    const firstPathDir = (process.env.PATH ?? "").split(":")[0] ?? "";
+    expect(firstPathDir).not.toBe("");
+    expect(captured).toContain(firstPathDir);
+    expect(captured).not.toContain("host-secret-exfiltrated");
     // The host is pointed at the sandbox via --dir and receives the prompt.
     expect(captured).toContain("--dir");
     expect(captured).toContain(project);
     expect(captured).toContain("the prompt");
+  });
+
+  test("flags budget-unmonitored when the host emits no usage events", async () => {
+    const stub = writeStub(tempDir("eval-stub-silent-"), `echo done`);
+    const runner = createOpenCodeRunner({
+      projectRoot,
+      binaryPath: stub,
+      authPath: authFile,
+    });
+    const trial = await runner.runTrial({
+      sandbox: sandboxFor(
+        tempDir("eval-sandbox-silent-"),
+        tempDir("eval-state-silent-"),
+      ),
+      prompt: "p",
+      timeoutMs: 10_000,
+      maxTokens: 400_000,
+    });
+    expect(trial.outcome).toBe("completed");
+    expect(trial.budgetUnmonitored).toBe(true);
   });
 });
 

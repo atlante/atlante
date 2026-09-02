@@ -198,6 +198,10 @@ async function diffAllowlistCheck(
   const outcome = await runCommand(
     [
       "git",
+      // Literal paths: default quoting C-escapes non-ASCII/special names,
+      // which would false-fail the allowlist and corrupt report evidence.
+      "-c",
+      "core.quotePath=false",
       "status",
       "--porcelain",
       "--untracked-files=all",

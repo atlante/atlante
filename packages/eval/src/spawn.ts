@@ -16,6 +16,11 @@ const DEFAULT_KILL_GRACE_MS = 5_000;
  * timeout: SIGTERM, a grace window, then SIGKILL. When the child was spawned
  * detached (own process group) the group is killed so subtrees cannot outlive
  * the trial.
+ *
+ * Windows caveat: `detached` is skipped on win32, so only the direct child
+ * receives the kill signals; grandchildren (e.g. tool processes the host
+ * spawned) can outlive a timed-out trial there. Revisit with `taskkill /T /F`
+ * if Windows becomes a supported eval platform.
  */
 export function runCommand(
   argv: readonly string[],
@@ -68,7 +73,7 @@ export function runCommand(
   });
 }
 
-/** SIGTERM, a grace window, then SIGKILL — against the whole process group. */
+/** SIGTERM, a grace window, then SIGKILL — group-wide on POSIX, child-only on Windows. */
 export function killTree(
   child: ReturnType<typeof spawn>,
   graceMs: number,

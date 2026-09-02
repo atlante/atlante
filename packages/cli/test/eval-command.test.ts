@@ -262,6 +262,9 @@ describe("runEvalCommand", () => {
     const { file } = reportPaths(project);
     const report = JSON.parse(readFileSync(file, "utf8"));
     expect(report.meta.config.trials).toBe(2);
+    // Recorded so before/after report diffs can explain setup/grading timing.
+    expect(report.meta.config.setupTimeoutMs).toBe(300_000);
+    expect(report.meta.config.checkTimeoutMs).toBe(120_000);
     expect(report.scenarios["cli-happy"].trials).toHaveLength(2);
   });
 

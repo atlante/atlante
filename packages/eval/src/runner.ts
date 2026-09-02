@@ -1,4 +1,7 @@
-import type { EvalConfig } from "@atlante/schema";
+import {
+  EVAL_CHECK_TIMEOUT_DEFAULT_MS,
+  type EvalConfig,
+} from "@atlante/schema";
 import type { DiscoveredEvalScenario } from "@atlante/validator";
 import { runChecks } from "./checks.js";
 import type { ResolvedBudget } from "./config.js";
@@ -61,6 +64,11 @@ export type TrialRun = {
   /** Model and version identifiers from the session events. */
   model?: string;
   modelVersion?: string;
+  /**
+   * No usage event was ever seen, so the maxTokens budget was not actually
+   * enforced (only the timeout bounded the run).
+   */
+  budgetUnmonitored?: boolean;
   /** Diagnostic detail for non-completed outcomes. */
   error?: string;
 };
@@ -125,6 +133,10 @@ export async function runEval(input: RunEvalInput): Promise<RunReport> {
         timeoutMs: input.budget.timeoutMs,
         maxSessions: input.budget.maxSessions,
         maxTokens: input.budget.maxTokens,
+        // Recorded so before/after report diffs can explain setup and
+        // grading timing changes.
+        setupTimeoutMs: input.budget.setupTimeoutMs,
+        checkTimeoutMs: EVAL_CHECK_TIMEOUT_DEFAULT_MS,
       },
     },
     scenarios: {},
@@ -383,6 +395,7 @@ async function gradeTrial(input: {
     durationMs: run.durationMs,
     ...(run.tokens !== undefined ? { tokens: run.tokens } : {}),
     ...(run.cost !== undefined ? { cost: run.cost } : {}),
+    ...(run.budgetUnmonitored ? { budgetUnmonitored: true } : {}),
     ...(run.error !== undefined ? { error: run.error } : {}),
   };
   try {

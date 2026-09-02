@@ -120,9 +120,16 @@ arrives. Stop it with `Ctrl-C`.
 ## `atlante eval`
 
 Run eval scenarios against the project's verified artifacts. Each trial runs
-the [OpenCode](https://opencode.ai/) host headless in an isolated sandbox
+the [OpenCode](https://opencode.ai/) host headless in a disposable sandbox
 (a copy of the scenario fixture plus the artifact publication), then grades
 the sandbox with deterministic, zero-LLM checks.
+
+Containment is tool-level policy, not OS-level isolation: forced permission
+denials close the host's web/search tools and the most destructive shell
+commands, and the trial process inherits only an allowlisted environment
+(your shell secrets stay with the host). The host's shell tool still has
+ordinary user access to the network and machine, so only run scenarios whose
+fixture content you trust.
 
 ```sh
 npx @atlante/cli@latest eval [path]

@@ -106,6 +106,8 @@ describe("runEval", () => {
     expect(report.meta.model).toBe("provider/model");
     expect(report.meta.modelVersion).toBe("v9");
     expect(report.meta.host).toBe("fake");
+    expect(report.meta.config.setupTimeoutMs).toBe(300_000);
+    expect(report.meta.config.checkTimeoutMs).toBe(120_000);
     expect(result.trials[0]?.checks).toHaveLength(3);
   });
 
@@ -119,6 +121,20 @@ describe("runEval", () => {
       runner: fakeRunner(() => completedRun()),
     });
     expect(report.meta.model).toBe("acme/model-x");
+  });
+
+  test("propagates budget-unmonitored into the trial result", async () => {
+    const report = await runEval({
+      projectRoot,
+      evalConfig,
+      budget: resolveBudget({ evalConfig, trialsOverride: 1 }),
+      scenarios,
+      atlanteVersion: "0.0.0-test",
+      runner: fakeRunner(() => completedRun({ budgetUnmonitored: true })),
+    });
+    const result = report.scenarios["happy-scenario"];
+    if (!result) throw new Error("missing scenario result");
+    expect(result.trials[0]?.budgetUnmonitored).toBe(true);
   });
 
   test("uses explicit unknown identity when neither config nor host reports it", async () => {

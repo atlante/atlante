@@ -13,6 +13,7 @@ import {
   type HostRunner,
   type RunReport,
   resolveBudget,
+  rollRunId,
   runEval,
   runExitCode,
   verifyArtifacts,
@@ -299,8 +300,11 @@ function publishReport(
   out: string | undefined,
 ): string {
   const base = out ?? join(projectRoot, ".atlante", "eval");
-  const dir = join(base, report.runId);
   assertNoSymlinkPath(base, "report output");
+  // A same-second rerun into the same base can regenerate the id: re-roll
+  // instead of letting mkdir succeed on (and clobber) an existing report.
+  rollRunId(report, (id) => existsSync(join(base, id)));
+  const dir = join(base, report.runId);
   assertNoSymlinkPath(dir, "report output");
   mkdirSync(dir, { recursive: true });
   const reportPath = join(dir, "report.json");
