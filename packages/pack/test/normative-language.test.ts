@@ -177,7 +177,6 @@ describe("normative authoring convention", () => {
         {
           name: "Schema",
           location: "https://example.test/schema.json",
-          readWhen: "Authoring configuration.",
         },
       ]);
 
@@ -186,7 +185,10 @@ describe("normative authoring convention", () => {
         "1. **Guide** — https://example.test/guide — Learning the basics.",
       );
       expect(output).toContain(
-        "2. **Schema** — https://example.test/schema.json — Authoring configuration.",
+        "2. **Schema** — https://example.test/schema.json",
+      );
+      expect(output).not.toContain(
+        "2. **Schema** — https://example.test/schema.json —",
       );
       expect(output.indexOf("1. **Guide**")).toBeLessThan(
         output.indexOf("2. **Schema**"),

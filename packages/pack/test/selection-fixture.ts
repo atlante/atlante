@@ -139,6 +139,7 @@ function referencesTextOf(entries: readonly JsonObject[]): string {
         .map((key) =>
           typeof entry[key] === "string" ? (entry[key] as string) : "",
         )
+        .filter((value) => value.length > 0)
         .join(" "),
     )
     .join("\n");
