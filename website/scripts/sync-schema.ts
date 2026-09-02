@@ -1,4 +1,4 @@
-import { copyFileSync, mkdirSync, readFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -14,53 +14,65 @@ type SyncSchemaResult = {
   destinationPath: string;
 };
 
+/**
+ * Publishes every generated JSON Schema under
+ * `packages/schema/schema/<version>/` to the website's public path so each
+ * schema's `$id` URL resolves in production. Each source must carry the
+ * `$id` its filename promises; a mismatch means the generator and the
+ * deployment contract have drifted, which must fail the build instead of
+ * serving a schema under the wrong identity.
+ */
 export function syncSchema({
   repoRoot: configuredRepoRoot,
   websiteRoot: configuredWebsiteRoot,
-}: SyncSchemaOptions = {}): SyncSchemaResult {
+}: SyncSchemaOptions = {}): SyncSchemaResult[] {
   const websiteRoot =
     configuredWebsiteRoot ?? dirname(dirname(fileURLToPath(import.meta.url)));
   const repoRoot = configuredRepoRoot ?? join(websiteRoot, "..");
-  const sourcePath = join(
-    repoRoot,
-    "packages",
-    "schema",
-    "schema",
-    "v0.1",
-    "schema.json",
-  );
-  const destinationPath = join(
-    websiteRoot,
-    "public",
-    "schema",
-    "v0.1",
-    "schema.json",
-  );
+  const sourceDir = join(repoRoot, "packages", "schema", "schema", "v0.1");
+  const destinationDir = join(websiteRoot, "public", "schema", "v0.1");
 
-  let source: Buffer;
+  let sources: string[];
   try {
-    source = readFileSync(sourcePath);
+    sources = readdirSync(sourceDir)
+      .filter((name) => name.endsWith(".json"))
+      .sort();
   } catch {
-    throw new Error(`Authoritative schema is unavailable: ${sourcePath}`);
+    throw new Error(`Authoritative schema is unavailable: ${sourceDir}`);
+  }
+  if (sources.length === 0) {
+    throw new Error(`Authoritative schema is unavailable: ${sourceDir}`);
   }
 
-  let schema: { $id?: unknown } | null;
-  try {
-    schema = JSON.parse(source.toString("utf8")) as { $id?: unknown };
-  } catch {
-    throw new Error(`Authoritative schema is not valid JSON: ${sourcePath}`);
-  }
+  return sources.map((name) => {
+    const sourcePath = join(sourceDir, name);
+    let source: Buffer;
+    try {
+      source = readFileSync(sourcePath);
+    } catch {
+      throw new Error(`Authoritative schema is unavailable: ${sourcePath}`);
+    }
 
-  if (schema?.$id !== SCHEMA_ID) {
-    throw new Error(
-      `Authoritative schema has unexpected $id; expected ${SCHEMA_ID}: ${sourcePath}`,
-    );
-  }
+    let schema: { $id?: unknown } | null;
+    try {
+      schema = JSON.parse(source.toString("utf8")) as { $id?: unknown };
+    } catch {
+      throw new Error(`Authoritative schema is not valid JSON: ${sourcePath}`);
+    }
 
-  mkdirSync(dirname(destinationPath), { recursive: true });
-  copyFileSync(sourcePath, destinationPath);
+    const expectedId = `https://atlante.sh/schema/v0.1/${name}`;
+    if (schema?.$id !== expectedId) {
+      throw new Error(
+        `Authoritative schema has unexpected $id; expected ${expectedId}: ${sourcePath}`,
+      );
+    }
 
-  return { sourcePath, destinationPath };
+    const destinationPath = join(destinationDir, name);
+    mkdirSync(dirname(destinationPath), { recursive: true });
+    copyFileSync(sourcePath, destinationPath);
+
+    return { sourcePath, destinationPath };
+  });
 }
 
 if (

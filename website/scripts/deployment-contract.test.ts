@@ -46,7 +46,7 @@ describe("website deployment contract", () => {
     expect(vercel.functions["api/**"]).toEqual({ maxDuration: 30 });
 
     const schemaHeader = vercel.headers.find(
-      (header) => header.source === "/schema/v0.1/schema.json",
+      (header) => header.source === "/schema/v0.1/:name.json",
     );
     expect(schemaHeader?.headers).toContainEqual({
       key: "Content-Type",

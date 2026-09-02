@@ -2,24 +2,18 @@ import { afterEach, describe, expect, it } from "bun:test";
 import {
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { syncSchema } from "./sync-schema";
 
 const repoRoot = join(import.meta.dirname, "..", "..");
-const sourcePath = join(
-  repoRoot,
-  "packages",
-  "schema",
-  "schema",
-  "v0.1",
-  "schema.json",
-);
-const expectedSchemaId = "https://atlante.sh/schema/v0.1/schema.json";
+const sourceDir = join(repoRoot, "packages", "schema", "schema", "v0.1");
+const schemaIdBase = "https://atlante.sh/schema/v0.1";
 let temporaryWebsiteRoot: string;
 
 afterEach(() => {
@@ -29,29 +23,54 @@ afterEach(() => {
 });
 
 describe("syncSchema", () => {
-  it("copies the authoritative schema to the website public path unchanged", () => {
+  it("copies every authoritative schema to the website public path unchanged", () => {
     temporaryWebsiteRoot = mkdtempSync(
       join(tmpdir(), "atlante-website-schema-"),
     );
 
-    const result = syncSchema({ repoRoot, websiteRoot: temporaryWebsiteRoot });
-    const destinationPath = join(
-      temporaryWebsiteRoot,
-      "public",
-      "schema",
-      "v0.1",
-      "schema.json",
-    );
+    const results = syncSchema({
+      repoRoot,
+      websiteRoot: temporaryWebsiteRoot,
+    });
+    const sourceNames = readdirSync(sourceDir)
+      .filter((name) => name.endsWith(".json"))
+      .sort();
 
-    expect(result.sourcePath).toBe(sourcePath);
-    expect(result.destinationPath).toBe(destinationPath);
-    expect(JSON.parse(readFileSync(sourcePath, "utf8")).$id).toBe(
-      expectedSchemaId,
+    // Every generated schema (the configuration document contract and the
+    // eval-scenario document contract, today) must be published: scenario
+    // documents name their matching atlante.sh URL in `$schema`, and a gap
+    // here would 404 in production.
+    expect(sourceNames).toEqual(["eval-scenario.json", "schema.json"]);
+    expect(results).toEqual(
+      sourceNames.map((name) => ({
+        sourcePath: join(sourceDir, name),
+        destinationPath: join(
+          temporaryWebsiteRoot,
+          "public",
+          "schema",
+          "v0.1",
+          name,
+        ),
+      })),
     );
-    expect(readFileSync(destinationPath)).toEqual(readFileSync(sourcePath));
+    for (const name of sourceNames) {
+      const destinationPath = join(
+        temporaryWebsiteRoot,
+        "public",
+        "schema",
+        "v0.1",
+        name,
+      );
+      expect(JSON.parse(readFileSync(destinationPath, "utf8")).$id).toBe(
+        `${schemaIdBase}/${name}`,
+      );
+      expect(readFileSync(destinationPath)).toEqual(
+        readFileSync(join(sourceDir, name)),
+      );
+    }
   });
 
-  it("fails when the authoritative schema is unavailable", () => {
+  it("fails when the authoritative schema directory is unavailable", () => {
     temporaryWebsiteRoot = mkdtempSync(
       join(tmpdir(), "atlante-website-schema-"),
     );
@@ -61,24 +80,23 @@ describe("syncSchema", () => {
         repoRoot: temporaryWebsiteRoot,
         websiteRoot: temporaryWebsiteRoot,
       }),
-    ).toThrow(`Authoritative schema is unavailable:`);
+    ).toThrow("Authoritative schema is unavailable:");
   });
 
-  it("fails when the authoritative schema has the wrong identity", () => {
+  it("fails when an authoritative schema has the wrong identity", () => {
     temporaryWebsiteRoot = mkdtempSync(
       join(tmpdir(), "atlante-website-schema-"),
     );
-    const fakeSourcePath = join(
+    const fakeSourceDir = join(
       temporaryWebsiteRoot,
       "packages",
       "schema",
       "schema",
       "v0.1",
-      "schema.json",
     );
-    mkdirSync(dirname(fakeSourcePath), { recursive: true });
+    mkdirSync(fakeSourceDir, { recursive: true });
     writeFileSync(
-      fakeSourcePath,
+      join(fakeSourceDir, "schema.json"),
       JSON.stringify({ $id: "https://example.com/schema.json" }),
     );
 
@@ -87,6 +105,6 @@ describe("syncSchema", () => {
         repoRoot: temporaryWebsiteRoot,
         websiteRoot: temporaryWebsiteRoot,
       }),
-    ).toThrow(`Authoritative schema has unexpected $id`);
+    ).toThrow("Authoritative schema has unexpected $id");
   });
 });
