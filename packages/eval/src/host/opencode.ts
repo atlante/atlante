@@ -8,9 +8,9 @@ import {
 } from "node:fs";
 import { createRequire } from "node:module";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join } from "node:path";
 import { readArtifacts } from "@atlante/artifacts/read-only";
-import { parse } from "jsonc-parser";
+import { parseJsonc } from "@atlante/validator";
 import type {
   HostRunner,
   RunTrialInput,
@@ -63,7 +63,22 @@ const FORCED_BASH_DENIALS = Object.freeze({
 const BASELINE_DEFAULTS = Object.freeze({
   edit: "allow",
   read: "allow",
+  glob: "allow",
+  grep: "allow",
+  list: "allow",
+  task: "allow",
+  skill: "allow",
+  lsp: "allow",
+  question: "allow",
+  todowrite: "allow",
+  doom_loop: "allow",
 } as const);
+const PERMISSION_ACTIONS = new Set(["allow", "deny", "ask"]);
+const PERMISSION_KEYS = [
+  ...Object.keys(BASELINE_DEFAULTS),
+  ...Object.keys(FORCED_DENIALS),
+  "bash",
+];
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -79,14 +94,32 @@ type PermissionMap = Record<string, unknown>;
 export function mergePermissionBaseline(existing: unknown): PermissionMap {
   const base = isObject(existing) ? existing : {};
   const baseBash = isObject(base.bash) ? base.bash : {};
+  const scalarDefault =
+    typeof existing === "string" && PERMISSION_ACTIONS.has(existing)
+      ? existing
+      : "allow";
+  const bashDefault =
+    typeof base.bash === "string" && PERMISSION_ACTIONS.has(base.bash)
+      ? base.bash
+      : typeof baseBash["*"] === "string" &&
+          PERMISSION_ACTIONS.has(baseBash["*"])
+        ? baseBash["*"]
+        : scalarDefault;
+  const customBash = Object.fromEntries(
+    Object.entries(baseBash).filter(
+      ([key]) => key !== "*" && !Object.hasOwn(FORCED_BASH_DENIALS, key),
+    ),
+  );
   return {
-    ...BASELINE_DEFAULTS,
+    ...Object.fromEntries(
+      PERMISSION_KEYS.map((permission) => [permission, scalarDefault]),
+    ),
     ...base,
     ...FORCED_DENIALS,
     bash: {
-      "*": "allow",
-      ...baseBash,
       ...FORCED_BASH_DENIALS,
+      "*": bashDefault,
+      ...customBash,
     },
   };
 }
@@ -95,15 +128,25 @@ function readHostConfig(projectRoot: string): Record<string, unknown> {
   for (const filename of ["opencode.jsonc", "opencode.json"]) {
     const path = join(projectRoot, filename);
     if (!existsSync(path)) continue;
+    let text: string;
     try {
-      const parsed = parse(readFileSync(path, "utf8"), undefined, {
-        allowTrailingComma: true,
-        disallowComments: filename.endsWith(".json") === false,
-      });
-      if (isObject(parsed)) return parsed;
-    } catch {
-      // Fall through: an unreadable host config yields a fresh one below.
+      text = readFileSync(path, "utf8");
+    } catch (cause) {
+      throw new Error(
+        `could not read ${filename}: ${cause instanceof Error ? cause.message : String(cause)}`,
+      );
     }
+    const parsed = parseJsonc(text, {
+      allowTrailingComma: true,
+      disallowComments: filename.endsWith(".json"),
+    });
+    if (parsed.errors.length > 0) {
+      throw new Error(`host configuration ${filename} is malformed`);
+    }
+    if (!isObject(parsed.value)) {
+      throw new Error(`host configuration ${filename} must contain an object`);
+    }
+    return parsed.value;
   }
   return {};
 }
@@ -139,21 +182,70 @@ function resolvePluginPath(projectRoot: string): string {
   );
 }
 
+function isAdapterPackagePath(value: string): boolean {
+  if (!isAbsolute(value)) return false;
+  const hasAdapterManifest = (dir: string): boolean => {
+    try {
+      const manifest = JSON.parse(
+        readFileSync(join(dir, "package.json"), "utf8"),
+      ) as unknown;
+      return isObject(manifest) && manifest.name === ATLANTE_PLUGIN_NAME;
+    } catch {
+      return false;
+    }
+  };
+
+  // An absolute entry may name either the package root or a bundled file.
+  if (hasAdapterManifest(value)) return true;
+  let dir = dirname(value);
+  for (let hop = 0; hop < 6; hop++) {
+    if (hasAdapterManifest(dir)) return true;
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return false;
+}
+
 function rewritePluginEntries(
   entries: unknown,
   projectRoot: string,
 ): unknown[] {
-  const pluginPath = resolvePluginPath(projectRoot);
-  const list = Array.isArray(entries) ? entries : [];
-  return list.map((entry) => {
+  if (!Array.isArray(entries)) {
+    throw new Error(
+      `host configuration plugin must be an array containing ${ATLANTE_PLUGIN_NAME}`,
+    );
+  }
+  let pluginPath: string | undefined;
+  let registered = false;
+  const resolvePath = () => (pluginPath ??= resolvePluginPath(projectRoot));
+  const rewritten = entries.map((entry) => {
     if (typeof entry === "string") {
-      return entry === ATLANTE_PLUGIN_NAME ? pluginPath : entry;
+      if (entry === ATLANTE_PLUGIN_NAME) {
+        registered = true;
+        return resolvePath();
+      }
+      if (isAdapterPackagePath(entry)) registered = true;
+      return entry;
     }
-    if (Array.isArray(entry) && entry[0] === ATLANTE_PLUGIN_NAME) {
-      return [pluginPath, ...entry.slice(1)];
+    if (Array.isArray(entry) && typeof entry[0] === "string") {
+      if (entry[0] === ATLANTE_PLUGIN_NAME) {
+        registered = true;
+        return [resolvePath(), ...entry.slice(1)];
+      }
+      if (isAdapterPackagePath(entry[0])) registered = true;
     }
     return entry;
   });
+  if (!registered) {
+    // Resolve once so a missing project dependency retains actionable install
+    // guidance instead of silently accepting a config without the adapter.
+    resolvePath();
+    throw new Error(
+      `host configuration plugin must register ${ATLANTE_PLUGIN_NAME}`,
+    );
+  }
+  return rewritten;
 }
 
 /**
@@ -199,6 +291,9 @@ export function createOpenCodeRunner(
       const agents = isObject(config.agent) ? config.agent : {};
       const agentNames = new Set<string>(["build"]);
       if (context.agent) agentNames.add(context.agent);
+      if (typeof config.default_agent === "string")
+        agentNames.add(config.default_agent);
+      for (const name of Object.keys(agents)) agentNames.add(name);
       for (const artifact of readArtifactAgentIds(projectRoot)) {
         agentNames.add(artifact);
       }
@@ -264,13 +359,11 @@ export function createOpenCodeRunner(
 }
 
 function readArtifactAgentIds(projectRoot: string): string[] {
-  try {
-    return (
-      readArtifacts(projectRoot)?.agents.map((agent) => agent.hostAgentId) ?? []
-    );
-  } catch {
-    return [];
+  const artifacts = readArtifacts(projectRoot);
+  if (!artifacts) {
+    throw new Error("verified artifacts became unavailable during host setup");
   }
+  return artifacts.agents.map((agent) => agent.hostAgentId);
 }
 
 type HostStreamResult = {
@@ -401,7 +494,7 @@ function spawnHost(
       if (eventCost !== undefined) cost = eventCost;
 
       const identifiers = extractModelIdentifiers(event);
-      if (identifiers?.provider && identifiers?.model) {
+      if (model === undefined && identifiers?.provider && identifiers?.model) {
         model = `${identifiers.provider}/${identifiers.model}`;
         modelVersion = identifiers.model;
       }

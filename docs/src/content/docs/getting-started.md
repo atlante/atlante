@@ -94,6 +94,8 @@ That is the first useful boundary: Atlante renders the prompts and
 materializes the files; the host discovers them and executes agents and
 skills. Atlante does not execute agents, skills, project code, or LLM
 inference.
+The optional `atlante eval` command delegates a sandboxed run to OpenCode;
+Atlante does not perform LLM inference itself.
 
 ## 5. Continue to the harness
 

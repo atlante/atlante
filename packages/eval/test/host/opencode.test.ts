@@ -55,13 +55,20 @@ beforeAll(() => {
       skills: [],
     }),
   );
-  // Make @atlante/opencode resolvable from the temp project by linking the
-  // repo's adapter package into the project's node_modules.
+  // Make @atlante/opencode resolvable from the temp project with a minimal
+  // package fixture. This keeps the unit test independent of generated
+  // packages/opencode/dist output, which is only created by the build step.
   const linkDir = join(projectRoot, "node_modules", "@atlante", "opencode");
-  mkdirSync(join(linkDir, ".."), { recursive: true });
-  cpSync(join(import.meta.dir, "..", "..", "..", "opencode"), linkDir, {
-    recursive: true,
-  });
+  mkdirSync(join(linkDir, "dist"), { recursive: true });
+  writeFileSync(
+    join(linkDir, "package.json"),
+    `${JSON.stringify({
+      name: "@atlante/opencode",
+      version: "0.0.0-test",
+      exports: { ".": "./dist/index.js" },
+    })}\n`,
+  );
+  writeFileSync(join(linkDir, "dist", "index.js"), "export default {};\n");
 
   authFile = join(tempDir("eval-host-auth-"), "auth.json");
   writeFileSync(authFile, '{"github":{"type":"token"}}');
@@ -115,6 +122,9 @@ describe("prepareHostIntegration", () => {
     expect(written.agent.build.permission.external_directory).toBe("deny");
     expect(written.agent.build.permission.bash["rm -rf *"]).toBe("deny");
     expect(written.agent.build.permission.bash["*"]).toBe("allow");
+    expect(
+      Object.keys(written.agent.build.permission.bash).slice(0, 3),
+    ).toEqual(["rm -rf *", "rm -fr *", "sudo *"]);
     // The artifact agent and the default agent both get blocks.
     expect(written.agent.build).toBeDefined();
     // Auth injected into the redirected data dir.
@@ -149,6 +159,78 @@ describe("prepareHostIntegration", () => {
       ),
     ).toThrow(/auth/);
   });
+
+  test("fails closed when the host configuration is malformed", () => {
+    const config = join(projectRoot, "opencode.jsonc");
+    writeFileSync(config, '{"agent":\n');
+    try {
+      const runner = createOpenCodeRunner({
+        projectRoot,
+        authPath: authFile,
+      });
+      expect(() =>
+        runner.prepareHostIntegration(
+          sandboxFor(
+            tempDir("eval-sandbox-malformed-"),
+            tempDir("eval-state-malformed-"),
+          ),
+          {},
+        ),
+      ).toThrow(/malformed/);
+    } finally {
+      rmSync(config, { force: true });
+    }
+  });
+
+  test("fails closed when the adapter is not registered", () => {
+    const config = join(projectRoot, "opencode.json");
+    writeFileSync(config, JSON.stringify({ plugin: [] }));
+    try {
+      const runner = createOpenCodeRunner({
+        projectRoot,
+        authPath: authFile,
+      });
+      expect(() =>
+        runner.prepareHostIntegration(
+          sandboxFor(
+            tempDir("eval-sandbox-no-plugin-"),
+            tempDir("eval-state-no-plugin-"),
+          ),
+          {},
+        ),
+      ).toThrow(/plugin.*@atlante\/opencode/);
+    } finally {
+      rmSync(config, { force: true });
+    }
+  });
+
+  test("merges the configured default agent into the baseline", () => {
+    const config = join(projectRoot, "opencode.json");
+    writeFileSync(
+      config,
+      JSON.stringify({
+        plugin: ["@atlante/opencode"],
+        default_agent: "custom",
+        agent: { custom: { permission: "deny" } },
+      }),
+    );
+    try {
+      const runner = createOpenCodeRunner({
+        projectRoot,
+        authPath: authFile,
+      });
+      const project = tempDir("eval-sandbox-default-agent-");
+      const state = tempDir("eval-state-default-agent-");
+      runner.prepareHostIntegration(sandboxFor(project, state), {});
+      const written = JSON.parse(
+        readFileSync(join(project, "opencode.json"), "utf8"),
+      );
+      expect(written.agent.custom.permission.read).toBe("deny");
+      expect(written.agent.custom.permission.webfetch).toBe("deny");
+    } finally {
+      rmSync(config, { force: true });
+    }
+  });
 });
 
 describe("runTrial", () => {
@@ -158,7 +240,7 @@ describe("runTrial", () => {
     // defensive fallback for other host versions.
     const stub = writeStub(
       tempDir("eval-stub-happy-"),
-      `printf '%s\\n' '{"type":"session","info":{"providerID":"acme","modelID":"model-x"}}' '{"type":"step_finish","part":{"type":"step-finish","tokens":{"total":350,"input":300,"output":40,"reasoning":10,"cache":{"read":0,"write":0}},"cost":0.01}}' '{"type":"step_finish","tokens":440,"cost":0.02}'`,
+      `printf '%s\\n' '{"type":"session","info":{"providerID":"acme","modelID":"model-x"}}' '{"type":"session","info":{"providerID":"other","modelID":"model-y"}}' '{"type":"step_finish","part":{"type":"step-finish","tokens":{"total":350,"input":300,"output":40,"reasoning":10,"cache":{"read":0,"write":0}},"cost":0.01}}' '{"type":"step_finish","tokens":440,"cost":0.02}'`,
     );
     const runner = createOpenCodeRunner({
       projectRoot,
@@ -324,12 +406,47 @@ describe("mergePermissionBaseline", () => {
     expect(merged.webfetch).toBe("deny");
     expect(merged.websearch).toBe("deny");
     expect(merged.external_directory).toBe("deny");
+    for (const permission of [
+      "read",
+      "glob",
+      "grep",
+      "list",
+      "task",
+      "skill",
+      "lsp",
+      "question",
+      "todowrite",
+      "doom_loop",
+    ]) {
+      expect(merged[permission]).toBe("allow");
+    }
     expect(merged.bash).toEqual({
       "*": "allow",
       "git push *": "deny",
       "rm -rf *": "deny",
       "rm -fr *": "deny",
       "sudo *": "deny",
+    });
+  });
+
+  test("preserves scalar Bash policies while adding forced denials", () => {
+    expect(mergePermissionBaseline({ bash: "deny" }).bash).toEqual({
+      "*": "deny",
+      "rm -rf *": "deny",
+      "rm -fr *": "deny",
+      "sudo *": "deny",
+    });
+  });
+
+  test("preserves restrictive scalar permissions while adding denials", () => {
+    const merged = mergePermissionBaseline("deny");
+    expect(merged.read).toBe("deny");
+    expect(merged.edit).toBe("deny");
+    expect(merged.bash).toEqual({
+      "rm -rf *": "deny",
+      "rm -fr *": "deny",
+      "sudo *": "deny",
+      "*": "deny",
     });
   });
 });

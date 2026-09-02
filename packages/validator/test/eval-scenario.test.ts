@@ -1,4 +1,12 @@
 import { describe, expect, test } from "bun:test";
+import {
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { EVAL_SCENARIO_SCHEMA_URI, evalScenarioSchema } from "@atlante/schema";
 import { globFiles, globToRegExp } from "../src/glob.js";
@@ -21,6 +29,12 @@ describe("glob", () => {
     expect(regex.test("eval/scenarios/a.eval.jsonc")).toBe(true);
     expect(regex.test("eval/scenarios/nested/a.eval.jsonc")).toBe(true);
     expect(regex.test("eval/scenarios/a.json")).toBe(false);
+  });
+
+  test("matches descendants when double-star is the final segment", () => {
+    const regex = globToRegExp("eval/**");
+    expect(regex.test("eval/a.eval.json")).toBe(true);
+    expect(regex.test("eval/scenarios/a.eval.json")).toBe(true);
   });
 
   test("escapes literal regex characters", () => {
@@ -86,6 +100,116 @@ describe("discoverEvalScenarios", () => {
       const result = discoverEvalScenarios(fixturesRoot, pattern);
       expect(result.scenarios).toEqual([]);
       expect(result.diagnostics[0]?.code).toBe("invalid-scenario-glob");
+    }
+  });
+
+  test("rejects fixture symlinks that could escape the project", () => {
+    const project = mkdtempSync(join(tmpdir(), "eval-scenario-project-"));
+    const outside = mkdtempSync(join(tmpdir(), "eval-scenario-outside-"));
+    try {
+      mkdirSync(join(project, "scenarios"), { recursive: true });
+      mkdirSync(join(outside, "fixture"), { recursive: true });
+      symlinkSync(join(outside, "fixture"), join(project, "fixture"), "dir");
+      writeFileSync(
+        join(project, "scenarios", "symlink.eval.json"),
+        `${JSON.stringify({
+          $schema: EVAL_SCENARIO_SCHEMA_URI,
+          version: "0.1",
+          name: "symlink-fixture",
+          task: { fixture: "fixture", prompt: "p" },
+          checks: [{ type: "file-exists", path: "src/index.ts" }],
+        })}\n`,
+      );
+
+      const result = discoverEvalScenarios(project, "scenarios/*.json");
+      expect(result.scenarios).toEqual([]);
+      expect(result.diagnostics[0]?.code).toBe("invalid-scenario-fixture");
+      expect(result.diagnostics[0]?.message).toContain("symbolic link");
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+      rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  test("rejects fixture paths with symlinked ancestors", () => {
+    const project = mkdtempSync(join(tmpdir(), "eval-scenario-project-"));
+    const outside = mkdtempSync(join(tmpdir(), "eval-scenario-outside-"));
+    try {
+      mkdirSync(join(project, "scenarios"), { recursive: true });
+      mkdirSync(join(outside, "fixture"), { recursive: true });
+      symlinkSync(outside, join(project, "link"), "dir");
+      writeFileSync(
+        join(project, "scenarios", "ancestor-link.eval.json"),
+        `${JSON.stringify({
+          $schema: EVAL_SCENARIO_SCHEMA_URI,
+          version: "0.1",
+          name: "ancestor-link",
+          task: { fixture: "link/fixture", prompt: "p" },
+          checks: [{ type: "file-exists", path: "src/index.ts" }],
+        })}\n`,
+      );
+
+      const result = discoverEvalScenarios(
+        project,
+        "scenarios/ancestor-link.eval.json",
+      );
+      expect(result.scenarios).toEqual([]);
+      expect(result.diagnostics[0]?.code).toBe("invalid-scenario-fixture");
+      expect(result.diagnostics[0]?.message).toContain("symbolic link");
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+      rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  test("rejects NUL characters in fixture paths", () => {
+    const project = mkdtempSync(join(tmpdir(), "eval-scenario-project-"));
+    try {
+      mkdirSync(join(project, "scenarios", "fixture"), { recursive: true });
+      writeFileSync(
+        join(project, "scenarios", "nul.eval.json"),
+        `${JSON.stringify({
+          $schema: EVAL_SCENARIO_SCHEMA_URI,
+          version: "0.1",
+          name: "nul-path",
+          task: { fixture: "scenarios/fixture\u0000", prompt: "p" },
+          checks: [{ type: "file-exists", path: "src/index.ts" }],
+        })}\n`,
+      );
+
+      const result = discoverEvalScenarios(project, "scenarios/nul.eval.json");
+      expect(result.scenarios).toEqual([]);
+      expect(result.diagnostics[0]?.code).toBe("invalid-eval-scenario");
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
+  });
+
+  test("rejects regular files named like forbidden fixture directories", () => {
+    const project = mkdtempSync(join(tmpdir(), "eval-scenario-project-"));
+    try {
+      mkdirSync(join(project, "scenarios", "fixture"), { recursive: true });
+      writeFileSync(join(project, "scenarios", "fixture", ".git"), "not git");
+      writeFileSync(
+        join(project, "scenarios", "forbidden-file.eval.json"),
+        `${JSON.stringify({
+          $schema: EVAL_SCENARIO_SCHEMA_URI,
+          version: "0.1",
+          name: "forbidden-file",
+          task: { fixture: "scenarios/fixture", prompt: "p" },
+          checks: [{ type: "file-exists", path: "src/index.ts" }],
+        })}\n`,
+      );
+
+      const result = discoverEvalScenarios(
+        project,
+        "scenarios/forbidden-file.eval.json",
+      );
+      expect(result.scenarios).toEqual([]);
+      expect(result.diagnostics[0]?.code).toBe("invalid-scenario-fixture");
+      expect(result.diagnostics[0]?.message).toContain(".git");
+    } finally {
+      rmSync(project, { recursive: true, force: true });
     }
   });
 

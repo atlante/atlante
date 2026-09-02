@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import {
   cpSync,
-  existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -10,7 +10,7 @@ import {
   statSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join, relative, sep } from "node:path";
 import { readArtifacts } from "@atlante/artifacts/read-only";
 import type { DiscoveredEvalScenario } from "@atlante/validator";
 import type { ResolvedBudget } from "./config.js";
@@ -105,6 +105,11 @@ export async function assembleSandbox(
   }
 
   // (a) Fixture copy: the sandbox root starts as a copy of the fixture.
+  assertNoSymlinkPath(
+    input.projectRoot,
+    join(input.projectRoot, input.scenario.scenario.task.fixture),
+    "fixture",
+  );
   copyFixtureTree(
     join(input.projectRoot, input.scenario.scenario.task.fixture),
     root,
@@ -112,11 +117,8 @@ export async function assembleSandbox(
 
   // (b) Verified artifact publication, copied as-is for the host plugin.
   const artifacts = join(input.projectRoot, ".atlante", "artifacts");
-  if (!existsSync(artifacts)) {
-    throw new ArtifactsNotVerifiedError(
-      "no artifact publication at .atlante/artifacts",
-    );
-  }
+  verifyArtifacts(input.projectRoot);
+  assertNoSymlinks(artifacts, "artifact tree");
   mkdirSync(join(root, ".atlante"), { recursive: true });
   cpSync(artifacts, join(root, ".atlante", "artifacts"), { recursive: true });
 
@@ -137,6 +139,9 @@ export async function assembleSandbox(
       cwd: root,
       timeoutMs: input.budget.setupTimeoutMs,
     });
+    if (outcome.timedOut) {
+      throw new Error(`setup timed out after ${input.budget.setupTimeoutMs}ms`);
+    }
     if (outcome.spawnError !== undefined || outcome.exit !== 0) {
       throw new Error(
         `setup failed: ${outcome.spawnError ?? `exit ${outcome.exit}`}: ${outcome.stderr.slice(-400)}`,
@@ -172,7 +177,9 @@ export async function assembleSandbox(
     }
   };
   await git(["init", "--quiet"]);
-  await git(["add", "--all"]);
+  // Track the complete baseline, including files ignored by fixture rules;
+  // otherwise later ignored writes cannot be distinguished from baseline.
+  await git(["add", "--all", "--force"]);
   await git([
     "commit",
     "--quiet",
@@ -203,7 +210,7 @@ function fileUnchangedPaths(scenario: DiscoveredEvalScenario): string[] {
   );
 }
 
-const SKIPPED_COPY_SEGMENTS = new Set([".git", "node_modules"]);
+const FORBIDDEN_COPY_SEGMENTS = new Set([".git", "node_modules"]);
 
 /**
  * Copies the fixture tree into the sandbox root. Discovery already validated
@@ -211,8 +218,10 @@ const SKIPPED_COPY_SEGMENTS = new Set([".git", "node_modules"]);
  * the sandbox (defense in depth, not duplication of validation logic).
  */
 function copyFixtureTree(source: string, target: string): void {
-  const stat = statSync(source, { throwIfNoEntry: false });
+  const stat = lstatSync(source, { throwIfNoEntry: false });
   if (!stat?.isDirectory()) {
+    if (stat?.isSymbolicLink())
+      throw new Error(`fixture must not be a symbolic link: ${source}`);
     throw new Error(`fixture is not a directory: ${source}`);
   }
   mkdirSync(target, { recursive: true });
@@ -221,11 +230,62 @@ function copyFixtureTree(source: string, target: string): void {
     encoding: "utf8",
   });
   for (const entry of entries) {
-    if (SKIPPED_COPY_SEGMENTS.has(entry.name)) continue;
+    if (entry.isSymbolicLink())
+      throw new Error(`fixture contains a symbolic link: ${entry.name}`);
+    if (FORBIDDEN_COPY_SEGMENTS.has(entry.name)) {
+      throw new Error(`fixture contains a forbidden entry: ${entry.name}`);
+    }
     if (entry.isDirectory()) {
       copyFixtureTree(join(source, entry.name), join(target, entry.name));
     } else if (entry.isFile()) {
       cpSync(join(source, entry.name), join(target, entry.name));
     }
   }
+}
+
+function assertNoSymlinkPath(
+  base: string,
+  target: string,
+  label: string,
+): void {
+  const relativePath = relative(base, target);
+  if (
+    isAbsolute(relativePath) ||
+    relativePath === ".." ||
+    relativePath.startsWith(`..${sep}`)
+  ) {
+    throw new Error(`${label} must resolve inside the project`);
+  }
+
+  let current = base;
+  if (lstatSync(current, { throwIfNoEntry: false })?.isSymbolicLink())
+    throw new Error(`${label} path traverses a symbolic link`);
+  for (const segment of relativePath.split(sep)) {
+    if (segment === "" || segment === ".") continue;
+    current = join(current, segment);
+    if (lstatSync(current, { throwIfNoEntry: false })?.isSymbolicLink())
+      throw new Error(`${label} path traverses a symbolic link`);
+  }
+}
+
+/** Refuses artifact trees with links before recursive copying can follow them. */
+function assertNoSymlinks(root: string, label: string): void {
+  const rootStat = lstatSync(root, { throwIfNoEntry: false });
+  if (!rootStat?.isDirectory()) {
+    throw new Error(`${label} is not a directory`);
+  }
+  const walk = (directory: string): void => {
+    const entries = readdirSync(directory, {
+      withFileTypes: true,
+      encoding: "utf8",
+    });
+    for (const entry of entries) {
+      const path = join(directory, entry.name);
+      if (entry.isSymbolicLink()) {
+        throw new Error(`${label} contains a symbolic link: ${entry.name}`);
+      }
+      if (entry.isDirectory()) walk(path);
+    }
+  };
+  walk(root);
 }

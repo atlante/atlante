@@ -14,6 +14,7 @@ const PACKAGES = [
   "builder",
   "pack",
   "opencode",
+  "eval",
   "cli",
 ] as const;
 const LEGACY_PACKAGES = ["templates", "presets"] as const;
@@ -71,7 +72,7 @@ test("removes old workspace entries, manifests, imports, scripts, and lock entri
   }
 });
 
-test("keeps resources private and synchronizes exactly seven workspaces", () => {
+test("keeps resources private and synchronizes exactly eight workspaces", () => {
   const resources = readJson(
     join(ROOT, "packages", "resources", "package.json"),
   );

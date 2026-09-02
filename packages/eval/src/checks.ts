@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { lstatSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { EvalCheck } from "@atlante/schema";
 import type { Sandbox } from "./sandbox.js";
@@ -34,6 +34,43 @@ function outputTail(text: string): string {
     : text;
 }
 
+type SafePath = { absolute: string } | { unsafe: string };
+
+/**
+ * Resolves a check path without traversing a symlink created by the host.
+ * Lexical schema validation protects authored paths; this walk protects the
+ * same path after the host has modified the sandbox tree.
+ */
+function noFollowPath(sandbox: Sandbox, path: string): SafePath {
+  try {
+    let current = sandbox.root;
+    const rootStat = lstatSync(current, { throwIfNoEntry: false });
+    if (rootStat?.isSymbolicLink()) {
+      return { unsafe: "sandbox root is a symbolic link" };
+    }
+    for (const segment of path.split(/[\\/]+/)) {
+      if (segment === "" || segment === ".") continue;
+      current = join(current, segment);
+      const stat = lstatSync(current, { throwIfNoEntry: false });
+      if (stat?.isSymbolicLink()) {
+        return { unsafe: `path traverses a symbolic link at ${segment}` };
+      }
+    }
+    return { absolute: current };
+  } catch (cause) {
+    return {
+      unsafe: `could not inspect sandbox path: ${cause instanceof Error ? cause.message : String(cause)}`,
+    };
+  }
+}
+
+function filesystemError(path: string, cause: unknown): RawCheckResult {
+  return errorVerdict({
+    path,
+    cause: cause instanceof Error ? cause.message : String(cause),
+  });
+}
+
 async function commandCheck(
   sandbox: Sandbox,
   check: Extract<EvalCheck, { type: "command" }>,
@@ -56,6 +93,9 @@ async function commandCheck(
     ...(outcome.timedOut ? { timedOut: true } : {}),
     output: outputTail(combined.trim()),
   };
+  // A timeout is a failed check even if the terminated process reports a
+  // clean exit after receiving SIGTERM.
+  if (outcome.timedOut) return fail(evidence);
   if (outcome.exit !== check.expectExit) return fail(evidence);
   if (check.outputMatches !== undefined) {
     const matched = new RegExp(check.outputMatches).test(combined);
@@ -70,25 +110,40 @@ function fileExistsCheck(
   path: string,
   expectExists: boolean,
 ): RawCheckResult {
-  const exists = existsSync(join(sandbox.root, path));
-  return exists === expectExists ? PASS : fail({ path, exists, expectExists });
+  const safe = noFollowPath(sandbox, path);
+  if ("unsafe" in safe) return errorVerdict({ path, cause: safe.unsafe });
+  try {
+    const exists =
+      lstatSync(safe.absolute, { throwIfNoEntry: false }) !== undefined;
+    return exists === expectExists
+      ? PASS
+      : fail({ path, exists, expectExists });
+  } catch (cause) {
+    return filesystemError(path, cause);
+  }
 }
 
 function fileContainsCheck(
   sandbox: Sandbox,
   check: Extract<EvalCheck, { type: "file-contains" }>,
 ): RawCheckResult {
-  const absolute = join(sandbox.root, check.path);
-  const stat = statSync(absolute, { throwIfNoEntry: false });
+  const safe = noFollowPath(sandbox, check.path);
+  if ("unsafe" in safe) {
+    return errorVerdict({ path: check.path, cause: safe.unsafe });
+  }
+  const absolute = safe.absolute;
+  let stat: ReturnType<typeof lstatSync>;
+  try {
+    stat = lstatSync(absolute, { throwIfNoEntry: false });
+  } catch (cause) {
+    return filesystemError(check.path, cause);
+  }
   if (!stat?.isFile()) return fail({ path: check.path, exists: Boolean(stat) });
   let content: string;
   try {
     content = readFileSync(absolute, "utf8");
   } catch (cause) {
-    return errorVerdict({
-      path: check.path,
-      cause: cause instanceof Error ? cause.message : String(cause),
-    });
+    return filesystemError(check.path, cause);
   }
   if (check.regex) {
     let regex: RegExp;
@@ -111,22 +166,29 @@ function fileContainsCheck(
 }
 
 function fileUnchangedCheck(sandbox: Sandbox, path: string): RawCheckResult {
-  const absolute = join(sandbox.root, path);
+  const safe = noFollowPath(sandbox, path);
+  if ("unsafe" in safe) return errorVerdict({ path, cause: safe.unsafe });
   const baseline = sandbox.snapshot.find((entry) => entry.path === path);
   if (!baseline) {
     // Snapshot capture is part of assembly; a missing entry is infra-level.
     return errorVerdict({ path, cause: "no baseline snapshot entry" });
   }
-  const current = statSync(absolute, { throwIfNoEntry: false })?.isFile()
-    ? createHash("sha256").update(readFileSync(absolute)).digest("hex")
-    : null;
-  return current === baseline.hash
-    ? PASS
-    : fail({
-        path,
-        baselineHash: baseline.hash,
-        currentHash: current,
-      });
+  try {
+    const current = lstatSync(safe.absolute, {
+      throwIfNoEntry: false,
+    })?.isFile()
+      ? createHash("sha256").update(readFileSync(safe.absolute)).digest("hex")
+      : null;
+    return current === baseline.hash
+      ? PASS
+      : fail({
+          path,
+          baselineHash: baseline.hash,
+          currentHash: current,
+        });
+  } catch (cause) {
+    return filesystemError(path, cause);
+  }
 }
 
 async function diffAllowlistCheck(
@@ -134,7 +196,13 @@ async function diffAllowlistCheck(
   allow: readonly string[],
 ): Promise<RawCheckResult> {
   const outcome = await runCommand(
-    ["git", "status", "--porcelain", "--untracked-files=all"],
+    [
+      "git",
+      "status",
+      "--porcelain",
+      "--untracked-files=all",
+      "--ignored=matching",
+    ],
     { cwd: sandbox.root, timeoutMs: 60_000 },
   );
   if (outcome.exit !== 0 || outcome.spawnError !== undefined) {

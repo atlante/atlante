@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-// All seven manifests stay synchronized and version-bumped together; the
+// All eight manifests stay synchronized and version-bumped together; the seven
 // internal packages plus the static pack are covered by the release graph.
 // Publishing is the separate scripts/publish-packages.ts step.
 // Packages are listed in architectural layer order, lowest layer first — the
@@ -16,6 +16,7 @@ const PACKAGES = [
   "builder",
   "pack",
   "opencode",
+  "eval",
   "cli",
 ] as const;
 

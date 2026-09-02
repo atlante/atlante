@@ -1,19 +1,14 @@
-import { type Dirent, readdirSync, readFileSync, statSync } from "node:fs";
+import { type Dirent, lstatSync, readdirSync, readFileSync } from "node:fs";
 import { basename, join, relative, resolve, sep } from "node:path";
 import {
   EVAL_SCENARIO_SCHEMA_URI,
   type EvalScenario,
   evalScenarioSchema,
 } from "@atlante/schema";
-import {
-  findNodeAtLocation,
-  getNodeValue,
-  type ParseError,
-  parseTree,
-} from "jsonc-parser";
 import type { Diagnostic } from "./diagnostic.js";
 import { error, sortDiagnostics } from "./diagnostic.js";
-import { globFiles, globHasMagic } from "./glob.js";
+import { globFiles } from "./glob.js";
+import { locationAtPointer, parseJsonc, positionOf } from "./jsonc.js";
 import { zodDiagnostics } from "./zod-diagnostics.js";
 
 const JSONC_EXTENSIONS = new Set([".jsonc"]);
@@ -22,36 +17,6 @@ function isJsoncFilename(filename: string): boolean {
   return [...JSONC_EXTENSIONS].some((extension) =>
     filename.endsWith(extension),
   );
-}
-
-function positionOf(text: string, offset: number) {
-  const before = text.slice(0, offset);
-  const lines = before.split("\n");
-  return { line: lines.length, column: (lines.at(-1)?.length ?? 0) + 1 };
-}
-
-function locationAtPointer(
-  text: string,
-  pointer: string | undefined,
-): { line: number; column: number } | undefined {
-  if (pointer === undefined) return undefined;
-  const parseErrors: ParseError[] = [];
-  const tree = parseTree(text, parseErrors, {
-    allowTrailingComma: true,
-    disallowComments: false,
-  });
-  const node = tree
-    ? findNodeAtLocation(tree, pointerSegments(pointer))
-    : undefined;
-  return node ? positionOf(text, node.offset) : undefined;
-}
-
-function pointerSegments(pointer: string | undefined): string[] {
-  if (!pointer || pointer === "" || pointer === "/") return [];
-  return pointer
-    .split("/")
-    .slice(1)
-    .map((segment) => segment.replaceAll("~1", "/").replaceAll("~0", "~"));
 }
 
 /** One validated scenario document paired with its project-relative source. */
@@ -72,13 +37,12 @@ function parseEvalScenarioText(
 ): { scenario?: EvalScenario; diagnostics: Diagnostic[] } {
   const filename = basename(source);
   const isJsonc = isJsoncFilename(filename);
-  const parseErrors: ParseError[] = [];
-  const tree = parseTree(text, parseErrors, {
+  const parsed = parseJsonc(text, {
     allowTrailingComma: isJsonc,
     disallowComments: !isJsonc,
   });
-  if (parseErrors.length > 0 || !tree) {
-    const first = parseErrors[0];
+  if (parsed.errors.length > 0 || parsed.value === undefined) {
+    const first = parsed.errors[0];
     return {
       diagnostics: [
         error("invalid-json", `${filename}: malformed JSON`, {
@@ -89,7 +53,7 @@ function parseEvalScenarioText(
     };
   }
 
-  const raw = getNodeValue(tree) as unknown;
+  const raw = parsed.value;
   const schemaUri =
     typeof raw === "object" && raw !== null
       ? (raw as Record<string, unknown>).$schema
@@ -135,13 +99,17 @@ const FIXTURE_FORBIDDEN_SEGMENTS = new Set([".git", "node_modules"]);
 /** Defensive cap so a cyclic or absurd fixture tree fails fast. */
 const FIXTURE_MAX_DEPTH = 32;
 
-function fixtureViolations(
-  _root: string,
-  absolute: string,
-): string | undefined {
-  const stat = statSync(absolute, { throwIfNoEntry: false });
-  if (!stat) return "the fixture directory does not exist";
-  if (!stat.isDirectory()) return "the fixture must be a directory";
+function fixtureViolations(root: string, absolute: string): string | undefined {
+  try {
+    if (pathTraversesSymlink(root, absolute))
+      return "the fixture path must not traverse a symbolic link";
+    const stat = lstatSync(absolute, { throwIfNoEntry: false });
+    if (!stat) return "the fixture directory does not exist";
+    if (stat.isSymbolicLink()) return "the fixture must not be a symbolic link";
+    if (!stat.isDirectory()) return "the fixture must be a directory";
+  } catch {
+    return "the fixture path could not be inspected";
+  }
   const walk = (directory: string, depth: number): string | undefined => {
     if (depth > FIXTURE_MAX_DEPTH)
       return "the fixture tree exceeds the depth limit";
@@ -155,9 +123,11 @@ function fixtureViolations(
       return "the fixture directory is unreadable";
     }
     for (const entry of entries) {
-      if (entry.isFile()) continue;
-      if (entry.isDirectory() && FIXTURE_FORBIDDEN_SEGMENTS.has(entry.name))
+      if (FIXTURE_FORBIDDEN_SEGMENTS.has(entry.name))
         return `the fixture contains a ${entry.name} entry`;
+      if (entry.isSymbolicLink())
+        return `the fixture contains a symbolic link (${entry.name})`;
+      if (entry.isFile()) continue;
       if (entry.isDirectory()) {
         const violation = walk(join(directory, entry.name), depth + 1);
         if (violation) return violation;
@@ -166,6 +136,20 @@ function fixtureViolations(
     return undefined;
   };
   return walk(absolute, 0);
+}
+
+function pathTraversesSymlink(root: string, absolute: string): boolean {
+  let current = root;
+  if (lstatSync(current, { throwIfNoEntry: false })?.isSymbolicLink())
+    return true;
+  const path = relative(root, absolute);
+  for (const segment of path.split(sep)) {
+    if (segment === "" || segment === ".") continue;
+    current = join(current, segment);
+    if (lstatSync(current, { throwIfNoEntry: false })?.isSymbolicLink())
+      return true;
+  }
+  return false;
 }
 
 /**
@@ -249,7 +233,23 @@ export function discoverEvalScenarios(
     }
     seenNames.set(scenario.name, match);
 
-    const fixtureAbsolute = resolve(root, scenario.task.fixture);
+    let fixtureAbsolute: string;
+    try {
+      fixtureAbsolute = resolve(root, scenario.task.fixture);
+    } catch {
+      diagnostics.push(
+        error(
+          "invalid-scenario-fixture",
+          `the fixture path is invalid: ${scenario.task.fixture}`,
+          {
+            source: match,
+            pointer: "/task/fixture",
+            expected: "project-root-relative fixture path",
+          },
+        ),
+      );
+      continue;
+    }
     const fixtureRelative = relative(root, fixtureAbsolute);
     if (fixtureRelative.startsWith("..") || fixtureRelative === "") {
       diagnostics.push(
@@ -289,5 +289,3 @@ export function discoverEvalScenarios(
   );
   return { scenarios, diagnostics: sortDiagnostics(diagnostics) };
 }
-
-export { globFiles, globHasMagic };

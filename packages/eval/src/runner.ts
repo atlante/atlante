@@ -91,6 +91,21 @@ export type RunEvalInput = {
 };
 
 /**
+ * Wraps an unexpected run-level failure while retaining the report prefix
+ * produced before it. Trial-level failures are recorded on their trial and do
+ * not use this error type.
+ */
+export class EvalRunError extends Error {
+  readonly report: RunReport;
+
+  constructor(report: RunReport, cause: unknown) {
+    super("the eval run failed before it completed", { cause });
+    this.name = "EvalRunError";
+    this.report = report;
+  }
+}
+
+/**
  * Executes the eval run: scenarios sorted by name, trials sequential, budget
  * enforced by construction (the runner loop is the process spawning the
  * host). Fail-closed: every budget violation is recorded as a trial verdict,
@@ -98,12 +113,13 @@ export type RunEvalInput = {
  */
 export async function runEval(input: RunEvalInput): Promise<RunReport> {
   const runId = createRunId();
-  const runRoot = createRunRoot();
   const report: RunReport = {
     runId,
     meta: {
       atlante: input.atlanteVersion,
       host: input.runner.name,
+      model: input.evalConfig.model ?? "unknown",
+      modelVersion: "unknown",
       config: {
         trials: input.budget.trials,
         timeoutMs: input.budget.timeoutMs,
@@ -113,9 +129,12 @@ export async function runEval(input: RunEvalInput): Promise<RunReport> {
     },
     scenarios: {},
   };
+  let runRoot: string | undefined;
 
   try {
+    runRoot = createRunRoot();
     let sessions = 0;
+    let hostIdentityRecorded = false;
     const scenarios = [...input.scenarios].sort((left, right) =>
       left.scenario.name < right.scenario.name
         ? -1
@@ -125,151 +144,291 @@ export async function runEval(input: RunEvalInput): Promise<RunReport> {
     );
 
     for (const scenario of scenarios) {
-      const name = scenario.scenario.name;
-      input.onProgress?.({ kind: "scenario-start", scenario: name });
-      const timeoutMs = scenarioTimeoutMs(
-        scenario.scenario.budget,
-        input.budget,
-      );
-      const trials: TrialResult[] = [];
-
-      for (let index = 0; index < input.budget.trials; index++) {
-        if (sessions >= input.budget.maxSessions) {
-          trials.push({ i: index, verdict: "skipped-budget", durationMs: 0 });
-          input.onProgress?.({
-            kind: "trial-end",
-            scenario: name,
-            trial: index,
-            verdict: "skipped-budget",
-            durationMs: 0,
-          });
-          continue;
-        }
-
-        input.onProgress?.({
-          kind: "trial-start",
-          scenario: name,
-          trial: index,
-        });
-        sessions += 1;
-        const startedAt = Date.now();
-        let sandbox: Sandbox;
-        try {
-          sandbox = await assembleSandbox(
-            {
-              runRoot,
-              projectRoot: input.projectRoot,
-              scenario,
-              trialIndex: index,
-              budget: input.budget,
-              keep: Boolean(input.keep),
-            },
-            (assembled) =>
-              input.runner.prepareHostIntegration(assembled, {
-                ...(scenario.scenario.task.agent
-                  ? { agent: scenario.scenario.task.agent }
-                  : {}),
-              }),
-          );
-        } catch (cause) {
-          const error = cause instanceof Error ? cause.message : String(cause);
-          const durationMs = Date.now() - startedAt;
-          trials.push({ i: index, verdict: "infra-error", durationMs, error });
-          input.onProgress?.({
-            kind: "trial-end",
-            scenario: name,
-            trial: index,
-            verdict: "infra-error",
-            durationMs,
-          });
-          continue;
-        }
-
-        const run = await input.runner.runTrial({
-          sandbox,
-          prompt: scenario.scenario.task.prompt,
-          ...(scenario.scenario.task.agent
-            ? { agent: scenario.scenario.task.agent }
-            : {}),
-          timeoutMs,
-          maxTokens: input.budget.maxTokens,
-          ...(input.evalConfig.model ? { model: input.evalConfig.model } : {}),
-        });
-
-        if (run.model && report.meta.model === undefined) {
-          report.meta.model = run.model;
-          report.meta.modelVersion = run.modelVersion;
-        }
-
-        const trial: TrialResult = {
-          i: index,
-          // Overwritten below; the mapping stays fail-closed either way.
-          verdict: "fail",
-          durationMs: run.durationMs,
-        };
-        if (run.outcome === "completed") {
-          const checks = await runChecks(sandbox, scenario.scenario.checks);
-          trial.verdict = checks.every((check) => check.verdict === "pass")
-            ? "pass"
-            : "fail";
-          trial.checks = checks;
-          trial.diff = await sandboxDiff(sandbox);
-        } else if (run.outcome === "timeout") {
-          trial.verdict = "timeout";
-          trial.error = run.error;
-        } else if (run.outcome === "budget-exceeded") {
-          trial.verdict = "budget-exceeded";
-          trial.error = run.error;
-        } else {
-          trial.verdict = "infra-error";
-          trial.error = run.error;
-        }
-        if (run.tokens !== undefined) trial.tokens = run.tokens;
-        if (run.cost !== undefined) trial.cost = run.cost;
-        trials.push(trial);
-        input.onProgress?.({
-          kind: "trial-end",
-          scenario: name,
-          trial: index,
-          verdict: trial.verdict,
-          durationMs: trial.durationMs,
-          ...(run.tokens !== undefined ? { tokens: run.tokens } : {}),
-          ...(run.cost !== undefined ? { cost: run.cost } : {}),
-        });
-        destroySandbox(sandbox);
-      }
-
-      const statistics = scenarioStatistics(trials);
-      report.scenarios[name] = statistics;
-      input.onProgress?.({
-        kind: "scenario-end",
-        scenario: name,
-        passRate: statistics.passRate,
+      const execution = await executeScenario({
+        input,
+        runRoot,
+        scenario,
+        sessions: () => sessions,
+        onSessionStart: () => {
+          sessions += 1;
+        },
       });
-    }
-
-    if (report.meta.model === undefined && input.evalConfig.model) {
-      // The host JSON stream does not identify the model it used; fall back
-      // to the model the run requested so report comparisons stay
-      // explainable. Host-reported identifiers win when present.
-      report.meta.model = input.evalConfig.model;
+      report.scenarios[scenario.scenario.name] = execution.result;
+      if (execution.model && !hostIdentityRecorded) {
+        report.meta.model = execution.model;
+        report.meta.modelVersion = execution.modelVersion ?? "unknown";
+        hostIdentityRecorded = true;
+      }
     }
 
     return report;
+  } catch (cause) {
+    throw new EvalRunError(report, cause);
   } finally {
-    if (!input.keep) destroyRunRoot(runRoot);
+    if (runRoot && !input.keep) destroyRunRoot(runRoot);
   }
+}
+
+type ExecuteTrialInput = {
+  input: RunEvalInput;
+  runRoot: string;
+  scenario: DiscoveredEvalScenario;
+  trialIndex: number;
+  timeoutMs: number;
+  onSessionStart: () => void;
+};
+
+type ExecuteTrialResult = {
+  trial: TrialResult;
+  model?: string;
+  modelVersion?: string;
+};
+
+type ExecuteScenarioInput = {
+  input: RunEvalInput;
+  runRoot: string;
+  scenario: DiscoveredEvalScenario;
+  sessions: () => number;
+  onSessionStart: () => void;
+};
+
+type ExecuteScenarioResult = {
+  result: ReturnType<typeof scenarioStatistics>;
+  model?: string;
+  modelVersion?: string;
+};
+
+async function executeScenario(
+  execution: ExecuteScenarioInput,
+): Promise<ExecuteScenarioResult> {
+  const { input, runRoot, scenario, sessions, onSessionStart } = execution;
+  const name = scenario.scenario.name;
+  input.onProgress?.({ kind: "scenario-start", scenario: name });
+  const timeoutMs = scenarioTimeoutMs(scenario.scenario.budget, input.budget);
+  const trials: TrialResult[] = [];
+  let model: string | undefined;
+  let modelVersion: string | undefined;
+
+  for (let index = 0; index < input.budget.trials; index++) {
+    if (sessions() >= input.budget.maxSessions) {
+      const trial: TrialResult = {
+        i: index,
+        verdict: "skipped-budget",
+        durationMs: 0,
+      };
+      trials.push(trial);
+      emitTrialEnd(input.onProgress, name, index, trial);
+      continue;
+    }
+
+    input.onProgress?.({
+      kind: "trial-start",
+      scenario: name,
+      trial: index,
+    });
+    const result = await executeTrial({
+      input,
+      runRoot,
+      scenario,
+      trialIndex: index,
+      timeoutMs,
+      onSessionStart,
+    });
+    if (model === undefined && result.model !== undefined) {
+      model = result.model;
+      modelVersion = result.modelVersion;
+    }
+    const { trial } = result;
+    trials.push(trial);
+    emitTrialEnd(input.onProgress, name, index, trial);
+  }
+
+  const result = scenarioStatistics(trials);
+  input.onProgress?.({
+    kind: "scenario-end",
+    scenario: name,
+    passRate: result.passRate,
+  });
+  return {
+    result,
+    ...(model !== undefined ? { model, modelVersion } : {}),
+  };
+}
+
+function emitTrialEnd(
+  onProgress: RunEvalInput["onProgress"],
+  scenario: string,
+  trial: number,
+  result: TrialResult,
+): void {
+  onProgress?.({
+    kind: "trial-end",
+    scenario,
+    trial,
+    verdict: result.verdict,
+    durationMs: result.durationMs,
+    ...(result.tokens !== undefined ? { tokens: result.tokens } : {}),
+    ...(result.cost !== undefined ? { cost: result.cost } : {}),
+  });
+}
+
+async function executeTrial(
+  execution: ExecuteTrialInput,
+): Promise<ExecuteTrialResult> {
+  const { input, scenario, trialIndex, timeoutMs } = execution;
+  const prepared = await assembleTrial(execution);
+  if ("trial" in prepared) {
+    return { trial: prepared.trial };
+  }
+
+  const run = await runHostTrial({
+    input,
+    scenario,
+    sandbox: prepared.sandbox,
+    timeoutMs,
+    onSessionStart: execution.onSessionStart,
+  });
+  const trial = await gradeTrial({
+    sandbox: prepared.sandbox,
+    scenario,
+    trialIndex,
+    run,
+  });
+  return {
+    trial,
+    ...(run.model ? { model: run.model } : {}),
+    ...(run.modelVersion ? { modelVersion: run.modelVersion } : {}),
+  };
+}
+
+type PreparedTrial = { sandbox: Sandbox } | { trial: TrialResult };
+
+async function assembleTrial(
+  execution: ExecuteTrialInput,
+): Promise<PreparedTrial> {
+  const { input, runRoot, scenario, trialIndex } = execution;
+  const startedAt = Date.now();
+  try {
+    const sandbox = await assembleSandbox(
+      {
+        runRoot,
+        projectRoot: input.projectRoot,
+        scenario,
+        trialIndex,
+        budget: input.budget,
+        keep: Boolean(input.keep),
+      },
+      (assembled) =>
+        input.runner.prepareHostIntegration(assembled, {
+          ...(scenario.scenario.task.agent
+            ? { agent: scenario.scenario.task.agent }
+            : {}),
+        }),
+    );
+    return { sandbox };
+  } catch (cause) {
+    return {
+      trial: {
+        i: trialIndex,
+        verdict: "infra-error",
+        durationMs: Date.now() - startedAt,
+        error: cause instanceof Error ? cause.message : String(cause),
+      },
+    };
+  }
+}
+
+async function runHostTrial(input: {
+  input: RunEvalInput;
+  scenario: DiscoveredEvalScenario;
+  sandbox: Sandbox;
+  timeoutMs: number;
+  onSessionStart: () => void;
+}): Promise<TrialRun> {
+  const startedAt = Date.now();
+  input.onSessionStart();
+  try {
+    return await input.input.runner.runTrial({
+      sandbox: input.sandbox,
+      prompt: input.scenario.scenario.task.prompt,
+      ...(input.scenario.scenario.task.agent
+        ? { agent: input.scenario.scenario.task.agent }
+        : {}),
+      timeoutMs: input.timeoutMs,
+      maxTokens: input.input.budget.maxTokens,
+      ...(input.input.evalConfig.model
+        ? { model: input.input.evalConfig.model }
+        : {}),
+    });
+  } catch (cause) {
+    return {
+      outcome: "infra-error",
+      durationMs: Date.now() - startedAt,
+      error: cause instanceof Error ? cause.message : String(cause),
+    };
+  }
+}
+
+async function gradeTrial(input: {
+  sandbox: Sandbox;
+  scenario: DiscoveredEvalScenario;
+  trialIndex: number;
+  run: TrialRun;
+}): Promise<TrialResult> {
+  const { sandbox, scenario, trialIndex, run } = input;
+  const trial: TrialResult = {
+    i: trialIndex,
+    // Overwritten below; the mapping stays fail-closed either way.
+    verdict: run.outcome === "completed" ? "fail" : run.outcome,
+    durationMs: run.durationMs,
+    ...(run.tokens !== undefined ? { tokens: run.tokens } : {}),
+    ...(run.cost !== undefined ? { cost: run.cost } : {}),
+    ...(run.error !== undefined ? { error: run.error } : {}),
+  };
+  try {
+    if (run.outcome === "completed") {
+      const checks = await runChecks(sandbox, scenario.scenario.checks);
+      trial.verdict = checks.some((check) => check.verdict === "error")
+        ? "infra-error"
+        : checks.every((check) => check.verdict === "pass")
+          ? "pass"
+          : "fail";
+      trial.checks = checks;
+      trial.diff = await sandboxDiff(sandbox);
+    }
+  } catch (cause) {
+    trial.verdict = "infra-error";
+    trial.error = cause instanceof Error ? cause.message : String(cause);
+  } finally {
+    destroySandbox(sandbox);
+  }
+  return trial;
 }
 
 const DIFF_EVIDENCE_LIMIT = 20_000;
 
 /** Sandbox diff against the baseline commit; report evidence, not a verdict. */
 async function sandboxDiff(sandbox: Sandbox): Promise<string> {
+  // Stage all current paths so git diff HEAD also includes untracked and
+  // ignored files created by the host after the baseline commit.
+  const staged = await runCommand(["git", "add", "--all", "--force"], {
+    cwd: sandbox.root,
+    timeoutMs: 60_000,
+  });
+  if (staged.spawnError !== undefined || staged.exit !== 0) {
+    throw new Error(
+      `could not collect sandbox diff: git add exited ${staged.exit}: ${staged.spawnError ?? staged.stderr.slice(-400)}`,
+    );
+  }
   const outcome = await runCommand(["git", "diff", "HEAD"], {
     cwd: sandbox.root,
     timeoutMs: 60_000,
   });
-  if (outcome.exit !== 0) return "";
+  if (outcome.spawnError !== undefined || outcome.exit !== 0) {
+    throw new Error(
+      `could not collect sandbox diff: git diff exited ${outcome.exit}: ${outcome.spawnError ?? outcome.stderr.slice(-400)}`,
+    );
+  }
   const diff = outcome.stdout;
   return diff.length > DIFF_EVIDENCE_LIMIT
     ? `${diff.slice(0, DIFF_EVIDENCE_LIMIT)}\n… truncated`

@@ -117,6 +117,7 @@ try {
       plugin: [PLUGIN_PACKAGE],
     })}\n`,
   );
+  await mkdir(join(project, "eval", "scenarios"), { recursive: true });
   await Bun.write(
     join(project, "eval", "scenarios", "smoke.eval.json"),
     `${JSON.stringify({

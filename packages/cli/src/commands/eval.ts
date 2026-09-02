@@ -1,8 +1,15 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
 import { loadProject, type ProjectContext } from "@atlante/builder";
 import {
   createOpenCodeRunner,
+  EvalRunError,
   type HostRunner,
   type RunReport,
   resolveBudget,
@@ -10,7 +17,14 @@ import {
   runExitCode,
   verifyArtifacts,
 } from "@atlante/eval";
-import { discoverEvalScenarios, error, hasErrors } from "@atlante/validator";
+import type { EvalConfig } from "@atlante/schema";
+import { EVAL_MAX_TRIALS } from "@atlante/schema";
+import {
+  type DiscoveredEvalScenario,
+  discoverEvalScenarios,
+  error,
+  hasErrors,
+} from "@atlante/validator";
 import packageJson from "../../package.json" with { type: "json" };
 import { firstPartyProjectContext } from "../first-party-pack.js";
 import { diagnosticPath, printDiagnostics } from "../report.js";
@@ -32,8 +46,9 @@ export type EvalCommandOptions = {
  * Runs eval scenarios against the project's verified artifacts. `atlante eval`
  * never builds: artifacts must already be published and verified, missing or
  * stale ones are a validation failure with `atlante build` as the recovery
- * action. Exit codes: 0 all trials pass, 1 any trial failed or was skipped,
- * 2 validation errors, 3 a run-preventing infrastructure error.
+ * action. Exit codes: 0 all trials pass, 1 any trial failed, was skipped, or
+ * hit a trial-level infrastructure error, 2 validation errors, 3 a
+ * run-preventing infrastructure error.
  */
 export async function runEvalCommand(
   target: string,
@@ -41,6 +56,76 @@ export async function runEvalCommand(
   context: ProjectContext = firstPartyProjectContext(),
   runner?: HostRunner,
 ): Promise<number> {
+  const prepared = prepareEval(target, options, context);
+  if (typeof prepared === "number") return prepared;
+
+  const host =
+    runner ?? createOpenCodeRunner({ projectRoot: prepared.projectRoot });
+  let report: RunReport;
+  try {
+    report = await runEval({
+      projectRoot: prepared.projectRoot,
+      evalConfig: prepared.evalConfig,
+      budget: resolveBudget({
+        evalConfig: prepared.evalConfig,
+        trialsOverride: prepared.trialsOverride,
+      }),
+      scenarios: prepared.scenarios,
+      atlanteVersion: packageJson.version,
+      ...(options.keep ? { keep: true } : {}),
+      runner: host,
+    });
+  } catch (cause) {
+    if (cause instanceof EvalRunError) {
+      try {
+        const reportDir = publishReport(
+          prepared.projectRoot,
+          cause.report,
+          options.out,
+        );
+        if (options.json) {
+          console.log(JSON.stringify(cause.report, null, 2));
+        } else {
+          printSummary(cause.report, reportDir);
+        }
+      } catch (publishCause) {
+        return reportPublishFailure(
+          prepared.projectRoot,
+          options.out,
+          publishCause,
+        );
+      }
+    }
+    return reportRunFailure(prepared.source, cause);
+  }
+
+  let reportDir: string;
+  try {
+    reportDir = publishReport(prepared.projectRoot, report, options.out);
+  } catch (cause) {
+    return reportPublishFailure(prepared.projectRoot, options.out, cause);
+  }
+  if (options.json) {
+    console.log(JSON.stringify(report, null, 2));
+  } else {
+    printSummary(report, reportDir);
+  }
+  return runExitCode(report);
+}
+
+type PreparedEval = {
+  projectRoot: string;
+  source: string;
+  evalConfig: EvalConfig;
+  scenarios: DiscoveredEvalScenario[];
+  trialsOverride: number | undefined;
+};
+
+function prepareEval(
+  target: string,
+  options: EvalCommandOptions,
+  context: ProjectContext,
+): PreparedEval | 2 {
   const loaded = loadProject(target, context);
   printDiagnostics(loaded.diagnostics);
   if (hasErrors(loaded.diagnostics)) return 2;
@@ -77,8 +162,10 @@ export async function runEvalCommand(
   printDiagnostics(discovery.diagnostics);
   if (hasErrors(discovery.diagnostics)) return 2;
 
-  const filters = options.scenario ?? [];
-  const scenarios = filterScenarios(discovery.scenarios, filters);
+  const scenarios = filterScenarios(
+    discovery.scenarios,
+    options.scenario ?? [],
+  );
   if (scenarios === null) return 2;
 
   try {
@@ -98,39 +185,50 @@ export async function runEvalCommand(
     return 2;
   }
 
-  const host =
-    runner ?? createOpenCodeRunner({ projectRoot: loaded.projectRoot });
-  let report: RunReport;
-  try {
-    report = await runEval({
-      projectRoot: loaded.projectRoot,
-      evalConfig,
-      budget: resolveBudget({ evalConfig, trialsOverride }),
-      scenarios,
-      atlanteVersion: packageJson.version,
-      ...(options.keep ? { keep: true } : {}),
-      runner: host,
-    });
-  } catch (cause) {
-    // Failures inside trials are verdicts; an exception out of the loop
-    // itself means the run could not proceed at all.
-    printDiagnostics([
-      error("eval-run-failed", "the eval run could not be executed", {
-        source: diagnosticPath(loaded.configPath ?? target),
-        cause: cause instanceof Error ? cause.message : String(cause),
-        next: "re-run with `--keep` and inspect the preserved sandboxes if the cause is unclear",
-      }),
-    ]);
-    return 3;
-  }
+  return {
+    projectRoot: loaded.projectRoot,
+    source: loaded.configPath ?? target,
+    evalConfig,
+    scenarios,
+    trialsOverride,
+  };
+}
 
-  const reportDir = publishReport(loaded.projectRoot, report, options.out);
-  if (options.json) {
-    console.log(JSON.stringify(report, null, 2));
-  } else {
-    printSummary(report, reportDir);
+function reportRunFailure(source: string, cause: unknown): 3 {
+  // Failures inside trials are verdicts; an exception out of the loop
+  // itself means the run could not proceed at all.
+  printDiagnostics([
+    error("eval-run-failed", "the eval run could not be executed", {
+      source: diagnosticPath(source),
+      cause: causeMessage(cause),
+      next: "re-run with `--keep` and inspect the preserved sandboxes if the cause is unclear",
+    }),
+  ]);
+  return 3;
+}
+
+function causeMessage(cause: unknown): string {
+  if (cause instanceof EvalRunError) {
+    return cause.cause instanceof Error
+      ? cause.cause.message
+      : String(cause.cause);
   }
-  return runExitCode(report);
+  return cause instanceof Error ? cause.message : String(cause);
+}
+
+function reportPublishFailure(
+  projectRoot: string,
+  out: string | undefined,
+  cause: unknown,
+): 3 {
+  printDiagnostics([
+    error("eval-report-failed", "the eval report could not be written", {
+      source: diagnosticPath(out ?? join(projectRoot, ".atlante", "eval")),
+      cause: cause instanceof Error ? cause.message : String(cause),
+      next: "choose a writable report location and try again",
+    }),
+  ]);
+  return 3;
 }
 
 function noEvalConfig(message: string, source: string, next: string) {
@@ -147,13 +245,13 @@ function parseTrialsOverride(
 ): number | undefined | null {
   if (raw === undefined) return undefined;
   const value = Number(raw);
-  if (!Number.isInteger(value) || value < 1) {
+  if (!Number.isInteger(value) || value < 1 || value > EVAL_MAX_TRIALS) {
     printDiagnostics([
       error(
         "invalid-trials",
-        `--trials must be a positive integer, got ${raw}`,
+        `--trials must be an integer from 1 to ${EVAL_MAX_TRIALS}, got ${raw}`,
         {
-          expected: "a positive integer",
+          expected: `an integer from 1 to ${EVAL_MAX_TRIALS}`,
           next: "pass e.g. `--trials 3`",
         },
       ),
@@ -202,21 +300,47 @@ function publishReport(
 ): string {
   const base = out ?? join(projectRoot, ".atlante", "eval");
   const dir = join(base, report.runId);
+  assertNoSymlinkPath(base, "report output");
+  assertNoSymlinkPath(dir, "report output");
   mkdirSync(dir, { recursive: true });
-  writeFileSync(
-    join(dir, "report.json"),
-    `${JSON.stringify(report, null, 2)}\n`,
-  );
+  const reportPath = join(dir, "report.json");
+  assertNoSymlinkPath(reportPath, "report output");
+  writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
   if (out === undefined) ensureEvalGitignored(projectRoot);
   return dir;
 }
 
 function ensureEvalGitignored(projectRoot: string): void {
   const gitignore = join(projectRoot, ".atlante", ".gitignore");
+  assertNoSymlinkPath(gitignore, "eval gitignore");
   const existing = existsSync(gitignore) ? readFileSync(gitignore, "utf8") : "";
   if (existing.split("\n").some((line) => line.trim() === "eval/")) return;
   const separator = existing === "" || existing.endsWith("\n") ? "" : "\n";
   writeFileSync(gitignore, `${existing}${separator}eval/\n`);
+}
+
+/** Refuses to read or write through a symlinked report path component. */
+function assertNoSymlinkPath(target: string, label: string): void {
+  const missing: string[] = [];
+  let current = resolve(target);
+  while (true) {
+    const stat = lstatSync(current, { throwIfNoEntry: false });
+    if (stat !== undefined) {
+      if (stat.isSymbolicLink())
+        throw new Error(`${label} path traverses a symbolic link: ${current}`);
+      break;
+    }
+    const parent = dirname(current);
+    if (parent === current) break;
+    missing.unshift(basename(current));
+    current = parent;
+  }
+  for (const segment of missing) {
+    current = join(current, segment);
+    const stat = lstatSync(current, { throwIfNoEntry: false });
+    if (stat?.isSymbolicLink())
+      throw new Error(`${label} path traverses a symbolic link: ${current}`);
+  }
 }
 
 function formatMs(ms: number): string {

@@ -4,6 +4,7 @@ import {
   EVAL_BUDGET_DEFAULTS,
   EVAL_SCENARIO_SCHEMA_URI,
   evalConfigSchema,
+  evalScenarioJsonSchema,
   evalScenarioSchema,
   SCHEMA_URI,
 } from "../src/index.js";
@@ -201,6 +202,26 @@ describe("evalScenarioSchema", () => {
         checks: [{ type: "file-unchanged", path }],
       });
       expect(result.success).toBe(false);
+    }
+  });
+
+  test("commits the same lexical path restrictions in JSON Schema", () => {
+    const task = (evalScenarioJsonSchema.properties as Record<string, unknown>)
+      .task as { properties: Record<string, { pattern?: string }> };
+    const pattern = task.properties.fixture.pattern;
+    expect(typeof pattern).toBe("string");
+    const pathPattern = new RegExp(pattern ?? "");
+    expect(pathPattern.test("src/fixture")).toBe(true);
+    for (const path of [
+      "/absolute",
+      "../outside",
+      ".git/config",
+      "a/",
+      "dir\\..\\outside",
+      "dir\\",
+      "dir\u0000name",
+    ]) {
+      expect(pathPattern.test(path)).toBe(false);
     }
   });
 

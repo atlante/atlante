@@ -9,10 +9,12 @@ import {
   discoverEvalScenarios,
 } from "@atlante/validator";
 import {
+  EvalRunError,
   type HostRunner,
   type RunReport,
   resolveBudget,
   runEval,
+  runExitCode,
   type TrialRun,
   type TrialRunOutcome,
   verifyArtifacts,
@@ -119,6 +121,19 @@ describe("runEval", () => {
     expect(report.meta.model).toBe("acme/model-x");
   });
 
+  test("uses explicit unknown identity when neither config nor host reports it", async () => {
+    const report = await runEval({
+      projectRoot,
+      evalConfig,
+      budget: resolveBudget({ evalConfig, trialsOverride: 1 }),
+      scenarios,
+      atlanteVersion: "0.0.0-test",
+      runner: fakeRunner(() => completedRun()),
+    });
+    expect(report.meta.model).toBe("unknown");
+    expect(report.meta.modelVersion).toBe("unknown");
+  });
+
   test("check failures produce fail verdicts with complete evidence", async () => {
     const report = await runEval({
       projectRoot,
@@ -198,7 +213,7 @@ describe("runEval", () => {
     expect(result?.passRate).toBe(1);
   });
 
-  test("sandbox assembly infra errors mark the trial, not the whole run", async () => {
+  test("sandbox assembly infra errors become an infrastructure trial", async () => {
     const base = scenarios.at(0);
     if (!base) throw new Error("fixture scenario not discovered");
     const broken: DiscoveredEvalScenario = {
@@ -220,6 +235,140 @@ describe("runEval", () => {
     const result = report.scenarios["broken-fixture"];
     expect(result?.trials[0]?.verdict).toBe("infra-error");
     expect(result?.trials[0]?.error).toContain("fixture");
+  });
+
+  test("continues after an infrastructure trial and exits with code 1", async () => {
+    const base = scenarios.at(0);
+    if (!base) throw new Error("fixture scenario not discovered");
+    const ordered = [
+      {
+        ...base,
+        scenario: {
+          ...base.scenario,
+          name: "a-infra-failure",
+          checks: [],
+        },
+      },
+      {
+        ...base,
+        scenario: {
+          ...base.scenario,
+          name: "z-after-infra",
+          checks: [],
+        },
+      },
+    ];
+    let calls = 0;
+    const report = await runEval({
+      projectRoot,
+      evalConfig,
+      budget: resolveBudget({ evalConfig, trialsOverride: 3 }),
+      scenarios: ordered,
+      atlanteVersion: "0.0.0-test",
+      runner: {
+        name: "fake",
+        prepareHostIntegration() {},
+        async runTrial() {
+          calls += 1;
+          return {
+            outcome: calls === 1 ? "infra-error" : "completed",
+            durationMs: 5,
+            ...(calls === 1 ? { error: "host unavailable" } : {}),
+          };
+        },
+      },
+    });
+    expect(calls).toBe(6);
+    expect(Object.keys(report.scenarios)).toEqual([
+      "a-infra-failure",
+      "z-after-infra",
+    ]);
+    expect(
+      report.scenarios["a-infra-failure"]?.trials.map((trial) => trial.verdict),
+    ).toEqual(["infra-error", "pass", "pass"]);
+    expect(
+      report.scenarios["z-after-infra"]?.trials.map((trial) => trial.verdict),
+    ).toEqual(["pass", "pass", "pass"]);
+    expect(runExitCode(report)).toBe(1);
+  });
+
+  test("converts a thrown host error into an infrastructure trial", async () => {
+    const report = await runEval({
+      projectRoot,
+      evalConfig,
+      budget: resolveBudget({ evalConfig, trialsOverride: 1 }),
+      scenarios,
+      atlanteVersion: "0.0.0-test",
+      runner: {
+        name: "fake",
+        prepareHostIntegration() {},
+        async runTrial() {
+          throw new Error("host exploded");
+        },
+      },
+    });
+    expect(report.scenarios["happy-scenario"]?.trials[0]?.verdict).toBe(
+      "infra-error",
+    );
+    expect(report.scenarios["happy-scenario"]?.trials[0]?.error).toBe(
+      "host exploded",
+    );
+    expect(runExitCode(report)).toBe(1);
+  });
+
+  test("reports an infrastructure verdict when diff evidence cannot be collected", async () => {
+    const base = scenarios.at(0);
+    if (!base) throw new Error("fixture scenario not discovered");
+    const scenario: DiscoveredEvalScenario = {
+      ...base,
+      scenario: { ...base.scenario, name: "diff-evidence", checks: [] },
+    };
+    const report = await runEval({
+      projectRoot,
+      evalConfig,
+      budget: resolveBudget({ evalConfig, trialsOverride: 1 }),
+      scenarios: [scenario],
+      atlanteVersion: "0.0.0-test",
+      runner: {
+        name: "fake",
+        prepareHostIntegration() {},
+        async runTrial(input) {
+          rmSync(join(input.sandbox.root, ".git"), {
+            recursive: true,
+            force: true,
+          });
+          return completedRun();
+        },
+      },
+    });
+    expect(report.scenarios["diff-evidence"]?.trials[0]?.verdict).toBe(
+      "infra-error",
+    );
+    expect(runExitCode(report)).toBe(1);
+  });
+
+  test("retains a partial report for an unexpected run-level error", async () => {
+    let failure: unknown;
+    try {
+      await runEval({
+        projectRoot,
+        evalConfig,
+        budget: resolveBudget({ evalConfig, trialsOverride: 1 }),
+        scenarios,
+        atlanteVersion: "0.0.0-test",
+        runner: fakeRunner(() => completedRun()),
+        onProgress() {
+          throw new Error("progress observer failed");
+        },
+      });
+    } catch (cause) {
+      failure = cause;
+    }
+    expect(failure).toBeInstanceOf(EvalRunError);
+    expect((failure as EvalRunError).report.runId).toMatch(
+      /^\d{4}-\d{2}-\d{2}T/,
+    );
+    expect((failure as EvalRunError).report.scenarios).toEqual({});
   });
 
   test("scenario keys are sorted regardless of discovery order", async () => {

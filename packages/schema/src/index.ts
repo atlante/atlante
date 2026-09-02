@@ -49,6 +49,7 @@ export {
   EVAL_BUDGET_DEFAULTS,
   EVAL_CHECK_TIMEOUT_DEFAULT_MS,
   EVAL_HOST,
+  EVAL_MAX_TRIALS,
   EVAL_SCENARIO_SCHEMA_URI,
   evalCheckSchema,
   evalConfigSchema,

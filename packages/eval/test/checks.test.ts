@@ -1,5 +1,12 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parsePorcelainPaths, runChecks } from "../src/checks.js";
@@ -63,6 +70,42 @@ describe("runChecks", () => {
       "fail",
     ]);
     expect(results[4]?.evidence.timedOut).toBe(true);
+  });
+
+  test("a command that exits cleanly after timeout still fails", async () => {
+    const sandbox = sandboxOf({});
+    const [result] = await runChecks(sandbox, [
+      {
+        type: "command",
+        run: ["sh", "-c", "trap 'exit 0' TERM; while :; do sleep 1; done"],
+        expectExit: 0,
+        timeoutMs: 100,
+      },
+    ]);
+    expect(result?.verdict).toBe("fail");
+    expect(result?.evidence.timedOut).toBe(true);
+  });
+
+  test("file checks do not follow host-created symlinks", async () => {
+    const sandbox = sandboxOf({});
+    const outside = mkdtempSync(join(tmpdir(), "eval-checks-outside-"));
+    writeFileSync(join(outside, "secret.txt"), "secret\n");
+    symlinkSync(outside, join(sandbox.root, "link"), "dir");
+    try {
+      const results = await runChecks(sandbox, [
+        { type: "file-exists", path: "link/secret.txt" },
+        { type: "file-contains", path: "link/secret.txt", pattern: "secret" },
+        { type: "file-unchanged", path: "link/secret.txt" },
+      ]);
+      expect(results.map((result) => result.verdict)).toEqual([
+        "error",
+        "error",
+        "error",
+      ]);
+    } finally {
+      rmSync(outside, { recursive: true, force: true });
+      rmSync(join(sandbox.root, "link"), { force: true });
+    }
   });
 
   test("command check: spawn failure is an error verdict", async () => {
@@ -154,6 +197,24 @@ describe("runChecks", () => {
     expect(createdAfterBaseline?.verdict).toBe("fail");
   });
 
+  test("file-unchanged reports read errors and continues with later checks", async () => {
+    const sandbox = sandboxOf({ "secret.txt": "secret\n" });
+    const path = join(sandbox.root, "secret.txt");
+    chmodSync(path, 0o000);
+    try {
+      const results = await runChecks(sandbox, [
+        { type: "file-unchanged", path: "secret.txt" },
+        { type: "file-exists", path: "secret.txt" },
+      ]);
+      expect(results.map((result) => result.verdict)).toEqual([
+        "error",
+        "pass",
+      ]);
+    } finally {
+      chmodSync(path, 0o644);
+    }
+  });
+
   test("diff-allowlist: porcelain output is matched against the allowlist", async () => {
     const root = mkdtempSync(join(tmpdir(), "eval-diff-"));
     cleanup.push(root);
@@ -183,6 +244,35 @@ describe("runChecks", () => {
     expect(tooNarrow?.verdict).toBe("fail");
     expect(tooNarrow?.evidence.unexpected).toEqual(["sneaky.ts"]);
     expect(wellScoped?.verdict).toBe("pass");
+  });
+
+  test("diff-allowlist: detects newly created ignored files", async () => {
+    const root = mkdtempSync(join(tmpdir(), "eval-diff-ignored-"));
+    cleanup.push(root);
+    writeFileSync(join(root, ".gitignore"), "ignored-*.ts\n");
+    writeFileSync(join(root, "ignored-before.ts"), "baseline\n");
+    const git = async (argv: string[]) => {
+      await Bun.$`git ${argv}`.cwd(root).quiet();
+    };
+    await git(["init"]);
+    await git(["add", "--all", "--force"]);
+    await git([
+      "-c",
+      "user.name=t",
+      "-c",
+      "user.email=t@t",
+      "commit",
+      "--allow-empty",
+      "-m",
+      "base",
+    ]);
+    writeFileSync(join(root, "ignored-after.ts"), "scope creep\n");
+
+    const [result] = await runChecks({ root, snapshot: [], keep: false }, [
+      { type: "diff-allowlist", allow: ["allowed.ts"] },
+    ]);
+    expect(result?.verdict).toBe("fail");
+    expect(result?.evidence.unexpected).toContain("ignored-after.ts");
   });
 
   test("all checks run even after one fails", async () => {

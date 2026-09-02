@@ -18,12 +18,16 @@ export const EVAL_BUDGET_DEFAULTS = {
   maxTokens: 400_000,
 } as const;
 
+/** Maximum number of trials accepted by both config and CLI overrides. */
+export const EVAL_MAX_TRIALS = 50;
+
 /** Per-trial default applied when a check does not set its own timeout. */
 export const EVAL_CHECK_TIMEOUT_DEFAULT_MS = 120_000;
 
 const slugPattern = /^[a-z0-9][a-z0-9-]*$/;
 
-const forbiddenPathSegments = new Set([".git", "node_modules"]);
+const sandboxRelativePathPattern =
+  /^(?!.*\0)(?![\\/])(?!.*[\\/]$)(?!.*(?:^|[\\/])\.\.(?:[\\/]|$))(?!.*(?:^|[\\/])(?:\.git|node_modules)(?:[\\/]|$)).+$/;
 
 /**
  * Project-root-relative paths used by fixtures, checks, and allowlists resolve
@@ -34,46 +38,16 @@ const forbiddenPathSegments = new Set([".git", "node_modules"]);
 const sandboxRelativePathSchema = z
   .string()
   .min(1)
-  .superRefine((input, context) => {
-    if (input.startsWith("/") || input.startsWith("\\")) {
-      context.addIssue({
-        code: "custom",
-        message: "path must be relative to the project root",
-      });
-      return;
-    }
-    if (input.endsWith("/") || input.endsWith("\\")) {
-      context.addIssue({
-        code: "custom",
-        message: "path must not end with a separator",
-      });
-      return;
-    }
-    const segments = input.split(/[\\/]/);
-    if (segments.includes("..")) {
-      context.addIssue({
-        code: "custom",
-        message: "path must not contain '..' segments",
-      });
-      return;
-    }
-    const forbidden = segments.find((segment) =>
-      forbiddenPathSegments.has(segment),
-    );
-    if (forbidden) {
-      context.addIssue({
-        code: "custom",
-        message: `path must not contain a ${forbidden} segment`,
-      });
-    }
-  });
+  .regex(sandboxRelativePathPattern, "path contains unsafe segments");
 
 export type SandboxRelativePath = z.infer<typeof sandboxRelativePathSchema>;
 
 const positiveIntSchema = z.number().int().positive();
 
 const evalBudgetSchema = z.strictObject({
-  trials: positiveIntSchema.max(50).default(EVAL_BUDGET_DEFAULTS.trials),
+  trials: positiveIntSchema
+    .max(EVAL_MAX_TRIALS)
+    .default(EVAL_BUDGET_DEFAULTS.trials),
   timeoutMs: positiveIntSchema.default(EVAL_BUDGET_DEFAULTS.timeoutMs),
   maxSessions: positiveIntSchema.default(EVAL_BUDGET_DEFAULTS.maxSessions),
   maxTokens: positiveIntSchema.default(EVAL_BUDGET_DEFAULTS.maxTokens),

@@ -64,8 +64,8 @@ export type RunMeta = {
   atlante: string;
   host: string;
   /** Mandatory for valid before/after comparisons. */
-  model?: string;
-  modelVersion?: string;
+  model: string;
+  modelVersion: string;
   config: {
     trials: number;
     timeoutMs: number;
@@ -82,7 +82,7 @@ export type RunReport = {
   scenarios: Record<string, ScenarioResult>;
 };
 
-/** Whether a run satisfies its exit-code contract at the given level. */
+/** Whether a run satisfies its exit-code contract at the trial level. */
 export function runExitCode(report: RunReport): 0 | 1 {
   for (const result of Object.values(report.scenarios)) {
     for (const trial of result.trials) {

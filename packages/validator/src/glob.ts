@@ -28,7 +28,8 @@ export function globToRegExp(pattern: string): RegExp {
   for (let index = 0; index < segments.length; index++) {
     const segment = segments[index] ?? "";
     if (segment === "**") {
-      source += "(?:[^/]+/)*";
+      source +=
+        index === segments.length - 1 ? "(?:[^/]+(?:/|$))*" : "(?:[^/]+/)*";
       continue;
     }
     source += segmentToRegexSource(segment);

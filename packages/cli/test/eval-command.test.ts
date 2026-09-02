@@ -7,6 +7,7 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -264,6 +265,18 @@ describe("runEvalCommand", () => {
     expect(report.scenarios["cli-happy"].trials).toHaveLength(2);
   });
 
+  test("exits 2 when --trials exceeds the configured maximum", async () => {
+    const project = evalProject();
+    await publishFixtureArtifacts(project);
+    const exit = await runEvalCommand(
+      project,
+      { trials: "51" },
+      undefined,
+      fakeRunner(true),
+    );
+    expect(exit).toBe(2);
+  });
+
   test("skipped-budget trials fail the run", async () => {
     const project = evalProject({
       evalSection: {
@@ -288,11 +301,11 @@ describe("runEvalCommand", () => {
     expect(verdicts).toEqual(["pass", "skipped-budget"]);
   });
 
-  test("exits 3 when the runner throws", async () => {
+  test("exits 1 when a host trial throws", async () => {
     const project = evalProject();
     await publishFixtureArtifacts(project);
     const exit = await runEvalCommand(project, {}, undefined, throwingRunner());
-    expect(exit).toBe(3);
+    expect(exit).toBe(1);
   });
 
   test("--json prints the report and --out relocates it", async () => {
@@ -324,5 +337,30 @@ describe("runEvalCommand", () => {
     } finally {
       spy.mockRestore();
     }
+  });
+
+  test("returns 3 when the report cannot be written", async () => {
+    const project = evalProject();
+    await publishFixtureArtifacts(project);
+    const out = join(project, "report-file");
+    writeFileSync(out, "not a directory\n");
+    const exit = await runEvalCommand(
+      project,
+      { out },
+      undefined,
+      fakeRunner(true),
+    );
+    expect(exit).toBe(3);
+  });
+
+  test("returns 3 instead of following a symlinked report directory", async () => {
+    const project = evalProject();
+    await publishFixtureArtifacts(project);
+    const outside = tempDir();
+    const reportDir = join(project, ".atlante", "eval");
+    symlinkSync(outside, reportDir, "dir");
+    const exit = await runEvalCommand(project, {}, undefined, fakeRunner(true));
+    expect(exit).toBe(3);
+    expect(readdirSync(outside)).toEqual([]);
   });
 });

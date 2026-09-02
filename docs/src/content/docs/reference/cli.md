@@ -148,7 +148,8 @@ npx @atlante/cli@latest eval [path] --keep
 ### Configuration
 
 `eval` runs require an `eval` section in `atlante.jsonc`, scenario documents,
-a published artifact tree, and an authenticated OpenCode host:
+a published artifact tree, an installed `@atlante/opencode` adapter, and an
+authenticated OpenCode host:
 
 ```jsonc
 {
@@ -178,11 +179,13 @@ sources change.
 ### Exit status
 
 - `0` every executed trial passed.
-- `1` at least one trial failed, timed out, exceeded its budget, hit an
-  infrastructure error, or was skipped by the session cap.
+- `1` at least one trial failed, timed out, exceeded its budget, hit a
+  trial-level infrastructure error, or was skipped by the session cap.
 - `2` validation failed: missing or broken configuration or `eval` section,
   invalid scenario documents, or missing/stale artifacts.
-- `3` an infrastructure error prevented the run from executing at all.
+- `3` an infrastructure error prevented the run from executing at all; when a
+  run ID exists, the partial report is still written before the error is
+  returned.
 
 ## Exit status
 

@@ -22,7 +22,7 @@ export type {
   TrialRun,
   TrialRunOutcome,
 } from "./runner.js";
-export { runEval } from "./runner.js";
+export { EvalRunError, runEval } from "./runner.js";
 export type { Sandbox, SnapshotEntry } from "./sandbox.js";
 export {
   ArtifactsNotVerifiedError,

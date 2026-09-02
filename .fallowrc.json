@@ -9,6 +9,7 @@
       { "name": "builder", "patterns": ["packages/builder/**"] },
       { "name": "pack", "patterns": ["packages/pack/**"] },
       { "name": "opencode", "patterns": ["packages/opencode/**"] },
+      { "name": "eval", "patterns": ["packages/eval/**"] },
       { "name": "cli", "patterns": ["packages/cli/**"] },
       { "name": "website", "patterns": ["website/**"] },
       { "name": "docs", "patterns": ["docs/**"] },
@@ -25,6 +26,7 @@
       },
       { "from": "pack", "allow": ["resources", "validator"] },
       { "from": "opencode", "allow": ["artifacts"] },
+      { "from": "eval", "allow": ["artifacts", "schema", "validator"] },
       {
         "from": "cli",
         "allow": [
@@ -33,7 +35,8 @@
           "validator",
           "resources",
           "schema",
-          "artifacts"
+          "artifacts",
+          "eval"
         ]
       },
       { "from": "website", "allow": [] },

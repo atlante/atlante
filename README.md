@@ -45,7 +45,10 @@ Atlante v0.1 includes:
 - **Packs:** local templates and instances, plus installed static packs.
 - **OpenCode:** prompt and skill materialization.
 
-Atlante does not perform LLM inference, execute agents or skills, run arbitrary project code while loading a pack, select host settings, maintain runtime workflow state, or provide another host in v0.1.
+Atlante does not perform LLM inference, execute agents or skills, run arbitrary
+project code while loading a pack, select host settings, or maintain runtime
+workflow state. The optional `atlante eval` command delegates a scenario run to
+OpenCode in a temporary sandbox; Atlante does not provide another host in v0.1.
 
 ## Packages
 
@@ -54,10 +57,11 @@ Three packages are published to npm:
 | Package | Responsibility |
 | --- | --- |
 | `@atlante/pack` | First-party static presets, templates, and instances |
-| `@atlante/cli` | `init`, `validate`, and `build` |
+| `@atlante/cli` | `init`, `validate`, `build`, and `eval` |
 | `@atlante/opencode` | OpenCode build-time host materializer |
 
-The remaining workspaces are private implementation packages for the schema, resource loading, validation, and build orchestration.
+The remaining workspaces are private implementation packages for the schema,
+resource loading, validation, build orchestration, and eval orchestration.
 
 ## Development
 
@@ -76,6 +80,7 @@ Run the CLI directly from source with `bun run cli <command>`:
 bun run cli init
 bun run cli validate
 bun run cli build
+bun run cli eval
 ```
 
 Run `bun run build` after CLI source changes. The linked `atlante` command uses the built CLI artifact.
@@ -194,7 +199,9 @@ Skills are reusable guidance, not agents. A skill uses structured template input
 
 For OpenCode, the build writes `.opencode/agents/<id>.md` with the rendered agent prompt and description, plus the `.atlante/opencode-native.json` ownership manifest. Models, permissions, tools, and modes remain owned by OpenCode. Restart OpenCode to pick up new or changed native files.
 
-Atlante validates, renders, and materializes deterministic host-native files; Atlante does not execute agents, skills, or project code.
+Atlante validates, renders, and materializes deterministic host-native files; the
+optional `atlante eval` command delegates sandbox execution to OpenCode rather
+than executing agents or project code during normal artifact processing.
 
 ### Packs and presets
 
