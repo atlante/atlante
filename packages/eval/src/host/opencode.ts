@@ -87,6 +87,33 @@ function isObject(value: unknown): value is Record<string, unknown> {
 type PermissionMap = Record<string, unknown>;
 
 /**
+ * Agent-map access restricted to own properties: an artifact or config agent
+ * id like `__proto__` must never read through the prototype or disappear into
+ * the prototype setter, or it would silently lose its containment baseline.
+ */
+function ownAgentEntry(
+  agents: Record<string, unknown>,
+  name: string,
+): Record<string, unknown> | undefined {
+  if (!Object.hasOwn(agents, name)) return undefined;
+  const value = agents[name];
+  return isObject(value) ? value : undefined;
+}
+
+function setOwnAgentEntry(
+  agents: Record<string, unknown>,
+  name: string,
+  value: Record<string, unknown>,
+): void {
+  Object.defineProperty(agents, name, {
+    configurable: true,
+    enumerable: true,
+    value,
+    writable: true,
+  });
+}
+
+/**
  * Merges the permission baseline into one agent's existing block: the agent's
  * own policy wins everywhere except the forced containment denials, which
  * always apply, and the pattern map keeps forced denials on top.
@@ -136,9 +163,13 @@ function readHostConfig(projectRoot: string): Record<string, unknown> {
         `could not read ${filename}: ${cause instanceof Error ? cause.message : String(cause)}`,
       );
     }
+    // The existing configuration contract treats JSONC as the serialized
+    // format with strict JSON as a subset (`atlante init` parses both
+    // filenames with comments and trailing commas allowed), so `eval` must
+    // accept the same documents.
     const parsed = parseJsonc(text, {
       allowTrailingComma: true,
-      disallowComments: filename.endsWith(".json"),
+      disallowComments: false,
     });
     if (parsed.errors.length > 0) {
       throw new Error(`host configuration ${filename} is malformed`);
@@ -183,7 +214,9 @@ function resolvePluginPath(projectRoot: string): string {
 }
 
 function isAdapterPackagePath(value: string): boolean {
-  if (!isAbsolute(value)) return false;
+  // The entry must name something that actually exists: a missing file below
+  // the adapter package would silently register nothing at runtime.
+  if (!isAbsolute(value) || !existsSync(value)) return false;
   const hasAdapterManifest = (dir: string): boolean => {
     try {
       const manifest = JSON.parse(
@@ -207,19 +240,35 @@ function isAdapterPackagePath(value: string): boolean {
   return false;
 }
 
+/** Same entry contract as `atlante init`: a name or [name, options] tuple. */
+type PluginEntry = string | [string, Record<string, unknown>];
+
+function isPluginEntry(value: unknown): value is PluginEntry {
+  if (typeof value === "string") return true;
+  return (
+    Array.isArray(value) &&
+    value.length === 2 &&
+    typeof value[0] === "string" &&
+    isObject(value[1])
+  );
+}
+
 function rewritePluginEntries(
   entries: unknown,
   projectRoot: string,
-): unknown[] {
-  if (!Array.isArray(entries)) {
+): PluginEntry[] {
+  // An absent "plugin" key is an absent registration, not a malformed value:
+  // it flows into the not-registered error (with install guidance) below.
+  const list = entries ?? [];
+  if (!Array.isArray(list) || !list.every(isPluginEntry)) {
     throw new Error(
-      `host configuration plugin must be an array containing ${ATLANTE_PLUGIN_NAME}`,
+      "host configuration plugin must be an array of strings or [name, options-object] tuples",
     );
   }
   let pluginPath: string | undefined;
   let registered = false;
   const resolvePath = () => (pluginPath ??= resolvePluginPath(projectRoot));
-  const rewritten = entries.map((entry) => {
+  const rewritten = list.map((entry): PluginEntry => {
     if (typeof entry === "string") {
       if (entry === ATLANTE_PLUGIN_NAME) {
         registered = true;
@@ -228,13 +277,11 @@ function rewritePluginEntries(
       if (isAdapterPackagePath(entry)) registered = true;
       return entry;
     }
-    if (Array.isArray(entry) && typeof entry[0] === "string") {
-      if (entry[0] === ATLANTE_PLUGIN_NAME) {
-        registered = true;
-        return [resolvePath(), ...entry.slice(1)];
-      }
-      if (isAdapterPackagePath(entry[0])) registered = true;
+    if (entry[0] === ATLANTE_PLUGIN_NAME) {
+      registered = true;
+      return [resolvePath(), entry[1]];
     }
+    if (isAdapterPackagePath(entry[0])) registered = true;
     return entry;
   });
   if (!registered) {
@@ -298,12 +345,11 @@ export function createOpenCodeRunner(
         agentNames.add(artifact);
       }
       for (const name of agentNames) {
-        agents[name] = {
-          ...(isObject(agents[name]) ? agents[name] : {}),
-          permission: mergePermissionBaseline(
-            isObject(agents[name]) ? agents[name].permission : undefined,
-          ),
-        };
+        const existing = ownAgentEntry(agents, name);
+        setOwnAgentEntry(agents, name, {
+          ...existing,
+          permission: mergePermissionBaseline(existing?.permission),
+        });
       }
       config.agent = agents;
 

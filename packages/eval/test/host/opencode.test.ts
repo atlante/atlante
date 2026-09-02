@@ -131,6 +131,34 @@ describe("prepareHostIntegration", () => {
     expect(existsSync(join(state, "data", "opencode", "auth.json"))).toBe(true);
   });
 
+  test("serializes a __proto__ agent id as an own agent entry", () => {
+    const config = join(projectRoot, "opencode.json");
+    writeFileSync(config, JSON.stringify({ plugin: ["@atlante/opencode"] }));
+    try {
+      const runner = createOpenCodeRunner({
+        projectRoot,
+        authPath: authFile,
+      });
+      const project = tempDir("eval-sandbox-proto-agent-");
+      runner.prepareHostIntegration(
+        sandboxFor(project, tempDir("eval-state-proto-agent-")),
+        {
+          agent: "__proto__",
+        },
+      );
+
+      const written = JSON.parse(
+        readFileSync(join(project, "opencode.json"), "utf8"),
+      );
+      expect(Object.hasOwn(written.agent, "__proto__")).toBe(true);
+      expect(
+        Object.getOwnPropertyDescriptor(written.agent, "__proto__")?.value,
+      ).toMatchObject({ permission: { webfetch: "deny" } });
+    } finally {
+      rmSync(config, { force: true });
+    }
+  });
+
   test("fails with install guidance when the plugin cannot resolve", () => {
     const emptyRoot = tempDir("eval-host-empty-");
     const runner = createOpenCodeRunner({
@@ -147,17 +175,25 @@ describe("prepareHostIntegration", () => {
   });
 
   test("fails closed when host auth is missing", () => {
-    const runner = createOpenCodeRunner({
-      projectRoot,
-      authPath: join(tempDir("eval-host-noauth-"), "auth.json"),
-    });
-    const project = tempDir("eval-sandbox-noauth-");
-    expect(() =>
-      runner.prepareHostIntegration(
-        sandboxFor(project, tempDir("eval-sandbox-noauth-state-")),
-        {},
-      ),
-    ).toThrow(/auth/);
+    // Own config: this test must not depend on config left behind by an
+    // earlier test in the file.
+    const config = join(projectRoot, "opencode.json");
+    writeFileSync(config, JSON.stringify({ plugin: ["@atlante/opencode"] }));
+    try {
+      const runner = createOpenCodeRunner({
+        projectRoot,
+        authPath: join(tempDir("eval-host-noauth-"), "auth.json"),
+      });
+      const project = tempDir("eval-sandbox-noauth-");
+      expect(() =>
+        runner.prepareHostIntegration(
+          sandboxFor(project, tempDir("eval-sandbox-noauth-state-")),
+          {},
+        ),
+      ).toThrow(/auth/);
+    } finally {
+      rmSync(config, { force: true });
+    }
   });
 
   test("fails closed when the host configuration is malformed", () => {
@@ -199,6 +235,124 @@ describe("prepareHostIntegration", () => {
           {},
         ),
       ).toThrow(/plugin.*@atlante\/opencode/);
+    } finally {
+      rmSync(config, { force: true });
+    }
+  });
+
+  test.each([
+    ["missing options", ["other-plugin"]],
+    ["null options", ["other-plugin", null]],
+    ["non-object options", ["other-plugin", true]],
+    ["extra tuple items", ["other-plugin", {}, "extra"]],
+    ["object entry", { name: "other-plugin" }],
+  ] as const)("rejects malformed plugin entries: %s", (_kind, malformed) => {
+    const config = join(projectRoot, "opencode.json");
+    writeFileSync(
+      config,
+      JSON.stringify({ plugin: ["@atlante/opencode", malformed] }),
+    );
+    try {
+      const runner = createOpenCodeRunner({
+        projectRoot,
+        authPath: authFile,
+      });
+      expect(() =>
+        runner.prepareHostIntegration(
+          sandboxFor(
+            tempDir("eval-sandbox-malformed-plugin-"),
+            tempDir("eval-state-malformed-plugin-"),
+          ),
+          {},
+        ),
+      ).toThrow(/plugin.*array.*tuples/);
+    } finally {
+      rmSync(config, { force: true });
+    }
+  });
+
+  test("does not treat a missing absolute adapter path as registered", () => {
+    const config = join(projectRoot, "opencode.json");
+    const missingPath = join(
+      projectRoot,
+      "node_modules",
+      "@atlante",
+      "opencode",
+      "dist",
+      "missing.js",
+    );
+    writeFileSync(config, JSON.stringify({ plugin: [missingPath] }));
+    try {
+      const runner = createOpenCodeRunner({
+        projectRoot,
+        authPath: authFile,
+      });
+      expect(() =>
+        runner.prepareHostIntegration(
+          sandboxFor(
+            tempDir("eval-sandbox-missing-adapter-"),
+            tempDir("eval-state-missing-adapter-"),
+          ),
+          {},
+        ),
+      ).toThrow(/plugin.*@atlante\/opencode/);
+    } finally {
+      rmSync(config, { force: true });
+    }
+  });
+
+  test("accepts an existing absolute adapter package path", () => {
+    const config = join(projectRoot, "opencode.json");
+    const packagePath = join(
+      projectRoot,
+      "node_modules",
+      "@atlante",
+      "opencode",
+    );
+    writeFileSync(config, JSON.stringify({ plugin: [packagePath] }));
+    try {
+      const runner = createOpenCodeRunner({
+        projectRoot,
+        authPath: authFile,
+      });
+      const project = tempDir("eval-sandbox-absolute-adapter-");
+      runner.prepareHostIntegration(
+        sandboxFor(project, tempDir("eval-state-absolute-adapter-")),
+        {},
+      );
+      const written = JSON.parse(
+        readFileSync(join(project, "opencode.json"), "utf8"),
+      );
+      expect(written.plugin).toEqual([packagePath]);
+    } finally {
+      rmSync(config, { force: true });
+    }
+  });
+
+  test("accepts JSONC comments in an existing opencode.json", () => {
+    const config = join(projectRoot, "opencode.json");
+    writeFileSync(
+      config,
+      `{
+  // Existing OpenCode configurations may use JSONC syntax.
+  "plugin": ["@atlante/opencode"],
+}
+`,
+    );
+    try {
+      const runner = createOpenCodeRunner({
+        projectRoot,
+        authPath: authFile,
+      });
+      const project = tempDir("eval-sandbox-jsonc-host-");
+      runner.prepareHostIntegration(
+        sandboxFor(project, tempDir("eval-state-jsonc-host-")),
+        {},
+      );
+      const written = JSON.parse(
+        readFileSync(join(project, "opencode.json"), "utf8"),
+      );
+      expect(written.plugin[0]).not.toBe("@atlante/opencode");
     } finally {
       rmSync(config, { force: true });
     }
