@@ -102,7 +102,8 @@ bindings are locator-only, so each skill instance owns its description. The
 agent template requires `identity` and `mission`; both agent and skill templates
 support ordered `markdown`, `instructions`, `responsibilities`, `gotchas`,
 `workflow`, and `invariants` sections. The skill template also supports
-`references` sections, which render named links with optional read-when guidance.
+`references` sections, which render named entries with their locations and
+optional read-when guidance.
 Responsibilities name owned outcomes, while instructions describe ordered
 actions and invariants carry binding guarantees and approval gates.
 
@@ -125,7 +126,7 @@ The `@atlante/pack/markdown` template expects an ordered block array, not a
 string. This is a breaking change for authored configurations that used the old
 form: rewrite `{ "markdown": "Body" }` as
 `{ "markdown": [{ "p": ["Body"] }] }` before upgrading to a release that
-contains this template.
+contains this block-array change.
 
 This is a static pack with `atlante.format: 1`; it has no runtime
 JavaScript entry point. Atlante loads only the selected template or instance
