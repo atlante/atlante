@@ -1,0 +1,7 @@
+{
+  "$schema": "https://atlante.sh/schema/v0.1/schema.json",
+  "version": "0.1",
+  "name": "wrong-schema",
+  "task": { "fixture": "fixtures/api", "prompt": "x" },
+  "checks": [{ "type": "file-exists", "path": "src/main.ts" }]
+}

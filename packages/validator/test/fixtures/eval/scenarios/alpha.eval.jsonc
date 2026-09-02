@@ -1,0 +1,19 @@
+// Eval scenario fixture: exercises JSONC comments and trailing commas.
+{
+  "$schema": "https://atlante.sh/schema/v0.1/eval-scenario.json",
+  "version": "0.1",
+  "name": "alpha-scenario",
+  "description": "First valid scenario.",
+  "task": {
+    "fixture": "fixtures/api",
+    "prompt": "Add a DELETE /users/:id endpoint."
+  },
+  "checks": [
+    { "type": "command", "run": ["bun", "test"], "expectExit": 0 },
+    {
+      "type": "file-contains",
+      "path": "src/routes/users.ts",
+      "pattern": "requireAdmin"
+    }
+  ]
+}

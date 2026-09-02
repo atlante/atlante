@@ -1,0 +1,10 @@
+{
+  "$schema": "https://atlante.sh/schema/v0.1/eval-scenario.json",
+  "version": "0.1",
+  "name": "bad-fixture",
+  "task": {
+    "fixture": "fixtures/polluted",
+    "prompt": "Trigger fixture violation."
+  },
+  "checks": [{ "type": "file-exists", "path": "src/main.ts" }]
+}

@@ -1,0 +1,7 @@
+{
+  "$schema": "https://atlante.sh/schema/v0.1/eval-scenario.json",
+  "version": "0.1",
+  "name": "Bad_Name",
+  "task": { "fixture": "fixtures/api", "prompt": "" },
+  "checks": [{ "type": "file-absent", "path": "../outside.ts" }]
+}
