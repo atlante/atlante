@@ -20,7 +20,7 @@
 {{/if}}
 {{#if markdown}}
 
-{{> slot/sections/markdown}}
+{{> slot/sections/markdown markdown}}
 {{/if}}
 {{#if instructions}}
 

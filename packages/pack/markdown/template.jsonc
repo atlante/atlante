@@ -1,6 +1,176 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "A raw Markdown content section.",
-  "type": "string",
-  "minLength": 1
+  "description": "Ordered Markdown blocks rendered in authored array order. Flow blocks (p, ul, ol) may interleave freely; at most one h2 section per array; h3 subsections live only inside an h2 block. Inline content such as code spans, bold, and links stays free Markdown inside strings.",
+  "type": "array",
+  "minItems": 1,
+  "contains": { "type": "object", "required": ["h2"] },
+  "minContains": 0,
+  "maxContains": 1,
+  "items": {
+    "oneOf": [
+      {
+        "type": "object",
+        "properties": {
+          "p": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "minItems": 1
+          }
+        },
+        "required": ["p"],
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "properties": {
+          "ul": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "minItems": 1
+          }
+        },
+        "required": ["ul"],
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "properties": {
+          "ol": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "minItems": 1
+          }
+        },
+        "required": ["ol"],
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "properties": {
+          "h2": {
+            "type": "object",
+            "properties": {
+              "title": { "type": "string", "minLength": 1 },
+              "block": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "p": {
+                          "type": "array",
+                          "items": { "type": "string", "minLength": 1 },
+                          "minItems": 1
+                        }
+                      },
+                      "required": ["p"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "ul": {
+                          "type": "array",
+                          "items": { "type": "string", "minLength": 1 },
+                          "minItems": 1
+                        }
+                      },
+                      "required": ["ul"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "ol": {
+                          "type": "array",
+                          "items": { "type": "string", "minLength": 1 },
+                          "minItems": 1
+                        }
+                      },
+                      "required": ["ol"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "h3": {
+                          "type": "object",
+                          "properties": {
+                            "title": { "type": "string", "minLength": 1 },
+                            "block": {
+                              "type": "array",
+                              "minItems": 1,
+                              "items": {
+                                "oneOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "p": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "minItems": 1
+                                      }
+                                    },
+                                    "required": ["p"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "ul": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "minItems": 1
+                                      }
+                                    },
+                                    "required": ["ul"],
+                                    "additionalProperties": false
+                                  },
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "ol": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "minItems": 1
+                                      }
+                                    },
+                                    "required": ["ol"],
+                                    "additionalProperties": false
+                                  }
+                                ]
+                              }
+                            }
+                          },
+                          "required": ["title", "block"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": ["h3"],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            },
+            "required": ["title", "block"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["h2"],
+        "additionalProperties": false
+      }
+    ]
+  }
 }

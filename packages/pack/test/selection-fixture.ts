@@ -109,11 +109,50 @@ function skillListItems(
   return items;
 }
 
+type FlowKind = "p" | "ul" | "ol";
+type HeadingKind = "h2" | "h3";
+
+function flowLines(record: Record<string, unknown>, kind: FlowKind): string[] {
+  const items = record[kind];
+  if (!Array.isArray(items)) return [];
+  return items
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => (kind === "p" ? item : `- ${item}`));
+}
+
+function headingLines(
+  record: Record<string, unknown>,
+  kind: HeadingKind,
+): string[] {
+  const heading = record[kind];
+  if (typeof heading !== "object" || heading === null || Array.isArray(heading))
+    return [];
+  const { title, block } = heading as Record<string, unknown>;
+  return [
+    ...(typeof title === "string" ? [title] : []),
+    ...markdownBlockLines(block),
+  ];
+}
+
+function markdownBlockLines(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((block) => {
+    if (typeof block !== "object" || block === null || Array.isArray(block))
+      return [];
+    const record = block as Record<string, unknown>;
+    const flowKinds: FlowKind[] = ["p", "ul", "ol"];
+    const headingKinds: HeadingKind[] = ["h2", "h3"];
+    return [
+      ...flowKinds.flatMap((kind) => flowLines(record, kind)),
+      ...headingKinds.flatMap((kind) => headingLines(record, kind)),
+    ];
+  });
+}
+
 function skillMarkdownText(sections: readonly JsonObject[]): string {
   return sections
-    .map((section) =>
-      typeof section.markdown === "string" ? section.markdown : "",
-    )
+    .map((section) => markdownBlockLines(section.markdown).join("\n"))
+    .filter((text) => text.length > 0)
     .join("\n");
 }
 

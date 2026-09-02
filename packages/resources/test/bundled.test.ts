@@ -253,7 +253,7 @@ describe("first-party package resources", () => {
         sections: [
           { instructions: ["Authored instruction."] },
           { invariants: ["Authored invariant."] },
-          { markdown: "Authored markdown." },
+          { markdown: [{ p: ["Authored markdown."] }] },
         ],
       },
     });

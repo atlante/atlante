@@ -196,10 +196,63 @@ describe("normative authoring convention", () => {
       expect(output).not.toMatch(normativeKeyword);
     });
 
-    test("structural templates render without normative keywords", () => {
-      expect(renderPackTemplate("@atlante/pack/markdown", "Body.")).not.toMatch(
-        normativeKeyword,
+    test("markdown renders ordered blocks with headings and lists", () => {
+      const output = renderPackTemplate("@atlante/pack/markdown", [
+        { p: ["First.", "Second."] },
+        { ul: ["alpha", "beta"] },
+        { ol: ["one", "two"] },
+        { p: ["Interleaved closing."] },
+        {
+          h2: {
+            title: "Context",
+            block: [
+              { p: ["Intro."] },
+              {
+                h3: {
+                  title: "Sub",
+                  block: [{ ul: ["deep"] }, { p: ["Deep prose."] }],
+                },
+              },
+            ],
+          },
+        },
+      ]);
+
+      expect(output).toBe(
+        [
+          "First.",
+          "",
+          "Second.",
+          "",
+          "- alpha",
+          "- beta",
+          "",
+          "1. one",
+          "2. two",
+          "",
+          "Interleaved closing.",
+          "",
+          "## Context",
+          "",
+          "Intro.",
+          "",
+          "### Sub",
+          "",
+          "- deep",
+          "",
+          "Deep prose.",
+        ].join("\n"),
       );
+      expect(output).not.toMatch(normativeKeyword);
+    });
+
+    test("structural templates render without normative keywords", () => {
+      expect(
+        renderPackTemplate("@atlante/pack/markdown", [
+          { p: ["Body."] },
+          { ul: ["Item."] },
+        ]),
+      ).not.toMatch(normativeKeyword);
       expect(
         renderPackTemplate("@atlante/pack/agent", {
           identity: "Identity.",
@@ -211,7 +264,7 @@ describe("normative authoring convention", () => {
         renderPackTemplate("@atlante/pack/skill", {
           title: "Skill",
           overview: "Overview.",
-          sections: [{ markdown: "Body." }],
+          sections: [{ markdown: [{ p: ["Body."] }] }],
         }),
       ).not.toMatch(normativeKeyword);
       expect(

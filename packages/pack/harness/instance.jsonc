@@ -5,7 +5,64 @@
   "overview": "Operate an Atlante harness with evidence: initialize and configure it from repository facts, run harness-related delivery alongside the active workflow phases, and route observed friction into a separately approved improvement cycle. This is a stewardship capability, not a workflow phase.",
   "sections": [
     {
-      "markdown": "## Operating context\n\nTreat this skill as a supplement to the active workflow phases (`brainstorm`, `plan`, `build`, `review`); it operates alongside them rather than replacing them or adding a fifth phase. Keep permanent policy authoritative and command-level mechanics provisional: mechanics are the first content shed when verified deterministic tools (such as a future Atlante MCP server) provide the same operations, and exact tool schemas, effects, and diagnostics belong in tool descriptions rather than here. The guidance in this skill stands alone without network access; references supplement it for humans and web-capable agents.\n\n### Atlante concepts\n\nAn Atlante harness is defined by authored source configuration and realized through built artifacts:\n\n- `atlante.jsonc` is the project's root source configuration. It declares values, agents, skills, and other bindings; `extends` inherits a preset such as `@atlante/pack`.\n- Values are named interpolations resolved into documents and rendered output; the first-party preset defines `project` and `workflow-root`.\n- Agents are rendered prompts that own a workflow; skills are project-global Markdown guidance an agent loads on demand through the host adapter's skill tool.\n- Templates define input structure and rendering; instances bind a template to concrete input. Versioned presets and packs are installable bundles of templates and instances.\n- Bindings connect named configuration entries to templates or instances.\n- Built artifacts are the deterministic rendered outputs published under the artifact tree and verified before a host adapter materializes them.\n\nDistinguish authoritative source configuration from generated output at all times: source configuration and project sources are the editable surface, and generated output is reproduced through validated build or materialization.\n\n### Coverage areas\n\n| Coverage area | Disposition |\n| --- | --- |\n| Atlante concepts and document structure, including the source-versus-generated boundary | Permanent policy |\n| Choosing suitable first-party, local, or package resources without inventing unavailable ones | Permanent policy |\n| Recognizing recurring workflow friction and proposing a separately approved harness-improvement cycle | Permanent policy |\n| Initializing Atlante and creating or updating `atlante.jsonc` from repository evidence | Provisional mechanics |\n| Running validation and build or materialization commands and interpreting common diagnostics | Provisional mechanics |\n| Integrating and troubleshooting the OpenCode adapter from repository evidence | Provisional mechanics |"
+      "markdown": [
+        {
+          "h2": {
+            "title": "Operating context",
+            "block": [
+              {
+                "p": [
+                  "Treat this skill as a supplement to the active workflow phases (`brainstorm`, `plan`, `build`, `review`); it operates alongside them rather than replacing them or adding a fifth phase. Keep permanent policy authoritative and command-level mechanics provisional: mechanics are the first content shed when verified deterministic tools (such as a future Atlante MCP server) provide the same operations, and exact tool schemas, effects, and diagnostics belong in tool descriptions rather than here. The guidance in this skill stands alone without network access; references supplement it for humans and web-capable agents."
+                ]
+              },
+              {
+                "h3": {
+                  "title": "Atlante concepts",
+                  "block": [
+                    {
+                      "p": [
+                        "An Atlante harness is defined by authored source configuration and realized through built artifacts:"
+                      ]
+                    },
+                    {
+                      "ul": [
+                        "`atlante.jsonc` is the project's root source configuration. It declares values, agents, skills, and other bindings; `extends` inherits a preset such as `@atlante/pack`.",
+                        "Values are named interpolations resolved into documents and rendered output; the first-party preset defines `project` and `workflow-root`.",
+                        "Agents are rendered prompts that own a workflow; skills are project-global Markdown guidance an agent loads on demand through the host adapter's skill tool.",
+                        "Templates define input structure and rendering; instances bind a template to concrete input. Versioned presets and packs are installable bundles of templates and instances.",
+                        "Bindings connect named configuration entries to templates or instances.",
+                        "Built artifacts are the deterministic rendered outputs published under the artifact tree and verified before a host adapter materializes them."
+                      ]
+                    },
+                    {
+                      "p": [
+                        "Distinguish authoritative source configuration from generated output at all times: source configuration and project sources are the editable surface, and generated output is reproduced through validated build or materialization."
+                      ]
+                    }
+                  ]
+                }
+              },
+              {
+                "h3": {
+                  "title": "Coverage areas",
+                  "block": [
+                    {
+                      "ul": [
+                        "Atlante concepts and document structure, including the source-versus-generated boundary — **Permanent policy**",
+                        "Choosing suitable first-party, local, or package resources without inventing unavailable ones — **Permanent policy**",
+                        "Recognizing recurring workflow friction and proposing a separately approved harness-improvement cycle — **Permanent policy**",
+                        "Initializing Atlante and creating or updating `atlante.jsonc` from repository evidence — **Provisional mechanics**",
+                        "Running validation and build or materialization commands and interpreting common diagnostics — **Provisional mechanics**",
+                        "Integrating and troubleshooting the OpenCode adapter from repository evidence — **Provisional mechanics**"
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
     },
     {
       "instructions": [
