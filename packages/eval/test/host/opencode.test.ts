@@ -199,7 +199,10 @@ sleep 30`,
     });
     expect(trial.outcome).toBe("budget-exceeded");
     expect(trial.tokens).toBe(900_000);
-    expect(Date.now() - started).toBeLessThan(10_000);
+    // Generous bound: the escalation adds a 5s grace plus kill time, and
+    // parallel CI load can stretch both. The assertion only guards against
+    // the 30s sleep completing, i.e. the kill never happening.
+    expect(Date.now() - started).toBeLessThan(20_000);
   });
 
   test("aborts past the timeout", async () => {
