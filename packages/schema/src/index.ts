@@ -35,6 +35,25 @@ export {
   skillBindingOverlaySchema,
   skillBindingSchema,
 } from "./document.js";
+export type {
+  AuthoredEvalConfig,
+  AuthoredEvalScenario,
+  EvalBudget,
+  EvalCheck,
+  EvalConfig,
+  EvalScenario,
+  EvalScenarioTask,
+  SandboxRelativePath,
+} from "./eval.js";
+export {
+  EVAL_BUDGET_DEFAULTS,
+  EVAL_CHECK_TIMEOUT_DEFAULT_MS,
+  EVAL_HOST,
+  EVAL_SCENARIO_SCHEMA_URI,
+  evalCheckSchema,
+  evalConfigSchema,
+  evalScenarioSchema,
+} from "./eval.js";
 export type { Value, ValuesMap, ValuesMapOverlay } from "./values.js";
 export {
   VALUE_KEY_PATTERN,
@@ -43,11 +62,19 @@ export {
   valuesMapSchema,
 } from "./values.js";
 
+import evalScenarioJsonSchemaRaw from "../schema/v0.1/eval-scenario.json" with {
+  type: "json",
+};
 import documentJsonSchemaRaw from "../schema/v0.1/schema.json" with {
   type: "json",
 };
 
 export const documentJsonSchema = documentJsonSchemaRaw as Record<
+  string,
+  unknown
+>;
+
+export const evalScenarioJsonSchema = evalScenarioJsonSchemaRaw as Record<
   string,
   unknown
 >;

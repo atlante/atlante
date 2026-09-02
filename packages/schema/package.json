@@ -27,7 +27,8 @@
   "private": true,
   "exports": {
     ".": "./src/index.ts",
-    "./schema.json": "./schema/v0.1/schema.json"
+    "./schema.json": "./schema/v0.1/schema.json",
+    "./eval-scenario.json": "./schema/v0.1/eval-scenario.json"
   },
   "scripts": {
     "generate": "bun scripts/generate.ts"

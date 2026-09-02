@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { evalConfigSchema } from "./eval.js";
 import type { ValuesMap, ValuesMapOverlay } from "./values.js";
 import {
   safeRecord,
@@ -257,6 +258,7 @@ export const atlanteDocumentOverlaySchema = z.strictObject({
   values: valuesMapOverlaySchema.optional(),
   agents: agentsOverlaySchema.optional(),
   skills: skillsOverlaySchema.optional(),
+  eval: evalConfigSchema.optional(),
 });
 
 export type AtlanteDocumentOverlay = z.infer<
@@ -270,6 +272,7 @@ export const atlanteDocumentSchema = z.strictObject({
   values: valuesMapSchema.optional(),
   agents: safeRecord(z.string().min(1), agentBindingSchema).default({}),
   skills: safeRecord(z.string().min(1), skillBindingSchema).default({}),
+  eval: evalConfigSchema.optional(),
 });
 
 type AtlanteDocumentOutput = z.infer<typeof atlanteDocumentSchema>;
