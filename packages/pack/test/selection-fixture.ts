@@ -56,6 +56,7 @@ export interface ResolvedPackSkill {
   readonly templateLocator: string;
   listText(kind: ListSectionKind): string;
   markdownText(): string;
+  referencesText(): string;
   everythingText(): string;
   renderedOutput(): string;
 }
@@ -116,8 +117,36 @@ function skillMarkdownText(sections: readonly JsonObject[]): string {
     .join("\n");
 }
 
+function skillReferencesEntries(
+  sections: readonly JsonObject[],
+): readonly JsonObject[] {
+  return sections.flatMap((section) =>
+    Array.isArray(section.references)
+      ? section.references.filter(
+          (entry): entry is JsonObject =>
+            typeof entry === "object" &&
+            entry !== null &&
+            !Array.isArray(entry),
+        )
+      : [],
+  );
+}
+
+function referencesTextOf(entries: readonly JsonObject[]): string {
+  return entries
+    .map((entry) =>
+      ["name", "location", "readWhen"]
+        .map((key) =>
+          typeof entry[key] === "string" ? (entry[key] as string) : "",
+        )
+        .join(" "),
+    )
+    .join("\n");
+}
+
 function skillEverythingText(
   input: Pick<ResolvedPackSkill, "overview" | "sections">,
+  referencesText: string,
 ): string {
   return [
     input.overview,
@@ -125,6 +154,7 @@ function skillEverythingText(
     skillListItems(input.sections, "instructions").join("\n"),
     skillListItems(input.sections, "gotchas").join("\n"),
     skillListItems(input.sections, "invariants").join("\n"),
+    referencesText,
   ].join("\n");
 }
 
@@ -136,6 +166,9 @@ export function resolvePackSkill(locator: string): ResolvedPackSkill {
     config,
   );
   const input = packSkillInput(locator, resolved.input);
+  const referencesText = referencesTextOf(
+    skillReferencesEntries(input.sections),
+  );
   const renderedOutput = (): string =>
     renderResolvedTemplate({
       template: resolved.effectiveTemplate,
@@ -147,7 +180,8 @@ export function resolvePackSkill(locator: string): ResolvedPackSkill {
     templateLocator: resolved.effectiveTemplate.locator,
     listText: (kind) => skillListItems(input.sections, kind).join("\n"),
     markdownText: () => skillMarkdownText(input.sections),
-    everythingText: () => skillEverythingText(input),
+    referencesText: () => referencesText,
+    everythingText: () => skillEverythingText(input, referencesText),
     renderedOutput,
   };
 }

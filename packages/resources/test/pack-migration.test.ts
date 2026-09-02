@@ -60,6 +60,8 @@ const expectedPackFiles = [
   "markdown/template.jsonc",
   "markdown/template.md",
   "plan/instance.jsonc",
+  "references/template.jsonc",
+  "references/template.md",
   "review/instance.jsonc",
   "skill/template.jsonc",
   "skill/template.md",

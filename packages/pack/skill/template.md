@@ -24,4 +24,8 @@
 
 {{> slot/sections/invariants invariants}}
 {{/if}}
+{{#if references}}
+
+{{> slot/sections/references references}}
+{{/if}}
 {{/each}}

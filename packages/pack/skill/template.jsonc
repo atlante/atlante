@@ -38,6 +38,13 @@
             },
             "required": ["invariants"],
             "additionalProperties": false
+          },
+          {
+            "properties": {
+              "references": { "template": "@atlante/pack/references" }
+            },
+            "required": ["references"],
+            "additionalProperties": false
           }
         ]
       },

@@ -58,7 +58,7 @@ describe("harness skill instance", () => {
     expect(skill.overview).not.toMatch(/\b(MUST|SHOULD|MAY)\b/);
     expect(
       skill.sections.map((section) => Object.keys(section).sort().join("+")),
-    ).toEqual(["markdown", "instructions", "invariants", "markdown"]);
+    ).toEqual(["markdown", "instructions", "invariants", "references"]);
   });
 
   test("description carries the trigger-focused routing verbatim", () => {
@@ -158,17 +158,21 @@ describe("harness skill instance", () => {
       expect(invariants).toContain(marker);
   });
 
-  test("a single Resources section lists exactly the verified entry points", () => {
+  test("a single References section lists exactly the verified entry points", () => {
     const skill = resolvePackSkill(locator);
     const output = skill.renderedOutput();
 
-    expect(output.match(/## Resources/g)?.length).toBe(1);
+    expect(output.match(/## References/g)?.length).toBe(1);
+    expect(skill.referencesText()).toContain("Documentation root");
+    expect(skill.referencesText()).toContain("Getting-started guide");
+    expect(skill.referencesText()).toContain("Specification");
+    expect(skill.referencesText()).toContain("JSON Schema");
     for (const url of verifiedResources) expect(output, url).toContain(url);
 
-    const resourcesStart = output.indexOf("## Resources");
-    const beforeResources = output.slice(0, resourcesStart);
+    const referencesStart = output.indexOf("## References");
+    const beforeReferences = output.slice(0, referencesStart);
     for (const url of verifiedResources)
-      expect(beforeResources, `scattered: ${url}`).not.toContain(url);
+      expect(beforeReferences, `scattered: ${url}`).not.toContain(url);
 
     const everything = skill.everythingText();
     const urls = everything.match(/https?:\/\/[^\s)`>]+/g) ?? [];
@@ -179,6 +183,7 @@ describe("harness skill instance", () => {
     const skill = resolvePackSkill(locator);
     const everything = skill.everythingText();
 
+    expect(everything).toContain("stands alone without network access");
     expect(everything).not.toMatch(/\b(fetch|download|curl|wget)\b/i);
     expect(everything).not.toMatch(/\bcopy (the|this) documentation\b/i);
   });
@@ -191,11 +196,12 @@ describe("harness skill instance", () => {
       "## Overview",
       "## Instructions",
       "## Invariants",
-      "## Resources",
+      "## References",
     ])
       expect(output).toContain(heading);
     expect(output).not.toContain("## Workflow");
     expect(output).not.toContain("## Gotchas");
+    expect(output).not.toContain("## Resources");
 
     const position = (heading: string) => output.indexOf(heading);
     expect(position("## Overview")).toBeLessThan(
@@ -205,6 +211,6 @@ describe("harness skill instance", () => {
       position("## Instructions"),
     );
     expect(position("## Instructions")).toBeLessThan(position("## Invariants"));
-    expect(position("## Invariants")).toBeLessThan(position("## Resources"));
+    expect(position("## Invariants")).toBeLessThan(position("## References"));
   });
 });

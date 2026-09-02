@@ -167,6 +167,33 @@ describe("normative authoring convention", () => {
       expect(output).not.toMatch(/\bMUST\b/);
     });
 
+    test("references render verified entries in order without normative keywords", () => {
+      const output = renderPackTemplate("@atlante/pack/references", [
+        {
+          name: "Guide",
+          location: "https://example.test/guide",
+          readWhen: "Learning the basics.",
+        },
+        {
+          name: "Schema",
+          location: "https://example.test/schema.json",
+          readWhen: "Authoring configuration.",
+        },
+      ]);
+
+      expect(output).toContain("## References");
+      expect(output).toContain(
+        "1. **Guide** — https://example.test/guide — Learning the basics.",
+      );
+      expect(output).toContain(
+        "2. **Schema** — https://example.test/schema.json — Authoring configuration.",
+      );
+      expect(output.indexOf("1. **Guide**")).toBeLessThan(
+        output.indexOf("2. **Schema**"),
+      );
+      expect(output).not.toMatch(normativeKeyword);
+    });
+
     test("structural templates render without normative keywords", () => {
       expect(renderPackTemplate("@atlante/pack/markdown", "Body.")).not.toMatch(
         normativeKeyword,
@@ -184,6 +211,15 @@ describe("normative authoring convention", () => {
           overview: "Overview.",
           sections: [{ markdown: "Body." }],
         }),
+      ).not.toMatch(normativeKeyword);
+      expect(
+        renderPackTemplate("@atlante/pack/references", [
+          {
+            name: "Guide",
+            location: "https://example.test/guide",
+            readWhen: "Learning the basics.",
+          },
+        ]),
       ).not.toMatch(normativeKeyword);
       expect(
         renderPackTemplate("@atlante/pack/workflow", {

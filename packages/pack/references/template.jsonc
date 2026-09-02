@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Reference entries an agent consults on demand. Keep each entry stable and verified; state where the entry lives and when to consult it. References supplement the guidance that lists them, and that guidance stands alone without them.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "name": { "type": "string", "minLength": 1 },
+      "location": { "type": "string", "minLength": 1 },
+      "readWhen": { "type": "string", "minLength": 1 }
+    },
+    "required": ["name", "location", "readWhen"],
+    "additionalProperties": false
+  },
+  "minItems": 1
+}
