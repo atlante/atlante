@@ -157,7 +157,7 @@ const evalScenarioTaskSchema = z.strictObject({
 export type EvalScenarioTask = z.infer<typeof evalScenarioTaskSchema>;
 
 /** A versioned eval scenario document (v0.1, normative). */
-export const evalScenarioSchema = z.strictObject({
+export const evalScenarioBaseSchema = z.strictObject({
   $schema: z.literal(EVAL_SCENARIO_SCHEMA_URI),
   version: z.literal("0.1"),
   /** Unique across the suite; duplicates are rejected at discovery. */
@@ -168,6 +168,28 @@ export const evalScenarioSchema = z.strictObject({
   budget: z.strictObject({ timeoutMs: positiveIntSchema }).optional(),
   checks: z.array(evalCheckSchema).min(1),
 });
+
+/**
+ * Cross-field validation: opt-in regular expressions are compiled at
+ * validation time so an invalid pattern fails before any model call.
+ */
+export const evalScenarioSchema = evalScenarioBaseSchema.superRefine(
+  (scenario, context) => {
+    for (const [index, check] of scenario.checks.entries()) {
+      if (check.type !== "file-contains" || !check.regex) continue;
+      try {
+        new RegExp(check.pattern);
+      } catch {
+        context.addIssue({
+          code: "custom",
+          message:
+            "pattern must be a valid regular expression when regex is true",
+          path: ["checks", index, "pattern"],
+        });
+      }
+    }
+  },
+);
 
 export type EvalScenario = z.infer<typeof evalScenarioSchema>;
 export type AuthoredEvalScenario = z.input<typeof evalScenarioSchema>;

@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { atlanteDocumentOverlaySchema, SCHEMA_URI } from "../src/document.js";
-import { EVAL_SCENARIO_SCHEMA_URI, evalScenarioSchema } from "../src/eval.js";
+import {
+  EVAL_SCENARIO_SCHEMA_URI,
+  evalScenarioBaseSchema,
+} from "../src/eval.js";
 import { VALUE_KEY_PATTERN } from "../src/values.js";
 
 export function buildDocumentJsonSchema(): Record<string, unknown> {
@@ -72,7 +75,7 @@ export function buildDocumentJsonSchema(): Record<string, unknown> {
 }
 
 function buildEvalScenarioJsonSchema(): Record<string, unknown> {
-  const generated = z.toJSONSchema(evalScenarioSchema, {
+  const generated = z.toJSONSchema(evalScenarioBaseSchema, {
     target: "draft-2020-12",
     io: "input",
   }) as Record<string, unknown>;

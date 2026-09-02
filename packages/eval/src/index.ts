@@ -1,3 +1,4 @@
+export { parsePorcelainPaths, runChecks } from "./checks.js";
 export type { ResolvedBudget } from "./config.js";
 export {
   resolveBudget,
@@ -5,6 +6,15 @@ export {
   scenarioTimeoutMs,
 } from "./config.js";
 export { createRunId } from "./run-id.js";
+export type {
+  EvalProgress,
+  HostRunner,
+  RunEvalInput,
+  RunTrialInput,
+  TrialRun,
+  TrialRunOutcome,
+} from "./runner.js";
+export { runEval } from "./runner.js";
 export type { Sandbox, SnapshotEntry } from "./sandbox.js";
 export {
   ArtifactsNotVerifiedError,
