@@ -20,28 +20,29 @@ export function createRunId(date = new Date()): string {
   return `${stamp}T${time}-${suffix}`;
 }
 
-/** A report whose `runId` names an existing report directory. */
+/** A report whose `runId` will name its reserved report directory. */
 type ReportedRun = { runId: string };
 
 const RUN_ID_ROLL_LIMIT = 8;
 
 /**
- * Re-rolls `report.runId` while `exists` reports a directory collision, so a
- * republished run can never clobber earlier evidence. The report is mutated
- * in place: the printed summary, the JSON body, and the published directory
- * must always name the same run. Throws after the bounded roll budget so a
- * persistently colliding base directory surfaces as a publish failure
- * instead of a silent overwrite.
+ * Atomically reserves a run id through the supplied callback, re-rolling
+ * `report.runId` when the callback reports a collision. The callback must
+ * perform the reservation itself (for example, `mkdir` without `recursive`),
+ * rather than checking existence first; this closes the check-then-create
+ * race that could otherwise clobber earlier evidence. The report is mutated
+ * in place so the printed summary, JSON body, and directory name stay equal.
+ * Throws after the bounded roll budget so a persistently colliding base
+ * directory surfaces a publish failure instead of a silent overwrite.
  */
-export function rollRunId<T extends ReportedRun>(
+export function reserveRunId<T extends ReportedRun>(
   report: T,
-  exists: (runId: string) => boolean,
+  reserve: (runId: string) => boolean,
   roll: () => string = createRunId,
 ): T {
-  if (!exists(report.runId)) return report;
   for (let attempt = 0; attempt < RUN_ID_ROLL_LIMIT; attempt++) {
+    if (reserve(report.runId)) return report;
     report.runId = roll();
-    if (!exists(report.runId)) return report;
   }
   throw new Error(
     `could not allocate a fresh eval run id under ${RUN_ID_ROLL_LIMIT} attempts`,

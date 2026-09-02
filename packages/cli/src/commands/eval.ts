@@ -12,8 +12,8 @@ import {
   EvalRunError,
   type HostRunner,
   type RunReport,
+  reserveRunId,
   resolveBudget,
-  rollRunId,
   runEval,
   runExitCode,
   verifyArtifacts,
@@ -292,7 +292,8 @@ function filterScenarios<T extends { scenario: { name: string } }>(
 /**
  * Writes `<base>/<runId>/report.json` under the project. Eval runs are
  * disposable evidence: the default location is gitignored via
- * `.atlante/.gitignore` (created or appended, never rewritten).
+ * `.atlante/.gitignore` (created or appended, never rewritten). The run
+ * directory is atomically reserved before the report file is written.
  */
 function publishReport(
   projectRoot: string,
@@ -301,17 +302,38 @@ function publishReport(
 ): string {
   const base = out ?? join(projectRoot, ".atlante", "eval");
   assertNoSymlinkPath(base, "report output");
-  // A same-second rerun into the same base can regenerate the id: re-roll
-  // instead of letting mkdir succeed on (and clobber) an existing report.
-  rollRunId(report, (id) => existsSync(join(base, id)));
+  mkdirSync(base, { recursive: true });
+  assertNoSymlinkPath(base, "report output");
+  // Reserve the leaf atomically: an existence check followed by recursive
+  // mkdir would still allow two concurrent evals to choose the same id.
+  reserveRunId(report, (id) => {
+    const candidate = join(base, id);
+    assertNoSymlinkPath(candidate, "report output");
+    try {
+      mkdirSync(candidate);
+      return true;
+    } catch (cause) {
+      if (isAlreadyExistsError(cause)) return false;
+      throw cause;
+    }
+  });
   const dir = join(base, report.runId);
   assertNoSymlinkPath(dir, "report output");
-  mkdirSync(dir, { recursive: true });
   const reportPath = join(dir, "report.json");
   assertNoSymlinkPath(reportPath, "report output");
-  writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
+  // A second exclusive guard prevents overwriting evidence if anything else
+  // creates a report file inside our freshly reserved directory.
+  writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`, {
+    flag: "wx",
+  });
   if (out === undefined) ensureEvalGitignored(projectRoot);
   return dir;
+}
+
+function isAlreadyExistsError(cause: unknown): boolean {
+  return (
+    cause instanceof Error && (cause as NodeJS.ErrnoException).code === "EEXIST"
+  );
 }
 
 function ensureEvalGitignored(projectRoot: string): void {

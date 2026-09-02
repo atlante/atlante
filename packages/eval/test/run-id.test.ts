@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { createRunId, rollRunId } from "../src/run-id.js";
+import { createRunId, reserveRunId } from "../src/run-id.js";
 
 describe("createRunId", () => {
   test("matches the documented run-id shape", () => {
@@ -9,21 +9,25 @@ describe("createRunId", () => {
   });
 });
 
-describe("rollRunId", () => {
+describe("reserveRunId", () => {
   test("keeps a run id whose report directory is free", () => {
     const report = { runId: "2026-09-02T10-00-00-abcd" };
-    expect(rollRunId(report, () => false).runId).toBe(
+    expect(reserveRunId(report, () => true).runId).toBe(
       "2026-09-02T10-00-00-abcd",
     );
   });
 
-  test("re-rolls on a report-directory collision until the id is free", () => {
+  test("re-rolls on an atomic reservation collision until the id is free", () => {
     const report = { runId: "taken-0" };
     const taken = new Set(["taken-0", "roll-1", "roll-2"]);
     let rolls = 0;
-    const rolled = rollRunId(
+    const rolled = reserveRunId(
       report,
-      (id) => taken.has(id),
+      (id) => {
+        if (taken.has(id)) return false;
+        taken.add(id);
+        return true;
+      },
       () => `roll-${++rolls}`,
     );
     expect(rolled.runId).toBe("roll-3");
@@ -34,9 +38,9 @@ describe("rollRunId", () => {
 
   test("fails closed when no free id can be allocated", () => {
     expect(() =>
-      rollRunId(
+      reserveRunId(
         { runId: "taken" },
-        () => true,
+        () => false,
         () => "also-taken",
       ),
     ).toThrow(/run id/i);

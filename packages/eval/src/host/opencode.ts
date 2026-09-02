@@ -9,6 +9,7 @@ import {
 import { createRequire } from "node:module";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join } from "node:path";
+import { URL } from "node:url";
 import { readArtifacts } from "@atlante/artifacts/read-only";
 import { parseJsonc } from "@atlante/validator";
 import type {
@@ -82,9 +83,9 @@ const PERMISSION_ACTIONS = new Set(["allow", "deny", "ask"]);
 /**
  * Host environment variables the spawned `opencode run` may inherit. The
  * credentials the host needs travel via the injected auth.json, not env
- * vars, so the allowlist covers execution basics and proxies only. A
- * prompt-injected `env | curl …` inside the sandbox then finds nothing of
- * the caller's shell environment to exfiltrate.
+ * vars, so the allowlist covers execution basics and proxies only after URL
+ * credentials are scrubbed. A prompt-injected `env | curl …` inside the
+ * sandbox then finds nothing of the caller's shell environment to exfiltrate.
  */
 const ENV_ALLOWLIST = Object.freeze([
   "PATH",
@@ -104,9 +105,29 @@ function pickAllowedEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const picked: NodeJS.ProcessEnv = {};
   for (const key of ENV_ALLOWLIST) {
     const value = env[key];
-    if (value !== undefined) picked[key] = value;
+    if (value === undefined) continue;
+    if (key.endsWith("_PROXY") || key.endsWith("_proxy")) {
+      const sanitized = sanitizeProxyValue(value);
+      if (sanitized !== undefined) picked[key] = sanitized;
+      continue;
+    }
+    picked[key] = value;
   }
   return picked;
+}
+
+/** Keeps proxy routing while removing URL userinfo from the child env. */
+function sanitizeProxyValue(value: string): string | undefined {
+  try {
+    const proxy = new URL(value);
+    proxy.username = "";
+    proxy.password = "";
+    return proxy.toString();
+  } catch {
+    // Do not pass an unparseable proxy value through: it may encode secrets
+    // in a form this sanitizer cannot identify safely.
+    return undefined;
+  }
 }
 const PERMISSION_KEYS = [
   ...Object.keys(BASELINE_DEFAULTS),
@@ -293,7 +314,7 @@ function rewritePluginEntries(
 ): PluginEntry[] {
   // An absent "plugin" key is an absent registration, not a malformed value:
   // it flows into the not-registered error (with install guidance) below.
-  const list = entries ?? [];
+  const list = entries === undefined ? [] : entries;
   if (!Array.isArray(list) || !list.every(isPluginEntry)) {
     throw new Error(
       "host configuration plugin must be an array of strings or [name, options-object] tuples",
