@@ -241,6 +241,7 @@ describe("normative authoring convention", () => {
           "- deep",
           "",
           "Deep prose.",
+          "",
         ].join("\n"),
       );
       expect(output).not.toMatch(normativeKeyword);

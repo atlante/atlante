@@ -337,6 +337,36 @@ describe("validateDocumentText", () => {
     expect(result.document?.skills?.testing?.description).toBe("Run tests");
   });
 
+  test("rejects markdown blocks that break the heading hierarchy", () => {
+    const skill = (markdown: unknown[]) =>
+      `{ "$schema": "${SCHEMA_URI}", "skills": { "testing": { "description": "Run tests", "title": "Testing", "overview": "Run tests.", "sections": [{ "markdown": ${JSON.stringify(markdown)} }] } } }`;
+
+    const twoH2 = validateWithFirstPartyPack(
+      skill([
+        { h2: { title: "First", block: [{ p: ["One."] }] } },
+        { h2: { title: "Second", block: [{ p: ["Two."] }] } },
+      ]),
+    );
+    expect(
+      twoH2.diagnostics.some(
+        (diagnostic) =>
+          diagnostic.code === "invalid-prompt-input" &&
+          diagnostic.path.startsWith("/skills/testing/sections/0/markdown"),
+      ),
+    ).toBe(true);
+
+    const rootH3 = validateWithFirstPartyPack(
+      skill([{ h3: { title: "Orphan", block: [{ p: ["No."] }] } }]),
+    );
+    expect(
+      rootH3.diagnostics.some(
+        (diagnostic) =>
+          diagnostic.code === "invalid-prompt-input" &&
+          diagnostic.path.startsWith("/skills/testing/sections/0/markdown"),
+      ),
+    ).toBe(true);
+  });
+
   test("accepts agent and skill bindings together", () => {
     const result = validateWithFirstPartyPack(
       `{ "$schema": "${SCHEMA_URI}", "agents": { "reviewer": { "description": "Agent", "identity": "x", "mission": "y" } }, "skills": { "testing": { "description": "Run tests", "title": "Testing", "overview": "Run tests.", "sections": [{ "markdown": [{ "p": ["Run tests."] }] }] } } }`,

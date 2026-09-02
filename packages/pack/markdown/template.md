@@ -9,4 +9,5 @@
 {{> blocks h2.block}}{{/if~}}{{#if h3}}### {{h3.title}}
 
 {{> blocks h3.block}}{{/if}}{{/each}}{{/inline~}}
-{{> blocks (input)}}
+{{> blocks (input)}}{{! trailing separation survives; bare trailing newlines are stripped}}
+{{! by Handlebars at compile time, so the newline between comments carries it}}
