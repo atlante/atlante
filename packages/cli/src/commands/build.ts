@@ -1,5 +1,6 @@
 import type { ProjectContext } from "@atlante/builder";
 import { buildProject } from "@atlante/builder";
+import { openCodeMaterializer } from "@atlante/opencode/materialize";
 import type { ResourceWatchContext } from "@atlante/validator";
 import { firstPartyProjectContext } from "../first-party-pack.js";
 import {
@@ -18,10 +19,12 @@ export function runBuildWithContext(
   context: ProjectContext = firstPartyProjectContext(),
 ): BuildOutcome {
   try {
-    const built = buildProject(target, context);
+    const built = buildProject(target, context, {
+      materializers: [openCodeMaterializer],
+    });
     if (!reportBuildResult(built))
       return { code: 1, resourceWatch: built.resourceWatch };
-    console.log(`built ${built.artifactsPath}`);
+    console.log(`built ${built.projectRoot}`);
     return { code: 0, resourceWatch: built.resourceWatch };
   } catch (cause) {
     printDiagnostic({

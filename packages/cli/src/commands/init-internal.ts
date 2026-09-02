@@ -13,6 +13,7 @@ import {
   buildProject as buildProjectDefault,
   type ProjectContext,
 } from "@atlante/builder";
+import { openCodeMaterializer } from "@atlante/opencode/materialize";
 import {
   createPackageResourcePack,
   isPackageDeclared,
@@ -65,6 +66,11 @@ type InitFileSystem = {
 };
 
 type BuildFunction = (target: string, context: ProjectContext) => BuildResult;
+
+const defaultBuildProject: BuildFunction = (target, context) =>
+  buildProjectDefault(target, context, {
+    materializers: [openCodeMaterializer],
+  });
 
 export type InitDependencies = Partial<InitFileSystem> & {
   buildProject?: BuildFunction;
@@ -470,7 +476,7 @@ function buildAndReport(
   }
   reportBuildResult(built);
   console.log(`created ${target}`);
-  console.log(`built ${built.artifactsPath}`);
+  console.log(`built ${built.projectRoot}`);
   return 0;
 }
 
@@ -980,7 +986,7 @@ export async function runInitWithDependencies(
     context: dependencies.context ?? {},
     runPackageManager:
       dependencies.runPackageManager ?? runPackageManagerDefault,
-    buildProject: dependencies.buildProject ?? buildProjectDefault,
+    buildProject: dependencies.buildProject ?? defaultBuildProject,
     selection: {
       isInteractive: dependencies.isInteractive ?? defaultIsInteractive,
       prompt: dependencies.prompt ?? defaultPrompt,

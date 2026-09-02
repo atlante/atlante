@@ -41,6 +41,10 @@
       "types": "./dist/api.d.ts",
       "default": "./dist/api.js"
     },
+    "./materialize": {
+      "types": "./src/materialize.ts",
+      "default": "./src/materialize.ts"
+    },
     "./server": "./dist/index.js"
   },
   "peerDependencies": {

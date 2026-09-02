@@ -14,9 +14,9 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { readArtifacts } from "@atlante/artifacts/read-only";
 import type { BuildResult } from "@atlante/builder";
 import { buildProject } from "@atlante/builder";
+import { openCodeMaterializer } from "@atlante/opencode/materialize";
 import { SCHEMA_URI } from "@atlante/schema";
 import {
   type InitDependencies,
@@ -289,9 +289,12 @@ describe("runInit", () => {
     expect(existsSync(join(dir, "resources"))).toBe(false);
     expect(existsSync(join(dir, "templates"))).toBe(false);
     expect(existsSync(join(dir, "presets"))).toBe(false);
-    expect(
-      existsSync(join(dir, ".atlante", "artifacts", "manifest.json")),
-    ).toBe(true);
+    expect(existsSync(join(dir, ".opencode", "agents", "architect.md"))).toBe(
+      true,
+    );
+    expect(existsSync(join(dir, ".atlante", "opencode-native.json"))).toBe(
+      true,
+    );
     expect(await runValidate(dir)).toBe(0);
     const opencode = JSON.parse(
       readFileSync(join(dir, "opencode.jsonc"), "utf8"),
@@ -332,16 +335,15 @@ describe("runInit", () => {
     expect(readFileSync(opencode, "utf8")).toBe(originalOpenCode);
   });
 
-  test("builds artifacts before reporting successful initialization", async () => {
+  test("builds before reporting successful initialization", async () => {
     const dir = tempDir();
     const calls: string[] = [];
     const buildProject = (target: string): BuildResult => {
       calls.push(target);
       return {
         projectRoot: dir,
-        artifactsPath: join(dir, ".atlante", "artifacts"),
         diagnostics: [],
-        warnings: [],
+        materializations: [],
       };
     };
 
@@ -349,9 +351,8 @@ describe("runInit", () => {
     expect(calls).toEqual([dir]);
   });
 
-  test("reports builder warnings after successful initialization", async () => {
+  test("reports a materializer failure after initialization and rolls back", async () => {
     const dir = tempDir();
-    let injected = false;
     const result = await captureErrors(() =>
       runInitWithDependencies(
         dir,
@@ -362,29 +363,35 @@ describe("runInit", () => {
               projectRoot,
               {},
               {
-                fault: (operation, path) => {
-                  if (
-                    !injected &&
-                    operation === "sync-directory" &&
-                    path === join(projectRoot, ".atlante")
-                  ) {
-                    injected = true;
-                    throw new Error("injected publication warning");
-                  }
-                },
+                materializers: [
+                  {
+                    host: "opencode",
+                    materialize: () => ({
+                      diagnostics: [
+                        {
+                          severity: "error",
+                          code: "materialization-collision",
+                          message: "injected materialization failure",
+                        },
+                      ],
+                      writtenPaths: [],
+                      removedPaths: [],
+                    }),
+                  },
+                ],
               },
             ),
         },
       ),
     );
 
-    expect(result.result).toBe(0);
+    expect(result.result).toBe(1);
+    expect(result.errors.join("\n")).toContain("materialization-collision");
     expect(result.errors.join("\n")).toContain(
-      "warning [post-publication-sync-failed]: unable to sync published artifact directory: injected publication warning",
+      "injected materialization failure",
     );
-    expect(
-      existsSync(join(dir, ".atlante", "artifacts", "manifest.json")),
-    ).toBe(true);
+    expect(existsSync(join(dir, "atlante.jsonc"))).toBe(false);
+    expect(existsSync(join(dir, ".opencode"))).toBe(false);
   });
 
   test("rolls back init-managed files when the build reports diagnostics", async () => {
@@ -404,7 +411,6 @@ describe("runInit", () => {
         {
           buildProject: () => ({
             projectRoot: dir,
-            artifactsPath: join(dir, ".atlante", "artifacts"),
             diagnostics: [
               {
                 severity: "error",
@@ -412,7 +418,7 @@ describe("runInit", () => {
                 message: "build failed",
               },
             ],
-            warnings: [],
+            materializations: [],
           }),
         },
       ),
@@ -425,7 +431,7 @@ describe("runInit", () => {
     expect(readFileSync(opencode, "utf8")).toBe(originalOpenCode);
   });
 
-  test("restores init state and existing artifacts after a preparation diagnostic", async () => {
+  test("restores init state and existing native outputs after a preparation diagnostic", async () => {
     const dir = tempDir();
     const target = join(dir, "atlante.jsonc");
     const alternate = join(dir, "atlante.json");
@@ -446,12 +452,13 @@ describe("runInit", () => {
         },
       }),
     );
-    buildProject(dir);
-    const originalManifest = readFileSync(
-      join(dir, ".atlante", "artifacts", "manifest.json"),
+    buildProject(dir, {}, { materializers: [openCodeMaterializer] });
+    const nativeManifest = join(dir, ".atlante", "opencode-native.json");
+    const originalManifest = readFileSync(nativeManifest, "utf8");
+    const originalAgent = readFileSync(
+      join(dir, ".opencode", "agents", "existing.md"),
       "utf8",
     );
-    const originalArtifacts = readArtifacts(dir);
     unlinkSync(target);
     writeFileSync(alternate, originalAlternate);
     writeFileSync(opencode, originalOpenCode);
@@ -463,7 +470,6 @@ describe("runInit", () => {
         {
           buildProject: () => ({
             projectRoot: dir,
-            artifactsPath: join(dir, ".atlante", "artifacts"),
             diagnostics: [
               {
                 severity: "error",
@@ -471,7 +477,7 @@ describe("runInit", () => {
                 message: "injected preparation diagnostic",
               },
             ],
-            warnings: [],
+            materializations: [],
           }),
         },
       ),
@@ -482,10 +488,10 @@ describe("runInit", () => {
     expect(existsSync(target)).toBe(false);
     expect(readFileSync(alternate, "utf8")).toBe(originalAlternate);
     expect(readFileSync(opencode, "utf8")).toBe(originalOpenCode);
+    expect(readFileSync(nativeManifest, "utf8")).toBe(originalManifest);
     expect(
-      readFileSync(join(dir, ".atlante", "artifacts", "manifest.json"), "utf8"),
-    ).toBe(originalManifest);
-    expect(readArtifacts(dir)).toEqual(originalArtifacts);
+      readFileSync(join(dir, ".opencode", "agents", "existing.md"), "utf8"),
+    ).toBe(originalAgent);
   });
 
   test("rolls back before a throwing diagnostic reporter runs", async () => {
@@ -508,11 +514,9 @@ describe("runInit", () => {
         },
       }),
     );
-    buildProject(dir);
-    const originalManifest = readFileSync(
-      join(dir, ".atlante", "artifacts", "manifest.json"),
-      "utf8",
-    );
+    buildProject(dir, {}, { materializers: [openCodeMaterializer] });
+    const nativeManifest = join(dir, ".atlante", "opencode-native.json");
+    const originalManifest = readFileSync(nativeManifest, "utf8");
     unlinkSync(target);
     writeFileSync(alternate, originalAlternate);
     writeFileSync(opencode, originalOpenCode);
@@ -529,7 +533,6 @@ describe("runInit", () => {
           {
             buildProject: () => ({
               projectRoot: dir,
-              artifactsPath: join(dir, ".atlante", "artifacts"),
               diagnostics: [
                 {
                   severity: "error",
@@ -537,7 +540,7 @@ describe("runInit", () => {
                   message: "build failed",
                 },
               ],
-              warnings: [],
+              materializations: [],
             }),
           },
         ),
@@ -549,23 +552,17 @@ describe("runInit", () => {
     expect(existsSync(target)).toBe(false);
     expect(readFileSync(alternate, "utf8")).toBe(originalAlternate);
     expect(readFileSync(opencode, "utf8")).toBe(originalOpenCode);
-    expect(
-      readFileSync(join(dir, ".atlante", "artifacts", "manifest.json"), "utf8"),
-    ).toBe(originalManifest);
-    expect(readArtifacts(dir)).toEqual({
-      agents: [expect.objectContaining({ hostAgentId: "existing" })],
-      skills: [],
-    });
+    expect(readFileSync(nativeManifest, "utf8")).toBe(originalManifest);
   });
 
-  test("preserves the previous artifacts when automatic publication fails", async () => {
+  test("preserves the previous native outputs when materialization fails", async () => {
     const dir = tempDir();
     const target = join(dir, "atlante.jsonc");
     const originalConfig = `{ "$schema": "${SCHEMA_URI}" }`;
     writeFileSync(target, originalConfig);
-    buildProject(dir);
-    const manifestPath = join(dir, ".atlante", "artifacts", "manifest.json");
-    const originalManifest = readFileSync(manifestPath, "utf8");
+    buildProject(dir, {}, { materializers: [openCodeMaterializer] });
+    const nativeManifest = join(dir, ".atlante", "opencode-native.json");
+    const originalManifest = readFileSync(nativeManifest, "utf8");
 
     const result = await captureErrors(() =>
       runInitWithDependencies(
@@ -577,11 +574,22 @@ describe("runInit", () => {
               projectRoot,
               {},
               {
-                fault: (operation) => {
-                  if (operation === "rename-stage") {
-                    throw new Error("injected build publication failure");
-                  }
-                },
+                materializers: [
+                  {
+                    host: "opencode",
+                    materialize: () => ({
+                      diagnostics: [
+                        {
+                          severity: "error",
+                          code: "materialization-publication-failed",
+                          message: "injected build materialization failure",
+                        },
+                      ],
+                      writtenPaths: [],
+                      removedPaths: [],
+                    }),
+                  },
+                ],
               },
             ),
         },
@@ -590,10 +598,10 @@ describe("runInit", () => {
 
     expect(result.result).toBe(1);
     expect(result.errors.join("\n")).toContain(
-      "injected build publication failure",
+      "injected build materialization failure",
     );
     expect(readFileSync(target, "utf8")).toBe(originalConfig);
-    expect(readFileSync(manifestPath, "utf8")).toBe(originalManifest);
+    expect(readFileSync(nativeManifest, "utf8")).toBe(originalManifest);
     expect(existsSync(join(dir, "opencode.jsonc"))).toBe(false);
   });
 
@@ -622,9 +630,9 @@ describe("runInit", () => {
       readFileSync(join(dir, "package.json"), "utf8"),
     ) as Record<string, Record<string, string>>;
     expect(manifest.devDependencies?.[EXTERNAL_PACK]).toBe("1.2.3");
-    expect(
-      existsSync(join(dir, ".atlante", "artifacts", "manifest.json")),
-    ).toBe(true);
+    expect(existsSync(join(dir, ".atlante", "opencode-native.json"))).toBe(
+      true,
+    );
     expect(await runValidate(dir)).toBe(0);
     expect(packManager.runs).toEqual([
       {
@@ -1222,7 +1230,6 @@ describe("runInit", () => {
           runPackageManager: packManager.runner,
           buildProject: () => ({
             projectRoot: dir,
-            artifactsPath: join(dir, ".atlante", "artifacts"),
             diagnostics: [
               {
                 severity: "error",
@@ -1230,7 +1237,7 @@ describe("runInit", () => {
                 message: "build failed",
               },
             ],
-            warnings: [],
+            materializations: [],
           }),
         },
       ),
@@ -1269,7 +1276,6 @@ describe("runInit", () => {
           runPackageManager: packManager.runner,
           buildProject: () => ({
             projectRoot: dir,
-            artifactsPath: join(dir, ".atlante", "artifacts"),
             diagnostics: [
               {
                 severity: "error",
@@ -1277,7 +1283,7 @@ describe("runInit", () => {
                 message: "build failed",
               },
             ],
-            warnings: [],
+            materializations: [],
           }),
         },
       ),
@@ -1311,12 +1317,12 @@ describe("runInit", () => {
     expect(readFileSync(join(dir, "atlante.jsonc"), "utf8")).toContain(
       '"extends": "@atlante/pack"',
     );
-    expect(
-      existsSync(join(dir, ".atlante", "artifacts", "manifest.json")),
-    ).toBe(true);
+    expect(existsSync(join(dir, ".atlante", "opencode-native.json"))).toBe(
+      true,
+    );
   });
 
-  test("rolls back external pack init after a build failure and preserves artifacts", async () => {
+  test("rolls back external pack init after a build failure and preserves native outputs", async () => {
     const dir = tempDirWithoutUserPack();
     externalPackFixture(dir);
     const target = join(dir, "atlante.jsonc");
@@ -1325,11 +1331,9 @@ describe("runInit", () => {
     const originalOpenCode = '{ "model": "demo" }';
     writeFileSync(target, originalConfig);
     writeFileSync(opencode, originalOpenCode);
-    buildProject(dir);
-    const manifest = readFileSync(
-      join(dir, ".atlante", "artifacts", "manifest.json"),
-      "utf8",
-    );
+    buildProject(dir, {}, { materializers: [openCodeMaterializer] });
+    const nativeManifest = join(dir, ".atlante", "opencode-native.json");
+    const originalManifest = readFileSync(nativeManifest, "utf8");
 
     const result = await captureErrors(() =>
       runInitWithDependencies(
@@ -1338,7 +1342,6 @@ describe("runInit", () => {
         {
           buildProject: () => ({
             projectRoot: dir,
-            artifactsPath: join(dir, ".atlante", "artifacts"),
             diagnostics: [
               {
                 severity: "error",
@@ -1346,7 +1349,7 @@ describe("runInit", () => {
                 message: "build failed",
               },
             ],
-            warnings: [],
+            materializations: [],
           }),
         },
       ),
@@ -1355,9 +1358,7 @@ describe("runInit", () => {
     expect(result.result).toBe(1);
     expect(readFileSync(target, "utf8")).toBe(originalConfig);
     expect(readFileSync(opencode, "utf8")).toBe(originalOpenCode);
-    expect(
-      readFileSync(join(dir, ".atlante", "artifacts", "manifest.json"), "utf8"),
-    ).toBe(manifest);
+    expect(readFileSync(nativeManifest, "utf8")).toBe(originalManifest);
   });
 
   test("registers the plugin in opencode.jsonc", async () => {
@@ -1633,7 +1634,10 @@ describe("runInit", () => {
     expect(written.join("\n")).toContain(
       `created ${join(dir, "atlante.jsonc")}`,
     );
-    expect(written.join("\n")).toContain(join(dir, ".atlante", "artifacts"));
+    expect(written.join("\n")).toContain(".opencode/agents/architect.md");
+    expect(existsSync(join(dir, ".atlante", "opencode-native.json"))).toBe(
+      true,
+    );
   });
 
   test("reports that the plugin was already registered, rather than claiming a fresh registration", async () => {

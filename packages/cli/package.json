@@ -35,6 +35,7 @@
     "atlante": "./dist/bin/atlante.js"
   },
   "dependencies": {
+    "@atlante/opencode": "workspace:*",
     "@atlante/pack": "workspace:*",
     "ajv": "^8.17.1",
     "jsonc-parser": "^3.3.1"

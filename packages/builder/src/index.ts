@@ -1,4 +1,3 @@
-import type { PublishOperation } from "@atlante/artifacts";
 import {
   type LoadedProject,
   loadProject,
@@ -8,8 +7,13 @@ import {
 export type {
   BuildDependencies,
   BuildResult,
+  MaterializationSummary,
 } from "./build.js";
 export { assertRealProjectRoot, buildProject } from "./build.js";
+export type {
+  HostMaterializer,
+  MaterializationOutcome,
+} from "./materializer.js";
 export type {
   AgentArtifact,
   PreparedProject,
@@ -23,7 +27,6 @@ export type {
 export { loadProject } from "./project.js";
 export { prepareResolvedDocument } from "./resource-prepare.js";
 export { mergeValues } from "./values.js";
-export type { PublishOperation };
 
 export function validateProject(
   target: string,

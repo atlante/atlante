@@ -137,7 +137,10 @@ test("the built launcher builds a project under Node", () => {
   });
 
   expect(result.status).toBe(0);
-  expect(existsSync(join(dir, ".atlante", "artifacts"))).toBe(true);
+  expect(existsSync(join(dir, ".opencode", "agents", "reviewer.md"))).toBe(
+    true,
+  );
+  expect(existsSync(join(dir, ".atlante", "opencode-native.json"))).toBe(true);
 });
 
 test("the built launcher resolves the first-party pack without a project declaration", () => {
@@ -206,9 +209,7 @@ test("CLI validates and builds local shorthand, selectors, and local extends", a
 
   expect(await runValidate(dir)).toBe(0);
   expect(await runBuild(dir)).toBe(0);
-  expect(existsSync(join(dir, ".atlante", "artifacts", "manifest.json"))).toBe(
-    true,
-  );
+  expect(existsSync(join(dir, ".atlante", "opencode-native.json"))).toBe(true);
 });
 
 test("CLI resolves first-party package resource facets", async () => {
@@ -238,9 +239,7 @@ test("CLI validate and build trust the installed first-party pack without a user
 
   expect(await runValidate(dir)).toBe(0);
   expect(runBuild(dir)).toBe(0);
-  expect(existsSync(join(dir, ".atlante", "artifacts", "manifest.json"))).toBe(
-    true,
-  );
+  expect(existsSync(join(dir, ".atlante", "opencode-native.json"))).toBe(true);
 });
 
 describe("runValidate", () => {
@@ -319,7 +318,7 @@ describe("runValidate", () => {
 });
 
 describe("runBuild", () => {
-  test("builds a valid project and publishes artifacts", async () => {
+  test("builds a valid project and materializes native outputs", async () => {
     const dir = project(valid);
     const written: string[] = [];
     const original = console.log;
@@ -337,7 +336,7 @@ describe("runBuild", () => {
     expect(await runBuild(join(dir, "atlante.jsonc"))).toBe(0);
   });
 
-  test("reports preparation diagnostics and does not publish", async () => {
+  test("reports preparation diagnostics and does not materialize", async () => {
     const dir = project(
       `{ "$schema": "${SCHEMA_URI}", "agents": { "broken": { "description": "{{values.missing}}", "identity": "x", "mission": "y" } } }`,
     );
@@ -349,7 +348,10 @@ describe("runBuild", () => {
     } finally {
       console.error = original;
     }
-    expect(existsSync(join(dir, ".atlante", "artifacts"))).toBe(false);
+    expect(existsSync(join(dir, ".opencode"))).toBe(false);
+    expect(existsSync(join(dir, ".atlante", "opencode-native.json"))).toBe(
+      false,
+    );
     expect(errors.join("\n")).toContain("missing-value");
   });
 });

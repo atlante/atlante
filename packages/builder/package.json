@@ -33,5 +33,8 @@
     "@atlante/resources": "workspace:*",
     "@atlante/schema": "workspace:*",
     "@atlante/validator": "workspace:*"
+  },
+  "devDependencies": {
+    "@atlante/opencode": "workspace:*"
   }
 }

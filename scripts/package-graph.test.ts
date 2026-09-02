@@ -172,11 +172,12 @@ test("keeps the first-party pack as a CLI runtime dependency in source", () => {
   expect(dependencies["@atlante/pack"]).toBe("workspace:*");
 });
 
-// build.ts deliberately documents itself as the only caller of the
+// build.ts once deliberately documented itself as the only caller of the
 // publisher: bypassing it would skip the fail-closed prepare-then-publish
-// ordering. publishArtifacts escaping into a package entry turned that
-// invariant into a convention, so pin it structurally.
-test("keeps publishArtifacts callers pinned to the builder orchestration", () => {
+// ordering. Native materialization replaced the publisher, and nothing in a
+// package source may resurrect `publishArtifacts` (only the @atlante/artifacts
+// implementation itself still names it, until that package is removed).
+test("keeps publishArtifacts out of every package source", () => {
   const offenders: string[] = [];
   for (const name of PACKAGES) {
     if (name === "artifacts") continue; // owns the implementation
@@ -187,9 +188,7 @@ test("keeps publishArtifacts callers pinned to the builder orchestration", () =>
       }
     }
   }
-  expect(offenders).toEqual([
-    join(ROOT, "packages", "builder", "src", "build.ts"),
-  ]);
+  expect(offenders).toEqual([]);
 });
 
 // The artifacts root entry also exports createArtifacts and publishArtifacts;

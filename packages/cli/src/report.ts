@@ -18,21 +18,24 @@ export function printDiagnostics(diagnostics: Diagnostic[]): void {
 }
 
 /**
- * Reports a build result: its diagnostics, and — only when the build
- * succeeded — its publication warnings. Returns whether the build succeeded,
- * so each command can keep its own failure and success handling.
+ * Reports a build result: its diagnostics and — only when the build
+ * succeeded — the per-host materialized paths and the legacy artifact-tree
+ * migration. Returns whether the build succeeded, so each command can keep
+ * its own failure and success handling.
  */
 export function reportBuildResult(
-  built: Pick<BuildResult, "diagnostics" | "warnings">,
+  built: Pick<
+    BuildResult,
+    "diagnostics" | "materializations" | "migratedLegacyArtifacts"
+  >,
 ): boolean {
   printDiagnostics(built.diagnostics);
   if (hasErrors(built.diagnostics)) return false;
-  for (const warning of built.warnings)
-    printDiagnostic({
-      severity: "warning",
-      code: warning.code,
-      message: warning.message,
-      source: diagnosticPath(warning.path),
-    });
+  for (const { host, writtenPaths, removedPaths } of built.materializations) {
+    for (const path of writtenPaths) console.log(`wrote ${host}: ${path}`);
+    for (const path of removedPaths) console.log(`removed ${host}: ${path}`);
+  }
+  if (built.migratedLegacyArtifacts)
+    console.log(`removed ${built.migratedLegacyArtifacts.removedPath}`);
   return true;
 }

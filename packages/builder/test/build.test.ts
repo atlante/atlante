@@ -10,17 +10,21 @@ import {
   realpathSync,
   rmSync,
   symlinkSync,
+  unlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { readArtifacts } from "@atlante/artifacts/read-only";
+import { openCodeMaterializer } from "@atlante/opencode/materialize";
 import { resourceTemplateSelection } from "@atlante/resources";
 import { SCHEMA_URI } from "@atlante/schema";
+import type { Diagnostic } from "@atlante/validator";
 import {
+  type BuildResult,
   buildProject,
-  type PublishOperation,
+  type HostMaterializer,
+  type MaterializationOutcome,
   prepareProject,
   validateProject,
 } from "../src/index.js";
@@ -255,33 +259,146 @@ const oneAgent = (id: string, prompt: string) =>
     },
   });
 
-function privateArtifactEntries(root: string): string[] {
-  if (!existsSync(join(root, ".atlante"))) return [];
-  return readdirSync(join(root, ".atlante")).filter((entry) =>
-    entry.startsWith(".artifacts."),
+type RecordedMaterialization = {
+  projectRoot: string;
+  agents: Array<{ hostAgentId: string; description: string; prompt: string }>;
+  skills: Array<{ skillId: string; description: string; content: string }>;
+};
+
+function fakeMaterializer(
+  outcome: Partial<MaterializationOutcome> = {},
+  host = "opencode",
+): HostMaterializer & { calls: RecordedMaterialization[] } {
+  const calls: RecordedMaterialization[] = [];
+  return {
+    host,
+    calls,
+    materialize(projectRoot, prepared) {
+      calls.push({
+        projectRoot,
+        agents: prepared.agents.map(({ hostAgentId, description, prompt }) => ({
+          hostAgentId,
+          description,
+          prompt,
+        })),
+        skills: prepared.skills.map(({ skillId, description, content }) => ({
+          skillId,
+          description,
+          content,
+        })),
+      });
+      return {
+        diagnostics: outcome.diagnostics ?? [],
+        writtenPaths: outcome.writtenPaths ?? [],
+        removedPaths: outcome.removedPaths ?? [],
+      };
+    },
+  };
+}
+
+function injectedFailure(code: string, message: string): Diagnostic[] {
+  return [{ severity: "error", code, message }];
+}
+
+// ---------------------------------------------------------------------------
+// Handcrafted legacy `.atlante/artifacts` fixtures. They deliberately avoid
+// @atlante/artifacts helpers so the superseded package stays removable.
+// ---------------------------------------------------------------------------
+
+function legacySlug(id: string): string {
+  const folded = id.replace(/[A-Z]/g, (character) =>
+    String.fromCharCode(character.charCodeAt(0) + 32),
+  );
+  const trimmed = folded
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48)
+    .replace(/-+$/, "");
+  return trimmed || "artifact";
+}
+
+type LegacyFixtureEntry = {
+  id: string;
+  description: string;
+  content: string;
+};
+
+function legacyPayloadPath(
+  namespace: "agents" | "skills",
+  id: string,
+  content: string,
+): string {
+  return `${namespace}/${legacySlug(id)}-${digest(id)}-${digest(content)}.md`;
+}
+
+function writeLegacyArtifacts(
+  root: string,
+  options: {
+    agents?: LegacyFixtureEntry[];
+    skills?: LegacyFixtureEntry[];
+    /** Files written below the tree without a manifest entry. */
+    extraFiles?: Array<{ path: string; content: string }>;
+    /** Raw manifest.json replacement for corrupt fixtures. */
+    manifest?: string;
+    omitManifest?: boolean;
+  } = {},
+): { tree: string; manifest: Record<string, unknown> } {
+  const tree = join(root, ".atlante", "artifacts");
+  mkdirSync(tree, { recursive: true });
+  const manifest = {
+    format: "atlante-artifacts",
+    version: 1,
+    agents: [] as Array<Record<string, string>>,
+    skills: [] as Array<Record<string, string>>,
+  };
+  for (const namespace of ["agents", "skills"] as const) {
+    for (const entry of options[namespace] ?? []) {
+      const path = legacyPayloadPath(namespace, entry.id, entry.content);
+      const absolute = join(tree, ...path.split("/"));
+      mkdirSync(dirname(absolute), { recursive: true });
+      writeFileSync(absolute, entry.content);
+      manifest[namespace].push({
+        id: entry.id,
+        description: entry.description,
+        path,
+        sha256: digest(entry.content),
+      });
+    }
+  }
+  if (!options.omitManifest)
+    writeFileSync(
+      join(tree, "manifest.json"),
+      options.manifest ?? `${JSON.stringify(manifest, null, 2)}\n`,
+    );
+  for (const file of options.extraFiles ?? []) {
+    const absolute = join(tree, ...file.path.split("/"));
+    mkdirSync(dirname(absolute), { recursive: true });
+    writeFileSync(absolute, file.content);
+  }
+  return { tree, manifest };
+}
+
+function legacyTreeSnapshot(
+  tree: string,
+): Array<{ path: string; bytes: Buffer }> {
+  const visit = (
+    absolute: string,
+    relative: string,
+  ): Array<{ path: string; bytes: Buffer }> =>
+    readdirSync(absolute, { withFileTypes: true }).flatMap((entry) => {
+      const childAbsolute = join(absolute, entry.name);
+      const childRelative = relative ? `${relative}/${entry.name}` : entry.name;
+      return entry.isDirectory()
+        ? visit(childAbsolute, childRelative)
+        : [{ path: childRelative, bytes: readFileSync(childAbsolute) }];
+    });
+  return visit(tree, "").sort((left, right) =>
+    left.path.localeCompare(right.path),
   );
 }
 
-function artifactTreeBytes(
-  root: string,
-): Array<{ path: string; bytes: Buffer }> {
-  const artifactRoot = join(root, ".atlante", "artifacts");
-  const paths = [
-    "manifest.json",
-    ...["agents", "skills"].flatMap((namespace) =>
-      readdirSync(join(artifactRoot, namespace)).map((file) =>
-        join(namespace, file),
-      ),
-    ),
-  ];
-  return paths.sort().map((path) => ({
-    path,
-    bytes: readFileSync(join(artifactRoot, path)),
-  }));
-}
-
 describe("buildProject", () => {
-  test("rejects a symlinked project target before publishing", () => {
+  test("rejects a symlinked project target before materializing", () => {
     const { root } = project(oneAgent("reviewer", "Review the change."));
     const target = join(root, "linked-project");
     symlinkSync(root, target);
@@ -290,25 +407,134 @@ describe("buildProject", () => {
     expect(existsSync(join(root, ".atlante"))).toBe(false);
   });
 
-  test("publishes exact prepared payloads and a verified manifest", () => {
+  test("fails the build when a declared host has no registered materializer", () => {
     const { root } = project(oneAgent("reviewer", "Review the change."));
-    const prepared = prepareProject(root);
 
     const result = buildProject(root);
+    const withoutMaterializers = buildProject(root, {}, { materializers: [] });
 
-    expect(result.diagnostics).toEqual([]);
-    expect(result.artifactsPath).toBe(join(root, ".atlante", "artifacts"));
-    expect(readArtifacts(root)?.agents[0]).toMatchObject({
-      hostAgentId: "reviewer",
-      description: "reviewer description",
-      prompt: prepared.agents[0]?.prompt,
-    });
-    expect(
-      readFileSync(join(result.artifactsPath, "manifest.json"), "utf8"),
-    ).toContain('"version": 1');
+    for (const built of [result, withoutMaterializers]) {
+      expect(built.diagnostics).toContainEqual(
+        expect.objectContaining({
+          severity: "error",
+          code: "unsupported-host",
+          message: expect.stringContaining("opencode"),
+        }),
+      );
+      expect(built.materializations).toEqual([]);
+    }
+    expect(existsSync(join(root, ".opencode"))).toBe(false);
   });
 
-  test("preserves prior artifacts when a valid resource fails Handlebars rendering", () => {
+  test("runs the registered materializer with the prepared project and reports its outcome", () => {
+    const { root } = project(oneAgent("reviewer", "Review the change."));
+    const materializer = fakeMaterializer({
+      writtenPaths: [".opencode/agents/reviewer.md"],
+      removedPaths: [".opencode/agents/stale.md"],
+    });
+
+    const result = buildProject(root, {}, { materializers: [materializer] });
+
+    expect(result.diagnostics).toEqual([]);
+    expect(materializer.calls).toEqual([
+      {
+        projectRoot: root,
+        agents: [
+          {
+            hostAgentId: "reviewer",
+            description: "reviewer description",
+            prompt: expect.stringContaining("Review the change."),
+          },
+        ],
+        skills: [],
+      },
+    ]);
+    expect(result.materializations).toEqual([
+      {
+        host: "opencode",
+        writtenPaths: [".opencode/agents/reviewer.md"],
+        removedPaths: [".opencode/agents/stale.md"],
+      },
+    ]);
+  });
+
+  test("selects the materializer through an explicit hosts field", () => {
+    const { root } = project(
+      JSON.stringify({
+        $schema: SCHEMA_URI,
+        hosts: ["opencode"],
+        agents: {
+          reviewer: {
+            description: "reviewer description",
+            identity: "Review the change.",
+            mission: "Do the work.",
+          },
+        },
+      }),
+    );
+    const materializer = fakeMaterializer();
+
+    const result = buildProject(root, {}, { materializers: [materializer] });
+
+    expect(result.diagnostics).toEqual([]);
+    expect(materializer.calls).toHaveLength(1);
+    expect(result.materializations.map(({ host }) => host)).toEqual([
+      "opencode",
+    ]);
+  });
+
+  test("merges materializer error diagnostics and fails the build", () => {
+    const { root } = project(oneAgent("reviewer", "Review the change."));
+    const materializer = fakeMaterializer({
+      diagnostics: injectedFailure(
+        "materialization-collision",
+        "unowned file at .opencode/agents/reviewer.md",
+      ),
+    });
+
+    const result = buildProject(root, {}, { materializers: [materializer] });
+
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        severity: "error",
+        code: "materialization-collision",
+      }),
+    );
+    expect(result.materializations).toEqual([
+      { host: "opencode", writtenPaths: [], removedPaths: [] },
+    ]);
+  });
+
+  test("reports no partial materialization when a materializer rolls back", () => {
+    const { root } = project(oneAgent("reviewer", "Review the change."));
+    const target = join(root, ".opencode", "agents", "reviewer.md");
+    const materializer: HostMaterializer = {
+      host: "opencode",
+      materialize: (_projectRoot, prepared) => {
+        mkdirSync(dirname(target), { recursive: true });
+        writeFileSync(target, prepared.agents[0]?.prompt ?? "");
+        // The materializer owns rollback semantics: it removes its staged
+        // write and reports no written paths for the failed publication.
+        rmSync(target, { force: true });
+        return {
+          diagnostics: injectedFailure(
+            "materialization-publication-failed",
+            "publication failed and rolled back",
+          ),
+          writtenPaths: [],
+          removedPaths: [],
+        };
+      },
+    };
+
+    const result = buildProject(root, {}, { materializers: [materializer] });
+
+    expect(result.diagnostics).toHaveLength(1);
+    expect(result.materializations[0]?.writtenPaths).toEqual([]);
+    expect(existsSync(target)).toBe(false);
+  });
+
+  test("keeps previous materialized outputs when a valid resource fails Handlebars rendering", () => {
     const { root } = project(
       JSON.stringify({
         $schema: SCHEMA_URI,
@@ -336,25 +562,21 @@ describe("buildProject", () => {
       },
       "{{identity}}\n{{mission}}\n",
     );
+    const materializer = fakeMaterializer();
 
-    expect(buildProject(root).diagnostics).toEqual([]);
-    const before = artifactTreeBytes(root);
+    expect(
+      buildProject(root, {}, { materializers: [materializer] }).diagnostics,
+    ).toEqual([]);
     writeFileSync(join(root, "agent", "template.md"), "{{#if");
 
     expect(validateProject(root).diagnostics).toEqual([]);
-    const failed = buildProject(root);
+    const failed = buildProject(root, {}, { materializers: [materializer] });
 
     expect(failed.diagnostics).toContainEqual(
       expect.objectContaining({ code: "template-render-failed" }),
     );
     expect(failed.diagnostics[0]?.message).toContain("agent");
-    expect(artifactTreeBytes(root)).toEqual(before);
-    expect(readArtifacts(root)?.agents).toEqual([
-      expect.objectContaining({
-        hostAgentId: "reviewer",
-        prompt: "You review.\nFind defects.\n",
-      }),
-    ]);
+    expect(materializer.calls).toHaveLength(1);
   });
 
   test("validates and builds a custom local template with its relative children and values", () => {
@@ -409,27 +631,42 @@ describe("buildProject", () => {
       },
       "RIGHT {{value}}",
     );
+    const materializer = fakeMaterializer();
 
     const validated = validateProject(root);
-    const built = buildProject(root);
+    const built = buildProject(root, {}, { materializers: [materializer] });
 
     expect(validated.diagnostics).toEqual([]);
     expect(built.diagnostics).toEqual([]);
-    expect(readArtifacts(root)?.agents).toEqual([
-      expect.objectContaining({
+    expect(materializer.calls[0]?.agents).toEqual([
+      {
         hostAgentId: "custom",
         description: "Built for local.",
         prompt: "# Custom\nLEFT localRIGHT right\n",
-      }),
+      },
     ]);
   });
 
-  test("builds a declared external pack into the unchanged artifact contract", () => {
+  test("builds a declared external pack into the same prepared payload as its local equivalent", () => {
     const external = externalPackProject();
     const local = localEquivalentProject();
+    const externalMaterializer = fakeMaterializer();
+    const localMaterializer = fakeMaterializer();
 
-    const externalResult = buildProject(external.root);
-    const localResult = buildProject(local);
+    const externalResult = buildProject(
+      external.root,
+      {},
+      {
+        materializers: [externalMaterializer],
+      },
+    );
+    const localResult = buildProject(
+      local,
+      {},
+      {
+        materializers: [localMaterializer],
+      },
+    );
 
     expect(externalResult.diagnostics).toEqual([]);
     expect(localResult.diagnostics).toEqual([]);
@@ -437,56 +674,29 @@ describe("buildProject", () => {
       canonical: realpathSync(external.packRoot),
       lexical: external.packRoot,
     });
-
-    const expectedManifest = {
-      format: "atlante-artifacts",
-      version: 1,
-      agents: [
-        {
-          id: "reviewer",
-          description: "External reviewer for strict-project.",
-          path: `agents/reviewer-${digest("reviewer")}-${digest(EXTERNAL_AGENT_PROMPT)}.md`,
-          sha256: digest(EXTERNAL_AGENT_PROMPT),
-        },
-      ],
-      skills: [
-        {
-          id: "testing",
-          description: "Strict external testing for strict-project.",
-          path: `skills/testing-${digest("testing")}-${digest(EXTERNAL_SKILL_CONTENT)}.md`,
-          sha256: digest(EXTERNAL_SKILL_CONTENT),
-        },
-      ],
-    };
-
-    expect(
-      JSON.parse(
-        readFileSync(
-          join(external.root, ".atlante", "artifacts", "manifest.json"),
-          "utf8",
-        ),
-      ),
-    ).toEqual(expectedManifest);
-    expect(artifactTreeBytes(external.root)).toEqual(artifactTreeBytes(local));
-    expect(artifactTreeBytes(external.root)).toEqual(
-      [
-        {
-          path: expectedManifest.agents[0]?.path ?? "",
-          bytes: Buffer.from(EXTERNAL_AGENT_PROMPT),
-        },
-        {
-          path: expectedManifest.skills[0]?.path ?? "",
-          bytes: Buffer.from(EXTERNAL_SKILL_CONTENT),
-        },
-        {
-          path: "manifest.json",
-          bytes: Buffer.from(`${JSON.stringify(expectedManifest, null, 2)}\n`),
-        },
-      ].sort((left, right) => left.path.localeCompare(right.path)),
+    expect(externalMaterializer.calls[0]?.agents).toEqual([
+      {
+        hostAgentId: "reviewer",
+        description: "External reviewer for strict-project.",
+        prompt: EXTERNAL_AGENT_PROMPT,
+      },
+    ]);
+    expect(externalMaterializer.calls[0]?.skills).toEqual([
+      {
+        skillId: "testing",
+        description: "Strict external testing for strict-project.",
+        content: EXTERNAL_SKILL_CONTENT,
+      },
+    ]);
+    expect(externalMaterializer.calls[0]?.agents).toEqual(
+      localMaterializer.calls[0]?.agents,
+    );
+    expect(externalMaterializer.calls[0]?.skills).toEqual(
+      localMaterializer.calls[0]?.skills,
     );
   });
 
-  test("does not resurrect a tombstoned global value during build", () => {
+  test("does not run a materializer when preparation reports missing values", () => {
     const { root } = project(
       JSON.stringify({
         $schema: SCHEMA_URI,
@@ -501,8 +711,9 @@ describe("buildProject", () => {
         },
       }),
     );
+    const materializer = fakeMaterializer();
 
-    const result = buildProject(root);
+    const result = buildProject(root, {}, { materializers: [materializer] });
 
     expect(result.diagnostics).toContainEqual(
       expect.objectContaining({
@@ -510,7 +721,8 @@ describe("buildProject", () => {
         path: "/agents/reviewer/identity",
       }),
     );
-    expect(readArtifacts(root)).toBeUndefined();
+    expect(materializer.calls).toEqual([]);
+    expect(result.materializations).toEqual([]);
   });
 
   test("renders the AJV-matching inline branch, including nested arrays", () => {
@@ -626,11 +838,12 @@ describe("buildProject", () => {
         },
         "SECOND {{value}}",
       );
+      const materializer = fakeMaterializer();
 
-      const result = buildProject(root);
+      const result = buildProject(root, {}, { materializers: [materializer] });
 
       expect(result.diagnostics).toEqual([]);
-      expect(readArtifacts(root)?.agents[0]?.prompt).toBe(
+      expect(materializer.calls[0]?.agents[0]?.prompt).toBe(
         `${composition === "allOf" ? "FIRST" : "SECOND"} single FIRST array-firstSECOND array-second`,
       );
     }
@@ -689,10 +902,11 @@ describe("buildProject", () => {
         },
         "{{> slot/choice/payload}}",
       );
+      const materializer = fakeMaterializer();
 
-      const result = buildProject(root);
+      const result = buildProject(root, {}, { materializers: [materializer] });
       expect(result.diagnostics).toEqual([]);
-      const prompt = readArtifacts(root)?.agents[0]?.prompt;
+      const prompt = materializer.calls[0]?.agents[0]?.prompt;
       if (prompt) prompts.push(prompt);
     }
 
@@ -703,11 +917,13 @@ describe("buildProject", () => {
     "selects inline branches inside resolved child templates",
     (testCase) => {
       const root = writeNestedChildProject(testCase);
-      const result = buildProject(root);
+      const materializer = fakeMaterializer();
+
+      const result = buildProject(root, {}, { materializers: [materializer] });
 
       expect(result.diagnostics).toEqual([]);
       const branch = testCase.composition === "allOf" ? "FIRST" : "SECOND";
-      expect(readArtifacts(root)?.agents[0]?.prompt).toBe(
+      expect(materializer.calls[0]?.agents[0]?.prompt).toBe(
         testCase.shape === "object"
           ? `${branch} object-selected`
           : `FIRST array-first${branch} array-second`,
@@ -847,65 +1063,78 @@ describe("buildProject", () => {
       Object.getOwnPropertySymbols(binding.template.facet.inputSchema),
     ).toEqual([]);
 
-    const result = buildProject(root);
+    const materializer = fakeMaterializer();
+    const result = buildProject(root, {}, { materializers: [materializer] });
 
     expect(result.diagnostics).toEqual([]);
-    expect(readArtifacts(root)?.agents[0]?.prompt).toBe("SECOND configured");
+    expect(materializer.calls[0]?.agents[0]?.prompt).toBe("SECOND configured");
   });
 
-  test("produces deterministic bytes on repeated builds", () => {
+  test("materializes deterministic native outputs and rebuilds without rewriting", () => {
     const { root } = project(oneAgent("reviewer", "Review the change."));
+    const materializers = [openCodeMaterializer];
 
-    buildProject(root);
-    const first = [
-      readFileSync(join(root, ".atlante", "artifacts", "manifest.json")),
-      ...readdirSync(join(root, ".atlante", "artifacts", "agents")).map(
-        (file) =>
-          readFileSync(join(root, ".atlante", "artifacts", "agents", file)),
-      ),
-    ];
-    buildProject(root);
-    const second = [
-      readFileSync(join(root, ".atlante", "artifacts", "manifest.json")),
-      ...readdirSync(join(root, ".atlante", "artifacts", "agents")).map(
-        (file) =>
-          readFileSync(join(root, ".atlante", "artifacts", "agents", file)),
-      ),
-    ];
+    const first = buildProject(root, {}, { materializers });
+    const agentPath = join(root, ".opencode", "agents", "reviewer.md");
+    const firstBytes = readFileSync(agentPath);
 
-    expect(second).toEqual(first);
-    expect(privateArtifactEntries(root)).toEqual([]);
+    const second = buildProject(root, {}, { materializers });
+
+    expect(first.diagnostics).toEqual([]);
+    expect(first.materializations).toEqual([
+      {
+        host: "opencode",
+        writtenPaths: [".opencode/agents/reviewer.md"],
+        removedPaths: [],
+      },
+    ]);
+    expect(existsSync(join(root, ".atlante", "opencode-native.json"))).toBe(
+      true,
+    );
+    expect(second.diagnostics).toEqual([]);
+    expect(second.materializations).toEqual([
+      { host: "opencode", writtenPaths: [], removedPaths: [] },
+    ]);
+    expect(readFileSync(agentPath)).toEqual(firstBytes);
   });
 
-  test("publishes an empty valid manifest", () => {
-    const { root } = project(JSON.stringify({ $schema: SCHEMA_URI }));
-
-    const result = buildProject(root);
-
-    expect(result.diagnostics).toEqual([]);
-    expect(readArtifacts(root)).toEqual({ agents: [], skills: [] });
-  });
-
-  test("removes stale payloads on a successful rebuild", () => {
+  test("removes stale native outputs on a successful rebuild", () => {
     const { root } = project(oneAgent("old", "Old prompt."));
-    buildProject(root);
-    expect(readArtifacts(root)?.agents[0]?.hostAgentId).toBe("old");
+    const materializers = [openCodeMaterializer];
+    buildProject(root, {}, { materializers });
+    expect(readdirSync(join(root, ".opencode", "agents"))).toEqual(["old.md"]);
 
     writeFileSync(join(root, "atlante.jsonc"), oneAgent("new", "New prompt."));
-    buildProject(root);
+    const rebuilt = buildProject(root, {}, { materializers });
 
-    expect(
-      readArtifacts(root)?.agents.map((agent) => agent.hostAgentId),
-    ).toEqual(["new"]);
-    expect(
-      readdirSync(join(root, ".atlante", "artifacts", "agents")),
-    ).toHaveLength(1);
+    expect(rebuilt.diagnostics).toEqual([]);
+    expect(readdirSync(join(root, ".opencode", "agents"))).toEqual(["new.md"]);
+    expect(rebuilt.materializations[0]?.removedPaths).toEqual([
+      ".opencode/agents/old.md",
+    ]);
+    expect(rebuilt.materializations[0]?.writtenPaths).toEqual([
+      ".opencode/agents/new.md",
+    ]);
   });
 
-  test("keeps the previous tree when preparation fails", () => {
+  test("materializes an empty prepared project", () => {
+    const { root } = project(JSON.stringify({ $schema: SCHEMA_URI }));
+    const materializer = fakeMaterializer();
+
+    const result = buildProject(root, {}, { materializers: [materializer] });
+
+    expect(result.diagnostics).toEqual([]);
+    expect(materializer.calls).toEqual([
+      { projectRoot: root, agents: [], skills: [] },
+    ]);
+  });
+
+  test("keeps previous materialized outputs when preparation fails", () => {
     const { root } = project(oneAgent("reviewer", "Good prompt."));
-    buildProject(root);
-    const before = artifactTreeBytes(root);
+    const materializers = [openCodeMaterializer];
+    buildProject(root, {}, { materializers });
+    const manifestPath = join(root, ".atlante", "opencode-native.json");
+    const before = readFileSync(manifestPath);
 
     writeFileSync(
       join(root, "atlante.jsonc"),
@@ -920,14 +1149,14 @@ describe("buildProject", () => {
         },
       }),
     );
-    const result = buildProject(root);
+    const result = buildProject(root, {}, { materializers });
 
     expect(result.diagnostics[0]?.code).toBe("missing-value");
-    expect(artifactTreeBytes(root)).toEqual(before);
-    expect(privateArtifactEntries(root)).toEqual([]);
+    expect(result.materializations).toEqual([]);
+    expect(readFileSync(manifestPath)).toEqual(before);
   });
 
-  test("keeps the last complete tree when an external package fails", () => {
+  test("keeps previous materialized outputs when an external package fails", () => {
     const { root } = project(
       JSON.stringify({ $schema: SCHEMA_URI, extends: "review-pack" }),
     );
@@ -975,10 +1204,10 @@ describe("buildProject", () => {
       })}\n`,
     );
     writeFileSync(join(agent, "template.md"), "{{identity}}\n");
+    const materializer = fakeMaterializer();
 
-    const first = buildProject(root);
+    const first = buildProject(root, {}, { materializers: [materializer] });
     expect(first.diagnostics).toEqual([]);
-    const before = artifactTreeBytes(root);
     expect(first.resourceWatch?.trustedRoots).toContainEqual({
       canonical: realpathSync(packageRoot),
       lexical: packageRoot,
@@ -992,7 +1221,7 @@ describe("buildProject", () => {
         atlante: { format: 2 },
       })}\n`,
     );
-    const failed = buildProject(root);
+    const failed = buildProject(root, {}, { materializers: [materializer] });
 
     expect(failed.diagnostics).toContainEqual(
       expect.objectContaining({ code: "unsupported-pack-format" }),
@@ -1000,272 +1229,338 @@ describe("buildProject", () => {
     const prepared = prepareProject(root);
     expect(prepared.agents).toEqual([]);
     expect(prepared.skills).toEqual([]);
-    expect(artifactTreeBytes(root)).toEqual(before);
-    expect(privateArtifactEntries(root)).toEqual([]);
+    expect(materializer.calls).toHaveLength(1);
   });
 
-  test.each([
-    "create-directory",
-    "write-manifest",
-    "sync-file",
-    "sync-directory",
-    "write-payload",
-    "rename-stage",
-    "rename-backup",
-  ] as PublishOperation[])(
-    "restores the previous tree after %s failure",
-    (operation) => {
-      const { root } = project(oneAgent("reviewer", "Original prompt."));
-      buildProject(root);
-      const before = readArtifacts(root);
-      let injected = false;
+  test("surfaces a real materializer collision as a failed build", () => {
+    const { root } = project(oneAgent("reviewer", "Review the change."));
+    const agentDirectory = join(root, ".opencode", "agents");
+    mkdirSync(agentDirectory, { recursive: true });
+    writeFileSync(join(agentDirectory, "reviewer.md"), "user-authored\n");
 
-      writeFileSync(
-        join(root, "atlante.jsonc"),
-        oneAgent("replacement", "New prompt."),
-      );
-      expect(() =>
-        buildProject(
-          root,
-          {},
-          {
-            fault: (current) => {
-              if (!injected && current === operation) {
-                injected = true;
-                throw new Error(`injected ${operation} failure`);
-              }
-            },
-          },
-        ),
-      ).toThrow(`injected ${operation} failure`);
+    const result = buildProject(
+      root,
+      {},
+      {
+        materializers: [openCodeMaterializer],
+      },
+    );
 
-      expect(readArtifacts(root)).toEqual(before);
-      expect(privateArtifactEntries(root)).toEqual([]);
-    },
-  );
+    expect(result.diagnostics).toHaveLength(1);
+    expect(result.diagnostics[0]).toMatchObject({
+      severity: "error",
+      code: "materialization-collision",
+    });
+    expect(readFileSync(join(agentDirectory, "reviewer.md"), "utf8")).toBe(
+      "user-authored\n",
+    );
+    expect(existsSync(join(root, ".atlante", "opencode-native.json"))).toBe(
+      false,
+    );
+  });
+});
 
-  test("reports stage cleanup failures without invalidating the previous tree", () => {
-    const { root } = project(oneAgent("reviewer", "Original prompt."));
-    buildProject(root);
-    let thrown: unknown;
-
-    try {
-      buildProject(
-        root,
-        {},
+describe("legacy artifact-tree migration", () => {
+  test("removes a manifest-valid legacy tree after successful materialization", () => {
+    const { root } = project(oneAgent("reviewer", "Review the change."));
+    const { tree } = writeLegacyArtifacts(root, {
+      agents: [
         {
-          fault: (operation) => {
-            if (operation === "write-manifest") {
-              throw new Error("injected publication failure");
-            }
-            if (operation === "cleanup-stage") {
-              throw new Error("injected cleanup-stage failure");
-            }
-          },
+          id: "architect",
+          description: "Legacy architect",
+          content: "Legacy prompt.\n",
         },
-      );
-    } catch (error) {
-      thrown = error;
-    }
-
-    expect(thrown).toMatchObject({
-      name: "ArtifactPublicationError",
-      recoverability: "no-previous-tree",
-      cleanupErrors: [
-        expect.objectContaining({ message: "injected cleanup-stage failure" }),
+      ],
+      skills: [
+        {
+          id: "plan",
+          description: "Legacy plan skill",
+          content: "Legacy plan.\n",
+        },
       ],
     });
-    expect((thrown as Error).message).toContain(
-      "cleanup failed: injected cleanup-stage failure",
-    );
-    expect(readArtifacts(root)?.agents[0]?.hostAgentId).toBe("reviewer");
-    expect(privateArtifactEntries(root)).toHaveLength(1);
-  });
+    const materializer = fakeMaterializer();
 
-  test("keeps the backup when restoring after a persistent stage rename failure fails", () => {
-    const { root } = project(oneAgent("reviewer", "Original prompt."));
-    buildProject(root);
-    writeFileSync(
-      join(root, "atlante.jsonc"),
-      oneAgent("replacement", "New prompt."),
-    );
+    const result = buildProject(root, {}, { materializers: [materializer] });
 
-    let stageAttempts = 0;
-    let restoreAttempts = 0;
-    let thrown: unknown;
-    try {
-      buildProject(
-        root,
-        {},
-        {
-          fault: (operation) => {
-            if (operation === "rename-stage") {
-              stageAttempts += 1;
-              throw new Error(
-                `persistent stage rename failure ${stageAttempts}`,
-              );
-            }
-            if (operation === "restore-backup") {
-              restoreAttempts += 1;
-              throw new Error(`restore failure ${restoreAttempts}`);
-            }
-          },
-        },
-      );
-    } catch (error) {
-      thrown = error;
-    }
-
-    expect(thrown).toMatchObject({
-      name: "ArtifactPublicationError",
-      recoverability: "backup-preserved",
+    expect(result.diagnostics).toEqual([]);
+    expect(result.migratedLegacyArtifacts).toEqual({
+      removedPath: join(root, ".atlante", "artifacts"),
     });
-    const backupPath = (thrown as { backupPath?: string }).backupPath;
-    if (!backupPath)
-      throw new Error("publication error did not preserve backup path");
-    expect(backupPath && existsSync(backupPath)).toBe(true);
-    expect(
-      backupPath && readFileSync(join(backupPath, "manifest.json"), "utf8"),
-    ).toContain('"reviewer"');
-    expect(existsSync(join(root, ".atlante", "artifacts"))).toBe(false);
-    expect(privateArtifactEntries(root)).toContain(
-      backupPath.substring(backupPath.lastIndexOf("/") + 1),
-    );
+    expect(existsSync(tree)).toBe(false);
+    expect(existsSync(join(root, ".atlante"))).toBe(true);
+    expect(materializer.calls).toHaveLength(1);
   });
 
-  test("publishes with a warning when post-swap directory sync fails", () => {
-    const { root } = project(oneAgent("reviewer", "Original prompt."));
-    buildProject(root);
-    writeFileSync(
-      join(root, "atlante.jsonc"),
-      oneAgent("replacement", "New prompt."),
-    );
-    let injected = false;
+  test("reports no migration when no legacy tree exists", () => {
+    const { root } = project(oneAgent("reviewer", "Review the change."));
+    const materializer = fakeMaterializer();
 
-    const result = buildProject(
-      root,
-      {},
-      {
-        fault: (operation, path) => {
-          if (
-            !injected &&
-            operation === "sync-directory" &&
-            path === join(root, ".atlante")
-          ) {
-            injected = true;
-            throw new Error("injected post-swap sync failure");
-          }
-        },
-      },
-    );
+    const result = buildProject(root, {}, { materializers: [materializer] });
 
-    expect(result.warnings).toEqual([
+    expect(result.diagnostics).toEqual([]);
+    expect(result.migratedLegacyArtifacts).toBeUndefined();
+  });
+
+  test("blocks the build before any materialization when manifest.json is missing", () => {
+    const { root } = project(oneAgent("reviewer", "Review the change."));
+    const { tree } = writeLegacyArtifacts(root, {
+      agents: [
+        { id: "architect", description: "Legacy", content: "Legacy.\n" },
+      ],
+      omitManifest: true,
+    });
+    const before = legacyTreeSnapshot(tree);
+    const materializer = fakeMaterializer();
+
+    const result = buildProject(root, {}, { materializers: [materializer] });
+
+    expect(result.diagnostics).toContainEqual(
       expect.objectContaining({
-        code: "post-publication-sync-failed",
-        path: join(root, ".atlante"),
+        severity: "error",
+        code: "artifact-migration-blocked",
+        message: expect.stringContaining("manifest.json"),
       }),
-    ]);
-    expect(readArtifacts(root)?.agents[0]?.hostAgentId).toBe("replacement");
-    expect(privateArtifactEntries(root)).toEqual([]);
+    );
+    expect(result.materializations).toEqual([]);
+    expect(materializer.calls).toEqual([]);
+    expect(legacyTreeSnapshot(tree)).toEqual(before);
   });
 
-  test("publishes with a warning and preserves the backup after persistent cleanup failure", () => {
-    const { root } = project(oneAgent("reviewer", "Original prompt."));
-    buildProject(root);
-    writeFileSync(
-      join(root, "atlante.jsonc"),
-      oneAgent("replacement", "New prompt."),
-    );
-    let injected = false;
+  test("blocks the build on a file the manifest does not declare", () => {
+    const { root } = project(oneAgent("reviewer", "Review the change."));
+    const { tree } = writeLegacyArtifacts(root, {
+      agents: [
+        { id: "architect", description: "Legacy", content: "Legacy.\n" },
+      ],
+      extraFiles: [{ path: "notes.txt", content: "unmanifested\n" }],
+    });
+    const before = legacyTreeSnapshot(tree);
+    const materializer = fakeMaterializer();
 
-    const result = buildProject(
+    const result = buildProject(root, {}, { materializers: [materializer] });
+
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        severity: "error",
+        code: "artifact-migration-blocked",
+        message: expect.stringContaining("notes.txt"),
+      }),
+    );
+    expect(result.diagnostics[0]?.next).toContain("manually");
+    expect(materializer.calls).toEqual([]);
+    expect(legacyTreeSnapshot(tree)).toEqual(before);
+  });
+
+  test("blocks the build on an unparseable manifest", () => {
+    const { root } = project(oneAgent("reviewer", "Review the change."));
+    const { tree } = writeLegacyArtifacts(root, {
+      manifest: "{ not json",
+    });
+    const before = legacyTreeSnapshot(tree);
+    const materializer = fakeMaterializer();
+
+    const result = buildProject(root, {}, { materializers: [materializer] });
+
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        severity: "error",
+        code: "artifact-migration-blocked",
+        message: expect.stringContaining("manifest.json"),
+      }),
+    );
+    expect(materializer.calls).toEqual([]);
+    expect(legacyTreeSnapshot(tree)).toEqual(before);
+  });
+
+  test("blocks the build on an unsupported manifest format", () => {
+    const { root } = project(oneAgent("reviewer", "Review the change."));
+    const { tree } = writeLegacyArtifacts(root, {
+      manifest: `${JSON.stringify({
+        format: "other-format",
+        version: 1,
+        agents: [],
+        skills: [],
+      })}\n`,
+    });
+    const materializer = fakeMaterializer();
+
+    const result = buildProject(root, {}, { materializers: [materializer] });
+
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        severity: "error",
+        code: "artifact-migration-blocked",
+      }),
+    );
+    expect(materializer.calls).toEqual([]);
+    expect(existsSync(tree)).toBe(true);
+  });
+
+  test("blocks the build on a manifest entry with an invalid digest", () => {
+    const { root } = project(oneAgent("reviewer", "Review the change."));
+    const { tree } = writeLegacyArtifacts(root, {
+      manifest: `${JSON.stringify({
+        format: "atlante-artifacts",
+        version: 1,
+        agents: [
+          {
+            id: "architect",
+            description: "Legacy",
+            path: "agents/architect.md",
+            sha256: "NOT-A-DIGEST",
+          },
+        ],
+        skills: [],
+      })}\n`,
+    });
+    const materializer = fakeMaterializer();
+
+    const result = buildProject(root, {}, { materializers: [materializer] });
+
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        severity: "error",
+        code: "artifact-migration-blocked",
+      }),
+    );
+    expect(materializer.calls).toEqual([]);
+    expect(existsSync(tree)).toBe(true);
+  });
+
+  test("blocks the build when a declared payload is missing", () => {
+    const { root } = project(oneAgent("reviewer", "Review the change."));
+    const { tree, manifest } = writeLegacyArtifacts(root, {
+      agents: [
+        { id: "architect", description: "Legacy", content: "Legacy.\n" },
+      ],
+    });
+    const declaredPath = manifest.agents[0]?.path;
+    if (typeof declaredPath !== "string")
+      throw new Error("fixture manifest has no agent path");
+    rmSync(join(tree, ...declaredPath.split("/")));
+    const materializer = fakeMaterializer();
+
+    const result = buildProject(root, {}, { materializers: [materializer] });
+
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        severity: "error",
+        code: "artifact-migration-blocked",
+        message: expect.stringContaining(declaredPath),
+      }),
+    );
+    expect(materializer.calls).toEqual([]);
+    expect(existsSync(tree)).toBe(true);
+  });
+
+  test("blocks the build on a symlinked legacy payload", () => {
+    const { root } = project(oneAgent("reviewer", "Review the change."));
+    const fixture = writeLegacyArtifacts(root, {
+      agents: [
+        { id: "architect", description: "Legacy", content: "Legacy.\n" },
+      ],
+    });
+    const declaredPath = fixture.manifest.agents[0]?.path;
+    if (typeof declaredPath !== "string")
+      throw new Error("fixture manifest has no agent path");
+    const { tree } = fixture;
+    unlinkSync(join(tree, ...declaredPath.split("/")));
+    symlinkSync(
+      join(root, "payload-target"),
+      join(tree, ...declaredPath.split("/")),
+    );
+    const materializer = fakeMaterializer();
+
+    const result = buildProject(root, {}, { materializers: [materializer] });
+
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        severity: "error",
+        code: "artifact-migration-blocked",
+        message: expect.stringContaining("symlink"),
+      }),
+    );
+    expect(materializer.calls).toEqual([]);
+    expect(existsSync(tree)).toBe(true);
+  });
+
+  test("keeps the legacy tree when a materializer fails", () => {
+    const { root } = project(oneAgent("reviewer", "Review the change."));
+    const { tree } = writeLegacyArtifacts(root, {
+      agents: [
+        { id: "architect", description: "Legacy", content: "Legacy.\n" },
+      ],
+    });
+    const before = legacyTreeSnapshot(tree);
+    const materializer = fakeMaterializer({
+      diagnostics: injectedFailure(
+        "materialization-collision",
+        "unowned file at .opencode/agents/reviewer.md",
+      ),
+    });
+
+    const result = buildProject(root, {}, { materializers: [materializer] });
+
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({ code: "materialization-collision" }),
+    );
+    expect(result.migratedLegacyArtifacts).toBeUndefined();
+    expect(legacyTreeSnapshot(tree)).toEqual(before);
+  });
+
+  test("keeps the legacy tree when a payload changes during materialization", () => {
+    const { root } = project(oneAgent("reviewer", "Review the change."));
+    const { tree, manifest } = writeLegacyArtifacts(root, {
+      agents: [
+        { id: "architect", description: "Legacy", content: "Legacy.\n" },
+      ],
+    });
+    const declaredPath = manifest.agents[0]?.path;
+    if (typeof declaredPath !== "string")
+      throw new Error("fixture manifest has no agent path");
+    const payloadPath = join(tree, ...declaredPath.split("/"));
+    const materializer: HostMaterializer = {
+      host: "opencode",
+      materialize: () => {
+        writeFileSync(payloadPath, "changed concurrently\n");
+        return { diagnostics: [], writtenPaths: [], removedPaths: [] };
+      },
+    };
+
+    const result = buildProject(root, {}, { materializers: [materializer] });
+
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        severity: "error",
+        code: "artifact-migration-blocked",
+        message: expect.stringContaining(declaredPath),
+      }),
+    );
+    expect(result.migratedLegacyArtifacts).toBeUndefined();
+    expect(existsSync(tree)).toBe(true);
+    expect(readFileSync(payloadPath, "utf8")).toBe("changed concurrently\n");
+  });
+});
+
+// The BuildResult shape the CLI reports on.
+describe("BuildResult shape", () => {
+  test("carries projectRoot, resourceWatch, diagnostics, and materializations", () => {
+    const { root } = project(oneAgent("reviewer", "Review the change."));
+    const materializer = fakeMaterializer();
+
+    const result: BuildResult = buildProject(
       root,
       {},
       {
-        fault: (operation) => {
-          if (operation === "cleanup-backup") {
-            injected = true;
-            throw new Error("injected backup cleanup failure");
-          }
-        },
+        materializers: [materializer],
       },
     );
 
-    expect(injected).toBe(true);
-    expect(result.warnings).toEqual([
-      expect.objectContaining({ code: "backup-cleanup-failed" }),
-    ]);
-    expect(readArtifacts(root)?.agents[0]?.hostAgentId).toBe("replacement");
-    expect(privateArtifactEntries(root)).toHaveLength(1);
-  });
-
-  test("does not create a usable tree when publication fails without a previous tree", () => {
-    const { root } = project(oneAgent("reviewer", "New prompt."));
-
-    expect(() =>
-      buildProject(
-        root,
-        {},
-        {
-          fault: (operation) => {
-            if (operation === "rename-stage") {
-              throw new Error("injected stage rename failure");
-            }
-          },
-        },
-      ),
-    ).toThrow("injected stage rename failure");
-
-    expect(existsSync(join(root, ".atlante", "artifacts"))).toBe(false);
-    expect(privateArtifactEntries(root)).toEqual([]);
-  });
-
-  test("permits the no-tree visibility window during a live swap", () => {
-    const { root } = project(oneAgent("reviewer", "Original prompt."));
-    buildProject(root);
-    writeFileSync(
-      join(root, "atlante.jsonc"),
-      oneAgent("replacement", "New prompt."),
-    );
-    let observed: ReturnType<typeof readArtifacts>;
-
-    expect(() =>
-      buildProject(
-        root,
-        {},
-        {
-          fault: (operation) => {
-            if (operation === "rename-stage") {
-              observed = readArtifacts(root);
-              throw new Error("stop during permitted no-tree window");
-            }
-          },
-        },
-      ),
-    ).toThrow("stop during permitted no-tree window");
-
-    expect(observed).toBeUndefined();
-    expect(readArtifacts(root)?.agents[0]?.hostAgentId).toBe("reviewer");
-  });
-
-  test("rejects a symlinked .atlante directory before staging", () => {
-    const { root } = project(oneAgent("reviewer", "Prompt."));
-    const metadataTarget = join(root, "metadata-target");
-    mkdirSync(metadataTarget);
-    symlinkSync(metadataTarget, join(root, ".atlante"));
-
-    expect(() => buildProject(root)).toThrow(".atlante");
-    expect(readdirSync(metadataTarget)).toEqual([]);
-    expect(privateArtifactEntries(root)).toEqual([]);
-  });
-
-  test("rejects a non-directory .atlante path before staging", () => {
-    const { root } = project(oneAgent("reviewer", "Prompt."));
-    writeFileSync(join(root, ".atlante"), "not a directory");
-
-    expect(() => buildProject(root)).toThrow(".atlante");
-    expect(readFileSync(join(root, ".atlante"), "utf8")).toBe(
-      "not a directory",
-    );
+    expect(result.projectRoot).toBe(root);
+    expect(result.diagnostics).toEqual([]);
+    expect(result.materializations).toHaveLength(1);
+    expect(result).not.toHaveProperty("artifactsPath");
+    expect(result).not.toHaveProperty("warnings");
   });
 });
