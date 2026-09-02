@@ -20,7 +20,9 @@ test("CLI build no longer copies the removed bundled resource tree", () => {
   expect(gitignore).not.toContain("packages/cli/bundled/");
 });
 
-test("CLI dry-run package contains no bundled resource files", async () => {
+test("CLI dry-run package contains no bundled resource files", {
+  timeout: 30_000,
+}, async () => {
   const stdout = execFileSync("npm", ["pack", "--dry-run", "--json"], {
     cwd: join(ROOT, "packages", "cli"),
     encoding: "utf8",

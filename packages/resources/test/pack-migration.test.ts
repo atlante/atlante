@@ -52,6 +52,7 @@ const expectedPackFiles = [
   "build/instance.jsonc",
   "gotchas/template.jsonc",
   "gotchas/template.md",
+  "harness/instance.jsonc",
   "instructions/template.jsonc",
   "instructions/template.md",
   "invariants/template.jsonc",
@@ -59,6 +60,10 @@ const expectedPackFiles = [
   "markdown/template.jsonc",
   "markdown/template.md",
   "plan/instance.jsonc",
+  "references/template.jsonc",
+  "references/template.md",
+  "responsibilities/template.jsonc",
+  "responsibilities/template.md",
   "review/instance.jsonc",
   "skill/template.jsonc",
   "skill/template.md",
@@ -68,6 +73,7 @@ const expectedPackFiles = [
   "test/architect.test.ts",
   "test/brainstorm.test.ts",
   "test/build.test.ts",
+  "test/harness.test.ts",
   "test/normative-language.test.ts",
   "test/plan.test.ts",
   "test/preset.test.ts",
@@ -216,6 +222,7 @@ describe("first-party package resolution", () => {
     expect(Object.keys(document.bindings.skills).sort()).toEqual([
       "brainstorm",
       "build",
+      "harness",
       "plan",
       "review",
     ]);
@@ -485,22 +492,26 @@ describe("first-party section semantics", () => {
   });
 
   test("keeps responsibilities, instructions, and gotchas semantically separate", () => {
-    const agentSchema = readJson(join(packRoot, "agent", "template.jsonc"));
-    const properties = agentSchema.properties as Record<string, unknown>;
-    const branches = (
-      properties.sections as {
-        items: { oneOf: Array<{ properties?: Record<string, unknown> }> };
-      }
-    ).items.oneOf;
-    const responsibilities = properties.responsibilities as {
-      description?: string;
-    };
+    const sectionBranches = (name: string) =>
+      (
+        readJson(join(packRoot, name, "template.jsonc")).properties as {
+          sections: {
+            items: { oneOf: Array<{ properties?: Record<string, unknown> }> };
+          };
+        }
+      ).sections.items.oneOf.flatMap((branch) =>
+        Object.keys(branch.properties ?? {}),
+      );
 
-    expect(responsibilities).toBeDefined();
-    expect(responsibilities.description).toContain("outcomes");
-    expect(responsibilities.description).toContain("not for behavioral limits");
-    expect(branches.some((branch) => branch.properties?.responsibilities)).toBe(
-      false,
+    for (const surface of ["agent", "skill"]) {
+      expect(sectionBranches(surface)).toContain("responsibilities");
+      expect(
+        readJson(join(packRoot, surface, "template.jsonc")).properties,
+      ).not.toHaveProperty("responsibilities");
+    }
+    expect(sectionDescription("responsibilities")).toContain("outcomes");
+    expect(sectionDescription("responsibilities")).toContain(
+      "not for behavioral limits",
     );
     expect(sectionDescription("instructions")).toContain("ordered instruction");
     expect(sectionDescription("gotchas")).toContain("situational");

@@ -21,6 +21,9 @@
     },
     "review": {
       "$instance": "@atlante/pack/review"
+    },
+    "harness": {
+      "$instance": "@atlante/pack/harness"
     }
   }
 }

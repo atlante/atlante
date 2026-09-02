@@ -23,6 +23,15 @@
             "additionalProperties": false
           },
           {
+            "properties": {
+              "responsibilities": {
+                "template": "@atlante/pack/responsibilities"
+              }
+            },
+            "required": ["responsibilities"],
+            "additionalProperties": false
+          },
+          {
             "properties": { "gotchas": { "template": "@atlante/pack/gotchas" } },
             "required": ["gotchas"],
             "additionalProperties": false
@@ -37,6 +46,13 @@
               "invariants": { "template": "@atlante/pack/invariants" }
             },
             "required": ["invariants"],
+            "additionalProperties": false
+          },
+          {
+            "properties": {
+              "references": { "template": "@atlante/pack/references" }
+            },
+            "required": ["references"],
             "additionalProperties": false
           }
         ]

@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Positive, ongoing outcomes owned throughout the work. Use responsibilities for what must be accomplished, not for behavioral limits; behavioral limits and approval gates belong in invariants. Do not duplicate requirements across sections.",
+  "type": "array",
+  "items": { "type": "string", "minLength": 1 },
+  "minItems": 1
+}

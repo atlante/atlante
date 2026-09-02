@@ -15,6 +15,7 @@ const firstPartyPackRoot = fileURLToPath(
 const phaseSkillTitles: Record<string, string> = {
   brainstorm: "# Brainstorm",
   build: "# Build",
+  harness: "# Harness",
   plan: "# Plan",
   review: "# Review",
 };
@@ -50,7 +51,7 @@ function firstPartyProject(): string {
 }
 
 describe("first-party pack integration", () => {
-  test("builds the preset and the verified reader loads the one agent and four skills", () => {
+  test("builds the preset and the verified reader loads the one agent and five skills", () => {
     const root = firstPartyProject();
 
     const built = buildProject(root);
@@ -65,6 +66,7 @@ describe("first-party pack integration", () => {
     expect(artifacts.skills.map(({ skillId }) => skillId).sort()).toEqual([
       "brainstorm",
       "build",
+      "harness",
       "plan",
       "review",
     ]);

@@ -1,0 +1,62 @@
+{
+  "$template": "@atlante/pack/skill",
+  "description": "Use when initializing, configuring, validating, building, troubleshooting, or improving an Atlante harness.",
+  "title": "Harness",
+  "overview": "Operate an Atlante harness with evidence: initialize and configure it from repository facts, run harness-related delivery alongside the active workflow phases, and route observed friction into a separately approved improvement cycle. This is a stewardship capability, not a workflow phase. Using this skill effectively requires web access: Atlante concepts, document structure, and configuration semantics are supplied on demand through the references below rather than restated here.",
+  "sections": [
+    {
+      "responsibilities": [
+        "Atlante concepts and document structure, including the source-versus-generated boundary — **Permanent policy**",
+        "Choosing suitable first-party, local, or package resources without inventing unavailable ones — **Permanent policy**",
+        "Recognizing recurring workflow friction and proposing a separately approved harness-improvement cycle — **Permanent policy**",
+        "Initializing Atlante and creating or updating `atlante.jsonc` from repository evidence — **Provisional mechanics**",
+        "Running validation and build or materialization commands and interpreting common diagnostics — **Provisional mechanics**",
+        "Integrating and troubleshooting the OpenCode adapter from repository evidence — **Provisional mechanics**"
+      ]
+    },
+    {
+      "instructions": [
+        "Before recommending commands, keys, locators, or resources, verify them against the installed Atlante version and capabilities, the current source configuration, and installed packs; distinguish verified recommendations from unverified suggestions, and report plainly anything that cannot be established.",
+        "Treat the CLI as the universal cold-start bootstrap path: bootstrap guidance starts from the CLI, since an Atlante-materialized skill becomes available only after the harness and host expose it.",
+        "Inspect repository structure, conventions, existing resources, project instructions, and desired workflows before recommending configuration; explain suitable choices and help the developer define the initialization or configuration task to approve.",
+        "Validate, build, and materialize through capabilities verified from the project, reporting diagnostics truthfully.",
+        "Preserve the phase boundaries and workflow invariants already in force, and record material harness friction without expanding the current task.",
+        "Turn observed workflow friction into an evidence-based suggestion that names the expected benefit and the affected configuration or resources.",
+        "Run an accepted harness improvement as its own workflow cycle using the normal adaptive brainstorm, plan, build, review, approval, and validation policy; an improvement stays a suggestion until its own cycle is approved.",
+        "Keep permanent policy authoritative and command-level mechanics provisional: mechanics are the first content shed when verified deterministic tools (such as a future Atlante MCP server) provide the same operations, and exact tool schemas, effects, and diagnostics belong in tool descriptions rather than in this skill."
+      ]
+    },
+    {
+      "invariants": [
+        "MUST NOT direct edits to generated artifacts; direct all changes to authoritative source configuration and reproduce generated output through validated build or materialization.",
+        "MUST NOT invent unavailable resources, configuration keys, commands, tool capabilities, or host behavior; report what is verified and what is unavailable.",
+        "MUST obtain explicit developer approval before changing the harness or expanding an unrelated task into harness work, and MUST run an accepted improvement as its own delivery cycle.",
+        "MUST NOT report an initialization, validation, build, or materialization outcome without command or tool evidence for it."
+      ]
+    },
+    {
+      "references": [
+        {
+          "name": "Documentation root",
+          "location": "https://docs.atlante.sh",
+          "readWhen": "Orienting in Atlante's product documentation."
+        },
+        {
+          "name": "Getting-started guide",
+          "location": "https://docs.atlante.sh/getting-started",
+          "readWhen": "Setting up or re-initializing a project harness."
+        },
+        {
+          "name": "Specification",
+          "location": "https://github.com/atlante/atlante/blob/main/SPECIFICATION.md",
+          "readWhen": "Orienting in Atlante concepts, document structure, and configuration semantics."
+        },
+        {
+          "name": "JSON Schema",
+          "location": "https://atlante.sh/schema/v0.1/schema.json",
+          "readWhen": "Authoring or validating atlante.jsonc."
+        }
+      ]
+    }
+  ]
+}

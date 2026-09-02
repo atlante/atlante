@@ -13,6 +13,7 @@ import {
 } from "./selection-fixture.js";
 
 const phaseSkills = ["brainstorm", "plan", "build", "review"] as const;
+const normativeSkills = [...phaseSkills, "harness"] as const;
 const normativeKeyword = /\b(MUST|SHOULD|MAY)\b/;
 const gateKeyword = /\bMUST( NOT)?\b/;
 const weakProhibitionForm = /\b(?:never|do not)\b/gi;
@@ -34,6 +35,10 @@ const gateLandmarks: Record<string, readonly string[]> = {
   review: [
     "MUST NOT intentionally modify reviewed source, configuration, or tests",
     "failed required check MUST make the verdict `BLOCKED`",
+  ],
+  harness: [
+    "MUST NOT direct edits to generated artifacts",
+    "MUST obtain explicit developer approval before changing the harness or expanding an unrelated task into harness work",
   ],
 };
 
@@ -65,8 +70,8 @@ function instanceDescription(locator: string): string {
 describe("normative authoring convention", () => {
   afterEach(cleanupPackResourceFixtures);
 
-  describe("phase skill instances", () => {
-    test.each(phaseSkills)("%s states every invariant as a gate", (id) => {
+  describe("first-party skill instances", () => {
+    test.each(normativeSkills)("%s states every invariant as a gate", (id) => {
       const skill = resolvePackSkill(`@atlante/pack/${id}`);
       const invariants = skill.listText("invariants").split("\n");
 
@@ -81,7 +86,7 @@ describe("normative authoring convention", () => {
         expect(skill.listText("invariants"), id).toContain(landmark);
     });
 
-    test.each(phaseSkills)(
+    test.each(normativeSkills)(
       "%s keeps descriptive prose free of normative keywords",
       (id) => {
         const skill = resolvePackSkill(`@atlante/pack/${id}`);
@@ -90,6 +95,13 @@ describe("normative authoring convention", () => {
           normativeKeyword,
         );
         expect(skill.overview).not.toMatch(normativeKeyword);
+        for (const responsibility of skill
+          .listText("responsibilities")
+          .split("\n"))
+          expect(
+            responsibility,
+            `${id} responsibility must name an outcome without a normative gate: ${responsibility}`,
+          ).not.toMatch(normativeKeyword);
         for (const instruction of skill.listText("instructions").split("\n"))
           for (const match of instruction.matchAll(weakProhibitionForm))
             expect(
@@ -148,6 +160,16 @@ describe("normative authoring convention", () => {
       expect(output).not.toMatch(normativeKeyword);
     });
 
+    test("responsibilities render owned outcomes without a normative preamble", () => {
+      const output = renderPackTemplate("@atlante/pack/responsibilities", [
+        "Own the outcome.",
+      ]);
+
+      expect(output).toContain("## Responsibilities");
+      expect(output).toContain("- Own the outcome.");
+      expect(output).not.toMatch(normativeKeyword);
+    });
+
     test("artifact guidance stays SHOULD-level with MAY for updateable output", () => {
       const output = renderPackTemplate("@atlante/pack/artifact", {
         description: "The plan record.",
@@ -162,10 +184,93 @@ describe("normative authoring convention", () => {
       expect(output).not.toMatch(/\bMUST\b/);
     });
 
-    test("structural templates render without normative keywords", () => {
-      expect(renderPackTemplate("@atlante/pack/markdown", "Body.")).not.toMatch(
-        normativeKeyword,
+    test("references render verified entries in order without normative keywords", () => {
+      const output = renderPackTemplate("@atlante/pack/references", [
+        {
+          name: "Guide",
+          location: "https://example.test/guide",
+          readWhen: "Learning the basics.",
+        },
+        {
+          name: "Schema",
+          location: "https://example.test/schema.json",
+        },
+      ]);
+
+      expect(output).toContain("## References");
+      expect(output).toContain(
+        "1. **Guide** — https://example.test/guide — Learning the basics.",
       );
+      expect(output).toContain(
+        "2. **Schema** — https://example.test/schema.json",
+      );
+      expect(output).not.toContain(
+        "2. **Schema** — https://example.test/schema.json —",
+      );
+      expect(output.indexOf("1. **Guide**")).toBeLessThan(
+        output.indexOf("2. **Schema**"),
+      );
+      expect(output).not.toMatch(normativeKeyword);
+    });
+
+    test("markdown renders ordered blocks with headings and lists", () => {
+      const output = renderPackTemplate("@atlante/pack/markdown", [
+        { p: ["First.", "Second."] },
+        { ul: ["alpha", "beta"] },
+        { ol: ["one", "two"] },
+        { p: ["Interleaved closing."] },
+        {
+          h2: {
+            title: "Context",
+            block: [
+              { p: ["Intro."] },
+              {
+                h3: {
+                  title: "Sub",
+                  block: [{ ul: ["deep"] }, { p: ["Deep prose."] }],
+                },
+              },
+            ],
+          },
+        },
+      ]);
+
+      expect(output).toBe(
+        [
+          "First.",
+          "",
+          "Second.",
+          "",
+          "- alpha",
+          "- beta",
+          "",
+          "1. one",
+          "2. two",
+          "",
+          "Interleaved closing.",
+          "",
+          "## Context",
+          "",
+          "Intro.",
+          "",
+          "### Sub",
+          "",
+          "- deep",
+          "",
+          "Deep prose.",
+          "",
+        ].join("\n"),
+      );
+      expect(output).not.toMatch(normativeKeyword);
+    });
+
+    test("structural templates render without normative keywords", () => {
+      expect(
+        renderPackTemplate("@atlante/pack/markdown", [
+          { p: ["Body."] },
+          { ul: ["Item."] },
+        ]),
+      ).not.toMatch(normativeKeyword);
       expect(
         renderPackTemplate("@atlante/pack/agent", {
           identity: "Identity.",
@@ -177,8 +282,17 @@ describe("normative authoring convention", () => {
         renderPackTemplate("@atlante/pack/skill", {
           title: "Skill",
           overview: "Overview.",
-          sections: [{ markdown: "Body." }],
+          sections: [{ markdown: [{ p: ["Body."] }] }],
         }),
+      ).not.toMatch(normativeKeyword);
+      expect(
+        renderPackTemplate("@atlante/pack/references", [
+          {
+            name: "Guide",
+            location: "https://example.test/guide",
+            readWhen: "Learning the basics.",
+          },
+        ]),
       ).not.toMatch(normativeKeyword);
       expect(
         renderPackTemplate("@atlante/pack/workflow", {

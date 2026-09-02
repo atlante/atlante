@@ -21,13 +21,20 @@ import {
   packResourceFixture,
 } from "./selection-fixture.js";
 
-const expectedSkillOrder = ["brainstorm", "plan", "build", "review"] as const;
+const expectedSkillOrder = [
+  "brainstorm",
+  "plan",
+  "build",
+  "review",
+  "harness",
+] as const;
 
 const focusedSkillLandmarks: Record<string, readonly string[]> = {
   brainstorm: ["Ask one focused question at a time"],
   plan: ["smallest independently actionable tasks"],
   build: ["Make the smallest implementation that satisfies the focused test"],
   review: ["`PASS` or `BLOCKED` verdict"],
+  harness: ["Permanent policy"],
 };
 
 interface PresetContext {
@@ -83,7 +90,7 @@ function renderWorkflowTemplate(workflow: Record<string, unknown>): string {
 describe("first-party preset surface", () => {
   afterEach(cleanupPackResourceFixtures);
 
-  test("keeps exactly one architect agent and exposes the four public skills in authored order", () => {
+  test("keeps exactly one architect agent, the four phase skills, and the non-phase harness skill in authored order", () => {
     const { document } = firstPartyPreset();
 
     expect(Object.keys(document.agents)).toEqual(["architect"]);

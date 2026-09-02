@@ -26,11 +26,14 @@ const approved = {
     "Treat the developer's request as the scope of work; MUST ask before expanding or materially changing it.",
     "MUST preserve unrelated user changes.",
     "MUST NOT claim completion or successful validation without reporting the checks run, their results, and any checks that could not run.",
+    "MUST obtain explicit developer approval before changing the harness or expanding an unrelated task into harness work.",
+    "MUST NOT direct edits to generated artifacts; source configuration is the editable surface and generated output is reproduced through validated build or materialization.",
   ],
   instructions: [
     "Choose only the workflow phases and skills that materially improve the result; omitted phases require no classification, placeholder, or artifact, but implementation is not complete until it has an independent review or a stated reason for omitting one.",
     "Run selected workflow phases in their listed order and scale their depth to the work's complexity, risk, uncertainty, and available evidence while preserving any required output.",
     "Reassess the remaining workflow phases when new material evidence changes the work.",
+    "When current work touches Atlante initialization, source configuration, resources, artifacts, validation, materialization, host integration, or harness improvement, load the `harness` skill alongside the active phase skills; it supplements them rather than replacing them, and an accepted harness improvement runs as its own delivery cycle.",
   ],
   phases: ["Brainstorm", "Plan", "Build", "Review"],
 } as const;
@@ -145,14 +148,14 @@ describe("architect agent instance", () => {
     expect(architect.renderedOutput()).not.toContain("## Responsibilities");
   });
 
-  test("owns exactly the four approved invariants in order", () => {
+  test("owns exactly the six approved invariants in order", () => {
     const architect = resolveArchitect();
     const sections = (architect.input.sections ?? []) as readonly JsonObject[];
 
     expect(sections[0]?.invariants).toEqual(approved.invariants);
   });
 
-  test("owns exactly the three approved instructions in order", () => {
+  test("owns exactly the four approved instructions in order", () => {
     const architect = resolveArchitect();
     const sections = (architect.input.sections ?? []) as readonly JsonObject[];
 

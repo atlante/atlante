@@ -47,7 +47,11 @@ export function cleanupPackResourceFixtures(): void {
     rmSync(root, { recursive: true, force: true });
 }
 
-type ListSectionKind = "instructions" | "gotchas" | "invariants";
+type ListSectionKind =
+  | "instructions"
+  | "responsibilities"
+  | "gotchas"
+  | "invariants";
 
 export interface ResolvedPackSkill {
   readonly title: string;
@@ -56,6 +60,7 @@ export interface ResolvedPackSkill {
   readonly templateLocator: string;
   listText(kind: ListSectionKind): string;
   markdownText(): string;
+  referencesText(): string;
   everythingText(): string;
   renderedOutput(): string;
 }
@@ -108,23 +113,93 @@ function skillListItems(
   return items;
 }
 
+type FlowKind = "p" | "ul" | "ol";
+type HeadingKind = "h2" | "h3";
+
+function flowLines(record: Record<string, unknown>, kind: FlowKind): string[] {
+  const items = record[kind];
+  if (!Array.isArray(items)) return [];
+  return items
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => (kind === "p" ? item : `- ${item}`));
+}
+
+function headingLines(
+  record: Record<string, unknown>,
+  kind: HeadingKind,
+): string[] {
+  const heading = record[kind];
+  if (typeof heading !== "object" || heading === null || Array.isArray(heading))
+    return [];
+  const { title, block } = heading as Record<string, unknown>;
+  return [
+    ...(typeof title === "string" ? [title] : []),
+    ...markdownBlockLines(block),
+  ];
+}
+
+function markdownBlockLines(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((block) => {
+    if (typeof block !== "object" || block === null || Array.isArray(block))
+      return [];
+    const record = block as Record<string, unknown>;
+    const flowKinds: FlowKind[] = ["p", "ul", "ol"];
+    const headingKinds: HeadingKind[] = ["h2", "h3"];
+    return [
+      ...flowKinds.flatMap((kind) => flowLines(record, kind)),
+      ...headingKinds.flatMap((kind) => headingLines(record, kind)),
+    ];
+  });
+}
+
 function skillMarkdownText(sections: readonly JsonObject[]): string {
   return sections
-    .map((section) =>
-      typeof section.markdown === "string" ? section.markdown : "",
+    .map((section) => markdownBlockLines(section.markdown).join("\n"))
+    .filter((text) => text.length > 0)
+    .join("\n");
+}
+
+function skillReferencesEntries(
+  sections: readonly JsonObject[],
+): readonly JsonObject[] {
+  return sections.flatMap((section) =>
+    Array.isArray(section.references)
+      ? section.references.filter(
+          (entry): entry is JsonObject =>
+            typeof entry === "object" &&
+            entry !== null &&
+            !Array.isArray(entry),
+        )
+      : [],
+  );
+}
+
+function referencesTextOf(entries: readonly JsonObject[]): string {
+  return entries
+    .map((entry) =>
+      ["name", "location", "readWhen"]
+        .map((key) =>
+          typeof entry[key] === "string" ? (entry[key] as string) : "",
+        )
+        .filter((value) => value.length > 0)
+        .join(" "),
     )
     .join("\n");
 }
 
 function skillEverythingText(
   input: Pick<ResolvedPackSkill, "overview" | "sections">,
+  referencesText: string,
 ): string {
   return [
     input.overview,
     skillMarkdownText(input.sections),
+    skillListItems(input.sections, "responsibilities").join("\n"),
     skillListItems(input.sections, "instructions").join("\n"),
     skillListItems(input.sections, "gotchas").join("\n"),
     skillListItems(input.sections, "invariants").join("\n"),
+    referencesText,
   ].join("\n");
 }
 
@@ -136,6 +211,9 @@ export function resolvePackSkill(locator: string): ResolvedPackSkill {
     config,
   );
   const input = packSkillInput(locator, resolved.input);
+  const referencesText = referencesTextOf(
+    skillReferencesEntries(input.sections),
+  );
   const renderedOutput = (): string =>
     renderResolvedTemplate({
       template: resolved.effectiveTemplate,
@@ -147,7 +225,8 @@ export function resolvePackSkill(locator: string): ResolvedPackSkill {
     templateLocator: resolved.effectiveTemplate.locator,
     listText: (kind) => skillListItems(input.sections, kind).join("\n"),
     markdownText: () => skillMarkdownText(input.sections),
-    everythingText: () => skillEverythingText(input),
+    referencesText: () => referencesText,
+    everythingText: () => skillEverythingText(input, referencesText),
     renderedOutput,
   };
 }
