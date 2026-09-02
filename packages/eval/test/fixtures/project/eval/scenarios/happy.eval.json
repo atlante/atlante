@@ -1,0 +1,17 @@
+{
+  "$schema": "https://atlante.sh/schema/v0.1/eval-scenario.json",
+  "version": "0.1",
+  "name": "happy-scenario",
+  "description": "Sandbox lifecycle fixture scenario.",
+  "task": {
+    "fixture": "eval/fixtures/api",
+    "setup": ["touch", "setup-ran.txt"],
+    "agent": "build",
+    "prompt": "Say hi."
+  },
+  "checks": [
+    { "type": "file-unchanged", "path": "src/index.ts" },
+    { "type": "file-unchanged", "path": "src/missing.ts" },
+    { "type": "file-exists", "path": "src/index.ts" }
+  ]
+}

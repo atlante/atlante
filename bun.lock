@@ -54,6 +54,15 @@
         "commander": "^12.1.0",
       },
     },
+    "packages/eval": {
+      "name": "@atlante/eval",
+      "version": "0.1.20",
+      "dependencies": {
+        "@atlante/artifacts": "workspace:*",
+        "@atlante/schema": "workspace:*",
+        "@atlante/validator": "workspace:*",
+      },
+    },
     "packages/opencode": {
       "name": "@atlante/opencode",
       "version": "0.1.20",
@@ -130,6 +139,8 @@
     "@atlante/cli": ["@atlante/cli@workspace:packages/cli"],
 
     "@atlante/docs": ["@atlante/docs@workspace:docs"],
+
+    "@atlante/eval": ["@atlante/eval@workspace:packages/eval"],
 
     "@atlante/opencode": ["@atlante/opencode@workspace:packages/opencode"],
 
