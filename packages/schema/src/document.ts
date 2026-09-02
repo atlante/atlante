@@ -8,6 +8,25 @@ import {
 
 export const SCHEMA_URI = "https://atlante.sh/schema/v0.1/schema.json";
 
+/** Host materialization targets admitted by document schema v0.1. */
+export const hostTargetSchema = z.literal("opencode");
+
+export type HostTarget = z.infer<typeof hostTargetSchema>;
+
+/**
+ * Authored host selection: at least one target, no duplicates. The canonical
+ * document defaults to the OpenCode host when the field is absent.
+ */
+export const hostsSchema = z
+  .array(hostTargetSchema)
+  .min(1)
+  .refine(
+    (hosts) => new Set(hosts).size === hosts.length,
+    "hosts must not contain duplicate entries",
+  );
+
+export type Hosts = z.infer<typeof hostsSchema>;
+
 /** Authored locators are structurally strings; resource grammar is semantic. */
 export const rawResourceLocatorSchema = z.string().min(1);
 
@@ -234,6 +253,7 @@ export type SkillsOverlay = z.infer<typeof skillsOverlaySchema>;
 export const atlanteDocumentOverlaySchema = z.strictObject({
   $schema: z.literal(SCHEMA_URI),
   extends: authoredExtendsSchema.optional(),
+  hosts: hostsSchema.optional(),
   values: valuesMapOverlaySchema.optional(),
   agents: agentsOverlaySchema.optional(),
   skills: skillsOverlaySchema.optional(),
@@ -246,6 +266,7 @@ export type AtlanteDocumentOverlay = z.infer<
 /** Canonical document after expansion: no extends, selectors, or tombstones. */
 export const atlanteDocumentSchema = z.strictObject({
   $schema: z.literal(SCHEMA_URI),
+  hosts: hostsSchema.default(["opencode"]),
   values: valuesMapSchema.optional(),
   agents: safeRecord(z.string().min(1), agentBindingSchema).default({}),
   skills: safeRecord(z.string().min(1), skillBindingSchema).default({}),

@@ -85,6 +85,20 @@ describe("document JSON Schema", () => {
     });
   });
 
+  test("publishes the supported host targets for editors", () => {
+    const properties = buildDocumentJsonSchema().properties as Record<
+      string,
+      unknown
+    >;
+
+    expect(properties.hosts).toEqual({
+      type: "array",
+      items: { const: "opencode" },
+      minItems: 1,
+      uniqueItems: true,
+    });
+  });
+
   test("the committed file matches the generated output", () => {
     expect(documentJsonSchema).toEqual(buildDocumentJsonSchema());
   });
