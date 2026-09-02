@@ -175,12 +175,14 @@ Values are named inputs shared by the document, such as `{{values.project}}`. Du
 ### Agent sections
 
 The first-party `@atlante/pack/agent` and `@atlante/pack/skill` templates
-support an ordered `sections` array. Section variants include `markdown`,
+support an ordered `sections` array. Common section variants include `markdown`,
 `instructions`, `responsibilities`, `gotchas`, `workflow`, and `invariants`.
-Each section contributes a distinct part of the rendered output, and the order in
-the array is preserved. Responsibilities name owned outcomes, instructions
-describe ordered actions, and invariants are binding guarantees and approval
-gates; keep invariants minimal, concrete, and observable.
+The skill template also supports `references`, which renders named links with
+optional guidance about when to read them. Each section contributes a distinct
+part of the rendered output, and the order in the array is preserved.
+Responsibilities name owned outcomes, instructions describe ordered actions, and
+invariants are binding guarantees and approval gates; keep invariants minimal,
+concrete, and observable.
 
 This lets the same agent template produce different agents without duplicating the template itself.
 

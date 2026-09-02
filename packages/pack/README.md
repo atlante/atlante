@@ -91,7 +91,7 @@ Useful public locators include:
 | Phase skill instances | `@atlante/pack/brainstorm`, `@atlante/pack/plan`, `@atlante/pack/build`, `@atlante/pack/review` |
 | Stewardship skill instance | `@atlante/pack/harness` |
 | Agent and skill templates | `@atlante/pack/agent`, `@atlante/pack/skill` |
-| Supporting templates | `@atlante/pack/workflow`, `@atlante/pack/markdown`, `@atlante/pack/artifact`, `@atlante/pack/gotchas`, `@atlante/pack/instructions`, `@atlante/pack/responsibilities`, `@atlante/pack/invariants` |
+| Supporting templates | `@atlante/pack/workflow`, `@atlante/pack/markdown`, `@atlante/pack/artifact`, `@atlante/pack/gotchas`, `@atlante/pack/instructions`, `@atlante/pack/responsibilities`, `@atlante/pack/invariants`, `@atlante/pack/references` |
 
 The default preset exposes exactly one agent binding, `architect`, and five
 public skill bindings: the four delivery-phase skills `brainstorm`, `plan`,
@@ -101,9 +101,10 @@ selects the phases and skills that materially improve the result. The skill
 bindings are locator-only, so each skill instance owns its description. The
 agent template requires `identity` and `mission`; both agent and skill templates
 support ordered `markdown`, `instructions`, `responsibilities`, `gotchas`,
-`workflow`, and `invariants` sections. Responsibilities name owned outcomes,
-while instructions describe ordered actions and invariants carry binding
-guarantees and approval gates.
+`workflow`, and `invariants` sections. The skill template also supports
+`references` sections, which render named links with optional read-when guidance.
+Responsibilities name owned outcomes, while instructions describe ordered
+actions and invariants carry binding guarantees and approval gates.
 
 ## Harness stewardship
 
@@ -119,6 +120,12 @@ mechanics later without changing the policy. Harness changes always require
 explicit developer approval and run as their own delivery cycle.
 
 ## Pack behavior
+
+The `@atlante/pack/markdown` template expects an ordered block array, not a
+string. This is a breaking change for authored configurations that used the old
+form: rewrite `{ "markdown": "Body" }` as
+`{ "markdown": [{ "p": ["Body"] }] }` before upgrading to a release that
+contains this template.
 
 This is a static pack with `atlante.format: 1`; it has no runtime
 JavaScript entry point. Atlante loads only the selected template or instance
