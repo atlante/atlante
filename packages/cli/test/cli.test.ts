@@ -356,11 +356,12 @@ describe("runBuild", () => {
   });
 });
 
-test("registers build, validate, and init, but not resolve", () => {
+test("registers validate, build, init, and eval, but not resolve", () => {
   expect(createProgram().commands.map((command) => command.name())).toEqual([
     "validate",
     "build",
     "init",
+    "eval",
   ]);
 });
 

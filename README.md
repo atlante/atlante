@@ -88,6 +88,7 @@ The CLI requires [Node.js](https://nodejs.org) 22 or newer. Run the published pa
 npx @atlante/cli@latest init
 npx @atlante/cli@latest validate
 npx @atlante/cli@latest build
+npx @atlante/cli@latest eval
 ```
 
 `init` writes `atlante.jsonc`, materializes the first native outputs, adds

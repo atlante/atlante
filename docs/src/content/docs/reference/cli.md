@@ -1,6 +1,6 @@
 ---
 title: CLI
-description: Command reference for init, validate, and build.
+description: Command reference for init, validate, build, and eval.
 ---
 
 The published package is `@atlante/cli`. It requires [Node.js](https://nodejs.org/)
@@ -117,10 +117,80 @@ build failure reports a diagnostic, leaves the previous valid generated set in
 place, and keeps the watcher running. The watcher retries when a later change
 arrives. Stop it with `Ctrl-C`.
 
+## `atlante eval`
+
+Run eval scenarios against the project's verified artifacts. Each trial runs
+the [OpenCode](https://opencode.ai/) host headless in an isolated sandbox
+(a copy of the scenario fixture plus the artifact publication), then grades
+the sandbox with deterministic, zero-LLM checks.
+
+```sh
+npx @atlante/cli@latest eval [path]
+npx @atlante/cli@latest eval [path] --scenario cli-happy
+npx @atlante/cli@latest eval [path] --trials 3
+npx @atlante/cli@latest eval [path] --json
+npx @atlante/cli@latest eval [path] --out /tmp/eval-runs
+npx @atlante/cli@latest eval [path] --keep
+```
+
+- `path` is a project directory or an explicit `atlante.jsonc`/`atlante.json`
+  file. It defaults to the current directory.
+- `--scenario <name>` runs only the named scenario; repeat the flag to select
+  several. Scenario names come from the documents matched by the `eval`
+  section's `scenarios` glob.
+- `--trials <n>` overrides the configured number of trials for this run.
+- `--json` prints the report JSON to stdout instead of the human summary.
+- `--out <dir>` writes the report under the given directory instead of
+  `<project>/.atlante/eval`.
+- `--keep` preserves the trial sandboxes for inspection instead of deleting
+  them.
+
+### Configuration
+
+`eval` runs require an `eval` section in `atlante.jsonc`, scenario documents,
+a published artifact tree, and an authenticated OpenCode host:
+
+```jsonc
+{
+  "eval": {
+    "host": "opencode",
+    "scenarios": "eval/scenarios/*.eval.json",
+    "model": "anthropic/claude-sonnet-4-5",
+    "budget": {
+      "trials": 3,
+      "timeoutMs": 600000,
+      "maxSessions": 15,
+      "maxTokens": 400000
+    }
+  }
+}
+```
+
+Scenario documents validate against
+[`https://atlante.sh/schema/v0.1/eval-scenario.json`](https://atlante.sh/schema/v0.1/eval-scenario.json).
+Each names a fixture directory copied as the sandbox root, a prompt, and at
+least one check (`command`, `file-exists`, `file-absent`, `file-contains`,
+`file-unchanged`, `diff-allowlist`). The report is written to
+`<project>/.atlante/eval/<run-id>/report.json`; that location is gitignored.
+`atlante eval` never builds: run `atlante build` first, and again whenever the
+sources change.
+
+### Exit status
+
+- `0` every executed trial passed.
+- `1` at least one trial failed, timed out, exceeded its budget, hit an
+  infrastructure error, or was skipped by the session cap.
+- `2` validation failed: missing or broken configuration or `eval` section,
+  invalid scenario documents, or missing/stale artifacts.
+- `3` an infrastructure error prevented the run from executing at all.
+
 ## Exit status
 
 - `0` means the command completed without errors. In watch mode, interruption also produces exit status `0`.
 - `1` means validation or build failed for a one-shot command.
+
+`atlante eval` has its own, finer-grained exit statuses; see
+[`atlante eval`](#atlante-eval) above.
 
 Warnings do not make a successful build fail. A failed build materializes no
 partial output set. Watch-mode failures are reported while the process remains
