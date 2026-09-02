@@ -60,12 +60,20 @@ try {
     .cwd(sandbox)
     .quiet();
 
-  // Author a real eval-enabled project the way `atlante init` would.
+  // Author a real eval-enabled project the way `atlante init` would: the
+  // pack AND the opencode adapter are project dependencies (the eval runner
+  // resolves @atlante/opencode from the project, so an initialized project
+  // always has it installed).
   const project = join(sandbox, "project");
   await mkdir(join(project, "node_modules", "@atlante"), { recursive: true });
   await cp(
     join(ROOT, "packages", "pack"),
     join(project, "node_modules", "@atlante", "pack"),
+    { recursive: true },
+  );
+  await cp(
+    join(ROOT, "packages", "opencode"),
+    join(project, "node_modules", "@atlante", "opencode"),
     { recursive: true },
   );
   await Bun.write(

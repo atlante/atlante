@@ -153,9 +153,12 @@ describe("prepareHostIntegration", () => {
 
 describe("runTrial", () => {
   test("parses the event stream for usage and model identifiers", async () => {
+    // First two events mirror the real 1.18.x stream (usage nested in `part`
+    // with a precomputed total); the third keeps the top-level shape as the
+    // defensive fallback for other host versions.
     const stub = writeStub(
       tempDir("eval-stub-happy-"),
-      `printf '%s\\n' '{"type":"session","info":{"providerID":"acme","modelID":"model-x"}}' '{"type":"step_finish","tokens":{"input":100,"output":50,"reasoning":10},"cost":0.01}' '{"type":"step_finish","tokens":{"input":200,"output":90,"reasoning":10},"cost":0.02}'`,
+      `printf '%s\\n' '{"type":"session","info":{"providerID":"acme","modelID":"model-x"}}' '{"type":"step_finish","part":{"type":"step-finish","tokens":{"total":350,"input":300,"output":40,"reasoning":10,"cache":{"read":0,"write":0}},"cost":0.01}}' '{"type":"step_finish","tokens":440,"cost":0.02}'`,
     );
     const runner = createOpenCodeRunner({
       projectRoot,
@@ -170,7 +173,7 @@ describe("runTrial", () => {
       maxTokens: 100_000,
     });
     expect(trial.outcome).toBe("completed");
-    expect(trial.tokens).toBe(300);
+    expect(trial.tokens).toBe(440);
     expect(trial.cost).toBe(0.02);
     expect(trial.model).toBe("acme/model-x");
     expect(trial.modelVersion).toBe("model-x");
@@ -285,8 +288,9 @@ exit 0`,
 });
 
 describe("event helpers", () => {
-  test("normalizeTokens handles numeric and component shapes", () => {
+  test("normalizeTokens handles numeric, total, and component shapes", () => {
     expect(normalizeTokens(1234)).toBe(1234);
+    expect(normalizeTokens({ total: 8880, input: 8849, output: 3 })).toBe(8880);
     expect(normalizeTokens({ input: 10, output: 20, reasoning: 5 })).toBe(35);
     expect(
       normalizeTokens({ input: 1, output: 2, cache: { read: 3, write: 4 } }),

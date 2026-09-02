@@ -72,6 +72,12 @@ const evalConfig: EvalConfig = {
   scenarios: "eval/scenarios/*.eval.json",
 };
 
+const evalConfigWithModel: EvalConfig = {
+  host: "opencode",
+  scenarios: "eval/scenarios/*.eval.json",
+  model: "acme/model-x",
+};
+
 describe("runEval", () => {
   test("runs trials per scenario and computes statistics", async () => {
     let call = 0;
@@ -99,6 +105,18 @@ describe("runEval", () => {
     expect(report.meta.modelVersion).toBe("v9");
     expect(report.meta.host).toBe("fake");
     expect(result.trials[0]?.checks).toHaveLength(3);
+  });
+
+  test("falls back to the requested model when the host reports none", async () => {
+    const report = await runEval({
+      projectRoot,
+      evalConfig: evalConfigWithModel,
+      budget: resolveBudget({ evalConfig: evalConfigWithModel }),
+      scenarios,
+      atlanteVersion: "0.0.0-test",
+      runner: fakeRunner(() => completedRun()),
+    });
+    expect(report.meta.model).toBe("acme/model-x");
   });
 
   test("check failures produce fail verdicts with complete evidence", async () => {

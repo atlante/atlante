@@ -248,6 +248,13 @@ export async function runEval(input: RunEvalInput): Promise<RunReport> {
       });
     }
 
+    if (report.meta.model === undefined && input.evalConfig.model) {
+      // The host JSON stream does not identify the model it used; fall back
+      // to the model the run requested so report comparisons stay
+      // explainable. Host-reported identifiers win when present.
+      report.meta.model = input.evalConfig.model;
+    }
+
     return report;
   } finally {
     if (!input.keep) destroyRunRoot(runRoot);

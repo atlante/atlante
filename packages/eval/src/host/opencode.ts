@@ -111,18 +111,32 @@ function readHostConfig(projectRoot: string): Record<string, unknown> {
 /**
  * Resolves the Atlante opencode plugin to an absolute directory so the
  * sandbox config (which lives in a temp dir with no node_modules) can load
- * it. Node resolution walks from the plugin's real location, so this works
- * for both workspace checkouts and installed packages.
+ * it. Resolution uses the package root export and stays strict enough for
+ * Node: the `exports` map does not expose `./package.json`, so resolving that
+ * subpath would throw `ERR_PACKAGE_PATH_NOT_EXPORTED` in the published CLI
+ * even with the package installed. The `"."` entry points at a bundled file
+ * inside the package (`dist/`); walk up to the directory owning the manifest.
  */
 function resolvePluginPath(projectRoot: string): string {
+  const require = createRequire(join(projectRoot, "package.json"));
+  let resolved: string;
   try {
-    const require = createRequire(join(projectRoot, "package.json"));
-    return dirname(require.resolve(`${ATLANTE_PLUGIN_NAME}/package.json`));
+    resolved = require.resolve(ATLANTE_PLUGIN_NAME);
   } catch {
     throw new Error(
       `the ${ATLANTE_PLUGIN_NAME} package is not installed in this project; run \`atlante init\` or install it and try again`,
     );
   }
+  let dir = dirname(resolved);
+  for (let hop = 0; hop < 5; hop++) {
+    if (existsSync(join(dir, "package.json"))) return dir;
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  throw new Error(
+    `resolved ${ATLANTE_PLUGIN_NAME} to ${resolved} but found no package manifest above it`,
+  );
 }
 
 function rewritePluginEntries(
@@ -374,9 +388,17 @@ function spawnHost(
       if (!isObject(event)) return;
 
       // Budget enforcement is in-flight: compare the latest cumulative count.
-      const eventTokens = normalizeTokens(event.tokens);
+      // Real 1.18.x streams nest usage inside the event's `part` object; the
+      // top-level shape stays a defensive fallback for other host versions.
+      const part = isObject(event.part) ? event.part : undefined;
+      const eventTokens =
+        (part ? normalizeTokens(part.tokens) : undefined) ??
+        normalizeTokens(event.tokens);
       if (eventTokens !== undefined) tokens = eventTokens;
-      if (typeof event.cost === "number") cost = event.cost;
+      const eventCost =
+        (part && typeof part.cost === "number" ? part.cost : undefined) ??
+        (typeof event.cost === "number" ? event.cost : undefined);
+      if (eventCost !== undefined) cost = eventCost;
 
       const identifiers = extractModelIdentifiers(event);
       if (identifiers?.provider && identifiers?.model) {
@@ -411,12 +433,16 @@ function spawnHost(
 }
 
 /**
- * Normalizes opencode usage shapes: either a numeric cumulative total or the
+ * Normalizes opencode usage shapes: a numeric cumulative total, a
+ * precomputed `total` field (real 1.18.x usage objects carry one), or the
  * documented component object (input/output/reasoning/cache read+write).
  */
 export function normalizeTokens(tokens: unknown): number | undefined {
   if (typeof tokens === "number" && Number.isFinite(tokens)) return tokens;
   if (!isObject(tokens)) return undefined;
+  if (typeof tokens.total === "number" && Number.isFinite(tokens.total)) {
+    return tokens.total;
+  }
   let sum = 0;
   let seen = false;
   for (const key of ["input", "output", "reasoning"]) {
