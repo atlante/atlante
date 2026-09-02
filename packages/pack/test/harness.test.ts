@@ -58,13 +58,7 @@ describe("harness skill instance", () => {
     expect(skill.overview).not.toMatch(/\b(MUST|SHOULD|MAY)\b/);
     expect(
       skill.sections.map((section) => Object.keys(section).sort().join("+")),
-    ).toEqual([
-      "markdown",
-      "responsibilities",
-      "instructions",
-      "invariants",
-      "references",
-    ]);
+    ).toEqual(["responsibilities", "instructions", "invariants", "references"]);
   });
 
   test("description carries the trigger-focused routing verbatim", () => {
@@ -97,13 +91,13 @@ describe("harness skill instance", () => {
     expect(instructions).toContain("tool descriptions");
   });
 
-  test("routes concept and structure orientation through the Specification reference", () => {
+  test("routes concept and structure orientation through the overview and Specification reference", () => {
     const skill = resolvePackSkill(locator);
 
+    expect(skill.overview).toContain("requires web access");
     expect(skill.referencesText()).toContain(
       "Orienting in Atlante concepts, document structure, and configuration semantics",
     );
-    expect(skill.markdownText()).not.toContain("named interpolations");
   });
 
   test("instructions cover the three stewardship contexts in order", () => {
@@ -190,6 +184,7 @@ describe("harness skill instance", () => {
     for (const heading of [
       "# Harness",
       "## Overview",
+      "## Responsibilities",
       "## Instructions",
       "## Invariants",
       "## References",
@@ -201,9 +196,9 @@ describe("harness skill instance", () => {
 
     const position = (heading: string) => output.indexOf(heading);
     expect(position("## Overview")).toBeLessThan(
-      position("## Operating context"),
+      position("## Responsibilities"),
     );
-    expect(position("## Operating context")).toBeLessThan(
+    expect(position("## Responsibilities")).toBeLessThan(
       position("## Instructions"),
     );
     expect(position("## Instructions")).toBeLessThan(position("## Invariants"));
