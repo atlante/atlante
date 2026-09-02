@@ -104,7 +104,7 @@
       "name": "@atlante/website",
       "version": "0.1.0",
       "dependencies": {
-        "@atlante/cli": "0.1.19",
+        "@atlante/cli": "0.1.20",
       },
       "devDependencies": {
         "astro": "^5.0.0",
@@ -1273,8 +1273,6 @@
     "@astrojs/mdx/source-map": ["source-map@0.7.6", "", {}, "sha512-i5uvt8C3ikiWeNZSVZNWcfZPItFQOsYTUAOkcUPGd8DqDy1uOUikjt5dG+uRlwyvR108Fb9DOd4GvXfT0N2/uQ=="],
 
     "@atlante/docs/typescript": ["typescript@6.0.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw=="],
-
-    "@atlante/website/@atlante/cli": ["@atlante/cli@0.1.19", "", { "dependencies": { "@atlante/pack": "^0.1.19", "ajv": "^8.17.1", "jsonc-parser": "^3.3.1" }, "bin": { "atlante": "dist/bin/atlante.js" } }, "sha512-TvARqR/VjkPSWdWLgABCoPPc5fUOgm1TOau36zAn3L4+lDKBf2f8TlmnYamfr6gnj23p28p7EMtkys4SXEQm1g=="],
 
     "@mdx-js/mdx/source-map": ["source-map@0.7.6", "", {}, "sha512-i5uvt8C3ikiWeNZSVZNWcfZPItFQOsYTUAOkcUPGd8DqDy1uOUikjt5dG+uRlwyvR108Fb9DOd4GvXfT0N2/uQ=="],
 
