@@ -47,7 +47,11 @@ export function cleanupPackResourceFixtures(): void {
     rmSync(root, { recursive: true, force: true });
 }
 
-type ListSectionKind = "instructions" | "gotchas" | "invariants";
+type ListSectionKind =
+  | "instructions"
+  | "responsibilities"
+  | "gotchas"
+  | "invariants";
 
 export interface ResolvedPackSkill {
   readonly title: string;
@@ -191,6 +195,7 @@ function skillEverythingText(
   return [
     input.overview,
     skillMarkdownText(input.sections),
+    skillListItems(input.sections, "responsibilities").join("\n"),
     skillListItems(input.sections, "instructions").join("\n"),
     skillListItems(input.sections, "gotchas").join("\n"),
     skillListItems(input.sections, "invariants").join("\n"),

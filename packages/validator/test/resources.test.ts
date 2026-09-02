@@ -2129,8 +2129,11 @@ describe("resource-backed document validation", () => {
 
   test.each([
     ["omitted", {}],
-    ["valid non-empty", { responsibilities: ["Own the outcome."] }],
-  ] as const)("accepts %s top-level responsibilities", (_label, fields) => {
+    [
+      "valid non-empty section",
+      { sections: [{ responsibilities: ["Own the outcome."] }] },
+    ],
+  ] as const)("accepts %s responsibilities", (_label, fields) => {
     const { configPath } = project({
       $schema: SCHEMA_URI,
       agents: {
@@ -2154,17 +2157,17 @@ describe("resource-backed document validation", () => {
     [
       "empty array",
       [] as unknown,
-      "/agents/reviewer/responsibilities",
+      "/agents/reviewer/sections/0/responsibilities",
       "fewer than 1 items",
     ],
     [
       "empty string item",
       [""],
-      "/agents/reviewer/responsibilities/0",
+      "/agents/reviewer/sections/0/responsibilities/0",
       "fewer than 1 characters",
     ],
   ] as const)(
-    "rejects %s top-level responsibilities",
+    "rejects %s responsibilities section",
     (_label, responsibilities, pointer, message) => {
       const { root, configPath } = project({
         $schema: SCHEMA_URI,
@@ -2174,7 +2177,7 @@ describe("resource-backed document validation", () => {
             description: "Reviews the change.",
             identity: "You review.",
             mission: "Find defects.",
-            responsibilities,
+            sections: [{ responsibilities }],
           },
         },
       });
@@ -2205,7 +2208,7 @@ describe("resource-backed document validation", () => {
           description: "Testing guidance",
           title: "Testing",
           overview: "Run tests.",
-          sections: [{ markdown: "Run tests." }],
+          sections: [{ markdown: [{ p: ["Run tests."] }] }],
           responsibilities: ["Own the outcome."],
         },
       },
@@ -2223,7 +2226,33 @@ describe("resource-backed document validation", () => {
     );
   });
 
-  test("rejects responsibilities nested in agent sections", () => {
+  test("rejects root-level responsibilities in a bundled agent", () => {
+    const { configPath } = project({
+      $schema: SCHEMA_URI,
+      agents: {
+        reviewer: {
+          $template: "@atlante/pack/agent",
+          description: "Reviews the change.",
+          identity: "You review.",
+          mission: "Find defects.",
+          responsibilities: ["Own the outcome."],
+        },
+      },
+    });
+
+    const result = load(configPath);
+
+    expect(result.document).toBeUndefined();
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: "invalid-prompt-input",
+        path: "/agents/reviewer/responsibilities",
+        message: expect.stringContaining("responsibilities"),
+      }),
+    );
+  });
+
+  test("accepts responsibilities in agent sections", () => {
     const { configPath } = project({
       $schema: SCHEMA_URI,
       agents: {
@@ -2239,13 +2268,8 @@ describe("resource-backed document validation", () => {
 
     const result = load(configPath);
 
-    expect(result.document).toBeUndefined();
-    expect(result.diagnostics).toContainEqual(
-      expect.objectContaining({
-        code: "invalid-prompt-input",
-        message: expect.stringContaining("responsibilities"),
-      }),
-    );
+    expect(result.diagnostics).toEqual([]);
+    expect(result.document?.agents?.reviewer).toBeDefined();
   });
 
   test("accepts a canonical workflow section in a bundled agent", () => {

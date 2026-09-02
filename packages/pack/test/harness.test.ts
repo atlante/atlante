@@ -58,24 +58,30 @@ describe("harness skill instance", () => {
     expect(skill.overview).not.toMatch(/\b(MUST|SHOULD|MAY)\b/);
     expect(
       skill.sections.map((section) => Object.keys(section).sort().join("+")),
-    ).toEqual(["markdown", "instructions", "invariants", "references"]);
+    ).toEqual([
+      "markdown",
+      "responsibilities",
+      "instructions",
+      "invariants",
+      "references",
+    ]);
   });
 
   test("description carries the trigger-focused routing verbatim", () => {
     expect(instanceDescription()).toBe(approvedDescription);
   });
 
-  test("coverage areas carry the permanent-policy and provisional-mechanics tags", () => {
+  test("responsibilities carry the permanent-policy and provisional-mechanics tags", () => {
     const skill = resolvePackSkill(locator);
-    const context = skill.markdownText();
+    const responsibilities = skill.listText("responsibilities");
 
-    expect(context).toContain("Permanent policy");
-    expect(context).toContain("Provisional mechanics");
+    expect(responsibilities).toContain("Permanent policy");
+    expect(responsibilities).toContain("Provisional mechanics");
     const rowOf = (area: string): string => {
-      const areaPosition = context.indexOf(area);
+      const areaPosition = responsibilities.indexOf(area);
       expect(areaPosition, area).toBeGreaterThan(-1);
-      const rowEnd = context.indexOf("\n", areaPosition);
-      return context.slice(areaPosition, rowEnd);
+      const rowEnd = responsibilities.indexOf("\n", areaPosition);
+      return responsibilities.slice(areaPosition, rowEnd);
     };
     for (const area of policyAreas)
       expect(rowOf(area), area).toContain("Permanent policy");

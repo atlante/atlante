@@ -40,12 +40,14 @@ Add project values and a reviewer to the generated document:
       "description": "Reviews changes for defects and design risks.",
       "identity": "You are a senior {{values.language}} reviewer on {{values.project}}.",
       "mission": "Find defects before changes are merged.",
-      "responsibilities": [
-        "Read the relevant source and tests",
-        "Check behavior against the project requirements",
-        "Report actionable findings with file and line references"
-      ],
       "sections": [
+        {
+          "responsibilities": [
+            "Read the relevant source and tests",
+            "Check behavior against the project requirements",
+            "Report actionable findings with file and line references"
+          ]
+        },
         {
           "invariants": [
             "Do not approve a change while a material defect remains unresolved."

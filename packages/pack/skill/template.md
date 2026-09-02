@@ -12,6 +12,10 @@
 
 {{> slot/sections/instructions instructions}}
 {{/if}}
+{{#if responsibilities}}
+
+{{> slot/sections/responsibilities responsibilities}}
+{{/if}}
 {{#if gotchas}}
 
 {{> slot/sections/gotchas gotchas}}

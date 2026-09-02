@@ -1,16 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "Root agent prompt renderer with identity, mission, optional responsibilities, and ordered sections.",
+  "description": "Root agent prompt renderer with identity, mission, and ordered sections.",
   "type": "object",
   "properties": {
     "identity": { "type": "string", "minLength": 1 },
     "mission": { "type": "string", "minLength": 1 },
-    "responsibilities": {
-      "description": "Positive, ongoing outcomes the agent owns throughout its work. Use responsibilities for what the agent must accomplish, not for behavioral limits.",
-      "type": "array",
-      "items": { "type": "string", "minLength": 1 },
-      "minItems": 1
-    },
     "sections": {
       "type": "array",
       "items": {
@@ -26,6 +20,15 @@
               "instructions": { "template": "@atlante/pack/instructions" }
             },
             "required": ["instructions"],
+            "additionalProperties": false
+          },
+          {
+            "properties": {
+              "responsibilities": {
+                "template": "@atlante/pack/responsibilities"
+              }
+            },
+            "required": ["responsibilities"],
             "additionalProperties": false
           },
           {

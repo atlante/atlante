@@ -23,6 +23,15 @@
             "additionalProperties": false
           },
           {
+            "properties": {
+              "responsibilities": {
+                "template": "@atlante/pack/responsibilities"
+              }
+            },
+            "required": ["responsibilities"],
+            "additionalProperties": false
+          },
+          {
             "properties": { "gotchas": { "template": "@atlante/pack/gotchas" } },
             "required": ["gotchas"],
             "additionalProperties": false

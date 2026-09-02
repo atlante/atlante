@@ -95,6 +95,13 @@ describe("normative authoring convention", () => {
           normativeKeyword,
         );
         expect(skill.overview).not.toMatch(normativeKeyword);
+        for (const responsibility of skill
+          .listText("responsibilities")
+          .split("\n"))
+          expect(
+            responsibility,
+            `${id} responsibility must name an outcome without a normative gate: ${responsibility}`,
+          ).not.toMatch(normativeKeyword);
         for (const instruction of skill.listText("instructions").split("\n"))
           for (const match of instruction.matchAll(weakProhibitionForm))
             expect(
@@ -150,6 +157,16 @@ describe("normative authoring convention", () => {
       expect(output).toContain(
         "These are required actions for completing the work.",
       );
+      expect(output).not.toMatch(normativeKeyword);
+    });
+
+    test("responsibilities render owned outcomes without a normative preamble", () => {
+      const output = renderPackTemplate("@atlante/pack/responsibilities", [
+        "Own the outcome.",
+      ]);
+
+      expect(output).toContain("## Responsibilities");
+      expect(output).toContain("- Own the outcome.");
       expect(output).not.toMatch(normativeKeyword);
     });
 

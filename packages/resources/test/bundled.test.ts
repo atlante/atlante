@@ -238,7 +238,7 @@ describe("first-party package resources", () => {
     );
   });
 
-  test("renders top-level responsibilities after mission and preserves authored supporting-section order", () => {
+  test("renders responsibilities as an authored section after mission and preserves section order", () => {
     const { root, config } = fixture();
     const output = renderResolvedTemplate({
       template: resolveResourceTemplate(
@@ -249,8 +249,8 @@ describe("first-party package resources", () => {
       input: {
         identity: "Identity",
         mission: "Mission",
-        responsibilities: ["Own the outcome."],
         sections: [
+          { responsibilities: ["Own the outcome."] },
           { instructions: ["Authored instruction."] },
           { invariants: ["Authored invariant."] },
           { markdown: [{ p: ["Authored markdown."] }] },
