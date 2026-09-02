@@ -61,6 +61,7 @@
         "@atlante/artifacts": "workspace:*",
         "@atlante/schema": "workspace:*",
         "@atlante/validator": "workspace:*",
+        "jsonc-parser": "^3.3.1",
       },
     },
     "packages/opencode": {

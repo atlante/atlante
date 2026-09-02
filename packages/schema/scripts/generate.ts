@@ -112,4 +112,8 @@ if (import.meta.main) {
     serializeDocumentJsonSchema(buildEvalScenarioJsonSchema()),
   );
   console.log(`wrote ${scenarioOut.pathname}`);
+  // Regeneration must be reproducible against the committed artifacts: the
+  // repo formatter defines the canonical style for the generated JSON.
+  await Bun.$`bunx biome format --write ${out.pathname} ${scenarioOut.pathname}`.quiet();
+  console.log("formatted generated schemas with biome");
 }

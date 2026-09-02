@@ -5,6 +5,14 @@ export {
   SETUP_TIMEOUT_DEFAULT_MS,
   scenarioTimeoutMs,
 } from "./config.js";
+export type { OpenCodeRunnerOptions } from "./host/opencode.js";
+export {
+  createOpenCodeRunner,
+  extractModelIdentifiers,
+  mergePermissionBaseline,
+  normalizeTokens,
+  OPENCODE_BINARY,
+} from "./host/opencode.js";
 export { createRunId } from "./run-id.js";
 export type {
   EvalProgress,

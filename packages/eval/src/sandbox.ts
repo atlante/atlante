@@ -50,6 +50,8 @@ export type SnapshotEntry = { path: string; hash: string | null };
 export type Sandbox = {
   /** Absolute sandbox project root. */
   root: string;
+  /** Isolation state dir with config/, data/, cache/ subdirectories. */
+  stateDir: string;
   /** sha256 of every declared file-unchanged path, taken before the session. */
   snapshot: SnapshotEntry[];
   keep: boolean;
@@ -92,6 +94,16 @@ export async function assembleSandbox(
   );
   mkdirSync(root, { recursive: true });
 
+  // Isolation state dirs (config/data/cache) inside the trial directory.
+  const stateDir = join(
+    input.runRoot,
+    `${name}-trial-${input.trialIndex}`,
+    "state",
+  );
+  for (const sub of ["config", "data", "cache"]) {
+    mkdirSync(join(stateDir, sub), { recursive: true });
+  }
+
   // (a) Fixture copy: the sandbox root starts as a copy of the fixture.
   copyFixtureTree(
     join(input.projectRoot, input.scenario.scenario.task.fixture),
@@ -108,7 +120,12 @@ export async function assembleSandbox(
   mkdirSync(join(root, ".atlante"), { recursive: true });
   cpSync(artifacts, join(root, ".atlante", "artifacts"), { recursive: true });
 
-  const sandbox: Sandbox = { root, snapshot: [], keep: input.keep };
+  const sandbox: Sandbox = {
+    root,
+    stateDir,
+    snapshot: [],
+    keep: input.keep,
+  };
 
   // (c) Host integration (config authoring is host-specific).
   await prepareHostIntegration(sandbox);

@@ -103,11 +103,7 @@
             "properties": {
               "type": {
                 "type": "string",
-                "enum": [
-                  "file-exists",
-                  "file-absent",
-                  "file-unchanged"
-                ]
+                "enum": ["file-exists", "file-absent", "file-unchanged"]
               },
               "path": {
                 "type": "string",
@@ -137,11 +133,7 @@
                 "type": "boolean"
               }
             },
-            "required": [
-              "type",
-              "path",
-              "pattern"
-            ],
+            "required": ["type", "path", "pattern"],
             "additionalProperties": false
           },
           {
@@ -167,12 +159,6 @@
       }
     }
   },
-  "required": [
-    "$schema",
-    "version",
-    "name",
-    "task",
-    "checks"
-  ],
+  "required": ["$schema", "version", "name", "task", "checks"],
   "additionalProperties": false
 }

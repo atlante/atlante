@@ -27,7 +27,10 @@ import {
 export interface HostRunner {
   readonly name: string;
   /** Writes the host integration into the assembled sandbox project. */
-  prepareHostIntegration(sandbox: Sandbox): Promise<void> | void;
+  prepareHostIntegration(
+    sandbox: Sandbox,
+    context: { agent?: string },
+  ): Promise<void> | void;
   /** Runs one session against the sandbox, honoring the given budget. */
   runTrial(input: RunTrialInput): Promise<TrialRun>;
 }
@@ -161,7 +164,12 @@ export async function runEval(input: RunEvalInput): Promise<RunReport> {
               budget: input.budget,
               keep: Boolean(input.keep),
             },
-            (assembled) => input.runner.prepareHostIntegration(assembled),
+            (assembled) =>
+              input.runner.prepareHostIntegration(assembled, {
+                ...(scenario.scenario.task.agent
+                  ? { agent: scenario.scenario.task.agent }
+                  : {}),
+              }),
           );
         } catch (cause) {
           const error = cause instanceof Error ? cause.message : String(cause);
