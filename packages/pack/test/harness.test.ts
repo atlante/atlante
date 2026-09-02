@@ -114,26 +114,22 @@ describe("harness skill instance", () => {
     const instructions = resolvePackSkill(locator).listText("instructions");
 
     for (const marker of [
-      "Establish from repository evidence whether Atlante is initialized",
+      "verify them against the installed Atlante version and capabilities",
       "universal cold-start bootstrap path",
-      "Inspect repository structure, conventions, installed packs",
-      "Recommend only commands, keys, locators, and resources verified as available",
-      "Treat current Atlante source configuration and built artifacts as part of the operating environment",
-      "Validate and build or materialize through capabilities verified from the project",
+      "Inspect repository structure, conventions",
+      "distinguish verified recommendations from unverified suggestions",
+      "Validate, build, and materialize through capabilities verified from the project",
       "Preserve the phase boundaries and workflow invariants already in force",
-      "Record material harness friction without silently expanding the current task",
+      "without expanding the current task",
       "Turn observed workflow friction into an evidence-based suggestion",
-      "Ask the developer before beginning any harness change",
-      "separate workflow cycle",
-      "remains unimplemented until its own cycle completes",
+      "its own workflow cycle",
+      "stays a suggestion until its own cycle is approved",
     ])
       expect(instructions).toContain(marker);
 
     const position = (marker: string) => instructions.indexOf(marker);
-    const bootstrap = position("Establish from repository evidence");
-    const delivery = position(
-      "Treat current Atlante source configuration and built artifacts",
-    );
+    const bootstrap = position("verify them against the installed Atlante");
+    const delivery = position("Validate, build, and materialize");
     const improvement = position(
       "Turn observed workflow friction into an evidence-based suggestion",
     );

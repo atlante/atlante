@@ -9,17 +9,13 @@
     },
     {
       "instructions": [
-        "Establish from repository evidence whether Atlante is initialized and which version and capabilities are available before recommending anything; when Atlante is absent or its version or capabilities cannot be established, report that plainly and proceed from what is verified.",
-        "Treat the CLI as the universal cold-start bootstrap path; an Atlante-materialized skill becomes available only after the harness and host expose it, so bootstrap guidance starts from the CLI rather than from a materialized skill.",
-        "Inspect repository structure, conventions, installed packs, existing resources, project instructions, and desired workflows before recommending configuration; explain suitable choices and help the developer define an approved initialization or configuration task.",
-        "Recommend only commands, keys, locators, and resources verified as available to the project; distinguish verified recommendations from unverified suggestions.",
-        "Treat current Atlante source configuration and built artifacts as part of the operating environment, distinguishing authoritative source configuration from generated output.",
-        "Validate and build or materialize through capabilities verified from the project, reporting diagnostics and unavailable checks truthfully and separating evidenced outcomes from assumptions.",
-        "Preserve the phase boundaries and workflow invariants already in force; harness stewardship runs alongside the active phases rather than inside them.",
-        "Record material harness friction without silently expanding the current task.",
+        "Before recommending commands, keys, locators, or resources, verify them against the installed Atlante version and capabilities, the current source configuration, and installed packs; distinguish verified recommendations from unverified suggestions, and report plainly anything that cannot be established.",
+        "Treat the CLI as the universal cold-start bootstrap path: bootstrap guidance starts from the CLI, since an Atlante-materialized skill becomes available only after the harness and host expose it.",
+        "Inspect repository structure, conventions, existing resources, project instructions, and desired workflows before recommending configuration; explain suitable choices and help the developer define the initialization or configuration task to approve.",
+        "Validate, build, and materialize through capabilities verified from the project, reporting diagnostics truthfully.",
+        "Preserve the phase boundaries and workflow invariants already in force, and record material harness friction without expanding the current task.",
         "Turn observed workflow friction into an evidence-based suggestion that names the expected benefit and the affected configuration or resources.",
-        "Ask the developer before beginning any harness change, and run an accepted improvement as a separate workflow cycle using the normal adaptive brainstorm, plan, build, review, approval, and validation policy.",
-        "Present unapproved suggestions as suggestions; an improvement discussed during unrelated work remains unimplemented until its own cycle completes with evidence."
+        "Run an accepted harness improvement as its own workflow cycle using the normal adaptive brainstorm, plan, build, review, approval, and validation policy; an improvement stays a suggestion until its own cycle is approved."
       ]
     },
     {
