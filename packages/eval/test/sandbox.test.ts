@@ -1,9 +1,18 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { cpSync, existsSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { materializeOpenCode } from "@atlante/opencode";
 import { discoverEvalScenarios } from "@atlante/validator";
+import { runChecks } from "../src/checks.js";
 import {
   assembleSandbox,
   createRunRoot,
@@ -202,6 +211,106 @@ describe("assembleSandbox", () => {
     } finally {
       rmSync(maliciousProject, { recursive: true, force: true });
       rmSync(outside, { recursive: true, force: true });
+    }
+  });
+
+  test("rejects a fixture file that collides with a native output", async () => {
+    const collidingProject = mkdtempSync(
+      join(tmpdir(), "eval-colliding-fixture-"),
+    );
+    cpSync(fixtureProject, collidingProject, { recursive: true });
+    // Ship a fixture file at the exact native-output path.
+    mkdirSync(
+      join(collidingProject, "eval", "fixtures", "api", ".opencode", "agents"),
+      {
+        recursive: true,
+      },
+    );
+    writeFileSync(
+      join(
+        collidingProject,
+        "eval",
+        "fixtures",
+        "api",
+        ".opencode",
+        "agents",
+        "build.md",
+      ),
+      "fixture impostor\n",
+    );
+    materializeOpenCode(collidingProject, {
+      agents: [
+        {
+          hostAgentId: "build",
+          description: "Build agent",
+          prompt: "You are a build agent.",
+        },
+      ],
+      skills: [],
+    });
+    const base = discoverEvalScenarios(
+      collidingProject,
+      "eval/scenarios/*.eval.json",
+    ).scenarios.at(0);
+    if (!base) throw new Error("fixture scenario not discovered");
+    try {
+      await expect(
+        assembleSandbox(
+          {
+            runRoot,
+            projectRoot: collidingProject,
+            scenario: {
+              ...base,
+              scenario: { ...base.scenario, name: "colliding-fixture" },
+            },
+            trialIndex: 5,
+            budget: resolveBudget({ evalConfig: undefined }),
+            keep: false,
+          },
+          () => {},
+        ),
+      ).rejects.toThrow(/collides with a verified native output/);
+    } finally {
+      rmSync(collidingProject, { recursive: true, force: true });
+    }
+  });
+
+  test("snapshot and grading agree on a symlink planted by setup", async () => {
+    const discovered = discoverHappyScenario();
+    const sandbox = await assembleSandbox(
+      {
+        runRoot,
+        projectRoot,
+        scenario: {
+          ...discovered,
+          scenario: {
+            ...discovered.scenario,
+            name: "setup-symlink",
+            task: {
+              ...discovered.scenario.task,
+              setup: ["ln", "-s", "src/index.ts", "planted-link.ts"],
+            },
+            checks: [{ type: "file-unchanged", path: "planted-link.ts" }],
+          },
+        },
+        trialIndex: 6,
+        budget: resolveBudget({ evalConfig: undefined }),
+        keep: false,
+      },
+      () => {},
+    );
+    try {
+      // The snapshot must not hash through the symlink: pre-lstat it stored
+      // the target's content hash, so a host swapping the link for a file
+      // with identical bytes would have graded as unchanged.
+      expect(sandbox.snapshot[0]?.hash).toBeNull();
+      // Grading refuses the symlink outright instead of following it.
+      const [result] = await runChecks(sandbox, [
+        { type: "file-unchanged", path: "planted-link.ts" },
+      ]);
+      expect(result?.verdict).toBe("error");
+    } finally {
+      destroySandbox(sandbox);
     }
   });
 

@@ -10,7 +10,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parsePorcelainPaths, runChecks } from "../src/checks.js";
+import { runChecks } from "../src/checks.js";
 import type { Sandbox } from "../src/sandbox.js";
 
 function fakeSandbox(files: Record<string, string>): Sandbox {
@@ -442,12 +442,32 @@ describe("runChecks", () => {
     expect(results).toHaveLength(2);
     expect(results.every((result) => result.verdict === "fail")).toBe(true);
   });
-});
 
-describe("parsePorcelainPaths", () => {
-  test("handles modifications, untracked files, and renames", () => {
-    expect(
-      parsePorcelainPaths(" M src/a.ts\n?? src/b.ts\nR  old.ts -> new.ts\n"),
-    ).toEqual(["src/a.ts", "src/b.ts", "old.ts", "new.ts"]);
+  test("check paths cannot traverse out of the sandbox", async () => {
+    const sandbox = sandboxOf({});
+    for (const path of ["../escape.ts", "/etc/passwd", "ok/../../escape.ts"]) {
+      const [result] = await runChecks(sandbox, [
+        { type: "file-exists", path },
+      ]);
+      expect(result?.verdict).toBe("error");
+      expect(JSON.stringify(result?.evidence)).toContain(
+        "must resolve inside the sandbox",
+      );
+    }
+  });
+
+  test("an invalid outputMatches pattern is an error, not a throw", async () => {
+    const sandbox = sandboxOf({});
+    const [result] = await runChecks(sandbox, [
+      {
+        type: "command",
+        run: ["true"],
+        expectExit: 0,
+        outputMatches: "([unclosed",
+        timeoutMs: 5000,
+      },
+    ]);
+    expect(result?.verdict).toBe("error");
+    expect(JSON.stringify(result?.evidence)).toContain("outputMatches");
   });
 });

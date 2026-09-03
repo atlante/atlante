@@ -8,6 +8,7 @@ import {
 import { basename, dirname, join, resolve } from "node:path";
 import { loadProject, type ProjectContext } from "@atlante/builder";
 import {
+  checkOpenCodeAuth,
   createOpenCodeRunner,
   EvalRunError,
   type HostRunner,
@@ -62,6 +63,25 @@ export async function runEvalCommand(
 
   const host =
     runner ?? createOpenCodeRunner({ projectRoot: prepared.projectRoot });
+  // The default runner needs stored credentials; without them every trial
+  // would fail individually. Missing auth is run-preventing infrastructure.
+  if (runner === undefined) {
+    const auth = checkOpenCodeAuth();
+    if (!auth.authenticated) {
+      printDiagnostics([
+        error(
+          "eval-host-unauthenticated",
+          `opencode authentication not found at ${auth.path}`,
+          {
+            source: diagnosticPath(auth.path),
+            expected: "host credentials stored by OpenCode",
+            next: "run `opencode` and sign in once, then re-run this command",
+          },
+        ),
+      ]);
+      return 3;
+    }
+  }
   let report: RunReport;
   try {
     report = await runEval({
@@ -107,11 +127,26 @@ export async function runEvalCommand(
     return reportPublishFailure(prepared.projectRoot, options.out, cause);
   }
   if (options.json) {
+    warnUnmonitoredBudget(report);
     console.log(JSON.stringify(report, null, 2));
   } else {
     printSummary(report, reportDir);
   }
   return runExitCode(report);
+}
+
+/** `budgetUnmonitored` must reach operators in both output modes. */
+function warnUnmonitoredBudget(report: RunReport): void {
+  if (!hasUnmonitoredBudget(report)) return;
+  console.error(
+    "warning: token budget unmonitored for one or more trials (no usage events were observed)",
+  );
+}
+
+function hasUnmonitoredBudget(report: RunReport): boolean {
+  return Object.values(report.scenarios).some((result) =>
+    result.trials.some((trial) => trial.budgetUnmonitored === true),
+  );
 }
 
 type PreparedEval = {
@@ -378,10 +413,8 @@ function printSummary(report: RunReport, reportDir: string): void {
   console.log(
     `host ${report.meta.host} · model ${report.meta.model ?? "host default"}`,
   );
-  const hasUnmonitoredBudget = Object.values(report.scenarios).some((result) =>
-    result.trials.some((trial) => trial.budgetUnmonitored === true),
-  );
-  if (hasUnmonitoredBudget) {
+  const hasUnmonitored = hasUnmonitoredBudget(report);
+  if (hasUnmonitored) {
     console.log(
       "warning: token budget unmonitored for one or more trials (no usage events were observed)",
     );

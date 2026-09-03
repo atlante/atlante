@@ -154,6 +154,27 @@ describe("prepareHostIntegration", () => {
     ).toThrow(/ownership manifest is missing/);
   });
 
+  test("rejects a fixture-provided opencode.jsonc that would shadow the generated config", () => {
+    const config = join(projectRoot, "opencode.json");
+    writeFileSync(config, JSON.stringify({}));
+    try {
+      const runner = createOpenCodeRunner({
+        projectRoot,
+        authPath: authFile,
+      });
+      const project = tempDir("eval-sandbox-jsonc-");
+      writeFileSync(join(project, "opencode.jsonc"), "{}\n");
+      expect(() =>
+        runner.prepareHostIntegration(
+          sandboxFor(project, tempDir("eval-state-jsonc-")),
+          {},
+        ),
+      ).toThrow(/opencode\.jsonc/);
+    } finally {
+      rmSync(config, { force: true });
+    }
+  });
+
   test("fails closed when host auth is missing", () => {
     // Own config: this test must not depend on config left behind by an
     // earlier test in the file.

@@ -369,6 +369,68 @@ describe("runEvalCommand", () => {
     }
   });
 
+  test("--json mode still warns about an unmonitored budget on stderr", async () => {
+    const project = evalProject();
+    await buildFixtureOutputs(project);
+    const out = tempDir();
+    const logs: string[] = [];
+    const errors: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation(
+      (...parts: unknown[]) => {
+        logs.push(parts.join(" "));
+      },
+    );
+    const errorSpy = spyOn(console, "error").mockImplementation(
+      (...parts: unknown[]) => {
+        errors.push(parts.join(" "));
+      },
+    );
+    try {
+      const exit = await runEvalCommand(
+        project,
+        { json: true, out },
+        undefined,
+        fakeRunner(true, true),
+      );
+      expect(exit).toBe(0);
+      expect(errors.some((line) => line.includes("budget unmonitored"))).toBe(
+        true,
+      );
+      // stdout stays parseable JSON.
+      JSON.parse(logs.join("\n"));
+    } finally {
+      logSpy.mockRestore();
+      errorSpy.mockRestore();
+    }
+  });
+
+  test("exits 3 with a diagnostic when the default runner has no host auth", async () => {
+    const project = evalProject();
+    await buildFixtureOutputs(project);
+    // Point the auth preflight at an empty data dir; injected runners skip
+    // the preflight entirely.
+    const emptyDataHome = tempDir();
+    const previous = process.env.XDG_DATA_HOME;
+    process.env.XDG_DATA_HOME = emptyDataHome;
+    const errors: string[] = [];
+    const errorSpy = spyOn(console, "error").mockImplementation(
+      (...parts: unknown[]) => {
+        errors.push(parts.join(" "));
+      },
+    );
+    try {
+      const exit = await runEvalCommand(project, {}, undefined);
+      expect(exit).toBe(3);
+      expect(errors.join("\n")).toContain("eval-host-unauthenticated");
+      // No report was published: the run never started.
+      expect(existsSync(join(project, ".atlante", "eval"))).toBe(false);
+    } finally {
+      errorSpy.mockRestore();
+      if (previous === undefined) delete process.env.XDG_DATA_HOME;
+      else process.env.XDG_DATA_HOME = previous;
+    }
+  });
+
   test("returns 3 when the report cannot be written", async () => {
     const project = evalProject();
     await buildFixtureOutputs(project);

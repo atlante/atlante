@@ -147,6 +147,10 @@ npx @atlante/cli@latest eval [path] --keep
   section's `scenarios` glob.
 - `--trials <n>` overrides the configured number of trials for this run.
 - `--json` prints the report JSON to stdout instead of the human summary.
+  Warnings (for example an unmonitored token budget) go to stderr in this
+  mode; a trial whose host emitted no usage events carries
+  `budgetUnmonitored: true`, meaning `maxTokens` could not be enforced and
+  only the trial timeout bounded spend.
 - `--out <dir>` writes the report under the given directory instead of
   `<project>/.atlante/eval`.
 - `--keep` preserves the trial sandboxes for inspection instead of deleting
@@ -161,7 +165,8 @@ materialized native OpenCode outputs, and an authenticated OpenCode host:
 {
   "eval": {
     "host": "opencode",
-    "scenarios": "eval/scenarios/*.eval.json",
+    // Scenario documents may be .json or .jsonc; a trailing star matches both.
+    "scenarios": "eval/scenarios/*.eval.json*",
     "model": "anthropic/claude-sonnet-4-5",
     "budget": {
       "trials": 3,
@@ -177,7 +182,11 @@ Scenario documents validate against
 [`https://atlante.sh/schema/v0.1/eval-scenario.json`](https://atlante.sh/schema/v0.1/eval-scenario.json).
 Each names a fixture directory copied as the sandbox root, a prompt, and at
 least one check (`command`, `file-exists`, `file-absent`, `file-contains`,
-`file-unchanged`, `diff-allowlist`). The report is written to
+`file-unchanged`, `diff-allowlist`). Fixtures must not ship host-owned files:
+a fixture `.opencode` file colliding with a native output fails the trial with
+a rename-or-remove diagnostic, and a fixture `opencode.jsonc` is rejected
+because OpenCode would prefer it over the generated `opencode.json` (which
+always wins over a fixture-provided `opencode.json`). The report is written to
 `<project>/.atlante/eval/<run-id>/report.json`; that location is gitignored.
 `atlante eval` never builds: run `atlante build` first, and again whenever the
 sources change.
@@ -189,9 +198,10 @@ sources change.
   trial-level infrastructure error, or was skipped by the session cap.
 - `2` validation failed: missing or broken configuration or `eval` section,
   invalid scenario documents, or missing/stale native outputs.
-- `3` an infrastructure error prevented the run from executing at all; when a
-  run ID exists, the partial report is still written before the error is
-  returned.
+- `3` an infrastructure error prevented the run from executing at all —
+  including an unauthenticated host, which is reported before any trial runs;
+  when a run ID exists, the partial report is still written before the error
+  is returned.
 
 ## Exit status
 

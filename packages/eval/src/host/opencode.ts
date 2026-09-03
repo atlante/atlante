@@ -40,6 +40,19 @@ function defaultAuthPath(): string {
 }
 
 /**
+ * Run-preventing infrastructure preflight: reports whether the host has
+ * stored credentials, so a missing auth file fails the run before any trial
+ * executes instead of failing every trial individually.
+ */
+export function checkOpenCodeAuth(authPath?: string): {
+  path: string;
+  authenticated: boolean;
+} {
+  const path = authPath ?? defaultAuthPath();
+  return { path, authenticated: existsSync(path) };
+}
+
+/**
  * Containment is opencode tool-level policy, NOT OS-level isolation, and it
  * is identical for every compared variant. The forced denials below close the
  * host's own web/search/external-directory tools and the most destructive
@@ -207,6 +220,14 @@ export function createOpenCodeRunner(
       const config = readHostConfig(projectRoot);
       config.$schema = "https://opencode.ai/config.json";
 
+      // OpenCode prefers a root opencode.jsonc over opencode.json, so a
+      // fixture-provided jsonc would silently bypass host integration.
+      if (existsSync(join(sandbox.root, "opencode.jsonc"))) {
+        throw new Error(
+          "the fixture provides opencode.jsonc, which OpenCode would prefer over the generated opencode.json; remove it from the fixture",
+        );
+      }
+
       // Auth injection: credentials stay with the host; the sandbox data dir
       // is where the redirected XDG_DATA_HOME will look for them.
       const authTarget = join(
@@ -245,6 +266,9 @@ export function createOpenCodeRunner(
       config.permission = mergePermissionBaseline(config.permission);
 
       mkdirSync(sandbox.root, { recursive: true });
+      // Host integration is authoritative: this generated opencode.json
+      // intentionally replaces a fixture-provided one (a fixture jsonc is
+      // rejected above because OpenCode would prefer it over this file).
       writeFileSync(
         join(sandbox.root, "opencode.json"),
         `${JSON.stringify(config, null, 2)}\n`,

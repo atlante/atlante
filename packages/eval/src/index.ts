@@ -1,4 +1,4 @@
-export { parsePorcelainPaths, runChecks } from "./checks.js";
+export { runChecks } from "./checks.js";
 export type { ResolvedBudget } from "./config.js";
 export {
   resolveBudget,
@@ -7,6 +7,7 @@ export {
 } from "./config.js";
 export type { OpenCodeRunnerOptions } from "./host/opencode.js";
 export {
+  checkOpenCodeAuth,
   createOpenCodeRunner,
   extractModelIdentifiers,
   mergePermissionBaseline,

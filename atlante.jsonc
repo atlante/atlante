@@ -9,7 +9,7 @@
   // real model calls through the host, so they never run in CI.
   "eval": {
     "host": "opencode",
-    "scenarios": "eval/scenarios/*.eval.json",
+    "scenarios": "eval/scenarios/*.eval.json*",
     "budget": {
       "trials": 2,
       "timeoutMs": 300000,

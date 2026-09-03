@@ -7,7 +7,6 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
-  statSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -208,7 +207,9 @@ export function destroySandbox(sandbox: Sandbox): void {
 }
 
 function sha256File(path: string): string | null {
-  const stat = statSync(path, { throwIfNoEntry: false });
+  // lstat so the snapshot sees exactly what grading sees: a symlink is not a
+  // file on either side.
+  const stat = lstatSync(path, { throwIfNoEntry: false });
   if (!stat?.isFile()) return null;
   return createHash("sha256").update(readFileSync(path)).digest("hex");
 }
@@ -286,6 +287,15 @@ function copyNativeFiles(
     const target = join(root, ...file.path.split("/"));
     assertNoSymlinkPath(root, target, "native output");
     mkdirSync(dirname(target), { recursive: true });
-    writeFileSync(target, file.bytes, { flag: "wx" });
+    try {
+      writeFileSync(target, file.bytes, { flag: "wx" });
+    } catch (cause) {
+      if ((cause as NodeJS.ErrnoException)?.code === "EEXIST") {
+        throw new Error(
+          `fixture file collides with a verified native output at ${file.path}; rename or remove it in the fixture`,
+        );
+      }
+      throw cause;
+    }
   }
 }

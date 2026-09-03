@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { lstatSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import type { EvalCheck } from "@atlante/schema";
 import { clearIndexFlags, parseGitNameList, runSandboxGit } from "./git.js";
 import type { Sandbox } from "./sandbox.js";
@@ -44,6 +44,11 @@ type SafePath = { absolute: string } | { unsafe: string };
  */
 function noFollowPath(sandbox: Sandbox, path: string): SafePath {
   try {
+    // Defense in depth against direct API callers that bypass schema
+    // validation: only sandbox-relative, non-traversing paths are walked.
+    if (isAbsolute(path) || path.split(/[\\/]+/).includes("..")) {
+      return { unsafe: "check path must resolve inside the sandbox" };
+    }
     let current = sandbox.root;
     const rootStat = lstatSync(current, { throwIfNoEntry: false });
     if (rootStat?.isSymbolicLink()) {
@@ -100,8 +105,18 @@ async function commandCheck(
   if (outcome.timedOut) return fail(evidence);
   if (outcome.exit !== check.expectExit) return fail(evidence);
   if (check.outputMatches !== undefined) {
-    const matched = new RegExp(check.outputMatches).test(combined);
     evidence.outputMatches = check.outputMatches;
+    // Schema validation guarantees a compilable pattern on the discovery
+    // path; programmatic callers get an error verdict instead of a throw.
+    let matched: boolean;
+    try {
+      matched = new RegExp(check.outputMatches).test(combined);
+    } catch (cause) {
+      return errorVerdict({
+        run: check.run,
+        cause: `invalid outputMatches pattern: ${cause instanceof Error ? cause.message : String(cause)}`,
+      });
+    }
     if (!matched) return fail(evidence);
   }
   return { verdict: "pass", evidence };
@@ -242,25 +257,6 @@ async function diffAllowlistCheck(
   return unexpected.length === 0
     ? PASS
     : fail({ allow: [...allowSet], unexpected, changed });
-}
-
-/**
- * Parses `git status --porcelain` v1 output into project-relative paths.
- * Rename entries contribute both the old and the new path.
- */
-export function parsePorcelainPaths(stdout: string): string[] {
-  const paths: string[] = [];
-  for (const line of stdout.split("\n")) {
-    if (line.length < 4) continue;
-    const body = line.slice(3);
-    const arrow = body.indexOf(" -> ");
-    if (arrow >= 0) {
-      paths.push(body.slice(0, arrow), body.slice(arrow + 4));
-    } else {
-      paths.push(body);
-    }
-  }
-  return paths;
 }
 
 /**
