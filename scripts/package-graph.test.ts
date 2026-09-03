@@ -1,8 +1,18 @@
 import { expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { lockSyncIssues } from "./package-graph";
 
 const ROOT = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 // Packages are listed in architectural layer order, lowest layer first; keep
@@ -91,38 +101,105 @@ test("keeps resources private and synchronizes exactly eight workspaces", () => 
   expect(release).toContain("const PACKAGES = [");
 });
 
-// bun.lock is machine-generated JSONC (trailing commas); normalize them and
-// parse strictly. A malformed strip fails loudly below instead of silently
-// letting stale lockfile bookkeeping strand into an unrelated PR.
-function readLockfile(): {
-  workspaces: Record<
-    string,
-    { version?: string; dependencies?: Record<string, string> }
-  >;
-} {
-  return JSON.parse(
-    readFileSync(join(ROOT, "bun.lock"), "utf8").replace(/,(\s*[}\]])/g, "$1"),
+// The release flow refreshes bun.lock, and release.ts asserts this same
+// invariant through the shared helper before committing a release (v0.1.21
+// shipped a stale lock because nothing gate-checked it there).
+test("keeps bun.lock synchronized with the workspace manifests", () => {
+  expect(
+    lockSyncIssues({
+      packages: PACKAGES,
+      pins: [{ manifest: "website/package.json", dependency: "@atlante/cli" }],
+    }),
+  ).toEqual([]);
+});
+
+function writeLockFixture(root: string, lock: string) {
+  writeFileSync(join(root, "bun.lock"), lock);
+  mkdirSync(join(root, "packages", "cli"), { recursive: true });
+  writeFileSync(
+    join(root, "packages", "cli", "package.json"),
+    JSON.stringify({ name: "@atlante/cli", version: "0.2.0" }),
+  );
+  mkdirSync(join(root, "website"), { recursive: true });
+  writeFileSync(
+    join(root, "website", "package.json"),
+    JSON.stringify({
+      name: "website",
+      dependencies: { "@atlante/cli": "0.2.0" },
+    }),
   );
 }
 
-// The release flow refreshes bun.lock, but nothing else asserted lockfile
-// consistency, so v0.1.19 stranded 0.1.18 workspace entries and a stale
-// website pin until an unrelated PR reconciled them.
-test("keeps bun.lock synchronized with the workspace manifests", () => {
-  const lock = readLockfile();
+function fixtureIssues(root: string, lock: string) {
+  writeLockFixture(root, lock);
+  return lockSyncIssues(
+    {
+      packages: ["cli"],
+      pins: [{ manifest: "website/package.json", dependency: "@atlante/cli" }],
+    },
+    root,
+  );
+}
 
-  for (const name of PACKAGES) {
+test("reports stale workspace versions and pins", () => {
+  const root = mkdtempSync(join(tmpdir(), "package-graph-"));
+  try {
     expect(
-      lock.workspaces[`packages/${name}`]?.version,
-      `bun.lock workspace entry for packages/${name} is stale`,
-    ).toBe(readJson(join(ROOT, "packages", name, "package.json")).version);
+      fixtureIssues(
+        root,
+        `{
+  "workspaces": {
+    "packages/cli": { "version": "0.1.0", },
+    "website": { "dependencies": { "@atlante/cli": "0.1.0", }, },
+  },
+}`,
+      ),
+    ).toEqual([
+      "packages/cli has version 0.1.0 in bun.lock but packages/cli/package.json declares 0.2.0",
+      "website pins @atlante/cli to 0.1.0 in bun.lock but website/package.json declares 0.2.0",
+    ]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
+});
 
-  const website = readJson(join(ROOT, "website", "package.json"));
-  expect(
-    lock.workspaces.website?.dependencies?.["@atlante/cli"],
-    "bun.lock website @atlante/cli pin is stale",
-  ).toBe((website.dependencies as Record<string, string>)["@atlante/cli"]);
+test("reports missing workspace entries and accepts JSONC trailing commas", () => {
+  const root = mkdtempSync(join(tmpdir(), "package-graph-"));
+  try {
+    expect(
+      fixtureIssues(
+        root,
+        `{
+  "workspaces": {
+    "website": { "dependencies": { "@atlante/cli": "0.2.0" } },
+  },
+}`,
+      ),
+    ).toEqual([
+      "packages/cli has version <missing> in bun.lock but packages/cli/package.json declares 0.2.0",
+    ]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("accepts a synchronized lock", () => {
+  const root = mkdtempSync(join(tmpdir(), "package-graph-"));
+  try {
+    expect(
+      fixtureIssues(
+        root,
+        `{
+  "workspaces": {
+    "packages/cli": { "version": "0.2.0" },
+    "website": { "dependencies": { "@atlante/cli": "0.2.0" } },
+  },
+}`,
+      ),
+    ).toEqual([]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("keeps only pack, CLI, and OpenCode publishable", () => {
