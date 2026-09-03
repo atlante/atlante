@@ -31,9 +31,8 @@ npx atlante init
 `init` scaffolds `atlante.jsonc`, materializes the initial native outputs, and
 enforces the ignore policy: `.opencode/agents/`, `.opencode/skills/`, and
 `.atlante/` are added to `.gitignore`, so generated files stay local. If an
-older Atlante version registered `@atlante/opencode` as an OpenCode plugin,
-`init` removes that registration. Existing host settings in the OpenCode
-config are preserved.
+Atlante-written `@atlante/opencode` plugin registration is present, `init`
+removes it. Existing host settings in the OpenCode config are preserved.
 You do not need to create a second onboarding configuration.
 
 The generated source selects the default first-party preset:

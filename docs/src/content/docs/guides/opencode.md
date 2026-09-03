@@ -4,18 +4,18 @@ description: Materialize Atlante agents and skills as OpenCode-native files.
 ---
 
 [OpenCode](https://opencode.ai/) is the supported host in Atlante v0.1. A
-build materializes your agents and skills as OpenCode-native files; there is
-no runtime plugin and no intermediate payload tree. Host-owned settings stay
-under OpenCode's control.
+build materializes your agents and skills as OpenCode-native files; Atlante
+does not use a runtime plugin or an intermediate payload tree. Host-owned
+settings stay under OpenCode's control.
 
 ## No registration needed
 
-Older Atlante versions registered `@atlante/opencode` as an OpenCode plugin in
-`opencode.jsonc` (or an existing `opencode.json`). That plugin no longer
-exists. `atlante init` removes the Atlante-written registration; the harmless
-`"plugin": []` residue it may leave requires no action. A stale registration
-in a project that has not been re-initialized is inert: OpenCode silently
-drops packages that expose no plugin target.
+Atlante does not require an OpenCode plugin registration or an
+`@atlante/opencode` dependency. `atlante init` removes an Atlante-written
+registration from `opencode.jsonc` (or an existing `opencode.json`) while
+preserving other host settings. The harmless `"plugin": []` residue it may
+leave requires no action. A registration that remains before `init` runs is
+inert: OpenCode silently drops packages that expose no plugin target.
 
 ## Build the native files
 The optional `atlante eval` command reads the verified native outputs the build

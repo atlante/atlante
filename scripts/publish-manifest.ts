@@ -11,10 +11,7 @@ type Manifest = {
 // registry as-is, so staging rewrites it to the released caret range; a
 // workspace range on any other workspace package can never resolve and stays
 // forbidden.
-const PUBLISHED_PACKAGES: ReadonlySet<string> = new Set([
-  "@atlante/pack",
-  "@atlante/opencode",
-]);
+const PUBLISHED_PACKAGES: ReadonlySet<string> = new Set(["@atlante/pack"]);
 
 function stagedManifest(manifest: Manifest, version: string): Manifest {
   const dependencies = manifest.dependencies;

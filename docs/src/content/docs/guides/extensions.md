@@ -40,10 +40,12 @@ Atlante reads only selected static resources and their transitive dependencies.
 
 ## Know what is public
 
-The publishable packages are `@atlante/pack`, `@atlante/cli`, and
-`@atlante/opencode` (the OpenCode host materializer). The `@atlante/resources`,
-`@atlante/validator`, `@atlante/schema`, and `@atlante/builder` workspaces are
-private implementation packages, not public installation targets.
+The publishable packages are `@atlante/pack` and `@atlante/cli`. The
+`@atlante/opencode` workspace is an internal host materializer bundled into the
+CLI, not an installation target. The `@atlante/resources`,
+`@atlante/validator`, `@atlante/schema`, `@atlante/builder`, and `@atlante/eval`
+workspaces are private implementation packages, not public installation
+targets.
 
 ## Know the runtime boundary
 
