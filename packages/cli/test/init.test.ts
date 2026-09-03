@@ -1050,6 +1050,10 @@ describe("runInit", () => {
 
     expect(result.result).toBe(1);
     expect(result.errors.join("\n")).toContain("pack-not-installed");
+    // The hoisting is explained: the install resolved at the workspace root,
+    // so the generic install hint would be a dead end.
+    expect(result.errors.join("\n")).toContain(`workspace root ${workspace}`);
+    expect(result.errors.join("\n")).not.toContain("`pnpm install` manually");
     // The hoisted install is not accepted, and the transaction still restores
     // the member manifest and the shared root lockfile.
     const manifest = JSON.parse(
@@ -1058,6 +1062,32 @@ describe("runInit", () => {
     expect(manifest.devDependencies).toBeUndefined();
     expect(readFileSync(rootLockfile, "utf8")).toBe(originalLockfile);
     expect(existsSync(join(app, "atlante.jsonc"))).toBe(false);
+  });
+
+  test("keeps the generic install hint without a hoisting dependency root", async () => {
+    // With no ancestor lockfile the dependency root is the project itself, so
+    // a missing entry is an ordinary install failure and the generic hint is
+    // still the right recovery.
+    const dir = tempDirWithoutUserPack();
+
+    const result = await captureErrors(() =>
+      runInitWithDependencies(
+        dir,
+        { pack: EXTERNAL_PACK },
+        {
+          // The add "succeeds" but places nothing in the project's own
+          // node_modules, so the entry check fails with no hoisting involved.
+          runPackageManager: () => ({ ok: true, status: 0 }),
+          isInteractive: () => false,
+        },
+      ),
+    );
+
+    expect(result.result).toBe(1);
+    expect(result.errors.join("\n")).toContain("pack-not-installed");
+    expect(result.errors.join("\n")).toContain("manually");
+    expect(result.errors.join("\n")).not.toContain("workspace root");
+    expect(existsSync(join(dir, "atlante.jsonc"))).toBe(false);
   });
 
   test("surfaces the spawn error when the package manager binary is missing", async () => {
