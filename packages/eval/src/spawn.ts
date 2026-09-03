@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { URL } from "node:url";
 
 export type CommandOutcome = {
   exit: number | null;
@@ -10,6 +11,63 @@ export type CommandOutcome = {
 };
 
 const DEFAULT_KILL_GRACE_MS = 5_000;
+
+/**
+ * Host environment variables that may reach a child process launched after a
+ * model-controlled trial. Credentials travel through the isolated host state
+ * directory, so only execution basics and sanitized proxy routing are kept.
+ */
+const ENV_ALLOWLIST = Object.freeze([
+  "PATH",
+  "HOME",
+  "LANG",
+  "LC_ALL",
+  "TMPDIR",
+  "HTTP_PROXY",
+  "HTTPS_PROXY",
+  "NO_PROXY",
+  "http_proxy",
+  "https_proxy",
+  "no_proxy",
+] as const);
+
+/**
+ * Picks a safe subset of the host environment for children that execute after
+ * model-controlled code. No-proxy lists are host names and CIDR ranges, not
+ * URLs, so they pass through unchanged; proxy URLs lose userinfo, while
+ * unparseable and scheme-less values are dropped.
+ */
+export function pickAllowedEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const picked: NodeJS.ProcessEnv = {};
+  for (const key of ENV_ALLOWLIST) {
+    const value = env[key];
+    if (value === undefined) continue;
+    if (key.toLowerCase() === "no_proxy") {
+      picked[key] = value;
+      continue;
+    }
+    if (key.endsWith("_PROXY") || key.endsWith("_proxy")) {
+      const sanitized = sanitizeProxyValue(value);
+      if (sanitized !== undefined) picked[key] = sanitized;
+      continue;
+    }
+    picked[key] = value;
+  }
+  return picked;
+}
+
+/** Keeps proxy routing while removing URL userinfo from a child env. */
+function sanitizeProxyValue(value: string): string | undefined {
+  try {
+    const proxy = new URL(value);
+    if (proxy.hostname === "") return undefined;
+    proxy.username = "";
+    proxy.password = "";
+    return proxy.toString();
+  } catch {
+    return undefined;
+  }
+}
 
 /**
  * Runs an argv array in a directory without a shell, with an in-flight

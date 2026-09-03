@@ -14,7 +14,7 @@ import {
   destroyRunRoot,
   destroySandbox,
 } from "./sandbox.js";
-import { runCommand } from "./spawn.js";
+import { pickAllowedEnv, runCommand } from "./spawn.js";
 import {
   type RunReport,
   scenarioStatistics,
@@ -424,19 +424,27 @@ const DIFF_EVIDENCE_LIMIT = 20_000;
 async function sandboxDiff(sandbox: Sandbox): Promise<string> {
   // Stage all current paths so git diff HEAD also includes untracked and
   // ignored files created by the host after the baseline commit.
-  const staged = await runCommand(["git", "add", "--all", "--force"], {
-    cwd: sandbox.root,
-    timeoutMs: 60_000,
-  });
+  const staged = await runCommand(
+    ["git", "-c", "core.fsmonitor=false", "add", "--all", "--force"],
+    {
+      cwd: sandbox.root,
+      timeoutMs: 60_000,
+      env: pickAllowedEnv(process.env),
+    },
+  );
   if (staged.spawnError !== undefined || staged.exit !== 0) {
     throw new Error(
       `could not collect sandbox diff: git add exited ${staged.exit}: ${staged.spawnError ?? staged.stderr.slice(-400)}`,
     );
   }
-  const outcome = await runCommand(["git", "diff", "HEAD"], {
-    cwd: sandbox.root,
-    timeoutMs: 60_000,
-  });
+  const outcome = await runCommand(
+    ["git", "-c", "core.fsmonitor=false", "diff", "HEAD"],
+    {
+      cwd: sandbox.root,
+      timeoutMs: 60_000,
+      env: pickAllowedEnv(process.env),
+    },
+  );
   if (outcome.spawnError !== undefined || outcome.exit !== 0) {
     throw new Error(
       `could not collect sandbox diff: git diff exited ${outcome.exit}: ${outcome.spawnError ?? outcome.stderr.slice(-400)}`,

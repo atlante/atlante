@@ -166,6 +166,8 @@ export async function assembleSandbox(
         "user.email=atlante-eval@atlante.local",
         "-c",
         "commit.gpgsign=false",
+        "-c",
+        "core.fsmonitor=false",
         ...argv,
       ],
       { cwd: root, timeoutMs: 60_000 },

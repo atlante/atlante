@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   rmSync,
@@ -41,6 +42,58 @@ afterAll(() => {
 });
 
 describe("runChecks", () => {
+  test("command checks run with an allowlisted environment", async () => {
+    const marker = "ATLANTE_EVAL_CHECK_SECRET";
+    const previous = process.env[marker];
+    process.env[marker] = "must-not-reach-check";
+    try {
+      const sandbox = sandboxOf({});
+      const [result] = await runChecks(sandbox, [
+        {
+          type: "command",
+          run: ["sh", "-c", `test -z "$${marker}"`],
+          expectExit: 0,
+          timeoutMs: 5000,
+        },
+      ]);
+      expect(result?.verdict).toBe("pass");
+    } finally {
+      if (previous === undefined) delete process.env[marker];
+      else process.env[marker] = previous;
+    }
+  });
+
+  test("diff checks disable repository fsmonitor commands", async () => {
+    const root = mkdtempSync(join(tmpdir(), "eval-diff-fsmonitor-"));
+    cleanup.push(root);
+    const canary = join(root, "fsmonitor-ran");
+    const fsmonitor = join(root, "fsmonitor.sh");
+    writeFileSync(fsmonitor, `#!/bin/sh\ntouch '${canary}'\n`);
+    chmodSync(fsmonitor, 0o755);
+    const git = async (argv: string[]) => {
+      await Bun.$`git ${argv}`.cwd(root).quiet();
+    };
+    await git(["init"]);
+    await git(["-c", "user.name=t", "-c", "user.email=t@t", "add", "--all"]);
+    await git([
+      "-c",
+      "user.name=t",
+      "-c",
+      "user.email=t@t",
+      "commit",
+      "--allow-empty",
+      "-m",
+      "base",
+    ]);
+    await git(["config", "core.fsmonitor", fsmonitor]);
+
+    const [result] = await runChecks({ root, snapshot: [], keep: false }, [
+      { type: "diff-allowlist", allow: ["allowed.ts"] },
+    ]);
+    expect(result?.verdict).toBe("pass");
+    expect(existsSync(canary)).toBe(false);
+  });
+
   test("command check: exit code and output match", async () => {
     const sandbox = sandboxOf({});
     const results = await runChecks(sandbox, [

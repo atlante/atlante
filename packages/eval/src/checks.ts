@@ -3,7 +3,7 @@ import { lstatSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { EvalCheck } from "@atlante/schema";
 import type { Sandbox } from "./sandbox.js";
-import { runCommand } from "./spawn.js";
+import { pickAllowedEnv, runCommand } from "./spawn.js";
 import type { CheckResult, CheckType, CheckVerdict } from "./types.js";
 
 /** Evidence output is capped so reports stay readable. */
@@ -78,6 +78,7 @@ async function commandCheck(
   const outcome = await runCommand(check.run, {
     cwd: sandbox.root,
     timeoutMs: check.timeoutMs,
+    env: pickAllowedEnv(process.env),
   });
   if (outcome.spawnError !== undefined) {
     return errorVerdict({
@@ -198,6 +199,8 @@ async function diffAllowlistCheck(
   const outcome = await runCommand(
     [
       "git",
+      "-c",
+      "core.fsmonitor=false",
       // Literal paths: default quoting C-escapes non-ASCII/special names,
       // which would false-fail the allowlist and corrupt report evidence.
       "-c",
@@ -207,7 +210,11 @@ async function diffAllowlistCheck(
       "--untracked-files=all",
       "--ignored=matching",
     ],
-    { cwd: sandbox.root, timeoutMs: 60_000 },
+    {
+      cwd: sandbox.root,
+      timeoutMs: 60_000,
+      env: pickAllowedEnv(process.env),
+    },
   );
   if (outcome.exit !== 0 || outcome.spawnError !== undefined) {
     return errorVerdict({

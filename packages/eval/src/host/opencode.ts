@@ -9,7 +9,6 @@ import {
 import { createRequire } from "node:module";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join } from "node:path";
-import { URL } from "node:url";
 import { readArtifacts } from "@atlante/artifacts/read-only";
 import { parseJsonc } from "@atlante/validator";
 import type {
@@ -18,7 +17,7 @@ import type {
   TrialRun,
   TrialRunOutcome,
 } from "../runner.js";
-import { killTree } from "../spawn.js";
+import { killTree, pickAllowedEnv } from "../spawn.js";
 
 export const OPENCODE_BINARY = "opencode";
 const ATLANTE_PLUGIN_NAME = "@atlante/opencode";
@@ -49,7 +48,7 @@ function defaultAuthPath(): string {
  * bash prefixes, but the bash tool still runs with ordinary user access to
  * the network and host filesystem. Fixture content is exactly the
  * prompt-injection surface eval grades, so the child environment is
- * allowlisted separately (see ENV_ALLOWLIST): model-controlled bash can read
+ * allowlisted separately by `pickAllowedEnv`: model-controlled bash can read
  * its own process env, and it must not be able to read the host's secrets.
  */
 const FORCED_DENIALS = Object.freeze({
@@ -80,66 +79,6 @@ const BASELINE_DEFAULTS = Object.freeze({
 } as const);
 const PERMISSION_ACTIONS = new Set(["allow", "deny", "ask"]);
 
-/**
- * Host environment variables the spawned `opencode run` may inherit. The
- * credentials the host needs travel via the injected auth.json, not env
- * vars, so the allowlist covers execution basics and proxies only after URL
- * credentials are scrubbed. A prompt-injected `env | curl …` inside the
- * sandbox then finds nothing of the caller's shell environment to exfiltrate.
- */
-const ENV_ALLOWLIST = Object.freeze([
-  "PATH",
-  "HOME",
-  "LANG",
-  "LC_ALL",
-  "TMPDIR",
-  "HTTP_PROXY",
-  "HTTPS_PROXY",
-  "NO_PROXY",
-  "http_proxy",
-  "https_proxy",
-  "no_proxy",
-] as const);
-
-function pickAllowedEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-  const picked: NodeJS.ProcessEnv = {};
-  for (const key of ENV_ALLOWLIST) {
-    const value = env[key];
-    if (value === undefined) continue;
-    // No-proxy lists carry host names and CIDR ranges, not URLs: routing
-    // them through the sanitizer would drop them and silently change the
-    // proxied network topology the trial runs in.
-    if (key.toLowerCase() === "no_proxy") {
-      picked[key] = value;
-      continue;
-    }
-    if (key.endsWith("_PROXY") || key.endsWith("_proxy")) {
-      const sanitized = sanitizeProxyValue(value);
-      if (sanitized !== undefined) picked[key] = sanitized;
-      continue;
-    }
-    picked[key] = value;
-  }
-  return picked;
-}
-
-/** Keeps proxy routing while removing URL userinfo from the child env. */
-function sanitizeProxyValue(value: string): string | undefined {
-  try {
-    const proxy = new URL(value);
-    // Scheme-less forms (`user:pass@proxy:8080`, `host:port`) parse as
-    // opaque values with an empty hostname: credentials cannot be located
-    // reliably, so the whole value is dropped.
-    if (proxy.hostname === "") return undefined;
-    proxy.username = "";
-    proxy.password = "";
-    return proxy.toString();
-  } catch {
-    // Do not pass an unparseable proxy value through: it may encode secrets
-    // in a form this sanitizer cannot identify safely.
-    return undefined;
-  }
-}
 const PERMISSION_KEYS = [
   ...Object.keys(BASELINE_DEFAULTS),
   ...Object.keys(FORCED_DENIALS),
