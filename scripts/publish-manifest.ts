@@ -6,29 +6,29 @@ type Manifest = {
   [key: string]: unknown;
 };
 
+// Packages published to the registry by scripts/publish-packages.ts, in the
+// same layer order. A workspace range on one of these cannot resolve from the
+// registry as-is, so staging rewrites it to the released caret range; a
+// workspace range on any other workspace package can never resolve and stays
+// forbidden.
+const PUBLISHED_PACKAGES: ReadonlySet<string> = new Set([
+  "@atlante/pack",
+  "@atlante/opencode",
+]);
+
 function stagedManifest(manifest: Manifest, version: string): Manifest {
   const dependencies = manifest.dependencies;
   if (dependencies) {
-    // Workspace packages other than the static pack are not published; a
-    // runtime dependency on one can never resolve from the registry.
     for (const [name, range] of Object.entries(dependencies)) {
-      if (
-        name !== "@atlante/pack" &&
-        typeof range === "string" &&
-        range.startsWith("workspace:")
-      ) {
+      if (typeof range !== "string" || !range.startsWith("workspace:")) {
+        continue;
+      }
+      if (!PUBLISHED_PACKAGES.has(name)) {
         throw new Error(
           `${name} declares "${range}" in dependencies; move it to devDependencies or publish the package`,
         );
       }
-    }
-
-    const packDependency = dependencies["@atlante/pack"];
-    if (
-      typeof packDependency === "string" &&
-      packDependency.startsWith("workspace:")
-    ) {
-      dependencies["@atlante/pack"] = `^${version}`;
+      dependencies[name] = `^${version}`;
     }
   }
 

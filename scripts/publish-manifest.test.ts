@@ -50,3 +50,71 @@ test("staging the publish manifest keeps main and exports untouched", async () =
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+// The CLI is the composition root that injects the OpenCode materializer, so
+// PR #128 moved @atlante/opencode into its runtime dependencies. Both
+// published workspace dependencies must resolve from the registry after
+// staging.
+test("staging rewrites every published workspace dependency to the released range", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "atlante-publish-manifest-"));
+  try {
+    const manifestPath = join(directory, "package.json");
+    const manifest = {
+      name: "@atlante/cli",
+      version: "0.1.21",
+      bin: { atlante: "./dist/bin/atlante.js" },
+      dependencies: {
+        "@atlante/opencode": "workspace:*",
+        "@atlante/pack": "workspace:*",
+      },
+      devDependencies: { "@atlante/eval": "workspace:*" },
+    };
+    writeFileSync(manifestPath, `${JSON.stringify(manifest)}\n`);
+
+    let staged: Record<string, unknown> | undefined;
+    await withStagedPublishManifest(manifestPath, "0.1.21", async () => {
+      staged = JSON.parse(readFileSync(manifestPath, "utf8")) as Record<
+        string,
+        unknown
+      >;
+    });
+
+    expect(staged?.dependencies).toEqual({
+      "@atlante/opencode": "^0.1.21",
+      "@atlante/pack": "^0.1.21",
+    });
+    expect(JSON.parse(readFileSync(manifestPath, "utf8"))).toEqual(manifest);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("staging rejects a workspace dependency on an unpublished package", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "atlante-publish-manifest-"));
+  try {
+    const manifestPath = join(directory, "package.json");
+    const manifest = {
+      name: "@atlante/cli",
+      version: "0.1.21",
+      dependencies: { "@atlante/eval": "workspace:*" },
+    };
+    writeFileSync(manifestPath, `${JSON.stringify(manifest)}\n`);
+
+    let staged: Record<string, unknown> | undefined;
+    expect(
+      async () =>
+        await withStagedPublishManifest(manifestPath, "0.1.21", async () => {
+          staged = JSON.parse(readFileSync(manifestPath, "utf8")) as Record<
+            string,
+            unknown
+          >;
+        }),
+    ).toThrow("@atlante/eval");
+
+    // Nothing was staged, so the manifest keeps its original content.
+    expect(staged).toBeUndefined();
+    expect(JSON.parse(readFileSync(manifestPath, "utf8"))).toEqual(manifest);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
