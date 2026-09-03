@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  AmbiguousSlotInvocationError,
   createProjectResourcePack,
   InvalidValueReferenceError,
   interpolateValues,
@@ -333,6 +334,163 @@ describe("resource renderer", () => {
 
     expect(markdownFirst).toBe("[ab]");
     expect(markdownLast).toBe("[ab]");
+  });
+
+  test("throws naming the slot when array data exists but cannot be resolved", () => {
+    const root = project();
+    writeTemplate(
+      root,
+      "parent",
+      {
+        type: "object",
+        properties: {
+          sections: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                markdown: { template: "../blocks" },
+              },
+            },
+          },
+        },
+      },
+      partial("sections/markdown"),
+    );
+    writeTemplate(
+      root,
+      "blocks",
+      { type: "array", items: { type: "string" } },
+      "[{{#each (input)}}{{this}}{{/each}}]",
+    );
+
+    let error: unknown;
+    try {
+      render(root, "parent", { sections: "not-an-array" });
+    } catch (thrown) {
+      error = thrown;
+    }
+
+    expect(error).toBeInstanceOf(AmbiguousSlotInvocationError);
+    expect((error as Error).message).toContain("{{> slot/sections/markdown}}");
+    expect(() => render(root, "parent", { sections: null })).toThrow(
+      AmbiguousSlotInvocationError,
+    );
+  });
+
+  test("throws naming the slot when a partial-context item blocks the item path", () => {
+    const root = project();
+    writeTemplate(
+      root,
+      "parent",
+      {
+        type: "object",
+        properties: {
+          sections: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                meta: {
+                  type: "object",
+                  properties: { markdown: { template: "../blocks" } },
+                },
+              },
+            },
+          },
+        },
+      },
+      `{{#each sections}}${partial("sections/meta/markdown")}{{/each}}`,
+    );
+    writeTemplate(
+      root,
+      "blocks",
+      { type: "array", items: { type: "string" } },
+      "[{{#each (input)}}{{this}}{{/each}}]",
+    );
+
+    expect(() =>
+      render(root, "parent", { sections: [{ meta: "scalar" }] }),
+    ).toThrow(AmbiguousSlotInvocationError);
+  });
+
+  test("throws naming the slot when a plain slot path crosses a scalar", () => {
+    const root = project();
+    writeTemplate(
+      root,
+      "parent",
+      {
+        type: "object",
+        properties: {
+          choice: {
+            type: "object",
+            properties: { payload: { template: "../blocks" } },
+          },
+        },
+      },
+      partial("choice/payload"),
+    );
+    writeTemplate(
+      root,
+      "blocks",
+      { type: "array", items: { type: "string" } },
+      "[{{#each (input)}}{{this}}{{/each}}]",
+    );
+
+    expect(() => render(root, "parent", { choice: "scalar" })).toThrow(
+      AmbiguousSlotInvocationError,
+    );
+  });
+
+  test("renders empty for absent array-valued slot data without a diagnostic", () => {
+    const root = project();
+    writeTemplate(
+      root,
+      "parent",
+      {
+        type: "object",
+        properties: {
+          sections: {
+            type: "array",
+            items: {
+              type: "object",
+              oneOf: [
+                {
+                  type: "object",
+                  properties: { markdown: { template: "../blocks" } },
+                  required: ["markdown"],
+                  additionalProperties: false,
+                },
+                {
+                  type: "object",
+                  properties: { notes: { template: "../note" } },
+                  required: ["notes"],
+                  additionalProperties: false,
+                },
+              ],
+            },
+          },
+        },
+      },
+      `A${partial("sections/markdown")}B{{#each sections}}${partial("sections/markdown")}{{/each}}`,
+    );
+    writeTemplate(
+      root,
+      "blocks",
+      { type: "array", items: { type: "string" } },
+      "[{{#each (input)}}{{this}}{{/each}}]",
+    );
+    writeTemplate(
+      root,
+      "note",
+      { type: "object", properties: { value: { type: "string" } } },
+      "({{value}})",
+    );
+
+    expect(
+      render(root, "parent", { sections: [{ notes: { value: "n" } }] }),
+    ).toBe("AB");
+    expect(render(root, "parent", {})).toBe("AB");
   });
 
   test("renders the selected child when branches share a data path", () => {

@@ -64,6 +64,48 @@ function itemSlotValues(input: unknown, itemPath: string[]): unknown[] {
   return itemSlotValues(input[segment], itemPath.slice(1));
 }
 
+/**
+ * Reports whether a value exists along the slot path but its shape blocks slot
+ * resolution (an iteration segment that is not an array, or a scalar where the
+ * path must continue). Diagnostics only: it never iterates for resolution and
+ * is consulted exclusively when a slot resolved to zero inputs.
+ */
+function blockedSlotValues(
+  input: unknown,
+  dataPath: string[],
+  itemPath: string[],
+  arrayItems: boolean,
+): boolean {
+  if (!arrayItems) return blockedDescent(input, dataPath);
+  const collections = dataPath.length - itemPath.length;
+  return blockedCollections(input, dataPath.slice(0, collections), itemPath);
+}
+
+function blockedCollections(
+  input: unknown,
+  collections: string[],
+  itemPath: string[],
+): boolean {
+  const segment = collections[0];
+  if (segment === undefined) return blockedDescent(input, itemPath);
+  if (!isRecordLike(input) || !Object.hasOwn(input, segment)) return false;
+  const value = input[segment];
+  if (!Array.isArray(value)) return true;
+  return value.some((item) =>
+    blockedCollections(item, collections.slice(1), itemPath),
+  );
+}
+
+function blockedDescent(input: unknown, path: string[]): boolean {
+  const segment = path[0];
+  if (segment === undefined) return false;
+  if (!isRecordLike(input) || !Object.hasOwn(input, segment)) return false;
+  const value = input[segment];
+  if (path.length === 1) return false;
+  if (!isRecordLike(value)) return true;
+  return blockedDescent(value, path.slice(1));
+}
+
 function unwrapArrayTemplateInput(
   input: unknown,
   property: string,
@@ -206,6 +248,11 @@ export function renderResolvedTemplate(
   const slots = template.slots;
 
   for (const group of groupSlots(slots)) {
+    const partial = slotPartialName(
+      (group.path.length ? group.path : [group.slots[0]?.slot.property]).join(
+        "/",
+      ),
+    );
     const renderSlot = (context: unknown): string => {
       const contextSlot = selectedSlot(group.slots, context);
       const contextChild = contextSlot.template;
@@ -225,6 +272,15 @@ export function renderResolvedTemplate(
         context !== input && arrayItems
           ? itemSlotValues(context, itemPath)
           : slotValues(input, group.path, itemPath, arrayItems);
+      if (
+        slotInputsForRender.length === 0 &&
+        isArrayInputSchema(contextChild.facet.inputSchema) &&
+        (context !== input && arrayItems
+          ? blockedDescent(context, itemPath)
+          : blockedSlotValues(input, group.path, itemPath, arrayItems))
+      ) {
+        throw new AmbiguousSlotInvocationError(partial);
+      }
       return slotInputsForRender
         .map((slotInput) => {
           const slot = selectedSlot(group.slots, slotInput);
@@ -243,14 +299,7 @@ export function renderResolvedTemplate(
         })
         .join("");
     };
-    handlebars.registerPartial(
-      slotPartialName(
-        (group.path.length ? group.path : [group.slots[0]?.slot.property]).join(
-          "/",
-        ),
-      ),
-      renderSlot,
-    );
+    handlebars.registerPartial(partial, renderSlot);
   }
 
   const compiled = handlebars.compile(template.facet.source, {
@@ -296,6 +345,15 @@ export class NonStringValueError extends Error {
       `{{values.${path}}} resolved to a non-string value (${typeof resolved}); values must be strings (SPECIFICATION.md, Configuration Document)`,
     );
     this.name = "NonStringValueError";
+  }
+}
+
+export class AmbiguousSlotInvocationError extends Error {
+  constructor(partial: string) {
+    super(
+      `array-valued slot partial "{{> ${partial}}}" resolved to no input although data exists along its path; the invocation is ambiguous — pass the slot value explicitly: {{> ${partial} value}}`,
+    );
+    this.name = "AmbiguousSlotInvocationError";
   }
 }
 

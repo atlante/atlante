@@ -89,6 +89,7 @@ export {
 } from "./provenance.js";
 export type { ResolvedRenderArgs } from "./renderer.js";
 export {
+  AmbiguousSlotInvocationError,
   InvalidValueReferenceError,
   interpolateValues,
   MissingValueError,
