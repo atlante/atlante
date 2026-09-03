@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { lstatSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { EvalCheck } from "@atlante/schema";
+import { clearIndexFlags, parseGitNameList, runSandboxGit } from "./git.js";
 import type { Sandbox } from "./sandbox.js";
 import { pickAllowedEnv, runCommand } from "./spawn.js";
 import type { CheckResult, CheckType, CheckVerdict } from "./types.js";
@@ -196,33 +197,46 @@ async function diffAllowlistCheck(
   sandbox: Sandbox,
   allow: readonly string[],
 ): Promise<RawCheckResult> {
-  const outcome = await runCommand(
-    [
-      "git",
-      "-c",
-      "core.fsmonitor=false",
-      // Literal paths: default quoting C-escapes non-ASCII/special names,
-      // which would false-fail the allowlist and corrupt report evidence.
-      "-c",
-      "core.quotePath=false",
-      "status",
-      "--porcelain",
-      "--untracked-files=all",
-      "--ignored=matching",
-    ],
-    {
-      cwd: sandbox.root,
-      timeoutMs: 60_000,
-      env: pickAllowedEnv(process.env),
-    },
-  );
-  if (outcome.exit !== 0 || outcome.spawnError !== undefined) {
+  const indexError = await clearIndexFlags(sandbox);
+  if (indexError) return errorVerdict({ cause: indexError });
+
+  const committedOrModified = await runSandboxGit(sandbox, [
+    "diff",
+    "--no-renames",
+    "--name-only",
+    "-z",
+    sandbox.baseline,
+  ]);
+  if (
+    committedOrModified.exit !== 0 ||
+    committedOrModified.spawnError !== undefined
+  ) {
     return errorVerdict({
-      cause: outcome.spawnError ?? `git status exited ${outcome.exit}`,
-      stderr: outputTail(outcome.stderr),
+      cause:
+        committedOrModified.spawnError ??
+        `git diff exited ${committedOrModified.exit}`,
+      stderr: outputTail(committedOrModified.stderr),
     });
   }
-  const changed = parsePorcelainPaths(outcome.stdout);
+  // Do not exclude ignored files: the previous status-based check surfaced
+  // them too, and a model can create one after the baseline commit.
+  const untracked = await runSandboxGit(sandbox, [
+    "ls-files",
+    "--others",
+    "-z",
+  ]);
+  if (untracked.exit !== 0 || untracked.spawnError !== undefined) {
+    return errorVerdict({
+      cause: untracked.spawnError ?? `git ls-files exited ${untracked.exit}`,
+      stderr: outputTail(untracked.stderr),
+    });
+  }
+  const changed = [
+    ...new Set([
+      ...parseGitNameList(committedOrModified.stdout),
+      ...parseGitNameList(untracked.stdout),
+    ]),
+  ].sort();
   const allowSet = new Set(allow);
   const unexpected = changed.filter((path) => !allowSet.has(path));
   return unexpected.length === 0

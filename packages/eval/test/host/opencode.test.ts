@@ -83,6 +83,7 @@ function sandboxFor(sandboxProject: string, state: string) {
     root: sandboxProject,
     stateDir: state,
     snapshot: [],
+    baseline: "",
     keep: false,
   };
 }

@@ -103,6 +103,7 @@ describe("assembleSandbox", () => {
     expect(
       sandbox.snapshot.find((entry) => entry.path === "src/missing.ts")?.hash,
     ).toBeNull();
+    expect(sandbox.baseline).toMatch(/^[0-9a-f]{40,64}$/);
 
     // Git baseline exists with the eval identity.
     const log = await gitLog(sandbox.root);

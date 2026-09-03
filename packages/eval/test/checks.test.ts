@@ -26,6 +26,7 @@ function fakeSandbox(files: Record<string, string>): Sandbox {
       path,
       hash: "baseline",
     })),
+    baseline: "",
     keep: false,
   };
 }
@@ -86,10 +87,12 @@ describe("runChecks", () => {
       "base",
     ]);
     await git(["config", "core.fsmonitor", fsmonitor]);
+    const baseline = (await Bun.$`git rev-parse HEAD`.cwd(root).text()).trim();
 
-    const [result] = await runChecks({ root, snapshot: [], keep: false }, [
-      { type: "diff-allowlist", allow: ["allowed.ts"] },
-    ]);
+    const [result] = await runChecks(
+      { root, snapshot: [], baseline, keep: false },
+      [{ type: "diff-allowlist", allow: ["allowed.ts"] }],
+    );
     expect(result?.verdict).toBe("pass");
     expect(existsSync(canary)).toBe(false);
   });
@@ -288,7 +291,8 @@ describe("runChecks", () => {
     ]);
     writeFileSync(join(root, "allowed.ts"), "ok\n");
     writeFileSync(join(root, "sneaky.ts"), "scope creep\n");
-    const sandbox: Sandbox = { root, snapshot: [], keep: false };
+    const baseline = (await Bun.$`git rev-parse HEAD`.cwd(root).text()).trim();
+    const sandbox: Sandbox = { root, snapshot: [], baseline, keep: false };
 
     const [tooNarrow, wellScoped] = await runChecks(sandbox, [
       { type: "diff-allowlist", allow: ["allowed.ts"] },
@@ -320,12 +324,83 @@ describe("runChecks", () => {
       "base",
     ]);
     writeFileSync(join(root, "ignored-after.ts"), "scope creep\n");
+    const baseline = (await Bun.$`git rev-parse HEAD`.cwd(root).text()).trim();
 
-    const [result] = await runChecks({ root, snapshot: [], keep: false }, [
-      { type: "diff-allowlist", allow: ["allowed.ts"] },
-    ]);
+    const [result] = await runChecks(
+      { root, snapshot: [], baseline, keep: false },
+      [{ type: "diff-allowlist", allow: ["allowed.ts"] }],
+    );
     expect(result?.verdict).toBe("fail");
     expect(result?.evidence.unexpected).toContain("ignored-after.ts");
+  });
+
+  test("diff-allowlist: preserves special-character paths", async () => {
+    const root = mkdtempSync(join(tmpdir(), "eval-diff-special-"));
+    cleanup.push(root);
+    const git = async (argv: string[]) => {
+      await Bun.$`git ${argv}`.cwd(root).quiet();
+    };
+    await git(["init"]);
+    await git([
+      "-c",
+      "user.name=t",
+      "-c",
+      "user.email=t@t",
+      "commit",
+      "--allow-empty",
+      "-m",
+      "base",
+    ]);
+    const paths = ['quote"name.ts', "tab\tname.ts", "space name.ts"];
+    for (const path of paths) writeFileSync(join(root, path), "scope\n");
+    const baseline = (await Bun.$`git rev-parse HEAD`.cwd(root).text()).trim();
+
+    const [result] = await runChecks(
+      { root, snapshot: [], baseline, keep: false },
+      [{ type: "diff-allowlist", allow: paths }],
+    );
+    expect(result?.verdict).toBe("pass");
+  });
+
+  test("diff-allowlist: detects changes hidden by index flags", async () => {
+    const root = mkdtempSync(join(tmpdir(), "eval-diff-index-flags-"));
+    cleanup.push(root);
+    const trackedPath = "--tracked.ts";
+    writeFileSync(join(root, trackedPath), "baseline\n");
+    const git = async (argv: string[]) => {
+      await Bun.$`git ${argv}`.cwd(root).quiet();
+    };
+    await git(["init"]);
+    await git(["add", "--all"]);
+    await git([
+      "-c",
+      "user.name=t",
+      "-c",
+      "user.email=t@t",
+      "commit",
+      "--allow-empty",
+      "-m",
+      "base",
+    ]);
+    const baseline = (await Bun.$`git rev-parse HEAD`.cwd(root).text()).trim();
+
+    for (const flag of ["--assume-unchanged", "--skip-worktree"]) {
+      await git(["update-index", flag, "--", trackedPath]);
+      writeFileSync(join(root, trackedPath), `${flag} changed\n`);
+      const [result] = await runChecks(
+        { root, snapshot: [], baseline, keep: false },
+        [{ type: "diff-allowlist", allow: ["allowed.ts"] }],
+      );
+      expect(result?.verdict).toBe("fail");
+      expect(result?.evidence.unexpected).toContain(trackedPath);
+      await git([
+        "update-index",
+        "--no-assume-unchanged",
+        "--no-skip-worktree",
+        "--",
+        trackedPath,
+      ]);
+    }
   });
 
   test("diff-allowlist: matches non-ASCII paths literally", async () => {
@@ -349,9 +424,11 @@ describe("runChecks", () => {
     // Without core.quotePath=false git C-quotes non-ASCII paths, which would
     // both false-fail the allowlist and leak quoted evidence into the report.
     writeFileSync(join(root, "案результат.txt"), "scope creep\n");
-    const [result] = await runChecks({ root, snapshot: [], keep: false }, [
-      { type: "diff-allowlist", allow: ["allowed.ts", "案результат.txt"] },
-    ]);
+    const baseline = (await Bun.$`git rev-parse HEAD`.cwd(root).text()).trim();
+    const [result] = await runChecks(
+      { root, snapshot: [], baseline, keep: false },
+      [{ type: "diff-allowlist", allow: ["allowed.ts", "案результат.txt"] }],
+    );
     // Passes only if the literal (unquoted) path matched the allowlist.
     expect(result?.verdict).toBe("pass");
   });

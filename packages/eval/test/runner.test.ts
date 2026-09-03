@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { cpSync, mkdtempSync, rmSync } from "node:fs";
+import { cpSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createArtifacts, publishArtifacts } from "@atlante/artifacts";
@@ -13,6 +13,7 @@ import {
   type HostRunner,
   type RunReport,
   resolveBudget,
+  runCommand,
   runEval,
   runExitCode,
   type TrialRun,
@@ -361,6 +362,105 @@ describe("runEval", () => {
       "infra-error",
     );
     expect(runExitCode(report)).toBe(1);
+  });
+
+  test("diff grading and evidence include changes committed by the host", async () => {
+    const base = scenarios.at(0);
+    if (!base) throw new Error("fixture scenario not discovered");
+    const scenario: DiscoveredEvalScenario = {
+      ...base,
+      scenario: {
+        ...base.scenario,
+        name: "committed-out-of-scope",
+        checks: [{ type: "diff-allowlist", allow: ["allowed.ts"] }],
+      },
+    };
+    const report = await runEval({
+      projectRoot,
+      evalConfig,
+      budget: resolveBudget({ evalConfig, trialsOverride: 1 }),
+      scenarios: [scenario],
+      atlanteVersion: "0.0.0-test",
+      runner: {
+        name: "fake",
+        prepareHostIntegration() {},
+        async runTrial(input) {
+          writeFileSync(join(input.sandbox.root, "sneaky.ts"), "scope creep\n");
+          const add = await runCommand(["git", "add", "--all", "--force"], {
+            cwd: input.sandbox.root,
+            timeoutMs: 30_000,
+          });
+          if (add.exit !== 0) throw new Error("could not stage host change");
+          const commit = await runCommand(
+            [
+              "git",
+              "-c",
+              "user.name=atlante-eval",
+              "-c",
+              "user.email=atlante-eval@atlante.local",
+              "commit",
+              "--quiet",
+              "-m",
+              "model commit",
+            ],
+            { cwd: input.sandbox.root, timeoutMs: 30_000 },
+          );
+          if (commit.exit !== 0)
+            throw new Error("could not commit host change");
+          return completedRun();
+        },
+      },
+    });
+    const trial = report.scenarios["committed-out-of-scope"]?.trials[0];
+    expect(trial?.verdict).toBe("fail");
+    expect(trial?.checks?.[0]?.evidence.unexpected).toEqual(["sneaky.ts"]);
+    expect(trial?.diff).toContain("sneaky.ts");
+  });
+
+  test("diff evidence includes changes hidden by index flags", async () => {
+    const base = scenarios.at(0);
+    if (!base) throw new Error("fixture scenario not discovered");
+    const scenario: DiscoveredEvalScenario = {
+      ...base,
+      scenario: {
+        ...base.scenario,
+        name: "index-flagged-change",
+        checks: [{ type: "file-exists", path: "src/index.ts" }],
+      },
+    };
+    const report = await runEval({
+      projectRoot,
+      evalConfig,
+      budget: resolveBudget({ evalConfig, trialsOverride: 1 }),
+      scenarios: [scenario],
+      atlanteVersion: "0.0.0-test",
+      runner: {
+        name: "fake",
+        prepareHostIntegration() {},
+        async runTrial(input) {
+          const flags = await runCommand(
+            [
+              "git",
+              "update-index",
+              "--assume-unchanged",
+              "--skip-worktree",
+              "--",
+              "src/index.ts",
+            ],
+            { cwd: input.sandbox.root, timeoutMs: 30_000 },
+          );
+          if (flags.exit !== 0) throw new Error("could not set index flags");
+          writeFileSync(
+            join(input.sandbox.root, "src", "index.ts"),
+            "export const changed = true;\n",
+          );
+          return completedRun();
+        },
+      },
+    });
+    const trial = report.scenarios["index-flagged-change"]?.trials[0];
+    expect(trial?.verdict).toBe("pass");
+    expect(trial?.diff).toContain("src/index.ts");
   });
 
   test("retains a partial report for an unexpected run-level error", async () => {

@@ -54,6 +54,8 @@ export type Sandbox = {
   stateDir: string;
   /** sha256 of every declared file-unchanged path, taken before the session. */
   snapshot: SnapshotEntry[];
+  /** Commit created before the host session; anchors diff grading and evidence. */
+  baseline: string;
   keep: boolean;
 };
 
@@ -126,6 +128,7 @@ export async function assembleSandbox(
     root,
     stateDir,
     snapshot: [],
+    baseline: "",
     keep: input.keep,
   };
 
@@ -156,7 +159,7 @@ export async function assembleSandbox(
   }));
 
   // (f) Git baseline for diff-allowlist and diff evidence.
-  const git = async (argv: readonly string[]) => {
+  const git = async (argv: readonly string[]): Promise<string> => {
     const outcome = await runCommand(
       [
         "git",
@@ -177,6 +180,7 @@ export async function assembleSandbox(
         `git ${argv.join(" ")} failed (exit ${outcome.exit}): ${outcome.stderr.slice(-400)}`,
       );
     }
+    return outcome.stdout.trim();
   };
   await git(["init", "--quiet"]);
   // Track the complete baseline, including files ignored by fixture rules;
@@ -189,6 +193,11 @@ export async function assembleSandbox(
     "-m",
     "atlante-eval baseline",
   ]);
+  const baseline = await git(["rev-parse", "HEAD"]);
+  if (!/^[0-9a-f]+$/.test(baseline)) {
+    throw new Error("git baseline did not produce a valid commit id");
+  }
+  sandbox.baseline = baseline;
 
   return sandbox;
 }

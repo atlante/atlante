@@ -6,6 +6,7 @@ import type { DiscoveredEvalScenario } from "@atlante/validator";
 import { runChecks } from "./checks.js";
 import type { ResolvedBudget } from "./config.js";
 import { scenarioTimeoutMs } from "./config.js";
+import { clearIndexFlags, runSandboxGit } from "./git.js";
 import { createRunId } from "./run-id.js";
 import type { Sandbox } from "./sandbox.js";
 import {
@@ -14,7 +15,6 @@ import {
   destroyRunRoot,
   destroySandbox,
 } from "./sandbox.js";
-import { pickAllowedEnv, runCommand } from "./spawn.js";
 import {
   type RunReport,
   scenarioStatistics,
@@ -422,29 +422,18 @@ const DIFF_EVIDENCE_LIMIT = 20_000;
 
 /** Sandbox diff against the baseline commit; report evidence, not a verdict. */
 async function sandboxDiff(sandbox: Sandbox): Promise<string> {
-  // Stage all current paths so git diff HEAD also includes untracked and
-  // ignored files created by the host after the baseline commit.
-  const staged = await runCommand(
-    ["git", "-c", "core.fsmonitor=false", "add", "--all", "--force"],
-    {
-      cwd: sandbox.root,
-      timeoutMs: 60_000,
-      env: pickAllowedEnv(process.env),
-    },
-  );
+  const indexError = await clearIndexFlags(sandbox);
+  if (indexError) throw new Error(indexError);
+
+  // Stage all current paths so git diff against the baseline also includes
+  // untracked and ignored files created by the host after the baseline commit.
+  const staged = await runSandboxGit(sandbox, ["add", "--all", "--force"]);
   if (staged.spawnError !== undefined || staged.exit !== 0) {
     throw new Error(
       `could not collect sandbox diff: git add exited ${staged.exit}: ${staged.spawnError ?? staged.stderr.slice(-400)}`,
     );
   }
-  const outcome = await runCommand(
-    ["git", "-c", "core.fsmonitor=false", "diff", "HEAD"],
-    {
-      cwd: sandbox.root,
-      timeoutMs: 60_000,
-      env: pickAllowedEnv(process.env),
-    },
-  );
+  const outcome = await runSandboxGit(sandbox, ["diff", sandbox.baseline]);
   if (outcome.spawnError !== undefined || outcome.exit !== 0) {
     throw new Error(
       `could not collect sandbox diff: git diff exited ${outcome.exit}: ${outcome.spawnError ?? outcome.stderr.slice(-400)}`,
