@@ -131,7 +131,9 @@ export async function assembleSandbox(
   // (c) Host integration (config authoring is host-specific).
   await prepareHostIntegration(sandbox);
 
-  // (d) Setup commands run in the sandbox before the snapshot.
+  // (d) Setup commands run in the sandbox before the snapshot. Setup runs
+  // pre-trial on author-trusted fixture content, so it keeps the full host
+  // env; every command after the trial uses the allowlisted env instead.
   const setup = input.scenario.scenario.task.setup;
   if (setup && setup.length > 0) {
     const outcome = await runCommand(setup, {
