@@ -21,6 +21,9 @@ export const EVAL_BUDGET_DEFAULTS = {
 /** Maximum number of trials accepted by both config and CLI overrides. */
 export const EVAL_MAX_TRIALS = 50;
 
+/** Maximum authored timeout for a run, scenario, or command check. */
+const EVAL_MAX_TIMEOUT_MS = 3_600_000;
+
 /** Per-trial default applied when a check does not set its own timeout. */
 export const EVAL_CHECK_TIMEOUT_DEFAULT_MS = 120_000;
 
@@ -48,7 +51,9 @@ const evalBudgetSchema = z.strictObject({
   trials: positiveIntSchema
     .max(EVAL_MAX_TRIALS)
     .default(EVAL_BUDGET_DEFAULTS.trials),
-  timeoutMs: positiveIntSchema.default(EVAL_BUDGET_DEFAULTS.timeoutMs),
+  timeoutMs: positiveIntSchema
+    .max(EVAL_MAX_TIMEOUT_MS)
+    .default(EVAL_BUDGET_DEFAULTS.timeoutMs),
   maxSessions: positiveIntSchema.default(EVAL_BUDGET_DEFAULTS.maxSessions),
   maxTokens: positiveIntSchema.default(EVAL_BUDGET_DEFAULTS.maxTokens),
 });
@@ -86,7 +91,9 @@ const commandCheckSchema = z.strictObject({
       }
     })
     .optional(),
-  timeoutMs: positiveIntSchema.default(EVAL_CHECK_TIMEOUT_DEFAULT_MS),
+  timeoutMs: positiveIntSchema
+    .max(EVAL_MAX_TIMEOUT_MS)
+    .default(EVAL_CHECK_TIMEOUT_DEFAULT_MS),
 });
 
 const filePathCheckSchema = z.strictObject({
@@ -139,7 +146,11 @@ export const evalScenarioBaseSchema = z.strictObject({
   description: z.string().min(1).optional(),
   task: evalScenarioTaskSchema,
   /** Scenario-level override of the configured budget timeout. */
-  budget: z.strictObject({ timeoutMs: positiveIntSchema }).optional(),
+  budget: z
+    .strictObject({
+      timeoutMs: positiveIntSchema.max(EVAL_MAX_TIMEOUT_MS),
+    })
+    .optional(),
   checks: z.array(evalCheckSchema).min(1),
 });
 

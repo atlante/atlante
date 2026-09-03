@@ -378,6 +378,14 @@ function printSummary(report: RunReport, reportDir: string): void {
   console.log(
     `host ${report.meta.host} · model ${report.meta.model ?? "host default"}`,
   );
+  const hasUnmonitoredBudget = Object.values(report.scenarios).some((result) =>
+    result.trials.some((trial) => trial.budgetUnmonitored === true),
+  );
+  if (hasUnmonitoredBudget) {
+    console.log(
+      "warning: token budget unmonitored for one or more trials (no usage events were observed)",
+    );
+  }
   for (const [name, result] of Object.entries(report.scenarios)) {
     console.log("");
     console.log(

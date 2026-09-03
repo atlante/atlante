@@ -113,7 +113,10 @@ async function publishFixtureArtifacts(project: string): Promise<void> {
 }
 
 /** Fake host: `createsFile` decides whether the graded check can pass. */
-function fakeRunner(createsFile: boolean): HostRunner {
+function fakeRunner(
+  createsFile: boolean,
+  budgetUnmonitored = false,
+): HostRunner {
   return {
     name: "fake",
     prepareHostIntegration() {},
@@ -127,6 +130,7 @@ function fakeRunner(createsFile: boolean): HostRunner {
       return {
         outcome: "completed",
         durationMs: 5,
+        ...(budgetUnmonitored ? { budgetUnmonitored: true } : {}),
         tokens: 100,
         cost: 0.001,
         model: "test/model",
@@ -264,7 +268,7 @@ describe("runEvalCommand", () => {
     expect(report.meta.config.trials).toBe(2);
     // Recorded so before/after report diffs can explain setup/grading timing.
     expect(report.meta.config.setupTimeoutMs).toBe(300_000);
-    expect(report.meta.config.checkTimeoutMs).toBe(120_000);
+    expect(report.meta.config.checkTimeoutDefaultMs).toBe(120_000);
     expect(report.scenarios["cli-happy"].trials).toHaveLength(2);
   });
 
@@ -337,6 +341,31 @@ describe("runEvalCommand", () => {
       expect(existsSync(join(out, runId, "report.json"))).toBe(true);
       // A custom location is not silently gitignored.
       expect(existsSync(join(project, ".atlante", ".gitignore"))).toBe(false);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test("human summary warns when token usage is unmonitored", async () => {
+    const project = evalProject();
+    await publishFixtureArtifacts(project);
+    const logs: string[] = [];
+    const spy = spyOn(console, "log").mockImplementation(
+      (...parts: unknown[]) => {
+        logs.push(parts.join(" "));
+      },
+    );
+    try {
+      const exit = await runEvalCommand(
+        project,
+        {},
+        undefined,
+        fakeRunner(true, true),
+      );
+      expect(exit).toBe(0);
+      expect(logs.some((line) => line.includes("budget unmonitored"))).toBe(
+        true,
+      );
     } finally {
       spy.mockRestore();
     }

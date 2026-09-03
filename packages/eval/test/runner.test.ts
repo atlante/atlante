@@ -108,7 +108,7 @@ describe("runEval", () => {
     expect(report.meta.modelVersion).toBe("v9");
     expect(report.meta.host).toBe("fake");
     expect(report.meta.config.setupTimeoutMs).toBe(300_000);
-    expect(report.meta.config.checkTimeoutMs).toBe(120_000);
+    expect(report.meta.config.checkTimeoutDefaultMs).toBe(120_000);
     expect(result.trials[0]?.checks).toHaveLength(3);
   });
 

@@ -136,7 +136,7 @@ export async function runEval(input: RunEvalInput): Promise<RunReport> {
         // Recorded so before/after report diffs can explain setup and
         // grading timing changes.
         setupTimeoutMs: input.budget.setupTimeoutMs,
-        checkTimeoutMs: EVAL_CHECK_TIMEOUT_DEFAULT_MS,
+        checkTimeoutDefaultMs: EVAL_CHECK_TIMEOUT_DEFAULT_MS,
       },
     },
     scenarios: {},

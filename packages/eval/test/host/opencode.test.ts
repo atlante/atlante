@@ -668,6 +668,7 @@ describe("mergePermissionBaseline", () => {
     const merged = mergePermissionBaseline("deny");
     expect(merged.read).toBe("deny");
     expect(merged.edit).toBe("deny");
+    expect(Object.keys(merged).filter((key) => /^\d+$/.test(key))).toEqual([]);
     expect(merged.bash).toEqual({
       "rm -rf *": "deny",
       "rm -fr *": "deny",

@@ -85,6 +85,28 @@ describe("evalConfigSchema", () => {
       expect(result.success).toBe(false);
     }
   });
+
+  test("rejects authored timeouts above one hour", () => {
+    const timeoutMs = 3_600_001;
+    expect(
+      evalConfigSchema.safeParse({
+        ...validConfig,
+        budget: { timeoutMs },
+      }).success,
+    ).toBe(false);
+    expect(
+      evalScenarioSchema.safeParse({
+        ...validScenario,
+        budget: { timeoutMs },
+      }).success,
+    ).toBe(false);
+    expect(
+      evalScenarioSchema.safeParse({
+        ...validScenario,
+        checks: [{ type: "command", run: ["bun", "test"], timeoutMs }],
+      }).success,
+    ).toBe(false);
+  });
 });
 
 describe("evalScenarioSchema", () => {

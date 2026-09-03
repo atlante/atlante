@@ -79,7 +79,7 @@ export type RunMeta = {
     /** Setup-command in-flight budget; recorded for report comparability. */
     setupTimeoutMs: number;
     /** Per-check default in-flight budget; recorded for comparability. */
-    checkTimeoutMs: number;
+    checkTimeoutDefaultMs: number;
   };
 };
 
