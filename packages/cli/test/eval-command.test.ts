@@ -369,6 +369,123 @@ describe("runEvalCommand", () => {
     }
   });
 
+  test("streams progress events to stderr as they arrive", async () => {
+    const project = evalProject();
+    await buildFixtureOutputs(project);
+    const logs: string[] = [];
+    const errors: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation(
+      (...parts: unknown[]) => {
+        logs.push(parts.join(" "));
+      },
+    );
+    const errorSpy = spyOn(console, "error").mockImplementation(
+      (...parts: unknown[]) => {
+        errors.push(parts.join(" "));
+      },
+    );
+    try {
+      const exit = await runEvalCommand(
+        project,
+        {},
+        undefined,
+        fakeRunner(true),
+      );
+      expect(exit).toBe(0);
+      // One human-readable line per event kind, on stderr only.
+      expect(errors).toContain("== cli-happy");
+      expect(errors).toContain("trial 0 running...");
+      expect(errors).toContain("trial 0: pass (5ms · $0.0010 · 100 tokens)");
+      expect(errors).toContain("cli-happy: 3/3 trials passed");
+      const indexOf = (line: string): number => {
+        const index = errors.indexOf(line);
+        if (index === -1) throw new Error(`missing stderr line: ${line}`);
+        return index;
+      };
+      expect(indexOf("== cli-happy")).toBeLessThan(
+        indexOf("trial 0 running..."),
+      );
+      expect(indexOf("trial 0 running...")).toBeLessThan(
+        indexOf("trial 0: pass (5ms · $0.0010 · 100 tokens)"),
+      );
+      expect(
+        indexOf("trial 0: pass (5ms · $0.0010 · 100 tokens)"),
+      ).toBeLessThan(indexOf("cli-happy: 3/3 trials passed"));
+      // stdout keeps the human summary; progress never pollutes it.
+      expect(logs.join("\n")).not.toContain("running...");
+    } finally {
+      logSpy.mockRestore();
+      errorSpy.mockRestore();
+    }
+  });
+
+  test("--json keeps stdout pure JSON while progress still streams to stderr", async () => {
+    const project = evalProject();
+    await buildFixtureOutputs(project);
+    const out = tempDir();
+    const logs: string[] = [];
+    const errors: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation(
+      (...parts: unknown[]) => {
+        logs.push(parts.join(" "));
+      },
+    );
+    const errorSpy = spyOn(console, "error").mockImplementation(
+      (...parts: unknown[]) => {
+        errors.push(parts.join(" "));
+      },
+    );
+    try {
+      const exit = await runEvalCommand(
+        project,
+        { json: true, out },
+        undefined,
+        fakeRunner(true),
+      );
+      expect(exit).toBe(0);
+      // Progress stays observable on stderr in --json mode.
+      expect(errors).toContain("== cli-happy");
+      expect(errors).toContain("trial 0 running...");
+      // stdout parses as exactly one JSON document: the report.
+      const printed = JSON.parse(logs.join("\n"));
+      expect(printed.scenarios["cli-happy"].passRate).toBe(1);
+    } finally {
+      logSpy.mockRestore();
+      errorSpy.mockRestore();
+    }
+  });
+
+  test("progress counts exclude skipped-budget trials", async () => {
+    const project = evalProject({
+      evalSection: {
+        host: "opencode",
+        scenarios: "eval/scenarios/*.eval.json",
+        budget: { maxSessions: 1 },
+      },
+    });
+    await buildFixtureOutputs(project);
+    const errors: string[] = [];
+    const errorSpy = spyOn(console, "error").mockImplementation(
+      (...parts: unknown[]) => {
+        errors.push(parts.join(" "));
+      },
+    );
+    try {
+      const exit = await runEvalCommand(
+        project,
+        { trials: "2" },
+        undefined,
+        fakeRunner(true),
+      );
+      expect(exit).toBe(1);
+      // 1 pass + 1 skipped: executed trials only, matching the pass rate.
+      expect(errors).toContain("trial 1: skipped-budget (0ms)");
+      expect(errors).toContain("cli-happy: 1/1 trials passed");
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
   test("--json mode still warns about an unmonitored budget on stderr", async () => {
     const project = evalProject();
     await buildFixtureOutputs(project);
