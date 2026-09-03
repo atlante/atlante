@@ -1,14 +1,13 @@
 #!/usr/bin/env bun
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { join } from "node:path";
 import { withStagedPublishManifest } from "./publish-manifest.js";
 
 const ROOT = join(import.meta.dir, "..");
 // The static pack must be published before the CLI that depends on it. The
-// OpenCode adapter remains the final public package: it ships the build-time
-// native materializer for the host.
-const PACKAGES = ["pack", "cli", "opencode"] as const;
+// CLI bundle includes the internal OpenCode materializer.
+const PACKAGES = ["pack", "cli"] as const;
 
 function parseArgs() {
   let version: string | undefined;
@@ -47,62 +46,7 @@ const REQUIRED_FILES: Record<(typeof PACKAGES)[number], string[]> = {
     "architect/instance.jsonc",
   ],
   cli: ["dist/bin/atlante.js"],
-  opencode: ["dist/index.js", "dist/index.d.ts"],
 };
-
-// Static, offline bundle inspection: follow every relative runtime import
-// reachable from the adapter entry JS files and require each target to exist
-// under dist. Bare specifiers (node builtins) are skipped; only files inside
-// dist are followed, so nothing outside dist is read and no adapter behavior
-// is invoked.
-const RELATIVE_IMPORT_RE =
-  /(?:from\s+|import\s*\(\s*|require\s*\()\s*["'](\.[^"']+)["']/g;
-
-async function relativeImports(file: string): Promise<string[]> {
-  const text = await readFile(file, "utf8");
-  const specs: string[] = [];
-  for (const match of text.matchAll(RELATIVE_IMPORT_RE)) {
-    specs.push(match[1]);
-  }
-  return specs;
-}
-
-async function pluginImportIssues(
-  dir: string,
-  name: string,
-): Promise<string[]> {
-  const issues: string[] = [];
-  const distDir = join(dir, "dist");
-  const seen = new Set<string>();
-  const queue = ["dist/index.js"]
-    .map((entry) => join(dir, entry))
-    .filter((path) => existsSync(path));
-
-  while (queue.length > 0) {
-    const file = queue.shift();
-    if (file === undefined) break;
-    if (seen.has(file)) continue;
-    seen.add(file);
-
-    for (const spec of await relativeImports(file)) {
-      const target = resolve(dirname(file), spec);
-      if (!target.startsWith(distDir + sep)) {
-        issues.push(
-          `${name}: import "${spec}" in ${relative(dir, file)} escapes dist`,
-        );
-        continue;
-      }
-      if (!existsSync(target)) {
-        issues.push(
-          `${name}: missing dist/${relative(distDir, target)} (imported by ${relative(dir, file)})`,
-        );
-        continue;
-      }
-      if (target.endsWith(".js") && !seen.has(target)) queue.push(target);
-    }
-  }
-  return issues;
-}
 
 async function preflightArtifacts(): Promise<string[]> {
   const missing: string[] = [];
@@ -122,8 +66,6 @@ async function preflightArtifacts(): Promise<string[]> {
         if (!head.startsWith("#!/usr/bin/env node"))
           missing.push(`${name}: dist/bin/atlante.js shebang is not node`);
       }
-    } else if (pkg === "opencode") {
-      missing.push(...(await pluginImportIssues(dir, name)));
     }
   }
 

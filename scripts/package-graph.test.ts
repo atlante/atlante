@@ -202,20 +202,20 @@ test("accepts a synchronized lock", () => {
   }
 });
 
-test("keeps only pack, CLI, and OpenCode publishable", () => {
+test("keeps only pack and CLI publishable", () => {
   const publishable = new Set<string>();
   for (const name of PACKAGES) {
     const manifest = readJson(join(ROOT, "packages", name, "package.json"));
     if (manifest.publishConfig) publishable.add(name);
   }
-  expect([...publishable].sort()).toEqual(["cli", "opencode", "pack"]);
+  expect([...publishable].sort()).toEqual(["cli", "pack"]);
 
   const publish = readFileSync(
     join(ROOT, "scripts", "publish-packages.ts"),
     "utf8",
   );
-  expect(publish).toContain('const PACKAGES = ["pack", "cli", "opencode"]');
-  expect(publish).not.toContain("bundled");
+  expect(publish).toContain('const PACKAGES = ["pack", "cli"]');
+  expect(publish).not.toContain('"opencode"');
 });
 
 test("publishes a static first-party pack with no executable API", async () => {
@@ -249,11 +249,10 @@ test("keeps the first-party pack as a CLI runtime dependency in source", () => {
   expect(dependencies["@atlante/pack"]).toBe("workspace:*");
 });
 
-test("orders release packages pack, CLI, then OpenCode adapter", () => {
+test("orders public packages pack before CLI", () => {
   const publish = readFileSync(
     join(ROOT, "scripts", "publish-packages.ts"),
     "utf8",
   );
   expect(publish.indexOf('"pack"')).toBeLessThan(publish.indexOf('"cli"'));
-  expect(publish.indexOf('"cli"')).toBeLessThan(publish.indexOf('"opencode"'));
 });

@@ -126,7 +126,7 @@ register a materializer for it.
 
 ## `init` touched my OpenCode config or `.gitignore`
 
-`init` no longer registers a plugin. It removes only the Atlante-written
+`init` does not register a plugin. It removes only the Atlante-written
 `@atlante/opencode` entry from `opencode.jsonc` (or an existing
 `opencode.json`); the removal may leave an empty `"plugin": []`, which is
 harmless and requires no action. Every other host setting is preserved.

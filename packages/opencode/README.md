@@ -1,15 +1,15 @@
-# `@atlante/opencode`
+# OpenCode materializer
 
-OpenCode host adapter for [Atlante](https://github.com/atlante/atlante). It
-ships the build-time native materializer that `atlante build` runs to write
-host-native agent and skill files directly into the project — no runtime
-plugin, no persisted payload tree. Requires Node.js 22 or later.
+Internal OpenCode host materializer for
+[Atlante](https://github.com/atlante/atlante). The CLI builds this workspace and
+bundles the materializer into its published artifact. It writes host-native
+agent and skill files directly into the project; it is not a runtime plugin or
+an installation target. Requires Node.js 22 or later.
 
-## Published package
+## Role in the build
 
-The adapter package is published to npm as `@atlante/opencode`. It ships as a
-self-contained Bun-bundled artifact (the `dist/` output of `bun run build` at
-the repository root) with a single entry, `@atlante/opencode`, exporting:
+The workspace provides a single entry for the CLI and private eval code. Its
+exports are:
 
 - `materializeOpenCode(projectRoot, prepared)` — deterministic native
   materialization of a prepared project
@@ -62,12 +62,3 @@ Materialization is fail-closed and staged:
   characters; invalid IDs fail the build rather than being renamed.
 
 Rebuilds are idempotent: unchanged content is not rewritten.
-
-## Migration from the runtime plugin
-
-Older versions exposed a runtime OpenCode plugin registered as
-`"plugin": ["@atlante/opencode"]` in `opencode.jsonc`/`opencode.json`. The
-plugin no longer exists: a stale registration is inert (the host silently
-drops packages that expose no plugin target), and `atlante init` removes the
-Atlante-written entry from the configuration. The harmless `"plugin": []`
-residue it may leave behind requires no action.

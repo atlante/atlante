@@ -20,8 +20,8 @@ website/           — private Astro landing site workspace (@atlante/website, n
 ```
 
 The eight workspaces are `schema`, `resources`, `validator`, `builder`,
-`pack`, `opencode`, `eval`, and `cli`. The publishable packages are `pack`,
-the CLI, and the OpenCode materializer; `resources`, `builder`, and `eval` remain private. The separate `website` workspace hosts the Astro landing site for [atlante.sh](https://atlante.sh); it stays outside the toolchain package graph and is not covered by these constraints.
+`pack`, `opencode`, `eval`, and `cli`. The publishable packages are `pack` and
+the CLI; `resources`, `builder`, `opencode`, and `eval` remain private. The separate `website` workspace hosts the Astro landing site for [atlante.sh](https://atlante.sh); it stays outside the toolchain package graph and is not covered by these constraints.
 
 Schema changes require building and validating (`atlante validate`, `atlante build`). `atlante init` runs the first build automatically; run `atlante build` after later source configuration changes. Tests live next to the code they test: `packages/<workspace>/test/` mirrors `src/`, `scripts/*.test.ts` files sit beside their scripts, and `website` and `docs` own their tests internally. Do not add tests in ad-hoc locations outside these trees.
 
@@ -40,7 +40,7 @@ Schema changes require building and validating (`atlante validate`, `atlante bui
 bun run test                    # run all tests (bun:test)
 bun run type:check              # type-check all packages
 bun run lint:check              # lint + format check
-bun run build                   # build publishable CLI + adapter artifacts (pack is static)
+bun run build                   # build publishable CLI + internal adapter artifacts (pack is static)
 bun run quick:check             # type:check + lint:check + test
 bun run full:check              # build + quick:check (CI gate)
 bun run cli                     # run the CLI (packages/cli/bin/atlante.ts)

@@ -7,7 +7,7 @@ import { dirname, join } from "node:path";
 const ROOT = join(import.meta.dir, "..");
 const TSC = join(ROOT, "node_modules", ".bin", "tsc");
 
-// 1) OpenCode adapter: Bun target=bun bundle + declarations (publishable artifact).
+// 1) OpenCode adapter: Bun target=bun bundle + declarations (internal artifact).
 const plugin = join(ROOT, "packages", "opencode");
 await rm(join(plugin, "dist"), { force: true, recursive: true });
 const pluginResult = await Bun.build({

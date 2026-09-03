@@ -52,15 +52,15 @@ OpenCode in a temporary sandbox; Atlante does not provide another host in v0.1.
 
 ## Packages
 
-Three packages are published to npm:
+Two packages are published to npm:
 
 | Package | Responsibility |
 | --- | --- |
 | `@atlante/pack` | First-party static presets, templates, and instances |
 | `@atlante/cli` | `init`, `validate`, `build`, and `eval` |
-| `@atlante/opencode` | OpenCode build-time host materializer |
 
-The remaining workspaces are private implementation packages for the schema,
+The OpenCode materializer is an internal workspace bundled into the CLI. The
+remaining workspaces are private implementation packages for the schema,
 resource loading, validation, build orchestration, and eval orchestration.
 
 ## Development
@@ -98,7 +98,9 @@ npx @atlante/cli@latest eval
 
 `init` writes `atlante.jsonc`, materializes the first native outputs, adds
 `.opencode/agents/`, `.opencode/skills/`, and `.atlante/` to `.gitignore`, and
-removes any leftover `@atlante/opencode` plugin registration from `opencode.jsonc` (or an existing `opencode.json`). Existing host settings are preserved.
+removes an Atlante-written `@atlante/opencode` plugin registration from
+`opencode.jsonc` (or an existing `opencode.json`). Existing host settings are
+preserved.
 
 You can edit the authored configuration and then run `npx @atlante/cli@latest build` again, or use `npx @atlante/cli@latest build --watch` during active editing.
 

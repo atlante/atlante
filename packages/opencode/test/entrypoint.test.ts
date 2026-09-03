@@ -25,10 +25,9 @@ test("the materializer surface keeps its runtime roles", () => {
   expect(typeof entrypoint.openCodeMaterializer.materialize).toBe("function");
 });
 
-// The published package ships dist/ only: the manifest's main and the single
-// "." export must point at files the build produces, or a packed tarball
-// would expose an entry that cannot resolve.
-test("the package manifest resolves its published entry into dist", () => {
+// The internal workspace builds dist/ for the CLI bundle: the manifest's main
+// and the single "." export must point at files the build produces.
+test("the workspace manifest resolves its entry into dist", () => {
   const packageRoot = fileURLToPath(new URL("..", import.meta.url));
   const manifest = JSON.parse(
     readFileSync(join(packageRoot, "package.json"), "utf8"),
