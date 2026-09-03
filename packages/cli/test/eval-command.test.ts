@@ -615,7 +615,7 @@ describe("runEvalCommand", () => {
     expect(readdirSync(outside)).toEqual([]);
   });
 
-  test("progress is dimmed when stderr is an interactive terminal", async () => {
+  test("progress is gray when stderr is an interactive terminal", async () => {
     const project = evalProject();
     await buildFixtureOutputs(project);
     const previousNoColor = process.env.NO_COLOR;
@@ -642,7 +642,7 @@ describe("runEvalCommand", () => {
         fakeRunner(true),
       );
       expect(exit).toBe(0);
-      expect(errors).toContain(`${"\x1b[2m"}== cli-happy${"\x1b[22m"}`);
+      expect(errors).toContain(`${"\x1b[90m"}== cli-happy${"\x1b[0m"}`);
     } finally {
       errorSpy.mockRestore();
       if (previousNoColor === undefined) delete process.env.NO_COLOR;
@@ -654,9 +654,9 @@ describe("runEvalCommand", () => {
 });
 
 describe("createProgressStyler", () => {
-  test("dims lines on an interactive stderr", () => {
+  test("grays lines on an interactive stderr", () => {
     const style = createProgressStyler({ isTTY: true }, {});
-    expect(style("== cli-happy")).toBe("\x1b[2m== cli-happy\x1b[22m");
+    expect(style("== cli-happy")).toBe("\x1b[90m== cli-happy\x1b[0m");
   });
 
   test("keeps plain text for piped stderr and for NO_COLOR", () => {
@@ -667,6 +667,6 @@ describe("createProgressStyler", () => {
     // An empty NO_COLOR value does not opt out (no-color.org).
     expect(
       createProgressStyler({ isTTY: true }, { NO_COLOR: "" })("== s"),
-    ).toBe("\x1b[2m== s\x1b[22m");
+    ).toBe("\x1b[90m== s\x1b[0m");
   });
 });

@@ -175,7 +175,8 @@ never printed twice. The summary repeats only what the live lines do not
 carry: run id, host and model, the budget warning when present,
 per-scenario aggregate statistics (pass rate, mean, p95), and the report
 location. On an interactive terminal the progress
-lines render dim so they do not read like errors; set `NO_COLOR` or pipe
+lines render gray (ANSI bright black) so they do not read like errors; set
+`NO_COLOR` or pipe
 stderr to get plain text. Redirect stderr (`2>/dev/null`) to silence
 progress entirely.
 
