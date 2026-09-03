@@ -4,10 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { withStagedPublishManifest } from "./publish-manifest.js";
 
-// The regression test in packages/opencode asserts the repo manifest is
-// server-discoverable; this test guards the publish-side half of the same
+// No packaged-entry test exists on the adapter side; the repo manifest shape
+// itself is pinned in packages/opencode/test/entrypoint.test.ts against the
+// package.json exports. This test guards the publish-side half of the same
 // premise: staging for publish must not transform main or exports, so what
-// ships is exactly the shape the loader discovers.
+// ships is exactly the shape the entry resolves through.
 test("staging the publish manifest keeps main and exports untouched", async () => {
   const directory = mkdtempSync(join(tmpdir(), "atlante-publish-manifest-"));
   try {
@@ -17,9 +18,10 @@ test("staging the publish manifest keeps main and exports untouched", async () =
       version: "0.1.19",
       main: "dist/index.js",
       exports: {
-        ".": "./dist/index.js",
-        "./api": "./dist/api.js",
-        "./server": "./dist/index.js",
+        ".": {
+          types: "./dist/index.d.ts",
+          default: "./dist/index.js",
+        },
       },
       dependencies: { "@atlante/pack": "workspace:*" },
       devDependencies: { "@atlante/builder": "workspace:*" },

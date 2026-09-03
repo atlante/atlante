@@ -116,6 +116,57 @@ describe("atlanteDocumentSchema", () => {
     expect(result.data.skills).toEqual({});
   });
 
+  test("defaults hosts to the OpenCode target when absent", () => {
+    const result = atlanteDocumentSchema.safeParse({ $schema: SCHEMA_URI });
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.hosts).toEqual(["opencode"]);
+  });
+
+  test("preserves an authored hosts selection", () => {
+    const result = atlanteDocumentSchema.safeParse({
+      ...valid,
+      hosts: ["opencode"],
+    });
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.hosts).toEqual(["opencode"]);
+  });
+
+  test("keeps hosts optional in the authored overlay", () => {
+    const withoutHosts = atlanteDocumentOverlaySchema.safeParse(valid);
+    expect(withoutHosts.success).toBe(true);
+
+    const withHosts = atlanteDocumentOverlaySchema.safeParse({
+      ...valid,
+      hosts: ["opencode"],
+    });
+    expect(withHosts.success).toBe(true);
+    if (!withHosts.success) return;
+    expect(withHosts.data.hosts).toEqual(["opencode"]);
+  });
+
+  test("rejects unsupported host targets", () => {
+    for (const hosts of [["claude"], ["opencode", "claude"], ["OpenCode"]]) {
+      const result = atlanteDocumentSchema.safeParse({ ...valid, hosts });
+      expect(result.success).toBe(false);
+    }
+  });
+
+  test("rejects empty and duplicate hosts selections", () => {
+    for (const hosts of [[], ["opencode", "opencode"]]) {
+      const result = atlanteDocumentSchema.safeParse({ ...valid, hosts });
+      expect(result.success).toBe(false);
+    }
+  });
+
+  test("rejects hosts that are not an array of strings", () => {
+    for (const hosts of ["opencode", {}, [1], [null]]) {
+      const result = atlanteDocumentSchema.safeParse({ ...valid, hosts });
+      expect(result.success).toBe(false);
+    }
+  });
+
   test("rejects an unsupported $schema URI", () => {
     const result = atlanteDocumentSchema.safeParse({
       ...valid,

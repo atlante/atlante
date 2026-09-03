@@ -11,7 +11,6 @@ const PACKAGES = [
   "schema",
   "resources",
   "validator",
-  "artifacts",
   "builder",
   "pack",
   "opencode",
@@ -72,7 +71,7 @@ test("removes old workspace entries, manifests, imports, scripts, and lock entri
   }
 });
 
-test("keeps resources private and synchronizes exactly eight workspaces", () => {
+test("keeps resources private and synchronizes exactly seven workspaces", () => {
   const resources = readJson(
     join(ROOT, "packages", "resources", "package.json"),
   );
@@ -172,54 +171,17 @@ test("keeps the first-party pack as a CLI runtime dependency in source", () => {
   expect(dependencies["@atlante/pack"]).toBe("workspace:*");
 });
 
-// build.ts deliberately documents itself as the only caller of the
+// build.ts once deliberately documented itself as the only caller of the
 // publisher: bypassing it would skip the fail-closed prepare-then-publish
-// ordering. publishArtifacts escaping into a package entry turned that
-// invariant into a convention, so pin it structurally.
-test("keeps publishArtifacts callers pinned to the builder orchestration", () => {
+// ordering. Native materialization replaced the publisher, and nothing in a
+// package source may resurrect `publishArtifacts`.
+test("keeps publishArtifacts out of every package source", () => {
   const offenders: string[] = [];
   for (const name of PACKAGES) {
-    if (name === "artifacts") continue; // owns the implementation
     const packageRoot = join(ROOT, "packages", name);
     for (const file of filesUnder(join(packageRoot, "src"))) {
       if (readFileSync(file, "utf8").includes("publishArtifacts")) {
         offenders.push(file);
-      }
-    }
-  }
-  expect(offenders).toEqual([
-    join(ROOT, "packages", "builder", "src", "build.ts"),
-  ]);
-});
-
-// The artifacts root entry also exports createArtifacts and publishArtifacts;
-// the adapter enforces the read-only boundary at runtime (#108), but nothing
-// structural stops a future CLI import of creation or publication helpers,
-// leaving that invariant as convention. Pin every @atlante/artifacts
-// specifier under packages/cli — src and test — to the read-only subpath;
-// revisit this gate if the CLI ever legitimately needs the full contract.
-// The manifest cannot share the pin: resolvers reject a subpath dependency
-// key (@atlante/artifacts/read-only@workspace:* fails to resolve), so the
-// devDependency stays on the package name and this gate is what keeps that
-// declaration read-only in practice.
-test("keeps CLI imports of @atlante/artifacts pinned to the read-only subpath", () => {
-  const cli = readJson(join(ROOT, "packages", "cli", "package.json"));
-  expect(
-    (cli.devDependencies as Record<string, string>)["@atlante/artifacts"],
-  ).toBe("workspace:*");
-
-  const offenders: string[] = [];
-  for (const dir of ["src", "test"]) {
-    for (const file of filesUnder(join(ROOT, "packages", "cli", dir))) {
-      const specifiers = [
-        ...readFileSync(file, "utf8").matchAll(
-          /(["'])(@atlante\/artifacts[^"']*)\1/g,
-        ),
-      ].map((match) => match[2]);
-      for (const specifier of specifiers) {
-        if (specifier !== "@atlante/artifacts/read-only") {
-          offenders.push(`${file}: ${specifier}`);
-        }
       }
     }
   }

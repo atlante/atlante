@@ -1,28 +1,23 @@
 ---
 title: Use OpenCode
-description: Connect verified Atlante artifacts to OpenCode through the host adapter.
+description: Materialize Atlante agents and skills as OpenCode-native files.
 ---
 
-[OpenCode](https://opencode.ai/) is the supported host adapter in Atlante v0.1.
-Use the adapter after a successful build. It consumes only the generated
-artifact tree and leaves host-owned settings under OpenCode's control.
+[OpenCode](https://opencode.ai/) is the supported host in Atlante v0.1. A
+build materializes your agents and skills as OpenCode-native files; there is
+no runtime plugin and no intermediate payload tree. Host-owned settings stay
+under OpenCode's control.
 
-## Register the adapter
+## No registration needed
 
-`atlante init` creates or updates `opencode.jsonc` (reusing an existing
-`opencode.json` when present) while preserving existing settings. The registration has this shape:
+Older Atlante versions registered `@atlante/opencode` as an OpenCode plugin in
+`opencode.jsonc` (or an existing `opencode.json`). That plugin no longer
+exists. `atlante init` removes the Atlante-written registration; the harmless
+`"plugin": []` residue it may leave requires no action. A stale registration
+in a project that has not been re-initialized is inert: OpenCode silently
+drops packages that expose no plugin target.
 
-```jsonc title="opencode.jsonc"
-{
-  "$schema": "https://opencode.ai/config.json",
-  "plugin": ["@atlante/opencode"]
-}
-```
-
-For manual registration, install the published `@atlante/opencode` package in
-the environment that runs OpenCode.
-
-## Build the input
+## Build the native files
 
 Run validation and build from the project directory:
 
@@ -31,34 +26,29 @@ npx @atlante/cli@latest validate
 npx @atlante/cli@latest build
 ```
 
-The adapter reads
-`<project>/.atlante/artifacts/manifest.json`, verifies every declared path and
-SHA-256 digest, and then stages the rendered agent descriptions and prompts. It
-does not read `atlante.jsonc`, local resources, or installed packs.
+The build writes `.opencode/agents/<id>.md`, `.opencode/skills/<id>/SKILL.md`,
+and the ownership manifest `.atlante/opencode-native.json`. It does not read
+or write host configuration: the host owns model, mode, permission, and tool
+settings, and Atlante never touches them.
 
-A missing, malformed, unsupported, or changed artifact tree leaves the host
-configuration unchanged. Verification and injection fail closed, so the adapter
-does not partially materialize a build.
+A collision with a file Atlante does not own, a drifted generated file, or any
+other materialization failure leaves the previous generated set in place and
+fails closed with a recovery action. See [Troubleshooting](/troubleshooting)
+for repair steps.
 
 ## Keep host settings in OpenCode
 
-Atlante writes the rendered prompt and resolved description for configured agent
-IDs. OpenCode continues to own model, effort, permission, tool, and mode
-settings. Atlante does not select those settings.
+OpenCode composes its own configuration with the native files when it starts:
+an agent's mode and permission rules from `opencode.json` still apply, while
+its prompt and description come from the native agent file. Atlante does not
+select those settings.
 
-If materialization replaces a non-empty host prompt, the adapter reports a
-warning. Repeating materialization for the same valid artifacts does not
-duplicate agents.
+Rebuilds are idempotent: unchanged content is not rewritten. OpenCode reads
+native agents and skills at startup, so restart it to pick up new or changed
+files.
 
-## Look up a skill
+## Skills are files
 
-After verification and materialization, the adapter can expose `atlante_skill`.
-Its input is exactly:
-
-```json
-{ "name": "skill-id" }
-```
-
-A successful lookup returns only the resolved Markdown content. Unknown names,
-invalid input, unavailable artifacts, and failed lifecycle states return explicit
-errors. Skill content is data; the adapter does not execute it.
+Each skill binding is materialized as `.opencode/skills/<skillId>/SKILL.md`
+with name and description frontmatter, which OpenCode lists like any native
+skill. Skill content is data; Atlante renders it but does not execute it.

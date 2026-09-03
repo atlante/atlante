@@ -7,8 +7,8 @@ Atlante requires [Node.js](https://nodejs.org/) 22 or later. Run the CLI from th
 project you want to configure. The published CLI bundles the first-party
 `@atlante/pack`, so the default path does not require a separate pack install.
 
-The goal is simple: finish with a versioned source document and a verified,
-host-neutral artifact tree that an adapter can hand to your coding-agent host.
+The goal is simple: finish with a versioned source document and host-native
+agent and skill files your coding-agent host discovers directly.
 
 ## 1. Invoke or install the CLI
 
@@ -28,9 +28,12 @@ npx atlante init
 
 ## 2. See what `init` creates
 
-`init` scaffolds `atlante.jsonc`, registers `@atlante/opencode` in
-`opencode.jsonc` (or an existing `opencode.json`), and builds the initial state. It is both the starting scaffold
-and the first build. Existing host settings in the OpenCode config are preserved.
+`init` scaffolds `atlante.jsonc`, materializes the initial native outputs, and
+enforces the ignore policy: `.opencode/agents/`, `.opencode/skills/`, and
+`.atlante/` are added to `.gitignore`, so generated files stay local. If an
+older Atlante version registered `@atlante/opencode` as an OpenCode plugin,
+`init` removes that registration. Existing host settings in the OpenCode
+config are preserved.
 You do not need to create a second onboarding configuration.
 
 The generated source selects the default first-party preset:
@@ -56,44 +59,46 @@ npx @atlante/cli@latest validate
 
 Validation parses the document, resolves selected content, and checks values,
 template schemas, composition, and template-owned input. It does not render or
-publish artifacts. Errors include structured diagnostics with codes and source
-locations; see [Diagnostics](/reference/diagnostics).
+materialize anything. Errors include structured diagnostics with codes and
+source locations; see [Diagnostics](/reference/diagnostics).
 
-When validation passes, build the new artifact tree:
+When validation passes, materialize the native outputs:
 
 ```sh
 npx @atlante/cli@latest build
 ```
 
-Build repeats validation, renders deterministic Markdown, and atomically
-publishes a complete host-neutral artifact tree. Both commands report the
+Build repeats validation, renders deterministic Markdown, and materializes
+the host-native files plus the ownership manifest. Both commands report the
 resolved filesystem path they used, so output may be an absolute path rather
 than the shortened examples shown here.
 
-## 4. Inspect the artifacts
+## 4. Inspect the native outputs
 
-Inspect `<project>/.atlante/artifacts/` after `init` or `build`:
+Inspect the generated files after `init` or `build`:
 
 ```text
-<project>/.atlante/artifacts/
-├── manifest.json
-├── agents/
-└── skills/
+<project>/.opencode/
+├── agents/<id>.md
+└── skills/<id>/SKILL.md
+<project>/.atlante/opencode-native.json
 ```
 
-`manifest.json` identifies each agent or skill payload and its SHA-256 digest.
-The adapter verifies the complete tree before consuming it. Keep `.atlante/`
-local: rendered values may contain project-sensitive content, and artifacts are
-generated output rather than source configuration.
+The ownership manifest identifies each generated file with its ID, path, and
+SHA-256 digest. OpenCode discovers these files when it starts; restart it to
+pick up new or changed agents. Keep the generated outputs local: rendered
+values may contain project-sensitive content, and they are generated output
+rather than source configuration (`init` already ignores them in git).
 
-That is the first useful boundary: Atlante prepares and verifies the prompts;
-the adapter materializes them, and the host executes agents and skills. Atlante
-does not execute agents, skills, project code, or LLM inference.
+That is the first useful boundary: Atlante renders the prompts and
+materializes the files; the host discovers them and executes agents and
+skills. Atlante does not execute agents, skills, project code, or LLM
+inference.
 
 ## 5. Continue to the harness
 
 Your next step can be small:
 
 - [Build a harness](/guides/building-a-harness) to add an agent, skill, or value.
-- [Use OpenCode](/guides/opencode) to connect verified artifacts to the supported host adapter.
-- Read [CLI](/reference/cli) for command options, [Artifact](/reference/artifact) for verification details, or [Diagnostics](/reference/diagnostics) when a build fails.
+- [Use OpenCode](/guides/opencode) to connect the native outputs to the supported host.
+- Read [CLI](/reference/cli) for command options, [Materialization](/reference/materialization) for output details, or [Diagnostics](/reference/diagnostics) when a build fails.

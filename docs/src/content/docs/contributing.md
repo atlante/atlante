@@ -72,8 +72,8 @@ to Vercel, so the remote build does not need Bun or access to the repository-lev
 
 Use active voice, sentence-case headings, and one primary idea per sentence. Use
 `configuration` for the authored system, `document` for its parsed data model,
-`artifact` for generated output, and `host adapter` for host-specific
-materialization.
+`native output` for generated host files, `ownership manifest` for the
+generated-file record, and `materializer` for host-specific materialization.
 
 Metaphor belongs in occasional explanatory copy. Procedures, CLI output, errors,
 schema references, and troubleshooting must remain literal.

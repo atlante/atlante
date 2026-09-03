@@ -51,6 +51,12 @@ export function buildDocumentJsonSchema(): Record<string, unknown> {
   documentProperties.extends = {
     oneOf: [sourceStringSchema, extendsArraySchema],
   };
+  documentProperties.hosts = {
+    type: "array",
+    items: { const: "opencode" },
+    minItems: 1,
+    uniqueItems: true,
+  };
   documentProperties.values = valuesSchema;
   documentProperties.agents = bindingProperties;
   documentProperties.skills = bindingProperties;

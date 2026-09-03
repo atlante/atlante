@@ -1,10 +1,16 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { cpSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { readArtifacts } from "@atlante/artifacts/read-only";
 import { buildProject, loadProject, prepareProject } from "@atlante/builder";
+import { openCodeMaterializer } from "@atlante/opencode";
 import { createProjectResourcePack, loadPresetFacet } from "@atlante/resources";
 import { SCHEMA_URI } from "@atlante/schema";
 import { validateDocumentText } from "@atlante/validator";
@@ -106,7 +112,7 @@ describe("first-party package resources as user configurations", () => {
     expect(agent?.prompt).not.toContain("{{values.");
   });
 
-  test("the built first-party artifact manifest lists one agent and five loadable skills", () => {
+  test("the built first-party project materializes one agent and five loadable skills", () => {
     const dir = projectRoot();
     writeFileSync(
       join(dir, "atlante.jsonc"),
@@ -116,30 +122,24 @@ describe("first-party package resources as user configurations", () => {
       }`,
     );
 
-    const built = buildProject(dir);
+    const built = buildProject(
+      dir,
+      {},
+      {
+        materializers: [openCodeMaterializer],
+      },
+    );
     expect(built.diagnostics).toEqual([]);
 
-    const artifacts = readArtifacts(dir);
-    expect(artifacts).toBeDefined();
-    if (!artifacts) throw new Error("expected built first-party artifacts");
-
-    expect(artifacts.agents.map(({ hostAgentId }) => hostAgentId)).toEqual([
-      "architect",
-    ]);
-    expect(artifacts.skills.map(({ skillId }) => skillId).sort()).toEqual([
-      "brainstorm",
-      "build",
-      "harness",
-      "plan",
-      "review",
-    ]);
-
-    const [agent] = artifacts.agents;
-    expect(agent?.prompt).toContain("## Workflow");
-    expect(agent?.prompt).toContain("### 1. Brainstorm");
-    expect(agent?.prompt).toContain("### 3. Build");
-    expect(agent?.prompt).toContain("### 4. Review");
-    expect(agent?.prompt).toContain("MUST preserve unrelated user changes.");
+    const agent = readFileSync(
+      join(dir, ".opencode", "agents", "architect.md"),
+      "utf8",
+    );
+    expect(agent).toContain("## Workflow");
+    expect(agent).toContain("### 1. Brainstorm");
+    expect(agent).toContain("### 3. Build");
+    expect(agent).toContain("### 4. Review");
+    expect(agent).toContain("MUST preserve unrelated user changes.");
 
     const titleLandmarks: Record<string, string> = {
       brainstorm: "# Brainstorm",
@@ -148,20 +148,28 @@ describe("first-party package resources as user configurations", () => {
       review: "# Review",
       harness: "# Harness",
     };
-    for (const skill of artifacts.skills) {
-      expect(
-        skill.description.length,
-        `${skill.skillId} description`,
-      ).toBeGreaterThan(0);
-      expect(
-        skill.content.trim().length,
-        `${skill.skillId} content`,
-      ).toBeGreaterThan(0);
-      expect(skill.content, skill.skillId).toContain(
-        titleLandmarks[skill.skillId],
+    for (const [skillId, title] of Object.entries(titleLandmarks)) {
+      const content = readFileSync(
+        join(dir, ".opencode", "skills", skillId, "SKILL.md"),
+        "utf8",
       );
-      expect(skill.content, skill.skillId).toContain("## Overview");
+      expect(content.length, skillId).toBeGreaterThan(0);
+      expect(content, skillId).toContain(title);
+      expect(content, skillId).toContain("## Overview");
     }
+
+    const manifest = JSON.parse(
+      readFileSync(join(dir, ".atlante", "opencode-native.json"), "utf8"),
+    ) as { files: Array<{ kind: string; id: string }> };
+    expect(
+      manifest.files.filter(({ kind }) => kind === "agent").map(({ id }) => id),
+    ).toEqual(["architect"]);
+    expect(
+      manifest.files
+        .filter(({ kind }) => kind === "skill")
+        .map(({ id }) => id)
+        .sort(),
+    ).toEqual(["brainstorm", "build", "harness", "plan", "review"]);
   });
 
   test("CLI loading returns a canonical document and first-party skill template", () => {

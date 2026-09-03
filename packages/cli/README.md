@@ -24,11 +24,13 @@ atlante --help
 ## Commands
 
 - `atlante init [path] [--pack <pack-locator>] [--force]` — scaffold
-  `atlante.jsonc`, register the OpenCode adapter package, and build artifacts
+  `atlante.jsonc`, enforce the generated-output ignore policy, and materialize
+  the first native outputs
 - `atlante validate [path]` — validate the document, selected templates and instances, and
   template inputs without rendering
-- `atlante build [path]` — validate, render, and atomically publish host-neutral
-  artifacts under `.atlante/artifacts/`
+- `atlante build [path]` — validate, render, and materialize host-native
+  outputs (`.opencode/` files plus the `.atlante/opencode-native.json`
+  ownership manifest)
 
 `path` defaults to the current directory and may be a configuration file or project
 directory. Atlante discovers both `atlante.jsonc` and `atlante.json`.
@@ -76,14 +78,9 @@ files, host configuration, dependency mutation, and the initial build:
   reconciled). If that reconciliation fails, `init` reports `rollback-failed`
   with manual instructions.
 
-`init` creates or updates `opencode.jsonc` (reusing an existing `opencode.json` when present) while preserving existing settings.
+`init` creates or updates `opencode.jsonc` (reusing an existing `opencode.json` when present) while preserving existing settings; a leftover Atlante-written `@atlante/opencode` plugin registration is removed.
 
-The OpenCode adapter is an artifact-only boundary: it never reads the source
-configuration or installed packs. The artifact format and its verification rules
-are documented in
-[`SPECIFICATION.md`](../../SPECIFICATION.md) §9.1; the fail-closed
-`readArtifacts` reader contract is in
-[`@atlante/artifacts`'s README](../artifacts/README.md#reading-artifacts). Artifact
-format/version is distinct from the document schema version. Artifacts contain
-rendered values and may be sensitive; keep `.atlante/` local and do not publish
-it.
+`build` materializes host-native outputs through the OpenCode materializer:
+agents and skills are written as native host files plus an ownership manifest
+under `.atlante/`. Rendered values may be sensitive; generated outputs stay local
+and are not published.

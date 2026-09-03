@@ -1,60 +1,70 @@
 # `@atlante/opencode`
 
 OpenCode host adapter for [Atlante](https://github.com/atlante/atlante). It
-reads and verifies the host-neutral artifact tree built by Atlante, atomically
-stages the resulting agent prompts and descriptions in the in-memory host
-configuration, and exposes skills through the `atlante_skill` tool. Requires Node.js 22
-or later.
+ships the build-time native materializer that `atlante build` runs to write
+host-native agent and skill files directly into the project — no runtime
+plugin, no persisted payload tree. Requires Node.js 22 or later.
 
 ## Published package
 
 The adapter package is published to npm as `@atlante/opencode`. It ships as a
 self-contained Bun-bundled artifact (the `dist/` output of `bun run build` at
-the repository root). `@opencode-ai/plugin` is a peer dependency: the host
-OpenCode installation provides it.
+the repository root) with a single entry, `@atlante/opencode`, exporting:
 
-The package exposes two entries:
+- `materializeOpenCode(projectRoot, prepared)` — deterministic native
+  materialization of a prepared project
+- `openCodeMaterializer` — the builder-facing adapter
+  (`{ host, materialize(projectRoot, prepared) }`) the CLI passes to
+  `buildProject`; failures map to `MaterializationDiagnostic` values
+- `OpenCodeMaterializationError` and its `OpenCodeMaterializationErrorCode`
+  (`invalid-input`, `invalid-id`, `invalid-manifest`, `unsafe-path`,
+  `collision`, `drift`, `filesystem`, `publication-failed`)
+- the ownership-manifest types (`OpenCodeOwnershipManifest`,
+  `OpenCodeOwnedFile`), prepared-project types (`OpenCodePreparedProject`,
+  `OpenCodePreparedAgent`, `OpenCodePreparedSkill`), and adapter types
+  (`OPENCODE_HOST_TARGET`, `MaterializationDiagnostic`,
+  `OpenCodeMaterializerPrepared`, `HostMaterializationOutcome`)
 
-- `@atlante/opencode` — the default export (`AtlantePlugin`) registered
-  in `opencode.jsonc` (or an existing `opencode.json`)
-- `@atlante/opencode/api` — the explicit programmatic entry, exporting
-  `injectAgents`, `createAtlantePlugin`, `AtlantePlugin`, `createSkillTool`,
-  and the adapter's artifact and host configuration types
+## What a build materializes
 
-Import from the `./api` entry with
-`import { injectAgents } from "@atlante/opencode/api"`.
+`atlante build` renders the source configuration into a prepared project and
+the materializer writes, deterministically:
 
-## Usage
+- `.opencode/agents/<id>.md` — frontmatter description plus the agent prompt
+- `.opencode/skills/<id>/SKILL.md` — frontmatter name/description plus the
+  skill content
+- `.atlante/opencode-native.json` — the ownership manifest: `format`,
+  `version`, and one `files` entry (`kind`, `id`, `path`, `sha256`) per
+  generated file
 
-Register the OpenCode adapter package in your OpenCode config
-(`opencode.jsonc`, or an existing `opencode.json`):
+The manifest is bookkeeping state, not a trust boundary: it never stores
+prompt or skill payloads, only identity and digests. Generated outputs and the
+manifest are ignored by git by default (`atlante init` enforces
+`.opencode/agents/`, `.opencode/skills/`, and `.atlante/` in `.gitignore`)
+because rendered content can carry sensitive interpolated values.
 
-```jsonc
-{
-  "$schema": "https://opencode.ai/config.json",
-  "plugin": ["@atlante/opencode"],
-}
-```
+## Safety invariants
 
-Running `npx @atlante/cli@latest init` creates this registration and builds artifacts
-automatically while preserving existing OpenCode settings. Run
-`npx @atlante/cli@latest build` after changing the source configuration.
+Materialization is fail-closed and staged:
 
-`atlante_skill` accepts exactly `{ "name": "skill-id" }` and looks up the
-resolved root `skills` map by that name. A successful lookup returns the skill's
-rendered Markdown content only; its description is not returned by the tool.
-Invalid input, an unknown name, and an inactive, unavailable, or failed tool
-return an error rather than partial content. Skill content is informational
-Markdown: the adapter does not execute it.
+- **Collisions** — an unowned file at a target path is never overwritten; the
+  build fails with a repair action instead.
+- **Drift** — an owned file whose recorded hash no longer matches is never
+  replaced; repair is intentional (restore or delete the drifted file).
+- **Stale outputs** — owned files no longer produced by the configuration are
+  removed only when the manifest still accounts for them.
+- **Rollback** — publication stages first and rolls back on failure,
+  preserving the previous valid generated set.
+- **ID rules** — IDs must be lowercase kebab-case ASCII, at most 64
+  characters; invalid IDs fail the build rather than being renamed.
 
-During initialization, the adapter reads only `.atlante/artifacts/manifest.json`
-and verifies every declared path, payload encoding, and SHA-256 digest before
-materialization. It does not load `atlante.jsonc`, local resources, installed
-packs, or any resolver/loader. If artifacts are absent, malformed,
-unsupported, or changed, the `atlante_skill` tool is omitted and the host configuration
-is unchanged. After the staged result is materialized, the tool is active; a
-failure after materialization, including a runtime failure, moves it to the
-failed lifecycle state. Verification and injection are fail-closed: the host
-configuration is updated only from a complete verified artifact set, so a failure
-cannot partially mutate the host. The native `skill` tool can coexist with
-`atlante_skill` without either replacing the other.
+Rebuilds are idempotent: unchanged content is not rewritten.
+
+## Migration from the runtime plugin
+
+Older versions exposed a runtime OpenCode plugin registered as
+`"plugin": ["@atlante/opencode"]` in `opencode.jsonc`/`opencode.json`. The
+plugin no longer exists: a stale registration is inert (the host silently
+drops packages that expose no plugin target), and `atlante init` removes the
+Atlante-written entry from the configuration. The harmless `"plugin": []`
+residue it may leave behind requires no action.

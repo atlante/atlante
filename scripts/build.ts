@@ -11,24 +11,17 @@ const TSC = join(ROOT, "node_modules", ".bin", "tsc");
 const plugin = join(ROOT, "packages", "opencode");
 await rm(join(plugin, "dist"), { force: true, recursive: true });
 const pluginResult = await Bun.build({
-  entrypoints: [join(plugin, "src", "index.ts"), join(plugin, "src", "api.ts")],
+  entrypoints: [join(plugin, "src", "index.ts")],
   target: "bun",
-  external: ["@opencode-ai/plugin"],
-  splitting: true, // shared chunk keeps api.js from duplicating index.js code
-  outdir: join(plugin, "dist"), // dist/index.js, dist/api.js, dist/chunk-*.js
+  outdir: join(plugin, "dist"), // dist/index.js
 });
 if (!pluginResult.success) throw new Error(pluginResult.logs.join("\n"));
-// Declarations: d.ts for every src module (consumer types resolve ./plugin.js → ./plugin.d.ts).
+// Declarations: d.ts for every src module (consumer types resolve ./native.js → ./native.d.ts).
 await Bun.$`${TSC} --project tsconfig.build.json --emitDeclarationOnly`.cwd(
   plugin,
 );
-if (
-  !existsSync(join(plugin, "dist", "index.js")) ||
-  !existsSync(join(plugin, "dist", "api.js"))
-) {
-  throw new Error(
-    "@atlante/opencode: bundle missing dist/index.js or dist/api.js",
-  );
+if (!existsSync(join(plugin, "dist", "index.js"))) {
+  throw new Error("@atlante/opencode: bundle missing dist/index.js");
 }
 
 // 2) CLI: Bun target=node bundle + guards (publishable artifact).

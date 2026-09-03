@@ -37,10 +37,10 @@ const observations = [
   {
     focus: "adapter" as const,
     term: "Projection",
-    title: "Only verified artifacts cross the boundary",
-    code: "configuration → artifacts → adapter",
+    title: "The build writes what the host reads",
+    code: "configuration → build → native files",
     detail:
-      "Atlante builds host-neutral artifacts, then the adapter verifies them before materializing the harness.",
+      "Atlante materializes a prepared project as host-native files and an ownership manifest; OpenCode discovers them when it starts.",
   },
   {
     focus: "runtime" as const,

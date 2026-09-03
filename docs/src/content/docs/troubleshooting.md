@@ -1,6 +1,6 @@
 ---
 title: Troubleshooting
-description: Diagnose configuration discovery, resource resolution, validation, and artifact problems.
+description: Diagnose configuration discovery, resource resolution, validation, and materialization problems.
 ---
 
 Start with the diagnostic code in the command output. It identifies the failure,
@@ -73,15 +73,15 @@ npx @atlante/cli@latest build
 ```
 
 `validate` checks source and selected content without rendering. `build` repeats
-validation, renders the output, and publishes no partial artifact tree when a
+validation, renders the output, and materializes no partial output set when a
 failure occurs. For command output structure and locations, read
 [Diagnostics](/reference/diagnostics).
 
 ## Watch mode reports a failure
 
 `build --watch` remains active after a validation or build failure. Fix the
-reported source error; the watcher retries on a later change. It leaves the last
-complete artifact tree in place and exits with status `0` when stopped with
+reported source error; the watcher retries on a later change. It leaves the
+previous valid generated set in place and exits with status `0` when stopped with
 `Ctrl-C`. See the [CLI](/reference/cli) for the full watch contract.
 
 ## The OpenCode agent is not updated
@@ -93,19 +93,50 @@ npx @atlante/cli@latest validate
 npx @atlante/cli@latest build
 ```
 
-Then confirm that your OpenCode config (`opencode.jsonc`, or an existing
-`opencode.json`) registers `@atlante/opencode`. The adapter
-reads only `<project>/.atlante/artifacts/`; it does not load the source
-configuration, local resources, or installed Packs.
+Then restart OpenCode. It reads `.opencode/agents/` and `.opencode/skills/`
+when it starts, so new or changed native files are picked up only after a
+restart. An idempotent rebuild rewrites nothing, which the CLI shows by
+printing no `wrote` lines for unchanged files.
 
-## Artifacts are absent or rejected
+## The build reports `materialization-*`
 
-A missing artifact tree means the project has not completed a build. A malformed
-or changed tree is rejected by the fail-closed reader. Re-run
-`npx @atlante/cli@latest build` after fixing the source. The reader also rejects unsafe
-paths, symlinks, non-regular files, invalid UTF-8, missing payloads, duplicate
-entries, and digest mismatches. Keep `.atlante/` local because rendered values
-may contain sensitive content.
+The materializer fails closed and changes nothing when a target is unsafe:
+
+- `materialization-collision`: an unowned file sits at a native path. Remove
+  or rename that file, then run `atlante build` again.
+- `materialization-drift`: a generated file was edited after the last build.
+  Restore it to its last generated state — deleting the drifted file is the
+  simplest repair — then run `atlante build` again.
+- `materialization-invalid-id`: an agent or skill ID is not lowercase
+  kebab-case ASCII of at most 64 characters. Rename the ID in
+  `atlante.jsonc`; materialization never renames IDs.
+- `materialization-invalid-manifest`: `.atlante/opencode-native.json` is
+  corrupt. Delete it to discard Atlante's ownership state, then build again.
+- `materialization-unsafe-path`: a symlink or non-directory blocks a
+  materialization path. Replace it with a real directory, then build again.
+- `materialization-publication-failed`: a staged publication failed; the
+  previous valid generated set is preserved. Fix the reported filesystem
+  condition and build again.
+
+## The build reports `unsupported-host`
+
+The document's `hosts` field names a host with no registered materializer. In
+v0.1 the only admitted value is `"opencode"`. Remove the unknown entry or
+register a materializer for it.
+
+## `init` touched my OpenCode config or `.gitignore`
+
+`init` no longer registers a plugin. It removes only the Atlante-written
+`@atlante/opencode` entry from `opencode.jsonc` (or an existing
+`opencode.json`); the removal may leave an empty `"plugin": []`, which is
+harmless and requires no action. Every other host setting is preserved.
+
+The generated-output ignore policy appends `.opencode/agents/`,
+`.opencode/skills/`, and `.atlante/` to `.gitignore` when missing. Because a
+git negation cannot re-include content of an ignored directory, a user
+negation such as `!.opencode/agents/` cannot override an appended Atlante
+entry; remove the Atlante entries yourself if you intentionally want generated
+outputs under version control.
 
 ## The output is stale after an edit
 

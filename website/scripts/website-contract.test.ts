@@ -40,9 +40,9 @@ const observatoryEntries = [
   [
     "adapter",
     "Projection",
-    "Only verified artifacts cross the boundary",
-    "configuration → artifacts → adapter",
-    "Atlante builds host-neutral artifacts, then the adapter verifies them before materializing the harness.",
+    "The build writes what the host reads",
+    "configuration → build → native files",
+    "Atlante materializes a prepared project as host-native files and an ownership manifest; OpenCode discovers them when it starts.",
   ],
   [
     "runtime",
@@ -88,7 +88,7 @@ describe("website content contract", () => {
     for (const text of [
       "Define, share, and evolve your harness through Atlante with your team.",
       "Build your constellation",
-      "Edit the configuration, run the real CLI, and inspect the generated artifacts.",
+      "Edit the configuration, run the real CLI, and inspect the generated files.",
       "Playground · real CLI · isolated sandbox",
       "Built for change. Strict by design",
       "Chart your harness",

@@ -610,7 +610,7 @@ describe("runBuildWatchWithDependencies", () => {
       unwatch: watcher.unwatch,
       debounceMs: 20,
     });
-    const manifestPath = join(dir, ".atlante", "artifacts", "manifest.json");
+    const manifestPath = join(dir, ".atlante", "opencode-native.json");
     const before = readFileSync(manifestPath, "utf8");
 
     writeFileSync(schemaPath, "{ malformed");
@@ -642,7 +642,7 @@ describe("runBuildWatchWithDependencies", () => {
         debounceMs: 40,
       });
 
-      const manifestPath = join(dir, ".atlante", "artifacts", "manifest.json");
+      const manifestPath = join(dir, ".atlante", "opencode-native.json");
       expect(existsSync(manifestPath)).toBe(true);
       const before = readFileSync(manifestPath, "utf8");
 
@@ -1014,7 +1014,7 @@ describe("runBuildWatchWithDependencies", () => {
     });
   });
 
-  test("reconciles external metadata and facets while retaining failed inputs and artifacts", async () => {
+  test("reconciles external metadata and facets while retaining failed inputs and native outputs", async () => {
     const { dir, packageRoot, installedPackage, files } =
       externalPackageProject();
     const watcher = fakeWatcher();
@@ -1039,12 +1039,7 @@ describe("runBuildWatchWithDependencies", () => {
           packageRelative === ".." || packageRelative.startsWith(`..${sep}`),
         ).toBe(true);
         expect(canonical(installedPackage)).toBe(packageCanonical);
-        const manifestPath = join(
-          dir,
-          ".atlante",
-          "artifacts",
-          "manifest.json",
-        );
+        const manifestPath = join(dir, ".atlante", "opencode-native.json");
         const before = readFileSync(manifestPath, "utf8");
         expect(callbackForPath(watcher, files.manifest)).toBeDefined();
         expect(callbackForPath(watcher, files.source)).toBeDefined();

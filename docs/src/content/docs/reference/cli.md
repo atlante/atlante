@@ -14,8 +14,8 @@ npx @atlante/cli@latest --version
 
 ## `atlante init`
 
-Scaffold a project configuration, register the [OpenCode](https://opencode.ai/)
-adapter, and build the initial artifacts.
+Scaffold a project configuration, enforce the generated-output ignore policy,
+and materialize the initial native outputs.
 
 ```sh
 npx @atlante/cli@latest init [path]
@@ -28,9 +28,13 @@ npx @atlante/cli@latest init [path] --force
 - `--pack <locator>` selects a pack to install and extend instead of the bundled default `@atlante/pack`. The locator subpath names a preset explicitly, e.g. `@acme/review-pack/strict`.
 - `--force` overwrites an existing `atlante.jsonc` and removes the alternate `atlante.json`.
 
-`init` validates the selected preset before changing files. It creates or updates
-`opencode.jsonc` (reusing an existing `opencode.json` when present) without
-replacing existing host settings and runs a build.
+`init` validates the selected preset before changing files. It ensures
+`.gitignore` contains `.opencode/agents/`, `.opencode/skills/`, and
+`.atlante/` (existing content is never reordered), removes an Atlante-written
+`@atlante/opencode` plugin registration from `opencode.jsonc` (or an existing
+`opencode.json`) while preserving every other host setting, and runs a build.
+When no registration exists, it prints `no @atlante/opencode plugin
+registration found …`.
 
 ### Pack installation
 
@@ -62,7 +66,7 @@ With `--pack`, installation is part of initialization:
 ## `atlante validate`
 
 Validate the source document, selected resources, template schemas, values, and
-template-owned input without rendering or publishing artifacts.
+template-owned input without rendering or materializing anything.
 
 ```sh
 npx @atlante/cli@latest validate [path]
@@ -79,19 +83,26 @@ validated /Users/example/project/atlante.jsonc
 
 ## `atlante build`
 
-Validate, render, and atomically publish host-neutral artifacts under
-`<project>/.atlante/artifacts/`.
+Validate, render, and materialize the host-native outputs selected by the
+document's `hosts` field.
 
 ```sh
 npx @atlante/cli@latest build [path]
 npx @atlante/cli@latest build [path] --watch
 ```
 
-A successful one-shot command prints the resolved artifact directory:
+A successful one-shot command prints the resolved project path, followed by
+one line per file the build wrote or removed:
 
 ```text
-built /Users/example/project/.atlante/artifacts
+built /Users/example/project
+wrote opencode: .opencode/agents/architect.md
+removed opencode: .opencode/skills/obsolete/SKILL.md
+wrote opencode: .atlante/opencode-native.json
 ```
+
+Unchanged files are not rewritten, so an idempotent rebuild prints no `wrote`
+or `removed` lines.
 
 ### Watch behavior
 
@@ -101,8 +112,8 @@ filenames, selected resource files and manifests, transitive files, trusted Pack
 roots, and safe unresolved parent directories. It does not watch unrelated
 resource siblings.
 
-A successful rebuild publishes a complete new artifact tree. A validation or
-build failure reports a diagnostic, leaves the last complete artifact tree in
+A successful rebuild materializes the updated native outputs. A validation or
+build failure reports a diagnostic, leaves the previous valid generated set in
 place, and keeps the watcher running. The watcher retries when a later change
 arrives. Stop it with `Ctrl-C`.
 
@@ -111,10 +122,10 @@ arrives. Stop it with `Ctrl-C`.
 - `0` means the command completed without errors. In watch mode, interruption also produces exit status `0`.
 - `1` means validation or build failed for a one-shot command.
 
-Warnings do not make a successful build fail. A failed build publishes no partial
-artifact tree. Watch-mode failures are reported while the process remains active
-and do not end the watch process or change its eventual exit status when it is
-stopped.
+Warnings do not make a successful build fail. A failed build materializes no
+partial output set. Watch-mode failures are reported while the process remains
+active and do not end the watch process or change its eventual exit status when
+it is stopped.
 
 ## Path behavior
 

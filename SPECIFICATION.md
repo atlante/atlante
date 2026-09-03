@@ -4,7 +4,7 @@
 **Version:** 0.1
 
 This document defines the version 0.1 contract for Atlante configuration,
-static content, deterministic artifacts, and host materialization.
+static content, deterministic rendering, and host-native materialization.
 
 Each section follows the same review shape:
 
@@ -33,9 +33,11 @@ Version 0.1 defines:
 - a JSONC configuration document for agents, skills, values, and presets;
 - local and installed static packs containing presets and resources;
 - template and instance semantics for prompt and skill content;
-- deterministic resolution, validation, rendering, and artifact publication;
-- an adapter boundary for materializing verified artifacts into a host; and
-- an OpenCode profile for the first supported host adapter.
+- deterministic resolution, validation, and rendering of an in-memory prepared
+  project;
+- build-time materialization of the prepared project into host-native files
+  through injected host materializers; and
+- an OpenCode materializer profile for the first supported host.
 
 Version 0.1 MUST NOT define or imply:
 
@@ -49,8 +51,8 @@ Version 0.1 MUST NOT define or imply:
 ### Examples
 
 An in-scope project contains `atlante.jsonc`, selects a static preset, validates
-agent inputs, builds artifacts, and lets the OpenCode adapter load those
-artifacts.
+agent inputs, and materializes OpenCode-native agent and skill files through a
+build.
 
 An out-of-scope project asks Atlante to choose a model or execute a skill. Those
 operations belong to the host or the prompted model.
@@ -76,11 +78,11 @@ Make conformance testable through explicit requirements and stable boundaries.
 A conforming implementation MUST:
 
 1. accept only documents that satisfy this specification;
-2. reject invalid source structure before publishing artifacts;
+2. reject invalid source structure before materializing any host output;
 3. reject invalid references, values, schemas, and template input;
 4. produce deterministic results for the same source and selected content;
-5. preserve the canonical document semantics in generated artifacts; and
-6. fail closed when any required validation or publication step fails.
+5. preserve the canonical document semantics in generated native files; and
+6. fail closed when any required validation or materialization step fails.
 
 The serialized configuration format is JSONC. Strict JSON is a compatible
 subset for `atlante.json`. Template input schemas MUST use JSON Schema Draft
@@ -89,11 +91,11 @@ that library's API MUST NOT become part of the configuration contract.
 
 ### Examples
 
-The following is a conformance failure: a builder publishes one agent artifact
-after another agent has failed template validation.
+The following is a conformance failure: a builder materializes one agent after
+another agent has failed template validation.
 
-The following is conforming behavior: the builder publishes no new artifact
-tree and reports the validation failure.
+The following is conforming behavior: the builder materializes no host files
+and reports the validation failure.
 
 ### Edge cases
 
@@ -115,7 +117,7 @@ Use one stable vocabulary for source documents, static content, and output.
 
 - **Configuration** is the primary public term for the authored system.
 - **Document** is the authored or resolved `atlante.jsonc` or `atlante.json`
-  data model. It is distinct from generated artifacts.
+  data model. It is distinct from generated output.
 - **Pack** is a static content distribution.
 - **Pack root** is the trusted filesystem boundary represented by a `ResourcePack`.
 - **Resource** is an addressable directory inside a pack.
@@ -130,8 +132,17 @@ Use one stable vocabulary for source documents, static content, and output.
   specified. It is distinct from first-party ownership.
 - **First-party pack** describes Atlante ownership of static content. It is not
   synonymous with the default preset.
-- **Artifact** is generated output under `.atlante/artifacts/`.
-- **Adapter** is the host-specific component that consumes verified artifacts.
+- **Prepared project** is the complete in-memory set of rendered agent and
+  skill descriptors a validated build produces.
+- **Host materialization** is the publication of a prepared project as
+  host-native files.
+- **Native output set** is the deterministic set of host-native files, and
+  their bytes, that one prepared project materializes.
+- **Ownership manifest** is the Atlante-owned record of generated native
+  files, their IDs, paths, and SHA-256 digests. It is bookkeeping state and
+  never stores payload content.
+- **Materializer** is the host-specific component that materializes a
+  prepared project.
 - **Host agent** is an agent identified and configured by the host.
 - **Agent binding** associates a host-agent ID with a description and prompt
   definition.
@@ -456,7 +467,8 @@ Every entry point accepting source configuration MUST apply these stages in orde
    templates, package metadata, and transitive references.
 3. **Resolved validation** checks the canonical document, values, selectors,
    composition, effective-template compatibility, and template-owned input.
-4. **Build** renders only validated input and publishes the complete artifact tree.
+4. **Build** renders only validated input into a prepared project and
+   materializes the complete native output set.
 
 Raw validation MUST NOT require a package or template schema. Resolution and
 resolved validation MUST reject invalid locator grammar, missing targets,
@@ -491,63 +503,106 @@ location, and code.
 Two validation stages preserve useful raw-overlay behavior without allowing
 unresolved or invalid content to reach rendering.
 
-## 9. Build and Artifacts
+## 9. Build and Materialization
 
 ### Goal
 
-Produce deterministic, host-independent output that adapters can verify locally.
+Render a validated document into a deterministic prepared project and
+materialize it as host-native files.
 
 ### Contract
 
 Building MUST accept only a document that passed resolution and validation. It
-MUST render deterministic Markdown, MUST NOT execute agents, commands, or
-arbitrary project code, and MUST publish no partial result.
+MUST render deterministic Markdown into an in-memory prepared project, MUST
+NOT execute agents, commands, or arbitrary project code, and MUST materialize
+no partial result.
 
-The artifact tree MUST be published under `.atlante/artifacts/`. Its manifest
-MUST be UTF-8 JSON containing only `format`, `version`, `agents`, and `skills`:
+The document MAY declare a `hosts` field. Version 0.1 admits only `"opencode"`
+as a host target; a `hosts` array MUST be non-empty and MUST NOT contain
+duplicates, and the canonical document defaults to `["opencode"]` when the
+field is absent. For each declared host, the build MUST select a registered
+host materializer or fail with an `unsupported-host` diagnostic. The
+materializer receives the prepared project as data and MUST NOT load source
+configuration, resolve resources, or import the builder.
+
+Materialization MUST be deterministic and planned completely before any
+filesystem mutation. For the OpenCode host it MUST publish exactly:
+
+```text
+.opencode/agents/<id>.md
+.opencode/skills/<id>/SKILL.md
+.atlante/opencode-native.json
+```
+
+Agent IDs and skill IDs MUST be lowercase kebab-case ASCII of at most 64
+characters. Materialization MUST NOT rename an ID; an ID that violates this
+grammar MUST fail the build.
+
+Each agent file MUST contain a YAML frontmatter description followed by the
+rendered prompt. Each skill file MUST contain YAML frontmatter name and
+description followed by the rendered skill content.
+
+The ownership manifest MUST be UTF-8 JSON containing only `format`, `version`,
+and `files`:
 
 ```json
 {
-  "format": "atlante-artifacts",
+  "format": "atlante-opencode-native",
   "version": 1,
-  "agents": [
+  "files": [
     {
+      "kind": "agent",
       "id": "reviewer",
-      "description": "Built description",
-      "path": "agents/reviewer-<id-sha256>-<content-sha256>.md",
+      "path": ".opencode/agents/reviewer.md",
       "sha256": "<64 lowercase hex characters>"
     }
-  ],
-  "skills": []
+  ]
 }
 ```
 
-Each entry MUST have a non-empty ID, description, relative POSIX path, and
-lowercase SHA-256 digest of the exact UTF-8 payload. Payload filenames MUST
-contain an ASCII slug, the ID digest, and the content digest. Slug generation
-MUST fold only ASCII uppercase letters, replace non-ASCII-alphanumeric runs with
-hyphens, trim hyphens, and use `artifact` when empty. IDs, paths, entries, and
-payloads MUST be unique.
+Each entry MUST have kind `agent` or `skill`, a native ID, the exact native
+path derived from that kind and ID, and a lowercase SHA-256 digest of the
+exact UTF-8 bytes of the file it describes. IDs and paths MUST be unique
+within the manifest. The manifest is bookkeeping state: it MUST NOT contain
+prompt or skill payload content, and materialization MUST write it last.
 
-Publication MUST prepare a complete private tree and replace the live tree by
-atomic directory rename. A reader MUST observe a complete previous tree, a
-complete new tree, or no usable tree, never a partial tree.
+Publication MUST satisfy these invariants:
+
+- An existing file at a target path that the ownership manifest does not
+  account for MUST NOT be overwritten; the build fails closed with a repair
+  action.
+- An owned target whose current bytes no longer match its recorded digest
+  MUST NOT be replaced or removed; drift is reported with an intentional
+  repair path.
+- A previously generated file the prepared project no longer produces MUST be
+  removed only when its bytes still match the manifest digest.
+- Writes MUST be staged and published file by file, each by an atomic rename,
+  with the manifest written last. A failed publication MUST roll back to the
+  previous valid generated set. Whole-tree atomicity across host directories
+  is not assumed.
+- Repeating materialization for an unchanged prepared project SHOULD write
+  nothing.
 
 ### Examples
 
-For a valid agent binding, the builder emits one agent entry and one Markdown
-payload. An empty `skills` map produces an empty `skills` array and is valid.
+A build of a document with one agent and one skill materializes two native
+files, removes generated files the document no longer declares, and rewrites
+the ownership manifest only when its bytes would change. A document with empty
+`agents` and `skills` maps materializes only the manifest and is valid.
 
 ### Edge cases
 
-Adapters MUST reject unknown manifest fields, unsafe paths, symlinks,
-non-regular files, invalid UTF-8, missing payloads, duplicate entries, and
-digest mismatches. Rendered values MAY be sensitive and SHOULD remain local.
+Materialization MUST reject a symlinked project root, symlinked parent
+directories, and symlinked targets. Rendered values MAY be sensitive and
+SHOULD remain local; the ignore-by-default policy of `atlante init` keeps
+generated native files and the manifest out of version control.
 
 ### Rationale
 
-Digest-addressed, host-neutral artifacts separate source configuration from host
-state and make publication verifiable without executing source content.
+An in-memory prepared project and host-native materialization separate source
+configuration from host state without a duplicate payload tree, and
+manifest-gated updates make every change to generated files intentional and
+verifiable.
 
 ## 10. Compatibility and Evolution
 
@@ -559,78 +614,104 @@ Keep independent contracts versioned independently and prevent silent upgrades.
 
 The document `$schema` URI identifies the versioned configuration contract and
 released schema URIs MUST be immutable. Template input schemas MUST declare JSON
-Schema Draft 2020-12. Artifact `format` and numeric `version` identify the
-artifact contract independently of the document schema.
+Schema Draft 2020-12. Ownership-manifest `format` and numeric `version` identify
+the materialization contract independently of the document schema.
 
-An adapter MUST reject unsupported artifact formats, artifact versions, and
-document schema URIs rather than guessing. Package versions are installation
-metadata and MUST NOT become part of authored resource locators.
+A materializer MUST reject unsupported ownership manifest formats and versions,
+and the CLI MUST reject unsupported document schema URIs, rather than guessing.
+Package versions are installation metadata and MUST NOT become part of authored
+resource locators.
 
 Local resource edits MAY take effect on the next build without changing the
 document schema URI. A versioned or immutable resource distribution MUST define
 its own version or digest mechanism.
 
-Version 0.1 defines no migration format. Future versions MAY add runtime tools,
-state, remote registries, preset sharing, or skill execution, but those features
-MUST preserve the separation between Atlante-owned prompt content and host-owned
-execution settings.
+Future versions MAY add runtime tools, state, remote registries, preset sharing,
+or skill execution, but those features MUST preserve the separation between
+Atlante-owned prompt content and host-owned execution settings.
 
 ### Examples
 
-An adapter that receives `format: "other-artifacts"` MUST reject it. A local
-change to `template.md` does not require changing `atlante.jsonc`'s `$schema`.
+A materializer that receives `format: "other-native-format"` MUST reject it. A
+local change to `template.md` does not require changing `atlante.jsonc`'s
+`$schema`.
 
 ### Edge cases
 
 A document with an unsupported schema URI MUST fail even if its fields resemble a
-known version. An artifact version MUST NOT be inferred from its directory name.
+known version. An ownership manifest version MUST NOT be inferred from its file
+name.
 
 ### Rationale
 
-Independent version domains let documents, templates, packs, and artifacts evolve
-without making one release boundary govern every other contract.
+Independent version domains let documents, templates, packs, and native outputs
+evolve without making one release boundary govern every other contract.
 
-## 11. OpenCode Adapter Profile
+## 11. OpenCode Materializer Profile
 
 ### Goal
 
-Define the first host adapter without making host behavior part of the document.
+Define the first host materializer without making host behavior part of the
+document.
 
 ### Contract
 
-The OpenCode adapter MUST consume only a complete verified artifact tree. It MUST:
+Version 0.1 admits `"opencode"` as the only host target, and `["opencode"]` is
+the canonical default of the document's `hosts` field. The OpenCode
+materializer MUST be selected only through that field and MUST receive the
+prepared project as data. It MUST NOT load source configuration, resolve
+resources or packs, or depend on the builder.
 
-- locate or create host agents by their configured IDs;
-- write the rendered prompt and resolved description as Atlante-owned fields;
-- preserve host-owned model, effort, permission, tool, and mode settings;
-- report warnings when replacing a non-empty host prompt;
-- avoid loading source configuration or source resources; and
-- leave host configuration unchanged when verification or materialization fails.
+The materializer MUST publish the native output set defined in section 9:
 
-Materialization MUST be atomic. Repeating materialization for the same valid
-artifacts SHOULD produce the same host state and MUST NOT duplicate agents.
+- `.opencode/agents/<id>.md` for each agent binding, keyed by the binding's
+  host-agent ID;
+- `.opencode/skills/<id>/SKILL.md` for each skill binding, keyed by the
+  binding's `skillId`; and
+- `.atlante/opencode-native.json`, the ownership manifest with format
+  `atlante-opencode-native`, version `1`, and one `files` entry of `kind`,
+  `id`, `path`, and `sha256` per generated file.
 
-After verification and materialization, the adapter MAY expose an `atlante_skill`
-tool. Its input MUST be exactly `{ "name": "<skillId>" }`, and a successful
-lookup MUST return only the resolved Markdown content. Unknown names, malformed
-input, unavailable artifacts, and failed lifecycle states MUST return explicit
-errors without partial content.
+Native IDs MUST follow the grammar of section 9 and are never renamed. Host
+configuration remains host-owned: model, effort, permission, tool, and mode
+settings live in the host configuration and are never written by the
+materializer. The host composes its own configuration with the native files
+when it starts. OpenCode reads native agents and skills at startup, so a
+restart is required to pick up new or changed native files.
+
+Materialization MUST fail closed with a stable diagnostic for collisions,
+drift, stale-output digest mismatches, invalid IDs, unsafe paths, and
+filesystem failures. Diagnostics carry the `materialization-` prefix over the
+failure code (`invalid-input`, `invalid-id`, `invalid-manifest`,
+`unsafe-path`, `collision`, `drift`, `filesystem`, `publication-failed`) and
+one deterministic recovery action.
+
+`atlante init` MUST NOT register a runtime integration for the materializer
+and MUST remove an Atlante-written `@atlante/opencode` plugin registration
+from the host configuration. A stale registration in a project not yet
+re-initialized is inert: the host drops packages that expose no plugin target.
+The removal MAY leave an empty `"plugin": []` field, which requires no action.
+Init MUST also enforce the ignore-by-default git policy: `.gitignore` MUST
+gain `.opencode/agents/`, `.opencode/skills/`, and `.atlante/` when missing,
+and existing `.gitignore` content MUST NOT be reordered.
 
 ### Examples
 
-The host registers the OpenCode adapter through its supported integration
-mechanism.
+The CLI is the composition root: it passes the OpenCode materializer to the
+builder, and a build of a document without a `hosts` field materializes the
+OpenCode native output set.
 
 ### Edge cases
 
-If artifact discovery, verification, or injection fails, the adapter MUST remain
-unavailable and MUST NOT mutate host configuration. Skill content is data and
-MUST NOT be executed.
+If host selection or materialization fails, the build MUST leave the previous
+valid generated set untouched. The ownership manifest is bookkeeping state, not
+a trust boundary.
 
 ### Rationale
 
-An artifact-only adapter keeps host integration narrow, preserves host ownership,
-and prevents source loading or execution from crossing the boundary.
+A build-time materializer keeps host integration narrow: no runtime plugin, no
+persisted payload tree, and no source loading past the builder boundary, while
+hash-gated updates keep every change to generated files intentional.
 
 ## 12. Acceptance Criteria
 
@@ -648,19 +729,23 @@ A conforming implementation MUST be able to:
 3. validate template input schemas and composition graphs;
 4. resolve global values, local overrides, presets, and deterministic merges;
 5. render deterministic agent prompts and Markdown skills;
-6. build and atomically publish verified artifact manifests and payloads;
-7. preserve host-owned settings while materializing an OpenCode agent;
-8. report a warning when replacing a non-empty host prompt;
+6. materialize a prepared project as deterministic host-native files and an
+   ownership manifest;
+7. preserve host-owned settings while materializing OpenCode agents and skills;
+8. fail closed on collisions, drift, stale-output digest mismatches, invalid
+   IDs, and unsafe paths;
 9. scaffold from the first-party `@atlante/pack` default preset through
-   `atlante init` and rebuild through `atlante build`;
-10. expose `atlante_skill` with the exact name lookup contract; and
-11. leave the host unchanged whenever validation, verification, or materialization
-    fails.
+   `atlante init`, enforce the ignore-by-default git policy, and rebuild
+   through `atlante build`;
+10. remove stale generated outputs and preserve host-owned files; and
+11. preserve the previous valid generated set whenever validation or
+    materialization fails.
 
 ### Examples
 
 The conformance checklist is satisfied when a minimal configuration can move from
-source to validated artifacts and then to an unchanged-or-atomically-updated host.
+source to a validated prepared project and then to host-native files, an
+up-to-date ownership manifest, and a host that discovers them.
 
 ### Edge cases
 

@@ -8,6 +8,12 @@ const ROOT = join(import.meta.dir, "..");
 const CLI_PACKAGE = join(ROOT, "packages", "cli");
 const PACK_PACKAGE = join(ROOT, "packages", "pack");
 
+type NativeManifest = {
+  format: string;
+  version: number;
+  files: { kind: string; id: string; path: string; sha256: string }[];
+};
+
 function assert(condition: boolean, message: string) {
   if (!condition) throw new Error(message);
 }
@@ -54,51 +60,55 @@ try {
   );
   const opencode = await Bun.file(join(project, "opencode.jsonc")).text();
   assert(
-    opencode.includes("@atlante/opencode"),
-    "missing @atlante/opencode in opencode.jsonc",
+    !opencode.includes("@atlante/opencode"),
+    "init registered @atlante/opencode in opencode.jsonc",
   );
 
   await Bun.$`node ${CLI} validate ${project}`.cwd(project);
   await Bun.$`node ${CLI} build ${project}`.cwd(project);
 
-  const artifacts = join(project, ".atlante", "artifacts");
   const manifest = (await Bun.file(
-    join(artifacts, "manifest.json"),
-  ).json()) as {
-    format: string;
-    version: number;
-    agents: { id: string; path: string; sha256: string }[];
-    skills: { id: string; path: string; sha256: string }[];
-  };
+    join(project, ".atlante", "opencode-native.json"),
+  ).json()) as NativeManifest;
   assert(
-    manifest.format === "atlante-artifacts" && manifest.version === 1,
-    "unexpected manifest",
+    manifest.format === "atlante-opencode-native" && manifest.version === 1,
+    "unexpected ownership manifest",
   );
 
-  const entries = [...manifest.agents, ...manifest.skills];
-  for (const entry of entries) {
-    const payload = await Bun.file(join(artifacts, entry.path)).bytes();
+  for (const entry of manifest.files) {
+    assert(
+      entry.path.startsWith(".opencode/agents/") ||
+        entry.path.startsWith(".opencode/skills/"),
+      `unexpected native output path: ${entry.path}`,
+    );
+    const payload = await Bun.file(join(project, entry.path)).bytes();
     const digest = createHash("sha256").update(payload).digest("hex");
     assert(digest === entry.sha256, `sha256 mismatch for ${entry.path}`);
   }
 
-  const agentIds = manifest.agents.map((agent) => agent.id).sort();
+  const agentIds = manifest.files
+    .filter((file) => file.kind === "agent")
+    .map((file) => file.id)
+    .sort();
   assert(
     agentIds.join(",") === "architect",
     `unexpected agent ids: ${agentIds}`,
   );
-  const skillIds = manifest.skills.map((skill) => skill.id).sort();
+  const skillIds = manifest.files
+    .filter((file) => file.kind === "skill")
+    .map((file) => file.id)
+    .sort();
   assert(
     skillIds.join(",") === "brainstorm,build,harness,plan,review",
     `unexpected skill ids: ${skillIds}`,
   );
 
   const contents = await Promise.all(
-    entries.map((entry) => Bun.file(join(artifacts, entry.path)).text()),
+    manifest.files.map((entry) => Bun.file(join(project, entry.path)).text()),
   );
   assert(
     contents.some((content) => content.includes("You are the lead engineer")),
-    "agent artifact missing lead engineer content",
+    "native agent file missing lead engineer content",
   );
 
   assert(
@@ -111,46 +121,49 @@ try {
   await Bun.$`node ${CLI} validate ${ROOT}`.cwd(ROOT);
   await Bun.$`node ${CLI} build ${ROOT}`.cwd(ROOT);
   const rootManifest = (await Bun.file(
-    join(ROOT, ".atlante", "artifacts", "manifest.json"),
-  ).json()) as {
-    format: string;
-    version: number;
-    agents: { id: string; description: string; path: string; sha256: string }[];
-    skills: { id: string; description: string; path: string; sha256: string }[];
-  };
+    join(ROOT, ".atlante", "opencode-native.json"),
+  ).json()) as NativeManifest;
   assert(
-    rootManifest.format === "atlante-artifacts" && rootManifest.version === 1,
-    "root artifact format changed",
+    rootManifest.format === "atlante-opencode-native" &&
+      rootManifest.version === 1,
+    "root ownership manifest format changed",
   );
   const rootManifestBefore = JSON.stringify(rootManifest);
   await Bun.$`node ${CLI} build ${ROOT}`.cwd(ROOT);
   const rootManifestAfter = await Bun.file(
-    join(ROOT, ".atlante", "artifacts", "manifest.json"),
+    join(ROOT, ".atlante", "opencode-native.json"),
   ).json();
   assert(
     JSON.stringify(rootManifestAfter) === rootManifestBefore,
-    "root artifact manifest or hashes changed",
+    "root ownership manifest or hashes changed",
   );
   assert(
-    rootManifest.agents.map(({ id }) => id).join(",") === "architect",
-    "root architect artifact ID changed",
+    rootManifest.files
+      .filter((file) => file.kind === "agent")
+      .map((file) => file.id)
+      .join(",") === "architect",
+    "root architect ID changed",
   );
   assert(
-    rootManifest.skills
-      .map(({ id }) => id)
+    rootManifest.files
+      .filter((file) => file.kind === "skill")
+      .map((file) => file.id)
       .sort()
       .join(",") === "brainstorm,build,harness,plan,review",
-    "root skill artifact IDs changed",
+    "root skill IDs changed",
   );
   assert(
-    rootManifest.agents[0]?.description ===
-      "General-purpose Atlante agent for planning, implementing, and reviewing software changes.",
-    "root architect description changed",
+    await Bun.file(join(ROOT, ".opencode", "agents", "architect.md")).exists(),
+    "root native architect file is missing",
+  );
+  assert(
+    await Bun.file(
+      join(ROOT, ".opencode", "skills", "plan", "SKILL.md"),
+    ).exists(),
+    "root native skill file is missing",
   );
   const rootContents = await Promise.all(
-    [...rootManifest.agents, ...rootManifest.skills].map((entry) =>
-      Bun.file(join(ROOT, ".atlante", "artifacts", entry.path)).text(),
-    ),
+    rootManifest.files.map((entry) => Bun.file(join(ROOT, entry.path)).text()),
   );
   assert(
     rootContents.some((content) =>

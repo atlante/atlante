@@ -22,9 +22,10 @@ jobs:
       # exercises the binary as a user does.
       - run: bun run full:check
 
-      # The OpenCode host drops plugins that expose no target silently, so
-      # the unit suite cannot catch a manifest regression. Boot the real
-      # OpenCode CLI against the built adapter and assert the plugin's
-      # architect agent registers.
-      - name: OpenCode plugin smoke
+      # The OpenCode host discovers native agent/skill files straight from
+      # disk with no runtime plugin, so the unit suite cannot catch a build
+      # that materializes nothing. Boot the real OpenCode CLI against a
+      # project built by the CLI and assert the native architect agent and
+      # skills are discovered with host-owned config merged.
+      - name: OpenCode host smoke
         run: bun scripts/opencode-smoke.ts

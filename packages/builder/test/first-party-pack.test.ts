@@ -1,9 +1,15 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { cpSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { readArtifacts } from "@atlante/artifacts/read-only";
+import { openCodeMaterializer } from "@atlante/opencode";
 import { SCHEMA_URI } from "@atlante/schema";
 import { buildProject } from "../src/index.js";
 
@@ -51,38 +57,74 @@ function firstPartyProject(): string {
 }
 
 describe("first-party pack integration", () => {
-  test("builds the preset and the verified reader loads the one agent and five skills", () => {
+  test("materializes the one agent and five phase skills into native OpenCode outputs", () => {
     const root = firstPartyProject();
 
-    const built = buildProject(root);
+    const built = buildProject(
+      root,
+      {},
+      {
+        materializers: [openCodeMaterializer],
+      },
+    );
 
     expect(built.diagnostics).toEqual([]);
-    const artifacts = readArtifacts(root);
-    if (!artifacts) throw new Error("expected built first-party artifacts");
-
-    expect(artifacts.agents.map(({ hostAgentId }) => hostAgentId)).toEqual([
-      "architect",
+    expect(
+      [...(built.materializations[0]?.writtenPaths ?? [])].sort((left, right) =>
+        left.localeCompare(right),
+      ),
+    ).toEqual([
+      ".opencode/agents/architect.md",
+      ".opencode/skills/brainstorm/SKILL.md",
+      ".opencode/skills/build/SKILL.md",
+      ".opencode/skills/harness/SKILL.md",
+      ".opencode/skills/plan/SKILL.md",
+      ".opencode/skills/review/SKILL.md",
     ]);
-    expect(artifacts.skills.map(({ skillId }) => skillId).sort()).toEqual([
-      "brainstorm",
-      "build",
-      "harness",
-      "plan",
-      "review",
-    ]);
+    expect(built.materializations[0]?.removedPaths).toEqual([]);
 
-    const [agent] = artifacts.agents;
-    expect(agent?.prompt.trim().length).toBeGreaterThan(0);
+    const agent = readFileSync(
+      join(root, ".opencode", "agents", "architect.md"),
+      "utf8",
+    );
+    expect(agent).toContain("You are the lead engineer");
+    expect(agent).toContain("## Workflow");
+    expect(agent).toContain("### 1. Brainstorm");
+    expect(agent).toContain("### 3. Build");
+    expect(agent).toContain("### 4. Review");
+    expect(agent).toContain("MUST preserve unrelated user changes.");
 
-    for (const skill of artifacts.skills) {
-      expect(
-        skill.content.trim().length,
-        `${skill.skillId} content`,
-      ).toBeGreaterThan(0);
-      expect(skill.content, skill.skillId).toContain(
-        phaseSkillTitles[skill.skillId],
+    for (const [skillId, title] of Object.entries(phaseSkillTitles)) {
+      const content = readFileSync(
+        join(root, ".opencode", "skills", skillId, "SKILL.md"),
+        "utf8",
       );
-      expect(skill.content, skill.skillId).toContain("## Overview");
+      expect(content, skillId).toContain(title);
+      expect(content, skillId).toContain("## Overview");
+      expect(content.trim().length, skillId).toBeGreaterThan(0);
     }
+
+    const manifest = JSON.parse(
+      readFileSync(join(root, ".atlante", "opencode-native.json"), "utf8"),
+    ) as {
+      format: string;
+      version: number;
+      files: Array<{ kind: string; id: string; path: string }>;
+    };
+    expect(manifest.format).toBe("atlante-opencode-native");
+    expect(manifest.version).toBe(1);
+    expect(
+      manifest.files.filter(({ kind }) => kind === "agent").map(({ id }) => id),
+    ).toEqual(["architect"]);
+    expect(
+      manifest.files
+        .filter(({ kind }) => kind === "skill")
+        .map(({ id }) => id)
+        .sort(),
+    ).toEqual(["brainstorm", "build", "harness", "plan", "review"]);
+    for (const file of manifest.files)
+      expect(
+        readFileSync(join(root, ...file.path.split("/")), "utf8").length,
+      ).toBeGreaterThan(0);
   });
 });

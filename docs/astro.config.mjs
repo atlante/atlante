@@ -14,7 +14,7 @@ export default defineConfig({
       disable404Route: true,
       title: "Atlante documentation",
       description:
-        "Reference documentation for Atlante configuration, validation, builds, artifacts, and host adapters.",
+        "Reference documentation for Atlante configuration, validation, builds, host materialization, and native outputs.",
       logo: {
         light: "./src/assets/atlante-horizontal.svg",
         dark: "./src/assets/atlante-horizontal-reverse.svg",
@@ -74,7 +74,7 @@ export default defineConfig({
             { slug: "concepts/templates", label: "Templates" },
             { slug: "concepts/values", label: "Values" },
             { slug: "concepts/resolution", label: "Resolution" },
-            { slug: "concepts/artifacts", label: "Artifacts" },
+            { slug: "concepts/native-outputs", label: "Native outputs" },
           ],
         },
         {
@@ -94,7 +94,7 @@ export default defineConfig({
           items: [
             { slug: "reference/cli", label: "CLI" },
             { slug: "reference/schema", label: "Schema" },
-            { slug: "reference/artifact", label: "Artifact" },
+            { slug: "reference/materialization", label: "Materialization" },
             { slug: "reference/diagnostics", label: "Diagnostics" },
           ],
         },
