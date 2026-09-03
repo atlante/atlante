@@ -3,5 +3,18 @@
   "extends": "@atlante/pack",
   "values": {
     "project": "Atlante"
+  },
+  // Dogfood suite: `atlante eval` grades this repo's own harness. Scenarios
+  // are cheap by design (tiny fixtures, no dependencies); running them spends
+  // real model calls through the host, so they never run in CI.
+  "eval": {
+    "host": "opencode",
+    "scenarios": "eval/scenarios/*.eval.json*",
+    "budget": {
+      "trials": 2,
+      "timeoutMs": 300000,
+      "maxSessions": 10,
+      "maxTokens": 200000
+    }
   }
 }

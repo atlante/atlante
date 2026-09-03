@@ -1,0 +1,7 @@
+{
+  "$schema": "https://atlante.sh/schema/v0.1/eval-scenario.json",
+  "version": "0.1",
+  "name": "beta-scenario",
+  "task": { "fixture": "fixtures/api", "prompt": "Duplicate name with beta." },
+  "checks": [{ "type": "file-exists", "path": "src/main.ts" }]
+}

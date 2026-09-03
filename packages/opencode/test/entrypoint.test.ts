@@ -10,12 +10,14 @@ test("the single entry exposes exactly the materializer surface", () => {
     "OpenCodeMaterializationError",
     "materializeOpenCode",
     "openCodeMaterializer",
+    "readOpenCodeNative",
   ]);
 });
 
 test("the materializer surface keeps its runtime roles", () => {
   expect(typeof entrypoint.materializeOpenCode).toBe("function");
   expect(typeof entrypoint.OpenCodeMaterializationError).toBe("function");
+  expect(typeof entrypoint.readOpenCodeNative).toBe("function");
   expect(entrypoint.OPENCODE_HOST_TARGET).toBe("opencode");
   expect(entrypoint.openCodeMaterializer.host).toBe(
     entrypoint.OPENCODE_HOST_TARGET,

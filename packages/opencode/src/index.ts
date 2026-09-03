@@ -9,10 +9,16 @@ export {
 } from "./materialize.js";
 export type {
   OpenCodeMaterializationErrorCode,
+  OpenCodeNativeFile,
+  OpenCodeNativeProject,
   OpenCodeOwnedFile,
   OpenCodeOwnershipManifest,
   OpenCodePreparedAgent,
   OpenCodePreparedProject,
   OpenCodePreparedSkill,
 } from "./native.js";
-export { materializeOpenCode, OpenCodeMaterializationError } from "./native.js";
+export {
+  materializeOpenCode,
+  OpenCodeMaterializationError,
+  readOpenCodeNative,
+} from "./native.js";

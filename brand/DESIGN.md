@@ -47,9 +47,10 @@ As analogy, Atlante bears the celestial sphere. The celestial sphere represents 
 | Bearing | Support, load, responsibility, materialization | Brand narrative and graphic devices |
 | Almanac | A possible future registry for independently authored harness families | Reserved; it is not shipped and has no current behavior |
 
-Skills remain literal skills, reusable guidance rather than stars. Artifacts remain artifacts. Never rename Atlante to Atlas or Atlantis.
+Skills remain literal skills, reusable guidance rather than stars. Generated
+outputs remain generated outputs. Never rename Atlante to Atlas or Atlantis.
 
-Technical vocabulary keeps its required meanings: `configuration` is the primary prose term for the authored system and `config` appears only in compact CLI, argument, or code contexts; `document` names the parsed or validated configuration entity in technical documentation; `preset` names a preconfigured root document used directly or through `extends`; `artifact` names generated output under `.atlante/artifacts/`; `host adapter` is the public phrase for host-specific materialization.
+Technical vocabulary keeps its required meanings: `configuration` is the primary prose term for the authored system and `config` appears only in compact CLI, argument, or code contexts; `document` names the parsed or validated configuration entity in technical documentation; `preset` names a preconfigured root document used directly or through `extends`; `native output` names generated host files under `.opencode/` and the ownership manifest under `.atlante/opencode-native.json`; `host adapter` is the public phrase for host-specific materialization.
 
 `Family` names one complete harness containing related constellations, skills, workflows, values, and supporting configuration. It is explanatory brand vocabulary only and does not name a schema field, package, type, or code identifier. `PackItem` remains a retired early discussion term.
 

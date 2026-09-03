@@ -14,13 +14,14 @@ packages/
   validator/       — document discovery/parsing, raw and resolved validation, template-input validation, diagnostics
   builder/         — private host-neutral preparation and build orchestration; keeps the prepared project in memory and runs injected host materializers
   opencode/        — OpenCode host materializer: deterministic native agent/skill files plus the ownership manifest
-  cli/             — user-facing command orchestration (validate, build, init), initialization defaults, composition root registering host materializers
+  eval/            — private host-runner orchestration and deterministic evaluation checks
+  cli/             — user-facing command orchestration (validate, build, init, eval), initialization defaults, host registration
 website/           — private Astro landing site workspace (@atlante/website, not published)
 ```
 
-The seven workspaces are `schema`, `resources`, `validator`, `builder`,
-`pack`, `opencode`, and `cli`. The publishable packages are `pack`,
-the CLI, and the OpenCode materializer; `resources` and `builder` remain private. The separate `website` workspace hosts the Astro landing site for [atlante.sh](https://atlante.sh); it stays outside the toolchain package graph and is not covered by these constraints.
+The eight workspaces are `schema`, `resources`, `validator`, `builder`,
+`pack`, `opencode`, `eval`, and `cli`. The publishable packages are `pack`,
+the CLI, and the OpenCode materializer; `resources`, `builder`, and `eval` remain private. The separate `website` workspace hosts the Astro landing site for [atlante.sh](https://atlante.sh); it stays outside the toolchain package graph and is not covered by these constraints.
 
 Schema changes require building and validating (`atlante validate`, `atlante build`). `atlante init` runs the first build automatically; run `atlante build` after later source configuration changes. Tests live next to the code they test: `packages/<workspace>/test/` mirrors `src/`, `scripts/*.test.ts` files sit beside their scripts, and `website` and `docs` own their tests internally. Do not add tests in ad-hoc locations outside these trees.
 

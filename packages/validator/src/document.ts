@@ -16,12 +16,6 @@ import {
   atlanteDocumentSchema,
   SCHEMA_URI,
 } from "@atlante/schema";
-import {
-  findNodeAtLocation,
-  getNodeValue,
-  type ParseError,
-  parseTree,
-} from "jsonc-parser";
 import type { Diagnostic, DiagnosticChainEntry } from "./diagnostic.js";
 import {
   error,
@@ -29,10 +23,12 @@ import {
   sortDiagnostics,
 } from "./diagnostic.js";
 import { discoverConfigPath } from "./discover.js";
+import { locationAtPointer, parseJsonc, positionOf } from "./jsonc.js";
 import {
   resourceOriginForDocument,
   validateResolvedDocument,
 } from "./templates.js";
+import { zodDiagnostics } from "./zod-diagnostics.js";
 
 export type DocumentLoadOptions = {
   cwd?: string;
@@ -78,12 +74,6 @@ function resourceWatchContext(value: {
   });
 }
 
-function positionOf(text: string, offset: number) {
-  const before = text.slice(0, offset);
-  const lines = before.split("\n");
-  return { line: lines.length, column: (lines.at(-1)?.length ?? 0) + 1 };
-}
-
 function sourceName(path: string): string {
   return basename(path);
 }
@@ -96,46 +86,12 @@ function ownPropertyValue(value: unknown, key: string): unknown {
     : undefined;
 }
 
-function pointerSegments(pointer: string | undefined): string[] {
-  if (!pointer || pointer === "" || pointer === "/") return [];
-  return pointer
-    .split("/")
-    .slice(1)
-    .map((segment) => segment.replaceAll("~1", "/").replaceAll("~0", "~"));
-}
-
-function locationAtPointer(
-  text: string,
-  pointer: string | undefined,
-): { line: number; column: number } | undefined {
-  if (pointer === undefined) return undefined;
-  const parseErrors: ParseError[] = [];
-  const tree = parseTree(text, parseErrors, {
-    allowTrailingComma: true,
-    disallowComments: false,
-  });
-  const node = tree
-    ? findNodeAtLocation(tree, pointerSegments(pointer))
-    : undefined;
-  return node ? positionOf(text, node.offset) : undefined;
-}
-
 type OverlayIssue = {
   code?: string;
   message: string;
   path: PropertyKey[];
   keys?: string[];
 };
-
-function pointerForPath(path: readonly PropertyKey[]): string {
-  return `/${path.map((segment) => escapeJsonPointerSegment(String(segment))).join("/")}`;
-}
-
-function overlayIssuePaths(issue: OverlayIssue): readonly PropertyKey[][] {
-  if (issue.code === "unrecognized_keys" && issue.keys)
-    return issue.keys.map((key) => [...issue.path, key]);
-  return [issue.path];
-}
 
 function overlayDiagnostics(
   result: {
@@ -145,29 +101,16 @@ function overlayDiagnostics(
   sourcePath: string,
   text: string,
 ): Diagnostic[] {
-  const diagnostics: Diagnostic[] = [];
-  const seen = new Set<string>();
-  for (const issue of result.error.issues) {
-    for (const issuePath of overlayIssuePaths(issue)) {
-      const path = pointerForPath(issuePath);
-      const message =
-        issue.code === "unrecognized_keys" && issuePath.at(-1) !== undefined
-          ? `unrecognized property ${JSON.stringify(String(issuePath.at(-1)))}`
-          : issue.message;
-      const key = `${path}\u0000${message}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      diagnostics.push(
-        error("invalid-document", `${sourceName(sourcePath)}: ${message}`, {
-          path,
-          pointer: path,
-          source: sourceName(sourcePath),
-          location: locationAtPointer(text, path),
-        }),
-      );
-    }
-  }
-  return sortDiagnostics(diagnostics);
+  return zodDiagnostics(
+    result,
+    text,
+    {
+      code: "invalid-document",
+      source: sourceName(sourcePath),
+      messagePrefix: `${sourceName(sourcePath)}: `,
+    },
+    locationAtPointer,
+  );
 }
 
 function stableSource(path: string, fallback: string): string {
@@ -296,14 +239,13 @@ function parseConfigSource(
     };
   }
 
-  const parseErrors: ParseError[] = [];
-  const tree = parseTree(text, parseErrors, {
+  const parsed = parseJsonc(text, {
     allowTrailingComma: !isJson,
     disallowComments: isJson,
   });
 
-  if (parseErrors.length > 0 || !tree) {
-    const first = parseErrors[0];
+  if (parsed.errors.length > 0 || parsed.value === undefined) {
+    const first = parsed.errors[0];
     return {
       diagnostics: [
         error("invalid-json", `${sourceName(sourcePath)}: malformed JSON`, {
@@ -314,7 +256,7 @@ function parseConfigSource(
     };
   }
 
-  return { raw: getNodeValue(tree) as unknown, diagnostics: [] };
+  return { raw: parsed.value, diagnostics: [] };
 }
 
 function unsupportedSchemaDiagnostic(

@@ -123,6 +123,10 @@ type BuiltEntry = {
     host: string;
     materialize: (projectRoot: string, prepared: unknown) => unknown;
   };
+  readOpenCodeNative: (projectRoot: string) => {
+    manifest: { format: string; version: number; files: unknown[] };
+    files: Array<{ path: string; bytes: Uint8Array }>;
+  };
 };
 
 async function builtEntry(): Promise<BuiltEntry> {
@@ -152,9 +156,11 @@ test("the built single entry exposes exactly the materializer surface", async ()
     "OpenCodeMaterializationError",
     "materializeOpenCode",
     "openCodeMaterializer",
+    "readOpenCodeNative",
   ]);
   expect(typeof entry.materializeOpenCode).toBe("function");
   expect(typeof entry.OpenCodeMaterializationError).toBe("function");
+  expect(typeof entry.readOpenCodeNative).toBe("function");
   expect(entry.OPENCODE_HOST_TARGET).toBe("opencode");
   expect(entry.openCodeMaterializer.host).toBe(entry.OPENCODE_HOST_TARGET);
 });
@@ -171,7 +177,7 @@ test("the built bundle is self-contained: no @atlante/ or bare external specifie
 test("the built entry materializes native files and the ownership manifest", async () => {
   const root = mkdtempSync(join(tmpdir(), "atlante-built-materializer-"));
   try {
-    const { materializeOpenCode } = await builtEntry();
+    const { materializeOpenCode, readOpenCodeNative } = await builtEntry();
     const result = materializeOpenCode(root, PREPARED);
 
     expect(result.writtenPaths).toEqual([
@@ -199,6 +205,16 @@ test("the built entry materializes native files and the ownership manifest", asy
     expect(result.manifest.files).toEqual(expectedOwnedFiles());
     expect(JSON.stringify(readFileSync(manifestPath))).not.toContain(
       "You are a built-path reviewer",
+    );
+
+    const native = readOpenCodeNative(root);
+    expect(native.manifest).toEqual(result.manifest);
+    expect(native.files.map(({ path }) => path)).toEqual([
+      ".opencode/agents/reviewer.md",
+      ".opencode/skills/testing/SKILL.md",
+    ]);
+    expect(new TextDecoder().decode(native.files[0]?.bytes)).toBe(
+      new TextDecoder().decode(agentBytes(PREPARED.agents[0])),
     );
   } finally {
     rmSync(root, { recursive: true, force: true });

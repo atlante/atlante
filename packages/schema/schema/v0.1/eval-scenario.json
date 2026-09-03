@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://atlante.sh/schema/v0.1/eval-scenario.json",
+  "title": "Atlante eval scenario document",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "const": "https://atlante.sh/schema/v0.1/eval-scenario.json"
+    },
+    "version": {
+      "type": "string",
+      "const": "0.1"
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task": {
+      "type": "object",
+      "properties": {
+        "fixture": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!.*\\0)(?![\\\\/])(?!.*[\\\\/]$)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$))(?!.*(?:^|[\\\\/])(?:\\.git|node_modules)(?:[\\\\/]|$)).+$"
+        },
+        "setup": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "agent": {
+          "type": "string",
+          "minLength": 1
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["fixture", "prompt"],
+      "additionalProperties": false
+    },
+    "budget": {
+      "type": "object",
+      "properties": {
+        "timeoutMs": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 3600000
+        }
+      },
+      "required": ["timeoutMs"],
+      "additionalProperties": false
+    },
+    "checks": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "command"
+              },
+              "run": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "expectExit": {
+                "default": 0,
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "outputMatches": {
+                "type": "string",
+                "minLength": 1
+              },
+              "timeoutMs": {
+                "default": 120000,
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 3600000
+              }
+            },
+            "required": ["type", "run"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["file-exists", "file-absent", "file-unchanged"]
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^(?!.*\\0)(?![\\\\/])(?!.*[\\\\/]$)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$))(?!.*(?:^|[\\\\/])(?:\\.git|node_modules)(?:[\\\\/]|$)).+$"
+              }
+            },
+            "required": ["type", "path"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "file-contains"
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^(?!.*\\0)(?![\\\\/])(?!.*[\\\\/]$)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$))(?!.*(?:^|[\\\\/])(?:\\.git|node_modules)(?:[\\\\/]|$)).+$"
+              },
+              "pattern": {
+                "type": "string",
+                "minLength": 1
+              },
+              "regex": {
+                "default": false,
+                "type": "boolean"
+              }
+            },
+            "required": ["type", "path", "pattern"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "diff-allowlist"
+              },
+              "allow": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^(?!.*\\0)(?![\\\\/])(?!.*[\\\\/]$)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$))(?!.*(?:^|[\\\\/])(?:\\.git|node_modules)(?:[\\\\/]|$)).+$"
+                }
+              }
+            },
+            "required": ["type", "allow"],
+            "additionalProperties": false
+          }
+        ]
+      }
+    }
+  },
+  "required": ["$schema", "version", "name", "task", "checks"],
+  "additionalProperties": false
+}

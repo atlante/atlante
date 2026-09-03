@@ -13,6 +13,8 @@ the repository root) with a single entry, `@atlante/opencode`, exporting:
 
 - `materializeOpenCode(projectRoot, prepared)` — deterministic native
   materialization of a prepared project
+- `readOpenCodeNative(projectRoot)` — verifies and reads the manifest-backed
+  native outputs for local consumers such as eval
 - `openCodeMaterializer` — the builder-facing adapter
   (`{ host, materialize(projectRoot, prepared) }`) the CLI passes to
   `buildProject`; failures map to `MaterializationDiagnostic` values
@@ -20,7 +22,8 @@ the repository root) with a single entry, `@atlante/opencode`, exporting:
   (`invalid-input`, `invalid-id`, `invalid-manifest`, `unsafe-path`,
   `collision`, `drift`, `filesystem`, `publication-failed`)
 - the ownership-manifest types (`OpenCodeOwnershipManifest`,
-  `OpenCodeOwnedFile`), prepared-project types (`OpenCodePreparedProject`,
+  `OpenCodeOwnedFile`), verified-native-output types (`OpenCodeNativeProject`,
+  `OpenCodeNativeFile`), prepared-project types (`OpenCodePreparedProject`,
   `OpenCodePreparedAgent`, `OpenCodePreparedSkill`), and adapter types
   (`OPENCODE_HOST_TARGET`, `MaterializationDiagnostic`,
   `OpenCodeMaterializerPrepared`, `HostMaterializationOutcome`)

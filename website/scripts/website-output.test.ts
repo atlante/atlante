@@ -88,14 +88,16 @@ describe.skipIf(process.env.ATLANTE_BUILT_OUTPUT_TESTS !== "1")(
       expect(html).toContain('aria-label="Switch theme"');
     });
 
-    it("keeps the built schema byte-equivalent to the authority", () => {
-      expect(
-        readFileSync(join(websiteRoot, "dist/schema/v0.1/schema.json")),
-      ).toEqual(
-        readFileSync(
-          join(websiteRoot, "..", "packages/schema/schema/v0.1/schema.json"),
-        ),
-      );
+    it("keeps the built schemas byte-equivalent to the authorities", () => {
+      for (const name of ["schema.json", "eval-scenario.json"]) {
+        expect(
+          readFileSync(join(websiteRoot, `dist/schema/v0.1/${name}`)),
+        ).toEqual(
+          readFileSync(
+            join(websiteRoot, "..", `packages/schema/schema/v0.1/${name}`),
+          ),
+        );
+      }
     });
   },
 );

@@ -10,7 +10,7 @@
   },
   "headers": [
     {
-      "source": "/schema/v0.1/schema.json",
+      "source": "/schema/v0.1/:name.json",
       "headers": [
         {
           "key": "Content-Type",

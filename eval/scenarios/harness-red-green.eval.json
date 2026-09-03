@@ -1,0 +1,15 @@
+{
+  "$schema": "https://atlante.sh/schema/v0.1/eval-scenario.json",
+  "version": "0.1",
+  "name": "harness-red-green",
+  "description": "Architect agent fixes a red function inside the build workflow without touching anything else.",
+  "task": {
+    "fixture": "eval/fixtures/calculator",
+    "agent": "architect",
+    "prompt": "src/sum.ts has a bug: sum(2, 3) returns 5 correctly, but sum(10, -4) returns 6. verify.ts prints the failing cases. Fix the implementation in src/sum.ts so bun verify.ts passes, and do not modify or create any other file."
+  },
+  "checks": [
+    { "type": "command", "run": ["bun", "verify.ts"], "expectExit": 0 },
+    { "type": "diff-allowlist", "allow": ["src/sum.ts"] }
+  ]
+}

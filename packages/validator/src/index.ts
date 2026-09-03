@@ -23,4 +23,16 @@ export {
   parseDocumentOverlay,
   validateDocumentText,
 } from "./document.js";
+export type {
+  DiscoveredEvalScenario,
+  EvalScenarioDiscovery,
+} from "./eval-scenario.js";
+export { discoverEvalScenarios } from "./eval-scenario.js";
+export { globFiles, globHasMagic } from "./glob.js";
+export type {
+  JsoncParseError,
+  JsoncParseOptions,
+  JsoncParseResult,
+} from "./jsonc.js";
+export { locationAtPointer, parseJsonc, positionOf } from "./jsonc.js";
 export { validateResolvedDocument } from "./templates.js";

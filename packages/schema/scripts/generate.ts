@@ -1,5 +1,9 @@
 import { z } from "zod";
 import { atlanteDocumentOverlaySchema, SCHEMA_URI } from "../src/document.js";
+import {
+  EVAL_SCENARIO_SCHEMA_URI,
+  evalScenarioBaseSchema,
+} from "../src/eval.js";
 import { VALUE_KEY_PATTERN } from "../src/values.js";
 
 export function buildDocumentJsonSchema(): Record<string, unknown> {
@@ -70,6 +74,19 @@ export function buildDocumentJsonSchema(): Record<string, unknown> {
   };
 }
 
+function buildEvalScenarioJsonSchema(): Record<string, unknown> {
+  const generated = z.toJSONSchema(evalScenarioBaseSchema, {
+    target: "draft-2020-12",
+    io: "input",
+  }) as Record<string, unknown>;
+  return {
+    $schema: "https://json-schema.org/draft-2020-12/schema",
+    $id: EVAL_SCENARIO_SCHEMA_URI,
+    title: "Atlante eval scenario document",
+    ...generated,
+  };
+}
+
 function serializeDocumentJsonSchema(schema: Record<string, unknown>): string {
   return `${JSON.stringify(schema, null, 2)
     .replaceAll(
@@ -86,4 +103,17 @@ if (import.meta.main) {
   const out = new URL("../schema/v0.1/schema.json", import.meta.url);
   await Bun.write(out, serializeDocumentJsonSchema(buildDocumentJsonSchema()));
   console.log(`wrote ${out.pathname}`);
+  const scenarioOut = new URL(
+    "../schema/v0.1/eval-scenario.json",
+    import.meta.url,
+  );
+  await Bun.write(
+    scenarioOut,
+    serializeDocumentJsonSchema(buildEvalScenarioJsonSchema()),
+  );
+  console.log(`wrote ${scenarioOut.pathname}`);
+  // Regeneration must be reproducible against the committed artifacts: the
+  // repo formatter defines the canonical style for the generated JSON.
+  await Bun.$`bunx biome format --write ${out.pathname} ${scenarioOut.pathname}`.quiet();
+  console.log("formatted generated schemas with biome");
 }
