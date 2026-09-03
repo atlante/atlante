@@ -131,6 +131,7 @@ describe("resource template composition", () => {
         path: ["groups", "items", "rows", "items", "detail"],
         dataPath: ["groups", "rows", "detail"],
         arrayItems: true,
+        itemPath: ["detail"],
       },
     ]);
   });
@@ -216,6 +217,7 @@ describe("resource template composition", () => {
         path: ["sections", "items", "oneOf", "0", "invariants"],
         dataPath: ["sections", "invariants"],
         arrayItems: true,
+        itemPath: ["invariants"],
       },
     ]);
   });

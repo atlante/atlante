@@ -12,57 +12,56 @@ export function slotPartialName(property: string): string {
   return `${SLOT_PARTIAL_PREFIX}${property}`;
 }
 
-function slotInputs(
-  input: unknown,
-  path: string[],
-  arrayItems: boolean,
-): unknown[] {
-  if (Array.isArray(input))
-    return arrayItems ? arraySlotInputs(input, path) : [];
-  if (path.length === 0) return presentSlotInput(input);
-  return descendSlotPath(input, path, arrayItems);
-}
-
-function arraySlotInputs(input: unknown[], path: string[]): unknown[] {
-  return input.flatMap((item) => slotInputs(item, path, true));
-}
-
 function presentSlotInput(input: unknown): unknown[] {
   return input === null || input === undefined ? [] : [input];
 }
 
-function descendSlotPath(
+// Unlike isRecord, this intentionally accepts arrays: indexed itemPath segments
+// (tuple positions) are looked up through hasOwn on array elements.
+function isRecordLike(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+/**
+ * Resolves every location of a slot value in the template input.
+ *
+ * For `arrayItems` slots the leading dataPath segments address the arrays whose
+ * items carry the slot; those are iterated and the remaining item-relative path
+ * is descended plainly within each item, so a slot value of any shape (including
+ * an array) is returned whole. Without `arrayItems` the whole dataPath is a
+ * plain descent from the template input.
+ */
+function slotValues(
   input: unknown,
-  path: string[],
+  dataPath: string[],
+  itemPath: string[],
   arrayItems: boolean,
 ): unknown[] {
-  if (typeof input !== "object" || input === null) return [];
-  const segment = path[0];
-  if (segment === undefined) return [];
-  if (!Object.hasOwn(input, segment)) return [];
-  return slotInputs(
-    (input as Record<string, unknown>)[segment],
-    path.slice(1),
-    arrayItems,
+  if (!arrayItems) return itemSlotValues(input, dataPath);
+  const collections = dataPath.length - itemPath.length;
+  return collectSlotValues(input, dataPath.slice(0, collections), itemPath);
+}
+
+function collectSlotValues(
+  input: unknown,
+  collections: string[],
+  itemPath: string[],
+): unknown[] {
+  const segment = collections[0];
+  if (segment === undefined) return itemSlotValues(input, itemPath);
+  if (!isRecordLike(input) || !Object.hasOwn(input, segment)) return [];
+  const value = input[segment];
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) =>
+    collectSlotValues(item, collections.slice(1), itemPath),
   );
 }
 
-function arrayItemPath(input: unknown, path: string[]): string[] | undefined {
-  let current = input;
-  let lastArrayPathIndex = -1;
-  for (let index = 0; index <= path.length; index++) {
-    if (Array.isArray(current)) {
-      lastArrayPathIndex = index;
-      current = current[0];
-    }
-    if (index === path.length)
-      return lastArrayPathIndex < 0
-        ? undefined
-        : path.slice(lastArrayPathIndex);
-    if (typeof current !== "object" || current === null) return undefined;
-    current = (current as Record<string, unknown>)[path[index] ?? ""];
-  }
-  return undefined;
+function itemSlotValues(input: unknown, itemPath: string[]): unknown[] {
+  const segment = itemPath[0];
+  if (segment === undefined) return presentSlotInput(input);
+  if (!isRecordLike(input) || !Object.hasOwn(input, segment)) return [];
+  return itemSlotValues(input[segment], itemPath.slice(1));
 }
 
 function unwrapArrayTemplateInput(
@@ -220,13 +219,12 @@ export function renderResolvedTemplate(
         );
       }
 
-      const contextPath =
-        contextSlot.slot.arrayItems && context !== input
-          ? arrayItemPath(input, group.path)
-          : undefined;
-      const slotInputsForRender = contextPath
-        ? slotInputs(context, contextPath, false)
-        : slotInputs(input, group.path, contextSlot.slot.arrayItems ?? false);
+      const arrayItems = contextSlot.slot.arrayItems === true;
+      const itemPath = arrayItems ? (contextSlot.slot.itemPath ?? []) : [];
+      const slotInputsForRender =
+        context !== input && arrayItems
+          ? itemSlotValues(context, itemPath)
+          : slotValues(input, group.path, itemPath, arrayItems);
       return slotInputsForRender
         .map((slotInput) => {
           const slot = selectedSlot(group.slots, slotInput);

@@ -8,11 +8,14 @@ export type Slot = {
   path?: string[];
   dataPath?: string[];
   arrayItems?: boolean;
+  /** Item-relative dataPath suffix for `arrayItems` slots; omitted when empty. */
+  itemPath?: string[];
 };
 
 type SlotMarker = {
   path: string[];
   dataPath: string[];
+  itemPath: string[];
   property: string;
   template: unknown;
   topLevel: boolean;
@@ -22,6 +25,7 @@ type SlotMarker = {
 type MarkerContext = {
   path: string[];
   dataPath: string[];
+  itemPath: string[];
   property: string;
   topLevel: boolean;
   arrayItems: boolean;
@@ -64,8 +68,9 @@ function childContext(
   dataPath: string[],
   property = context.property,
   arrayItems = context.arrayItems,
+  itemPath = context.itemPath,
 ): MarkerContext {
-  return { path, dataPath, property, topLevel: false, arrayItems };
+  return { path, dataPath, itemPath, property, topLevel: false, arrayItems };
 }
 
 function visitSchemaNode(node: unknown, context: MarkerContext): SlotMarker[] {
@@ -75,6 +80,7 @@ function visitSchemaNode(node: unknown, context: MarkerContext): SlotMarker[] {
       {
         path: context.path,
         dataPath: context.dataPath,
+        itemPath: context.itemPath,
         property: context.dataPath.at(-1) ?? context.property,
         template: node.template,
         topLevel: context.topLevel,
@@ -106,6 +112,11 @@ function visitSchemaArray(
           : context.dataPath,
         context.property,
         arrayItems,
+        // Indexed positions address one element directly in schema space (tuple
+        // and inline-array positions), so they stay item-relative; iterated
+        // arrays restart the item-relative suffix. Tuple slots themselves still
+        // do not resolve against runtime data — their rendering is unchanged.
+        includeDataIndex ? [String(index)] : context.itemPath,
       ),
     ),
   );
@@ -124,6 +135,7 @@ function visitProperties(
         [...context.dataPath, property],
         property,
         context.arrayItems,
+        [...context.itemPath, property],
       ),
     ),
   );
@@ -140,6 +152,7 @@ function visitItems(value: unknown, context: MarkerContext): SlotMarker[] {
       context.dataPath,
       context.property,
       true,
+      [],
     ),
   );
 }
@@ -186,6 +199,7 @@ function markersOf(inputSchema: Record<string, unknown>): SlotMarker[] {
         visitSchemaNode(node, {
           path: [property],
           dataPath: [property],
+          itemPath: [property],
           property,
           topLevel: true,
           arrayItems: false,
@@ -198,6 +212,7 @@ function markersOf(inputSchema: Record<string, unknown>): SlotMarker[] {
       visitSchemaEntry(key, value, {
         path: [],
         dataPath: [],
+        itemPath: [],
         property: key,
         topLevel: false,
         arrayItems: false,
@@ -214,7 +229,10 @@ function slotFromMarker(marker: SlotMarker & { template: string }): Slot {
   if (!marker.topLevel) {
     slot.path = marker.path;
     slot.dataPath = marker.dataPath;
-    if (marker.arrayItems) slot.arrayItems = true;
+    if (marker.arrayItems) {
+      slot.arrayItems = true;
+      if (marker.itemPath.length > 0) slot.itemPath = marker.itemPath;
+    }
   }
   return slot;
 }

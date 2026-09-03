@@ -139,6 +139,202 @@ describe("resource renderer", () => {
     ).toBe("[one][two][three]");
   });
 
+  test("renders bare array-valued slot partials identically regardless of section order", () => {
+    const root = project();
+    const sectionsSchema = {
+      type: "object",
+      properties: {
+        sections: {
+          type: "array",
+          items: {
+            type: "object",
+            oneOf: [
+              {
+                type: "object",
+                properties: { markdown: { template: "../blocks" } },
+                required: ["markdown"],
+                additionalProperties: false,
+              },
+              {
+                type: "object",
+                properties: { notes: { template: "../note" } },
+                required: ["notes"],
+                additionalProperties: false,
+              },
+            ],
+          },
+        },
+      },
+    };
+    writeTemplate(
+      root,
+      "parent",
+      sectionsSchema,
+      `{{#each sections}}{{#if markdown}}${partial("sections/markdown")}{{/if}}{{/each}}`,
+    );
+    writeTemplate(
+      root,
+      "blocks",
+      { type: "array", items: { type: "string" } },
+      "[{{#each (input)}}{{this}}{{/each}}]",
+    );
+    writeTemplate(
+      root,
+      "note",
+      { type: "object", properties: { value: { type: "string" } } },
+      "({{value}})",
+    );
+
+    const markdownFirst = render(root, "parent", {
+      sections: [{ markdown: ["a", "b"] }, { notes: { value: "n" } }],
+    });
+    const markdownLast = render(root, "parent", {
+      sections: [{ notes: { value: "n" } }, { markdown: ["a", "b"] }],
+    });
+
+    expect(markdownFirst).toBe("[ab]");
+    expect(markdownLast).toBe("[ab]");
+  });
+
+  test("renders a bare top-level array-valued slot across every section in order", () => {
+    const root = project();
+    writeTemplate(
+      root,
+      "parent",
+      {
+        type: "object",
+        properties: {
+          sections: {
+            type: "array",
+            items: {
+              type: "object",
+              oneOf: [
+                {
+                  type: "object",
+                  properties: { markdown: { template: "../blocks" } },
+                  required: ["markdown"],
+                  additionalProperties: false,
+                },
+                {
+                  type: "object",
+                  properties: { notes: { template: "../note" } },
+                  required: ["notes"],
+                  additionalProperties: false,
+                },
+              ],
+            },
+          },
+        },
+      },
+      partial("sections/markdown"),
+    );
+    writeTemplate(
+      root,
+      "blocks",
+      { type: "array", items: { type: "string" } },
+      "[{{#each (input)}}{{this}}{{/each}}]",
+    );
+    writeTemplate(
+      root,
+      "note",
+      { type: "object", properties: { value: { type: "string" } } },
+      "({{value}})",
+    );
+
+    expect(
+      render(root, "parent", {
+        sections: [
+          { markdown: ["a", "b"] },
+          { notes: { value: "n" } },
+          { markdown: ["c"] },
+        ],
+      }),
+    ).toBe("[ab][c]");
+  });
+
+  test("renders array-root item slots per element", () => {
+    const root = project();
+    writeTemplate(
+      root,
+      "parent",
+      {
+        type: "object",
+        properties: {
+          sections: { type: "array", items: { template: "../item" } },
+        },
+      },
+      partial("sections"),
+    );
+    writeTemplate(
+      root,
+      "item",
+      { type: "object", properties: { value: { type: "string" } } },
+      "[{{value}}]",
+    );
+
+    expect(
+      render(root, "parent", {
+        sections: [{ value: "one" }, { value: "two" }],
+      }),
+    ).toBe("[one][two]");
+  });
+
+  test("renders explicit-arg array-valued slot partials identically regardless of section order", () => {
+    const root = project();
+    writeTemplate(
+      root,
+      "parent",
+      {
+        type: "object",
+        properties: {
+          sections: {
+            type: "array",
+            items: {
+              type: "object",
+              oneOf: [
+                {
+                  type: "object",
+                  properties: { markdown: { template: "../blocks" } },
+                  required: ["markdown"],
+                  additionalProperties: false,
+                },
+                {
+                  type: "object",
+                  properties: { notes: { template: "../note" } },
+                  required: ["notes"],
+                  additionalProperties: false,
+                },
+              ],
+            },
+          },
+        },
+      },
+      `{{#each sections}}{{#if markdown}}{{> slot/sections/markdown markdown}}{{/if}}{{/each}}`,
+    );
+    writeTemplate(
+      root,
+      "blocks",
+      { type: "array", items: { type: "string" } },
+      "[{{#each (input)}}{{this}}{{/each}}]",
+    );
+    writeTemplate(
+      root,
+      "note",
+      { type: "object", properties: { value: { type: "string" } } },
+      "({{value}})",
+    );
+
+    const markdownFirst = render(root, "parent", {
+      sections: [{ markdown: ["a", "b"] }, { notes: { value: "n" } }],
+    });
+    const markdownLast = render(root, "parent", {
+      sections: [{ notes: { value: "n" } }, { markdown: ["a", "b"] }],
+    });
+
+    expect(markdownFirst).toBe("[ab]");
+    expect(markdownLast).toBe("[ab]");
+  });
+
   test("renders the selected child when branches share a data path", () => {
     const root = project();
     writeTemplate(
