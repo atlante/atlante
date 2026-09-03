@@ -83,6 +83,25 @@ describe("syncSchema", () => {
     ).toThrow("Authoritative schema is unavailable:");
   });
 
+  it("fails when the authoritative schema directory has no schemas", () => {
+    temporaryWebsiteRoot = mkdtempSync(
+      join(tmpdir(), "atlante-website-schema-"),
+    );
+    mkdirSync(
+      join(temporaryWebsiteRoot, "packages", "schema", "schema", "v0.1"),
+      {
+        recursive: true,
+      },
+    );
+
+    expect(() =>
+      syncSchema({
+        repoRoot: temporaryWebsiteRoot,
+        websiteRoot: temporaryWebsiteRoot,
+      }),
+    ).toThrow("Authoritative schema is unavailable:");
+  });
+
   it("fails when an authoritative schema has the wrong identity", () => {
     temporaryWebsiteRoot = mkdtempSync(
       join(tmpdir(), "atlante-website-schema-"),

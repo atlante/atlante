@@ -2,8 +2,6 @@ import { copyFileSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const SCHEMA_ID = "https://atlante.sh/schema/v0.1/schema.json";
-
 type SyncSchemaOptions = {
   repoRoot?: string;
   websiteRoot?: string;

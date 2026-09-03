@@ -106,6 +106,13 @@ function pickAllowedEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   for (const key of ENV_ALLOWLIST) {
     const value = env[key];
     if (value === undefined) continue;
+    // No-proxy lists carry host names and CIDR ranges, not URLs: routing
+    // them through the sanitizer would drop them and silently change the
+    // proxied network topology the trial runs in.
+    if (key.toLowerCase() === "no_proxy") {
+      picked[key] = value;
+      continue;
+    }
     if (key.endsWith("_PROXY") || key.endsWith("_proxy")) {
       const sanitized = sanitizeProxyValue(value);
       if (sanitized !== undefined) picked[key] = sanitized;
@@ -120,6 +127,10 @@ function pickAllowedEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
 function sanitizeProxyValue(value: string): string | undefined {
   try {
     const proxy = new URL(value);
+    // Scheme-less forms (`user:pass@proxy:8080`, `host:port`) parse as
+    // opaque values with an empty hostname: credentials cannot be located
+    // reliably, so the whole value is dropped.
+    if (proxy.hostname === "") return undefined;
     proxy.username = "";
     proxy.password = "";
     return proxy.toString();

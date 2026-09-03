@@ -524,6 +524,8 @@ printenv XDG_CACHE_HOME >> '${capture}'
 printenv PATH >> '${capture}'
 printenv EVAL_SECRET_MARKER >> '${capture}' || true
 printenv HTTPS_PROXY >> '${capture}' || true
+printenv NO_PROXY >> '${capture}' || true
+printenv HTTP_PROXY >> '${capture}' || true
 for arg do printf '%s\\n' "$arg" >> '${capture}'; done
 test -f "$XDG_DATA_HOME/opencode/auth.json" || exit 9
 exit 0`,
@@ -532,11 +534,15 @@ exit 0`,
       projectRoot,
       binaryPath: stub,
       authPath: authFile,
-      // Only PATH is on the allowlist: any other host variable must stay with
-      // the host instead of reaching the model-controlled process.
+      // PATH and NO_PROXY are on the allowlist verbatim; other host
+      // variables must stay with the host or arrive sanitized only.
       baseEnv: {
         EVAL_SECRET_MARKER: "host-secret-exfiltrated",
         HTTPS_PROXY: "https://proxy-user:proxy-secret@example.test:8443",
+        // Scheme-less form: credentials cannot be located reliably, so the
+        // whole value must be dropped rather than passed through.
+        HTTP_PROXY: "proxy-user:proxy-secret@proxy.example.test:8080",
+        NO_PROXY: "localhost,127.0.0.1,.internal.example.com",
         PATH: process.env.PATH ?? "",
       },
     });
@@ -560,6 +566,10 @@ exit 0`,
     expect(captured).not.toContain("proxy-user");
     expect(captured).not.toContain("proxy-secret");
     expect(captured).toContain("https://example.test:8443/");
+    // No-proxy lists are host names, not URLs: they must survive verbatim.
+    expect(captured).toContain("localhost,127.0.0.1,.internal.example.com");
+    // The scheme-less proxy value is dropped entirely, credentials included.
+    expect(captured).not.toContain("proxy.example.test");
     // The host is pointed at the sandbox via --dir and receives the prompt.
     expect(captured).toContain("--dir");
     expect(captured).toContain(project);
