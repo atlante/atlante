@@ -1,7 +1,7 @@
+import { expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { expect, test } from "bun:test";
 import * as entrypoint from "../src/index.js";
 
 test("the single entry exposes exactly the materializer surface", () => {
