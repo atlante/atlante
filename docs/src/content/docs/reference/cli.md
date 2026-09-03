@@ -147,14 +147,38 @@ npx @atlante/cli@latest eval [path] --keep
   section's `scenarios` glob.
 - `--trials <n>` overrides the configured number of trials for this run.
 - `--json` prints the report JSON to stdout instead of the human summary.
-  Warnings (for example an unmonitored token budget) go to stderr in this
-  mode; a trial whose host emitted no usage events carries
+  Progress lines still stream to stderr in this mode, so stdout stays pure
+  JSON. Warnings (for example an unmonitored token budget) go to stderr too;
+  a trial whose host emitted no usage events carries
   `budgetUnmonitored: true`, meaning `maxTokens` could not be enforced and
   only the trial timeout bounded spend.
 - `--out <dir>` writes the report under the given directory instead of
   `<project>/.atlante/eval`.
 - `--keep` preserves the trial sandboxes for inspection instead of deleting
   them.
+
+### Progress
+
+While a run executes, one human-readable line per event streams to stderr, so
+a multi-minute run is never silent:
+
+```text
+== cli-happy
+trial 0 running...
+trial 0: pass (98.5s · $0.0123 · 9860 tokens)
+cli-happy: 1/1 trials passed
+```
+
+stdout stays reserved for the final summary (or, with `--json`, the report
+JSON); progress always goes to stderr, in both modes, so the same trials are
+never printed twice. The summary repeats only what the live lines do not
+carry: run id, host and model, the budget warning when present,
+per-scenario aggregate statistics (pass rate, mean, p95), and the report
+location. On an interactive terminal the progress
+lines render gray (ANSI bright black) so they do not read like errors; set
+`NO_COLOR` or pipe
+stderr to get plain text. Redirect stderr (`2>/dev/null`) to silence
+progress entirely.
 
 ### Configuration
 

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, spyOn, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import {
   cpSync,
   existsSync,
@@ -15,7 +15,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { HostRunner, RunTrialInput, TrialRun } from "@atlante/eval";
 import { EVAL_SCENARIO_SCHEMA_URI, SCHEMA_URI } from "@atlante/schema";
-import { runEvalCommand } from "../src/commands/eval.js";
+import { createProgressStyler, runEvalCommand } from "../src/commands/eval.js";
 import { runBuild } from "../src/main.js";
 
 const created: string[] = [];
@@ -163,6 +163,18 @@ function reportPaths(project: string): { runId: string; file: string } {
 }
 
 describe("runEvalCommand", () => {
+  // Pin plain-text progress so stderr assertions are deterministic whether
+  // the test runner's stderr is a terminal or a pipe.
+  let previousNoColor: string | undefined;
+  beforeEach(() => {
+    previousNoColor = process.env.NO_COLOR;
+    process.env.NO_COLOR = "1";
+  });
+  afterEach(() => {
+    if (previousNoColor === undefined) delete process.env.NO_COLOR;
+    else process.env.NO_COLOR = previousNoColor;
+  });
+
   test("runs the suite, writes the report, and gitignores it", async () => {
     const project = evalProject();
     await buildFixtureOutputs(project);
@@ -369,6 +381,153 @@ describe("runEvalCommand", () => {
     }
   });
 
+  test("streams progress events to stderr as they arrive", async () => {
+    const project = evalProject();
+    await buildFixtureOutputs(project);
+    const logs: string[] = [];
+    const errors: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation(
+      (...parts: unknown[]) => {
+        logs.push(parts.join(" "));
+      },
+    );
+    const errorSpy = spyOn(console, "error").mockImplementation(
+      (...parts: unknown[]) => {
+        errors.push(parts.join(" "));
+      },
+    );
+    try {
+      const exit = await runEvalCommand(
+        project,
+        {},
+        undefined,
+        fakeRunner(true),
+      );
+      expect(exit).toBe(0);
+      // One human-readable line per event kind, on stderr only.
+      expect(errors).toContain("== cli-happy");
+      expect(errors).toContain("trial 0 running...");
+      expect(errors).toContain("trial 0: pass (5ms · $0.0010 · 100 tokens)");
+      expect(errors).toContain("cli-happy: 3/3 trials passed");
+      const indexOf = (line: string): number => {
+        const index = errors.indexOf(line);
+        if (index === -1) throw new Error(`missing stderr line: ${line}`);
+        return index;
+      };
+      expect(indexOf("== cli-happy")).toBeLessThan(
+        indexOf("trial 0 running..."),
+      );
+      expect(indexOf("trial 0 running...")).toBeLessThan(
+        indexOf("trial 0: pass (5ms · $0.0010 · 100 tokens)"),
+      );
+      expect(
+        indexOf("trial 0: pass (5ms · $0.0010 · 100 tokens)"),
+      ).toBeLessThan(indexOf("cli-happy: 3/3 trials passed"));
+      // stdout keeps the human summary; progress never pollutes it.
+      expect(logs.join("\n")).not.toContain("running...");
+    } finally {
+      logSpy.mockRestore();
+      errorSpy.mockRestore();
+    }
+  });
+
+  test("--json keeps stdout pure JSON while progress still streams to stderr", async () => {
+    const project = evalProject();
+    await buildFixtureOutputs(project);
+    const out = tempDir();
+    const logs: string[] = [];
+    const errors: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation(
+      (...parts: unknown[]) => {
+        logs.push(parts.join(" "));
+      },
+    );
+    const errorSpy = spyOn(console, "error").mockImplementation(
+      (...parts: unknown[]) => {
+        errors.push(parts.join(" "));
+      },
+    );
+    try {
+      const exit = await runEvalCommand(
+        project,
+        { json: true, out },
+        undefined,
+        fakeRunner(true),
+      );
+      expect(exit).toBe(0);
+      // Progress stays observable on stderr in --json mode.
+      expect(errors).toContain("== cli-happy");
+      expect(errors).toContain("trial 0 running...");
+      // stdout parses as exactly one JSON document: the report.
+      const printed = JSON.parse(logs.join("\n"));
+      expect(printed.scenarios["cli-happy"].passRate).toBe(1);
+    } finally {
+      logSpy.mockRestore();
+      errorSpy.mockRestore();
+    }
+  });
+
+  test("progress counts exclude skipped-budget trials", async () => {
+    const project = evalProject({
+      evalSection: {
+        host: "opencode",
+        scenarios: "eval/scenarios/*.eval.json",
+        budget: { maxSessions: 1 },
+      },
+    });
+    await buildFixtureOutputs(project);
+    const errors: string[] = [];
+    const errorSpy = spyOn(console, "error").mockImplementation(
+      (...parts: unknown[]) => {
+        errors.push(parts.join(" "));
+      },
+    );
+    try {
+      const exit = await runEvalCommand(
+        project,
+        { trials: "2" },
+        undefined,
+        fakeRunner(true),
+      );
+      expect(exit).toBe(1);
+      // 1 pass + 1 skipped: executed trials only, matching the pass rate.
+      expect(errors).toContain("trial 1: skipped-budget (0ms)");
+      expect(errors).toContain("cli-happy: 1/1 trials passed");
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  test("summary repeats aggregates, not the per-trial lines", async () => {
+    const project = evalProject();
+    await buildFixtureOutputs(project);
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation(
+      (...parts: unknown[]) => {
+        logs.push(parts.join(" "));
+      },
+    );
+    try {
+      const exit = await runEvalCommand(
+        project,
+        {},
+        undefined,
+        fakeRunner(true),
+      );
+      expect(exit).toBe(0);
+      const stdout = logs.join("\n");
+      // Per-trial verdicts stream live to stderr; the summary must not
+      // repeat them.
+      expect(stdout).not.toContain("trial 0:");
+      // Aggregates, header, and report path stay.
+      expect(stdout).toContain("cli-happy: pass 100% · mean 5ms · p95 5ms");
+      expect(stdout).toContain("host fake · model test/model");
+      expect(stdout).toContain("report ");
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+
   test("--json mode still warns about an unmonitored budget on stderr", async () => {
     const project = evalProject();
     await buildFixtureOutputs(project);
@@ -454,5 +613,60 @@ describe("runEvalCommand", () => {
     const exit = await runEvalCommand(project, {}, undefined, fakeRunner(true));
     expect(exit).toBe(3);
     expect(readdirSync(outside)).toEqual([]);
+  });
+
+  test("progress is gray when stderr is an interactive terminal", async () => {
+    const project = evalProject();
+    await buildFixtureOutputs(project);
+    const previousNoColor = process.env.NO_COLOR;
+    delete process.env.NO_COLOR;
+    // Force the TTY branch of the styler regardless of how the tests run.
+    const stderr = process.stderr as unknown as { isTTY?: boolean };
+    const previousIsTTY = stderr.isTTY;
+    Object.defineProperty(stderr, "isTTY", {
+      value: true,
+      configurable: true,
+      writable: true,
+    });
+    const errors: string[] = [];
+    const errorSpy = spyOn(console, "error").mockImplementation(
+      (...parts: unknown[]) => {
+        errors.push(parts.join(" "));
+      },
+    );
+    try {
+      const exit = await runEvalCommand(
+        project,
+        { trials: "1" },
+        undefined,
+        fakeRunner(true),
+      );
+      expect(exit).toBe(0);
+      expect(errors).toContain(`${"\x1b[90m"}== cli-happy${"\x1b[0m"}`);
+    } finally {
+      errorSpy.mockRestore();
+      if (previousNoColor === undefined) delete process.env.NO_COLOR;
+      else process.env.NO_COLOR = previousNoColor;
+      if (previousIsTTY === undefined) delete stderr.isTTY;
+      else stderr.isTTY = previousIsTTY;
+    }
+  });
+});
+
+describe("createProgressStyler", () => {
+  test("grays lines on an interactive stderr", () => {
+    const style = createProgressStyler({ isTTY: true }, {});
+    expect(style("== cli-happy")).toBe("\x1b[90m== cli-happy\x1b[0m");
+  });
+
+  test("keeps plain text for piped stderr and for NO_COLOR", () => {
+    expect(createProgressStyler({ isTTY: false }, {})("== s")).toBe("== s");
+    expect(
+      createProgressStyler({ isTTY: true }, { NO_COLOR: "1" })("== s"),
+    ).toBe("== s");
+    // An empty NO_COLOR value does not opt out (no-color.org).
+    expect(
+      createProgressStyler({ isTTY: true }, { NO_COLOR: "" })("== s"),
+    ).toBe("\x1b[90m== s\x1b[0m");
   });
 });

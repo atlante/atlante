@@ -10,6 +10,7 @@ import { loadProject, type ProjectContext } from "@atlante/builder";
 import {
   checkOpenCodeAuth,
   createOpenCodeRunner,
+  type EvalProgress,
   EvalRunError,
   type HostRunner,
   type RunReport,
@@ -83,6 +84,8 @@ export async function runEvalCommand(
     }
   }
   let report: RunReport;
+  const progressLine = createProgressRenderer();
+  const styleProgress = createProgressStyler();
   try {
     report = await runEval({
       projectRoot: prepared.projectRoot,
@@ -95,6 +98,11 @@ export async function runEvalCommand(
       atlanteVersion: packageJson.version,
       ...(options.keep ? { keep: true } : {}),
       runner: host,
+      // Live progress goes to stderr in both output modes; stdout stays
+      // reserved for the summary (or the pure JSON report with `--json`).
+      onProgress: (progress) => {
+        console.error(styleProgress(progressLine(progress)));
+      },
     });
   } catch (cause) {
     if (cause instanceof EvalRunError) {
@@ -408,6 +416,83 @@ function formatMs(ms: number): string {
   return ms >= 10_000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
 }
 
+/** Shared `(<duration> · <$cost> · <tokens>)` detail; absent parts are omitted. */
+function formatTrialDetail(trial: {
+  durationMs: number;
+  tokens?: number;
+  cost?: number;
+}): string {
+  const usage = [
+    trial.cost !== undefined ? `$${trial.cost.toFixed(4)}` : undefined,
+    trial.tokens !== undefined ? `${trial.tokens} tokens` : undefined,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  return [formatMs(trial.durationMs), usage].filter(Boolean).join(" · ");
+}
+
+type EvalTrialTally = { passed: number; executed: number };
+
+/**
+ * Turns each `EvalProgress` event into one human-readable stderr line.
+ * Stateful across a run so the scenario-end line can report passed/executed
+ * counts consistent with the report's `passRate` (`skipped-budget` trials
+ * excluded, like `scenarioStatistics`).
+ */
+function createProgressRenderer(): (progress: EvalProgress) => string {
+  const tallies = new Map<string, EvalTrialTally>();
+  return (progress: EvalProgress) => {
+    switch (progress.kind) {
+      case "scenario-start":
+        tallies.set(progress.scenario, { passed: 0, executed: 0 });
+        return `== ${progress.scenario}`;
+      case "trial-start":
+        return `trial ${progress.trial} running...`;
+      case "trial-end": {
+        const tally = tallies.get(progress.scenario) ?? {
+          passed: 0,
+          executed: 0,
+        };
+        if (progress.verdict !== "skipped-budget") tally.executed += 1;
+        if (progress.verdict === "pass") tally.passed += 1;
+        tallies.set(progress.scenario, tally);
+        const detail = formatTrialDetail(progress);
+        return `trial ${progress.trial}: ${progress.verdict}${detail ? ` (${detail})` : ""}`;
+      }
+      case "scenario-end": {
+        const tally = tallies.get(progress.scenario) ?? {
+          passed: 0,
+          executed: 0,
+        };
+        return tally.executed === 0
+          ? `${progress.scenario}: no trials executed`
+          : `${progress.scenario}: ${tally.passed}/${tally.executed} trials passed`;
+      }
+    }
+  };
+}
+
+const PROGRESS_GRAY = "\x1b[90m";
+const PROGRESS_RESET = "\x1b[0m";
+
+/**
+ * Grays progress lines on an interactive stderr so live output does not read
+ * like an error; piped stderr and `NO_COLOR` get plain text.
+ */
+export function createProgressStyler(
+  stream: { isTTY?: boolean } = process.stderr,
+  env: NodeJS.ProcessEnv = process.env,
+): (line: string) => string {
+  if (env.NO_COLOR || !stream.isTTY) return (line) => line;
+  return (line) => `${PROGRESS_GRAY}${line}${PROGRESS_RESET}`;
+}
+
+/**
+ * End-of-run recap on stdout. Per-trial verdicts already streamed live to
+ * stderr, so the summary repeats only what the logs do not carry: run id,
+ * host identity, warnings, per-scenario aggregate statistics, and the report
+ * location.
+ */
 function printSummary(report: RunReport, reportDir: string): void {
   console.log(`eval ${report.runId}`);
   console.log(
@@ -424,27 +509,6 @@ function printSummary(report: RunReport, reportDir: string): void {
     console.log(
       `${name}: pass ${Math.round(result.passRate * 100)}% · mean ${formatMs(result.meanDurationMs)} · p95 ${formatMs(result.spread.durationP95Ms)}`,
     );
-    for (const trial of result.trials) {
-      const usage = [
-        trial.cost !== undefined ? `$${trial.cost.toFixed(4)}` : undefined,
-        trial.tokens !== undefined ? `${trial.tokens} tokens` : undefined,
-      ]
-        .filter(Boolean)
-        .join(" · ");
-      const detail = [formatMs(trial.durationMs), usage]
-        .filter(Boolean)
-        .join(" · ");
-      console.log(
-        `  trial ${trial.i}: ${trial.verdict}${detail ? ` (${detail})` : ""}`,
-      );
-      for (const check of trial.checks ?? []) {
-        if (check.verdict !== "pass") {
-          console.log(
-            `    check ${check.index} (${check.type}): ${check.verdict}`,
-          );
-        }
-      }
-    }
   }
   console.log("");
   console.log(`report ${diagnosticPath(join(reportDir, "report.json"))}`);
