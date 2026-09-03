@@ -657,11 +657,18 @@ function packInstallFailure(
   };
 }
 
+/**
+ * Builds the missing-entry diagnostic. Without a hoisting dependency root the
+ * generic install hint applies; with one, the install already succeeded in the
+ * workspace root's node_modules, so the manual install command cannot fix it
+ * and the guidance points at the root instead.
+ */
 function packMissingEntryFailure(
   entry: string,
   installCommand: string,
   command: string,
   packageName: string,
+  hoistedRoot: string | undefined,
 ): { error: string } {
   return {
     error: formatInitError(
@@ -669,7 +676,14 @@ function packMissingEntryFailure(
       `${packageName} is not installed after \`${command}\``,
       {
         expected: `${entry} to exist after the package manager run`,
-        next: `run \`${installCommand}\` manually and run \`atlante init\` again`,
+        ...(hoistedRoot === undefined
+          ? {
+              next: `run \`${installCommand}\` manually and run \`atlante init\` again`,
+            }
+          : {
+              cause: `the install resolved at the workspace root ${hoistedRoot} (hoisted above the project's own node_modules)`,
+              next: `run \`atlante init\` at the workspace root ${hoistedRoot}, or install ${packageName} into this project directly, then run \`atlante init\` again`,
+            }),
       },
     ),
   };
@@ -686,6 +700,7 @@ function runPackageManagerStep(
   pack: SelectedPack,
   entry: string,
   installCommand: string,
+  hoistedRoot: string | undefined,
   runPackageManager: PackageManagerRunner,
   fileSystem: InitFileSystem,
 ): { error?: string } {
@@ -700,6 +715,7 @@ function runPackageManagerStep(
       installCommand,
       command,
       pack.packageName,
+      hoistedRoot,
     );
   }
   return {};
@@ -778,6 +794,10 @@ function ensurePackInstalled(
     ? packageManagerInstallArgs(manager)
     : packageManagerAddArgs(manager, pack.packageName);
 
+  // When the dependency root sits above the project, a workspace-scoped
+  // install hoists the pack out of the project's own node_modules; the
+  // missing-entry diagnostic then names the root instead of the install.
+  const hoistedRoot = dependencyRoot === directory ? undefined : dependencyRoot;
   const step = runPackageManagerStep(
     manager,
     args,
@@ -785,6 +805,7 @@ function ensurePackInstalled(
     pack,
     entry,
     installCommand,
+    hoistedRoot,
     runPackageManager,
     fileSystem,
   );
