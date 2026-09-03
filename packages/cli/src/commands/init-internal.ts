@@ -104,12 +104,30 @@ async function defaultPrompt(query: string): Promise<string> {
 
 type Snapshot = { exists: boolean; contents?: string };
 
+const ATLANTE_PLUGIN_ID = "@atlante/opencode";
+
+/** The ignore policy init enforces for generated native outputs and state. */
+const GITIGNORE_ENTRIES: readonly string[] = [
+  ".opencode/agents/",
+  ".opencode/skills/",
+  ".atlante/",
+];
+
 type PluginOptions = Record<string, unknown>;
 type PluginEntry = string | [string, PluginOptions];
 type PluginPlan = {
   previous: Snapshot;
   contents: string;
-  registered: boolean;
+  /** An existing Atlante plugin entry was removed from the configuration. */
+  removed: boolean;
+  /** The configuration file must be written: it is created or edited. */
+  write: boolean;
+};
+
+type GitignorePlan = {
+  previous: Snapshot;
+  contents: string;
+  write: boolean;
 };
 
 function bareConfig(preset: string, firstParty = true): string {
@@ -211,10 +229,10 @@ function parsePluginEntries(
 }
 
 /**
- * Resolves the OpenCode config file to register the plugin in. Prefers an
- * existing `opencode.jsonc`, falls back to an existing `opencode.json`
- * (OpenCode discovers both, and JSON is valid JSONC), and only defaults to
- * creating `opencode.jsonc` when neither exists.
+ * Resolves the OpenCode config file that owns the Atlante plugin registration.
+ * Prefers an existing `opencode.jsonc`, falls back to an existing
+ * `opencode.json` (OpenCode discovers both, and JSON is valid JSONC), and only
+ * defaults to creating `opencode.jsonc` when neither exists.
  */
 function opencodeConfigPath(
   directory: string,
@@ -227,6 +245,13 @@ function opencodeConfigPath(
   return jsonc;
 }
 
+/**
+ * Prepares the plugin-removal edit: on init, a leftover Atlante-written
+ * `@atlante/opencode` registration (string or tuple form) is removed while
+ * every other plugin entry and all other configuration content stays
+ * byte-faithful. A missing configuration file is still created with the
+ * template shape, minus any plugin registration.
+ */
 function preparePlugin(
   directory: string,
   fileSystem: InitFileSystem,
@@ -242,14 +267,48 @@ function preparePlugin(
 `;
   const entries = parsePluginEntries(path, text);
   if ("error" in entries) return entries;
-  if (entries.some((entry) => pluginId(entry) === "@atlante/opencode")) {
-    return { previous, contents: text, registered: false };
-  }
+  const remaining = entries.filter(
+    (entry) => pluginId(entry) !== ATLANTE_PLUGIN_ID,
+  );
 
-  const edits = modify(text, ["plugin"], [...entries, "@atlante/opencode"], {
+  if (!previous.exists)
+    return { previous, contents: text, removed: false, write: true };
+  if (remaining.length === entries.length)
+    return { previous, contents: text, removed: false, write: false };
+
+  const edits = modify(text, ["plugin"], remaining, {
     formattingOptions: { insertSpaces: true, tabSize: 2 },
   });
-  return { previous, contents: applyEdits(text, edits), registered: true };
+  return {
+    previous,
+    contents: applyEdits(text, edits),
+    removed: true,
+    write: true,
+  };
+}
+
+/**
+ * Prepares the ignore-policy edit: `.gitignore` at the project root ends up
+ * with exactly the generated-output entries. Existing content is never
+ * reordered or duplicated; missing entries are appended after a single blank
+ * line, and a missing or empty file is created with exactly the entries.
+ */
+function prepareGitignore(
+  directory: string,
+  fileSystem: InitFileSystem,
+): GitignorePlan {
+  const path = join(directory, ".gitignore");
+  const previous = snapshot(path, fileSystem);
+  const contents = previous.exists ? (previous.contents ?? "") : "";
+  const present = new Set(contents.split(/\r?\n/).map((line) => line.trim()));
+  const missing = GITIGNORE_ENTRIES.filter((entry) => !present.has(entry));
+  if (missing.length === 0) return { previous, contents, write: false };
+
+  const base =
+    contents.length === 0
+      ? ""
+      : `${contents.endsWith("\n") ? contents : `${contents}\n`}\n`;
+  return { previous, contents: `${base}${missing.join("\n")}\n`, write: true };
 }
 
 function restore(
@@ -378,28 +437,30 @@ function abortWithRestore(
 }
 
 function commitInitFiles(
-  target: string,
+  flow: InitFlow,
   contents: string,
-  alternate: string,
-  opencode: string,
   before: { target: Snapshot; alternate: Snapshot },
   plugin: PluginPlan,
-  state: DependencyMutationState,
-  fileSystem: InitFileSystem,
+  gitignore: GitignorePlan,
 ): { error?: string } {
-  const { changes } = state;
+  const { changes } = flow.state;
   try {
-    changes.push({ path: target, before: before.target });
-    fileSystem.writeFileSync(target, contents);
+    changes.push({ path: flow.target, before: before.target });
+    flow.fileSystem.writeFileSync(flow.target, contents);
 
-    if (plugin.registered) {
-      changes.push({ path: opencode, before: plugin.previous });
-      fileSystem.writeFileSync(opencode, plugin.contents);
+    if (plugin.write) {
+      changes.push({ path: flow.opencode, before: plugin.previous });
+      flow.fileSystem.writeFileSync(flow.opencode, plugin.contents);
+    }
+
+    if (gitignore.write) {
+      changes.push({ path: flow.gitignore, before: gitignore.previous });
+      flow.fileSystem.writeFileSync(flow.gitignore, gitignore.contents);
     }
 
     if (before.alternate.exists) {
-      changes.push({ path: alternate, before: before.alternate });
-      fileSystem.unlinkSync(alternate);
+      changes.push({ path: flow.alternate, before: before.alternate });
+      flow.fileSystem.unlinkSync(flow.alternate);
     }
   } catch (cause) {
     return {
@@ -874,6 +935,7 @@ type InitFlow = Readonly<{
   target: string;
   alternate: string;
   opencode: string;
+  gitignore: string;
   fileSystem: InitFileSystem;
   context: ProjectContext;
   runPackageManager: PackageManagerRunner;
@@ -938,9 +1000,10 @@ async function prepareConfiguration(
 }
 
 /**
- * Snapshots the configuration targets, prepares the host plugin edit, and
- * commits the configuration files. Every snapshotted file is recorded in the
- * shared state, so a later failure restores the whole pre-init state.
+ * Snapshots the configuration targets, prepares the host plugin-removal edit
+ * and the ignore-policy edit, and commits the configuration files. Every
+ * snapshotted file is recorded in the shared state, so a later failure
+ * restores the whole pre-init state.
  */
 function commitConfiguration(
   flow: InitFlow,
@@ -953,17 +1016,9 @@ function commitConfiguration(
   };
   const plugin = preparePlugin(flow.directory, flow.fileSystem);
   if ("error" in plugin) return abort(plugin.error);
+  const gitignore = prepareGitignore(flow.directory, flow.fileSystem);
 
-  const committed = commitInitFiles(
-    flow.target,
-    contents,
-    flow.alternate,
-    flow.opencode,
-    before,
-    plugin,
-    flow.state,
-    flow.fileSystem,
-  );
+  const committed = commitInitFiles(flow, contents, before, plugin, gitignore);
   if (committed.error) return abort(committed.error);
   return { plugin };
 }
@@ -982,6 +1037,7 @@ export async function runInitWithDependencies(
     target: join(directory, "atlante.jsonc"),
     alternate: join(directory, "atlante.json"),
     opencode: opencodeConfigPath(directory, fileSystem),
+    gitignore: join(directory, ".gitignore"),
     fileSystem,
     context: dependencies.context ?? {},
     runPackageManager:
@@ -1014,9 +1070,9 @@ export async function runInitWithDependencies(
     );
     if (result !== 0) return result;
     console.log(
-      committed.plugin.registered
-        ? `registered @atlante/opencode in ${flow.opencode}`
-        : `@atlante/opencode is already registered in ${flow.opencode}`,
+      committed.plugin.removed
+        ? `removed the @atlante/opencode plugin registration from ${flow.opencode}`
+        : `no @atlante/opencode plugin registration found in ${flow.opencode}`,
     );
     return 0;
   } catch (cause) {

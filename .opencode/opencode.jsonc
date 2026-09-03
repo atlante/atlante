@@ -1,7 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "default_agent": "architect",
-  "plugin": ["../packages/opencode/src/index.ts"],
 
   "mcp": {
     "fallow": {
