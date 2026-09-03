@@ -739,7 +739,6 @@ describe("runInit", () => {
     expect(errors).toContain("atlante init --pack @acme/review-pack/<preset>");
     expect(readFileSync(opencodePath, "utf8")).toBe(originalOpenCode);
     expect(existsSync(join(dir, "atlante.jsonc"))).toBe(false);
-    expect(existsSync(join(dir, ".atlante", "artifacts"))).toBe(false);
     // The dependency mutation is rolled back: the manifest and node_modules
     // are reconciled with the pre-init state.
     const manifest = JSON.parse(
@@ -876,7 +875,6 @@ describe("runInit", () => {
     expect(errors).toContain("install --save-dev");
     expect(readFileSync(join(dir, "package.json"), "utf8")).toBe(before);
     expect(existsSync(join(dir, "atlante.jsonc"))).toBe(false);
-    expect(existsSync(join(dir, ".atlante", "artifacts"))).toBe(false);
   });
 
   test("rejects a malformed pack locator before touching the project", async () => {

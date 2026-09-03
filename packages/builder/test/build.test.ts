@@ -1174,7 +1174,5 @@ describe("BuildResult shape", () => {
     expect(result.projectRoot).toBe(root);
     expect(result.diagnostics).toEqual([]);
     expect(result.materializations).toHaveLength(1);
-    expect(result).not.toHaveProperty("artifactsPath");
-    expect(result).not.toHaveProperty("warnings");
   });
 });

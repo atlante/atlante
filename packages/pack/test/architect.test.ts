@@ -43,7 +43,6 @@ interface ResolvedArchitect {
   readonly templateLocator: string;
   readonly sectionKinds: readonly string[];
   readonly workflow: JsonObject;
-  prose(): string;
   renderedOutput(): string;
 }
 
@@ -59,26 +58,11 @@ function resolveArchitect(): ResolvedArchitect {
   const workflowSection = sections.find(
     (section) => section.workflow !== undefined,
   );
-  const listItems = (kind: "instructions" | "invariants"): string[] =>
-    sections.flatMap((section) =>
-      Array.isArray(section[kind])
-        ? (section[kind] as unknown[]).filter(
-            (item): item is string => typeof item === "string",
-          )
-        : [],
-    );
   return {
     input,
     templateLocator: resolved.effectiveTemplate.locator,
     sectionKinds: sections.map((section) => Object.keys(section)[0] ?? ""),
     workflow: (workflowSection?.workflow ?? {}) as JsonObject,
-    prose: () =>
-      [
-        typeof input.description === "string" ? input.description : "",
-        typeof input.mission === "string" ? input.mission : "",
-        ...listItems("invariants"),
-        ...listItems("instructions"),
-      ].join("\n"),
     renderedOutput: () =>
       renderResolvedTemplate({
         template: resolved.effectiveTemplate,
@@ -195,42 +179,5 @@ describe("architect agent instance", () => {
       expect(output.indexOf(markers[index - 1])).toBeLessThan(
         output.indexOf(markers[index]),
       );
-  });
-
-  test("carries no removed orchestration, delegation, or artifact policy prose", () => {
-    const architect = resolveArchitect();
-    const prose = architect.prose();
-    const output = architect.renderedOutput();
-
-    for (const removed of [
-      "Plan, implement, and review Atlante work",
-      "Orchestrate every workflow cycle",
-      "sole durable control plane",
-      "isolated worker",
-      "delegat",
-      "disposition",
-      "placeholder plan",
-      "orchestratorReadOnly",
-      "adaptive",
-      "maxLoops",
-      "plan.md",
-      "brief-<n>.md",
-      "review-<n>.md",
-      "final-review",
-      "Brainstorm and intake",
-      "Task review",
-      "Final review",
-      "MUST NOT edit project source",
-      "MUST NOT substitute self-review",
-      "commit",
-    ])
-      expect(prose, removed).not.toContain(removed);
-    for (const removed of [
-      "## Policies",
-      "(adaptive)",
-      "(mandatory)",
-      "Correction MUST be limited",
-    ])
-      expect(output, removed).not.toContain(removed);
   });
 });

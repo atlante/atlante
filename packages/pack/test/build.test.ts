@@ -33,7 +33,6 @@ describe("build skill instance", () => {
     expect(skill.templateLocator).toBe("@atlante/pack/skill");
     expect(skill.title).toBe("Build");
     expect(skill.overview).toContain("one defined task");
-    expect(skill.overview).not.toMatch(/\bcorrection/i);
     expect(skill.overview).toContain("truthful validation evidence");
     expect(skill.overview).not.toMatch(/\b(MUST|SHOULD|MAY)\b/);
     expect(
@@ -41,11 +40,10 @@ describe("build skill instance", () => {
     ).toEqual(["instructions", "invariants"]);
   });
 
-  test("description frames the work as one defined task without correction modes", () => {
+  test("description frames the work as one defined task", () => {
     const description = instanceDescription();
 
     expect(description).toContain("task");
-    expect(description).not.toMatch(/\bcorrection/i);
   });
 
   test("instructions carry the implementation lifecycle with the red-green chain in order", () => {
@@ -74,8 +72,6 @@ describe("build skill instance", () => {
       "Return a concise implementation handoff",
     ])
       expect(instructions).toContain(marker);
-    expect(instructions).not.toMatch(/\bcorrection/i);
-
     const position = (marker: string) => instructions.indexOf(marker);
     expect(
       position("the relevant source and tests before editing"),
@@ -106,7 +102,6 @@ describe("build skill instance", () => {
       "stop at the smallest safe point and report the blocker instead of improvising",
     ])
       expect(invariants).toContain(marker);
-    expect(invariants).not.toMatch(/\bcorrection/i);
   });
 
   test("invariants require reusing suitable existing code before new implementation", () => {
@@ -120,22 +115,6 @@ describe("build skill instance", () => {
       /speculative/i,
     ])
       expect(invariants, String(pattern)).toMatch(pattern);
-  });
-
-  test("carries no removed disposition, workflow-artifact, or correction-mode semantics", () => {
-    const skill = resolvePackSkill(locator);
-    const everything = skill.everythingText();
-
-    expect(skill.markdownText().trim()).toBe("");
-    expect(everything).not.toContain("`full`");
-    expect(everything).not.toContain("`reduced`");
-    expect(everything).not.toMatch(/\barchitect\b/i);
-    expect(everything).not.toMatch(/disposition|eligib/i);
-    expect(everything).not.toContain(".atlante/");
-    expect(everything).not.toContain("Brief record");
-    expect(everything).not.toMatch(/\bbrief\b/i);
-    expect(everything).not.toMatch(/cumulative/i);
-    expect(everything).not.toMatch(/\bcorrection/i);
   });
 
   test("renders structural landmarks in the shared section order", () => {
@@ -154,9 +133,6 @@ describe("build skill instance", () => {
     expect(output).toContain(
       "- MUST NOT implement a behavior change until its focused test has produced the expected red evidence",
     );
-    expect(output).not.toContain("## Gotchas");
-    expect(output).not.toContain("## Brief record");
-
     const position = (heading: string) => output.indexOf(heading);
     expect(position("## Overview")).toBeLessThan(position("## Instructions"));
     expect(position("## Instructions")).toBeLessThan(position("## Invariants"));

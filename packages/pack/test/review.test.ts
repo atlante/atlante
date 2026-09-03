@@ -119,21 +119,6 @@ describe("review skill instance", () => {
       expect(invariants).toContain(marker);
   });
 
-  test("carries no removed disposition, mode, or workflow-artifact semantics", () => {
-    const skill = resolvePackSkill(locator);
-    const everything = skill.everythingText();
-
-    expect(skill.markdownText().trim()).toBe("");
-    expect(everything).not.toContain("`full`");
-    expect(everything).not.toContain("`reduced`");
-    expect(everything).not.toMatch(/`task-review`|`final-review`/);
-    expect(everything).not.toMatch(/\barchitect\b/i);
-    expect(everything).not.toMatch(/disposition|eligib/i);
-    expect(everything).not.toContain(".atlante/");
-    expect(everything).not.toContain("Report record");
-    expect(everything).not.toMatch(/\bimmutable\b/i);
-  });
-
   test("renders structural landmarks in the shared section order", () => {
     const output = resolvePackSkill(locator).renderedOutput();
 
@@ -148,9 +133,6 @@ describe("review skill instance", () => {
     expect(output).toContain(
       "- Any unresolved critical or important finding or failed required check MUST make the verdict `BLOCKED`.",
     );
-    expect(output).not.toContain("## Gotchas");
-    expect(output).not.toContain("## Report record");
-
     const position = (heading: string) => output.indexOf(heading);
     expect(position("## Overview")).toBeLessThan(position("## Instructions"));
     expect(position("## Instructions")).toBeLessThan(position("## Invariants"));

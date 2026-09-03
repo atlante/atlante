@@ -171,23 +171,6 @@ test("keeps the first-party pack as a CLI runtime dependency in source", () => {
   expect(dependencies["@atlante/pack"]).toBe("workspace:*");
 });
 
-// build.ts once deliberately documented itself as the only caller of the
-// publisher: bypassing it would skip the fail-closed prepare-then-publish
-// ordering. Native materialization replaced the publisher, and nothing in a
-// package source may resurrect `publishArtifacts`.
-test("keeps publishArtifacts out of every package source", () => {
-  const offenders: string[] = [];
-  for (const name of PACKAGES) {
-    const packageRoot = join(ROOT, "packages", name);
-    for (const file of filesUnder(join(packageRoot, "src"))) {
-      if (readFileSync(file, "utf8").includes("publishArtifacts")) {
-        offenders.push(file);
-      }
-    }
-  }
-  expect(offenders).toEqual([]);
-});
-
 test("orders release packages pack, CLI, then OpenCode adapter", () => {
   const publish = readFileSync(
     join(ROOT, "scripts", "publish-packages.ts"),

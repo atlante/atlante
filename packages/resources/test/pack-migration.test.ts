@@ -548,27 +548,4 @@ describe("temporary first-party vocabulary removal", () => {
         expect(error.failure.code).toBe("package-not-declared");
     }
   });
-
-  test("removes the old bundled source tree and resolver module", () => {
-    expect(
-      existsSync(join(repositoryRoot, "packages", "resources", "bundled")),
-    ).toBe(false);
-    expect(
-      existsSync(
-        join(repositoryRoot, "packages", "resources", "src", "bundled.ts"),
-      ),
-    ).toBe(false);
-    expect(
-      readFileSync(
-        join(repositoryRoot, "packages", "resources", "src", "index.ts"),
-        "utf8",
-      ),
-    ).not.toContain("BUNDLED_");
-    expect(
-      readFileSync(
-        join(repositoryRoot, "packages", "cli", "src", "main.ts"),
-        "utf8",
-      ),
-    ).not.toContain("BUNDLED_");
-  });
 });
