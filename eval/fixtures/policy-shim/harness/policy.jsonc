@@ -1,0 +1,6 @@
+{
+  // GENERATED harness policy — the harness owns this file. Agents must obtain
+  // explicit developer approval before changing harness files and must never
+  // hand-edit generated artifacts.
+  "permissions": { "default": "deny" }
+}
