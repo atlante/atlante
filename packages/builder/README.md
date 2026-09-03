@@ -25,8 +25,5 @@ the injected `HostMaterializer` values selected by the document's `hosts`
 field, collecting each outcome (`diagnostics`, `writtenPaths`,
 `removedPaths`) into the result. The builder never imports a host package:
 materializers are injected by the composition layer (the CLI passes the
-OpenCode materializer). A legacy `.atlante/artifacts` tree left by earlier
-versions migrates on build: a manifest-valid tree is removed after every
-materialization succeeds, while unmanifested content fails closed with
-manual-resolution guidance instead of being deleted. Rendered values can be
-sensitive; generated outputs stay local and are not published.
+OpenCode materializer). Rendered values can be sensitive; generated outputs
+stay local and are not published.

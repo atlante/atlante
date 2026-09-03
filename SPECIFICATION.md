@@ -626,10 +626,9 @@ Local resource edits MAY take effect on the next build without changing the
 document schema URI. A versioned or immutable resource distribution MUST define
 its own version or digest mechanism.
 
-Version 0.1 defines no migration format. Future versions MAY add runtime tools,
-state, remote registries, preset sharing, or skill execution, but those features
-MUST preserve the separation between Atlante-owned prompt content and host-owned
-execution settings.
+Future versions MAY add runtime tools, state, remote registries, preset sharing,
+or skill execution, but those features MUST preserve the separation between
+Atlante-owned prompt content and host-owned execution settings.
 
 ### Examples
 
@@ -696,14 +695,6 @@ Init MUST also enforce the ignore-by-default git policy: `.gitignore` MUST
 gain `.opencode/agents/`, `.opencode/skills/`, and `.atlante/` when missing,
 and existing `.gitignore` content MUST NOT be reordered.
 
-A legacy `.atlante/artifacts` payload tree from an earlier release MUST be
-migrated only when a valid `atlante-artifacts` manifest accounts for every
-file in the tree. That preflight MUST run before any mutation; an
-unmanifested or invalid tree MUST fail the build closed with
-`artifact-migration-blocked` and leave the tree untouched. A manifest-valid
-tree MUST be removed only after every materialization succeeded, after
-re-verifying its accounting and payload digests.
-
 ### Examples
 
 The CLI is the composition root: it passes the OpenCode materializer to the
@@ -712,9 +703,9 @@ OpenCode native output set.
 
 ### Edge cases
 
-If host selection, preflight, or materialization fails, the build MUST leave
-the previous valid generated set and any legacy tree untouched. The ownership
-manifest is bookkeeping state, not a trust boundary.
+If host selection or materialization fails, the build MUST leave the previous
+valid generated set untouched. The ownership manifest is bookkeeping state, not
+a trust boundary.
 
 ### Rationale
 
@@ -742,12 +733,11 @@ A conforming implementation MUST be able to:
    ownership manifest;
 7. preserve host-owned settings while materializing OpenCode agents and skills;
 8. fail closed on collisions, drift, stale-output digest mismatches, invalid
-   IDs, unsafe paths, and unmanifested legacy content;
+   IDs, and unsafe paths;
 9. scaffold from the first-party `@atlante/pack` default preset through
    `atlante init`, enforce the ignore-by-default git policy, and rebuild
    through `atlante build`;
-10. remove stale generated outputs and migrate a manifest-valid legacy
-    `.atlante/artifacts` tree; and
+10. remove stale generated outputs and preserve host-owned files; and
 11. preserve the previous valid generated set whenever validation or
     materialization fails.
 

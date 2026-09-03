@@ -61,7 +61,6 @@ watch, and publication failures can produce additional stable codes.
 | `conflicting-selectors` | A source uses `$template` and `$instance` together |
 | `build-failed` | A build could not complete after the reported failure |
 | `unsupported-host` | The document declares a host with no registered materializer |
-| `artifact-migration-blocked` | The legacy `.atlante/artifacts` tree cannot be migrated safely and is left untouched |
 | `materialization-*` | An OpenCode materialization failure; see [Materialization](/reference/materialization) for the code list |
 | `watch-build-failed` | A watch-mode rebuild failed and will be retried |
 | `watch-inputs-failed` | Watch mode could not update its watched files and will retry |

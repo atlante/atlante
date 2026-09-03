@@ -2,11 +2,6 @@ import { lstatSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Diagnostic, ResourceWatchContext } from "@atlante/validator";
 import { error, hasErrors } from "@atlante/validator";
-import {
-  type LegacyArtifactMigration,
-  preflightLegacyArtifactTree,
-  removeLegacyArtifactTree,
-} from "./legacy-artifacts.js";
 import type { HostMaterializer } from "./materializer.js";
 import { loadProject, type ProjectContext } from "./project.js";
 import { prepareResolvedDocument } from "./resource-prepare.js";
@@ -27,7 +22,6 @@ export type BuildResult = {
   resourceWatch?: ResourceWatchContext;
   diagnostics: Diagnostic[];
   materializations: readonly MaterializationSummary[];
-  migratedLegacyArtifacts?: { removedPath: string };
 };
 
 export function assertRealProjectRoot(projectRoot: string): void {
@@ -80,12 +74,7 @@ function failed(
   };
 }
 
-/**
- * Prepares the complete project in memory, then materializes it through the
- * injected host materializers selected by the document's `hosts` field. A
- * manifest-valid legacy `.atlante/artifacts` tree is removed only after every
- * materialization succeeded; anything else fails the build closed.
- */
+/** Prepares and materializes the complete project through selected hosts. */
 export function buildProject(
   target: string,
   context: ProjectContext = {},
@@ -109,11 +98,6 @@ export function buildProject(
   if ("diagnostics" in selection)
     return failed(projectRoot, loaded.resourceWatch, selection.diagnostics);
 
-  const legacy: LegacyArtifactMigration =
-    preflightLegacyArtifactTree(projectRoot);
-  if (legacy.state === "blocked")
-    return failed(projectRoot, loaded.resourceWatch, legacy.diagnostics);
-
   const diagnostics: Diagnostic[] = [];
   const materializations: MaterializationSummary[] = [];
   for (const materializer of selection.selected) {
@@ -126,19 +110,10 @@ export function buildProject(
     });
   }
 
-  let migratedLegacyArtifacts: BuildResult["migratedLegacyArtifacts"];
-  if (legacy.state === "pending" && !hasErrors(diagnostics)) {
-    const removed = removeLegacyArtifactTree(legacy.tree);
-    if (removed.state === "removed")
-      migratedLegacyArtifacts = { removedPath: removed.removedPath };
-    else diagnostics.push(...removed.diagnostics);
-  }
-
   return {
     projectRoot,
     ...(loaded.resourceWatch ? { resourceWatch: loaded.resourceWatch } : {}),
     diagnostics,
     materializations,
-    ...(migratedLegacyArtifacts ? { migratedLegacyArtifacts } : {}),
   };
 }

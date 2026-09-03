@@ -92,15 +92,13 @@ npx @atlante/cli@latest build [path] --watch
 ```
 
 A successful one-shot command prints the resolved project path, followed by
-one line per file the build wrote or removed, and the migration line when a
-legacy tree was removed:
+one line per file the build wrote or removed:
 
 ```text
 built /Users/example/project
 wrote opencode: .opencode/agents/architect.md
 removed opencode: .opencode/skills/obsolete/SKILL.md
 wrote opencode: .atlante/opencode-native.json
-removed /Users/example/project/.atlante/artifacts
 ```
 
 Unchanged files are not rewritten, so an idempotent rebuild prints no `wrote`

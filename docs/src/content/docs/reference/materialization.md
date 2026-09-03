@@ -81,18 +81,6 @@ previously generated file, the materializer captures a byte snapshot, then:
 - **Idempotence** — an unchanged prepared project writes nothing: identical
   bytes are not rewritten.
 
-## Legacy `.atlante/artifacts` migration
-
-A project built by an earlier Atlante release may still have a
-`.atlante/artifacts` payload tree. The first build migrates it:
-
-- If a valid `atlante-artifacts` manifest accounts for every file in the
-  tree, the build re-verifies the accounting and payload digests after all
-  materializations succeed and removes the whole tree.
-- Anything the manifest does not account for — or a missing, malformed, or
-  unsupported manifest — fails the build with `artifact-migration-blocked`
-  before any mutation, and the tree is left untouched.
-
 ## Failure diagnostics
 
 Materialization failures carry a `materialization-` prefix:

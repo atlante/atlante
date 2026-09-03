@@ -118,15 +118,6 @@ The materializer fails closed and changes nothing when a target is unsafe:
   previous valid generated set is preserved. Fix the reported filesystem
   condition and build again.
 
-## The build reports `artifact-migration-blocked`
-
-A legacy `.atlante/artifacts` tree from an earlier release is removed
-automatically only when its `atlante-artifacts` manifest accounts for every
-file in the tree. Unmanifested or changed content blocks the build before any
-mutation, and the tree is left untouched. Resolve it manually — restore the
-tree to a manifest-consistent state, or delete the whole tree when you no
-longer need its payloads — then run `atlante build` again.
-
 ## The build reports `unsupported-host`
 
 The document's `hosts` field names a host with no registered materializer. In

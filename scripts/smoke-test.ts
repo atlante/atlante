@@ -67,10 +67,6 @@ try {
   await Bun.$`node ${CLI} validate ${project}`.cwd(project);
   await Bun.$`node ${CLI} build ${project}`.cwd(project);
 
-  assert(
-    !(await Bun.file(join(project, ".atlante", "artifacts")).exists()),
-    "legacy .atlante/artifacts tree still exists after build",
-  );
   const manifest = (await Bun.file(
     join(project, ".atlante", "opencode-native.json"),
   ).json()) as NativeManifest;
