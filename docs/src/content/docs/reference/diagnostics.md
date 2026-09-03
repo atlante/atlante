@@ -26,8 +26,8 @@ The terminal lines have a fixed order:
 
 Diagnostics use project-relative or stable package-qualified source identities. A
 normal diagnostic does not expose a machine-specific absolute path. CLI success
-lines separately report resolved filesystem paths for the configuration and
-artifact output.
+lines separately report resolved filesystem paths for the configuration and the
+materialized outputs.
 
 ## Diagnostic fields
 
@@ -60,6 +60,9 @@ watch, and publication failures can produce additional stable codes.
 | `invalid-resolved-input` | Resolved document or template-owned input is invalid |
 | `conflicting-selectors` | A source uses `$template` and `$instance` together |
 | `build-failed` | A build could not complete after the reported failure |
+| `unsupported-host` | The document declares a host with no registered materializer |
+| `artifact-migration-blocked` | The legacy `.atlante/artifacts` tree cannot be migrated safely and is left untouched |
+| `materialization-*` | An OpenCode materialization failure; see [Materialization](/reference/materialization) for the code list |
 | `watch-build-failed` | A watch-mode rebuild failed and will be retried |
 | `watch-inputs-failed` | Watch mode could not update its watched files and will retry |
 

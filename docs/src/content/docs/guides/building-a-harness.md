@@ -10,8 +10,8 @@ validate-and-build loop.
 ## Start with the generated source
 
 If you have not initialized the project yet, begin with [Getting
-started](/getting-started). `init` creates `atlante.jsonc`, registers the
-[OpenCode](https://opencode.ai/) adapter, and builds the initial artifacts. The
+started](/getting-started). `init` creates `atlante.jsonc` and materializes
+the initial native outputs for [OpenCode](https://opencode.ai/). The
 published CLI bundles the first-party `@atlante/pack`, so the default setup does
 not require a separate pack installation.
 
@@ -93,29 +93,33 @@ Skills are reusable Markdown guidance addressed by `skillId`, not host-agent IDs
 }
 ```
 
-This selector-less skill uses the first-party skill template. The OpenCode
-adapter exposes its resolved content through `atlante_skill`; Atlante renders
+This selector-less skill uses the first-party skill template. The build
+materializes its content as `.opencode/skills/<skillId>/SKILL.md`, which
+OpenCode discovers; Atlante renders
 the skill but does not execute it.
 
-## Validate and publish
+## Validate and materialize
 
 After editing `atlante.jsonc` or selected resources, validate first and then
-publish a new artifact tree:
+materialize the new native outputs:
 
 ```sh
 npx @atlante/cli@latest validate
 npx @atlante/cli@latest build
 ```
 
-Both commands report the resolved filesystem path they used. For example:
+Both commands report the resolved filesystem path they used, and `build` adds
+one line per file it wrote or removed. For example:
 
 ```text
 validated /Users/example/billing-api/atlante.jsonc
-built /Users/example/billing-api/.atlante/artifacts
+built /Users/example/billing-api
+wrote opencode: .opencode/agents/reviewer.md
 ```
 
-Inspect `<project>/.atlante/artifacts/` when checking the result. Artifacts are
-host-neutral derived output and may contain rendered project values, so keep
-`.atlante/` local. For continuous editing, use `build --watch` as documented in
+Inspect `.opencode/` and `.atlante/opencode-native.json` when checking the
+result. The native files are derived output and may contain rendered project
+values, so the ignore policy keeps them local. For continuous editing, use
+`build --watch` as documented in
 the [CLI](/reference/cli). Continue to [Use OpenCode](/guides/opencode) when the
-artifact tree is ready for the host adapter.
+native outputs are in place.

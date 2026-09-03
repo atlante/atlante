@@ -6,9 +6,9 @@
 
 Atlante gives software architects, engineers, and developers one versioned source for the agents, skills, and workflows that make up their coding-agent harness. It makes those relationships explicit in the repository so individuals and teams can share, review, and evolve the system through a versioning system (e.g., Git).
 
-The builder validates the authored configuration, composes selected templates, instances, and presets, and publishes deterministic artifacts. A host adapter materializes those artifacts for the host.
+The builder validates the authored configuration, composes selected templates, instances, and presets, and renders a prepared project in memory. A host materializer then writes that prepared project as host-native files the host discovers directly.
 
-[OpenCode](https://opencode.ai/) is the only supported host adapter today.
+[OpenCode](https://opencode.ai/) is the only supported host today.
 Read the [documentation](https://docs.atlante.sh) for installation, concepts,
 configuration, CLI reference, and OpenCode integration.
 
@@ -17,8 +17,8 @@ configuration, CLI reference, and OpenCode integration.
 - **Structure:** define agents, skills, workflows, values, and their relationships in one configuration.
 - **Shared source:** keep the harness with project code and review changes through a versioning system.
 - **Composition:** inherit presets and compose templates and instances instead of duplicating prompts.
-- **Validation:** check document structure and template inputs before building artifacts.
-- **Deterministic output:** render prompts and skills into verified artifact files.
+- **Validation:** check document structure and template inputs before building.
+- **Deterministic output:** render prompts and skills into deterministic host-native files.
 - **Clear boundary:** Atlante defines prompt-level orchestration; OpenCode and the prompted model execute it.
 
 ## Flow
@@ -27,12 +27,11 @@ configuration, CLI reference, and OpenCode integration.
 flowchart LR
   source["atlante.jsonc<br/>versioned source"] --> validate["validate"]
   validate --> build["build"]
-  build --> artifacts[".atlante/artifacts/<br/>verified output"]
-  artifacts --> adapter["OpenCode adapter"]
-  adapter --> host["OpenCode"]
+  build --> native[".opencode/ + manifest<br/>native outputs"]
+  native --> host["OpenCode"]
 ```
 
-The authored source stays in the project repository. The builder publishes the artifact tree, and the OpenCode adapter verifies it before materializing prompts and skills in memory.
+The authored source stays in the project repository. The build materializes prompts and skills as host-native files, and OpenCode discovers them when it starts.
 
 ## Features
 
@@ -40,9 +39,9 @@ Atlante v0.1 includes:
 
 - **Configuration:** declarative JSONC or JSON documents with composable templates.
 - **Values:** global values with per-agent overrides.
-- **Skills:** project-global Markdown skills through the `atlante_skill` adapter tool.
+- **Skills:** project-global Markdown skills materialized as native skill files.
 - **Validation:** structural and template-input validation.
-- **Artifacts:** deterministic prompt resolution and artifact publication.
+- **Native outputs:** deterministic rendering and host-native materialization.
 - **Packs:** local templates and instances, plus installed static packs.
 - **OpenCode:** prompt and skill materialization.
 
@@ -56,9 +55,9 @@ Three packages are published to npm:
 | --- | --- |
 | `@atlante/pack` | First-party static presets, templates, and instances |
 | `@atlante/cli` | `init`, `validate`, and `build` |
-| `@atlante/opencode` | OpenCode host adapter and `atlante_skill` |
+| `@atlante/opencode` | OpenCode build-time host materializer |
 
-The remaining workspaces are private implementation packages for the schema, resource loading, validation, and artifact builder.
+The remaining workspaces are private implementation packages for the schema, resource loading, validation, and build orchestration.
 
 ## Development
 
@@ -91,7 +90,9 @@ npx @atlante/cli@latest validate
 npx @atlante/cli@latest build
 ```
 
-`init` writes `atlante.jsonc`, builds the initial `.atlante/artifacts/` tree, and registers `@atlante/opencode` in `opencode.jsonc` (or an existing `opencode.json`). This preserves the existing host settings.
+`init` writes `atlante.jsonc`, materializes the first native outputs, adds
+`.opencode/agents/`, `.opencode/skills/`, and `.atlante/` to `.gitignore`, and
+removes any leftover `@atlante/opencode` plugin registration from `opencode.jsonc` (or an existing `opencode.json`). Existing host settings are preserved.
 
 You can edit the authored configuration and then run `npx @atlante/cli@latest build` again, or use `npx @atlante/cli@latest build --watch` during active editing.
 
@@ -188,11 +189,11 @@ This lets the same agent template produce different agents without duplicating t
 
 ### Skills
 
-Skills are reusable guidance, not agents. A skill uses structured template input and is rendered as Markdown. After the artifacts are built, the OpenCode adapter makes a resolved skill available to host agents through the `atlante_skill` tool. Atlante provides the rendered content but does not execute the skill.
+Skills are reusable guidance, not agents. A skill uses structured template input and is rendered as Markdown. After a build, each skill is materialized as `.opencode/skills/<skillId>/SKILL.md`, which OpenCode discovers like any native skill. Atlante provides the rendered content but does not execute the skill.
 
-For OpenCode, the adapter loads only the verified `.atlante/artifacts/` tree. It writes the rendered agent `prompt` and `description` fields during initialization. Models, permissions, tools, and modes remain owned by OpenCode.
+For OpenCode, the build writes `.opencode/agents/<id>.md` with the rendered agent prompt and description, plus the `.atlante/opencode-native.json` ownership manifest. Models, permissions, tools, and modes remain owned by OpenCode. Restart OpenCode to pick up new or changed native files.
 
-Atlante validates and renders deterministic artifacts; OpenCode consumes only verified artifacts, while Atlante does not execute agents, skills, or project code.
+Atlante validates, renders, and materializes deterministic host-native files; Atlante does not execute agents, skills, or project code.
 
 ### Packs and presets
 

@@ -43,14 +43,14 @@ const fields = [
 const pipeline = [
   { id: "source", label: "Source", value: "atlante.jsonc" },
   { id: "validate", label: "Contract", value: "document + templates" },
-  { id: "build", label: "Artifacts", value: ".atlante/artifacts/" },
-  { id: "adapter", label: "Host adapter", value: "OpenCode" },
+  { id: "build", label: "Native outputs", value: ".opencode/" },
+  { id: "adapter", label: "Manifest", value: ".atlante/opencode-native.json" },
 ];
 
 const hints: Record<string, string> = {
-  init: "Scaffolds a real project, builds the first artifacts, and registers the OpenCode adapter.",
-  validate: "Checks the document and every selected template before publication.",
-  build: "Renders and atomically publishes the host-neutral artifact tree.",
+  init: "Scaffolds a real project, materializes the first native agent and skill files, and enforces the ignore policy.",
+  validate: "Checks the document and every selected template before materialization.",
+  build: "Renders and materializes the host-native files and the ownership manifest.",
 };
 ---
 
@@ -59,7 +59,7 @@ const hints: Record<string, string> = {
     <header class="intro">
       <h2>Build your constellation</h2>
       <p>
-        Edit the configuration, run the real CLI, and inspect the generated artifacts.
+        Edit the configuration, run the real CLI, and inspect the generated files.
       </p>
     </header>
 
@@ -177,10 +177,10 @@ const hints: Record<string, string> = {
 
 <script>
   const hints: Record<string, string> = {
-    init: "Scaffolds a real project, builds the first artifacts, and registers the OpenCode adapter.",
+    init: "Scaffolds a real project, materializes the first native agent and skill files, and enforces the ignore policy.",
     validate:
-      "Checks the document and every selected template before publication.",
-    build: "Renders and atomically publishes the host-neutral artifact tree.",
+      "Checks the document and every selected template before materialization.",
+    build: "Renders and materializes the host-native files and the ownership manifest.",
   };
 
   const instrument = document.querySelector<HTMLElement>("[data-playground]");
@@ -350,8 +350,8 @@ const hints: Record<string, string> = {
     };
 
 
-    /** Strips id/content digests from artifact payload names so the tree
-     * reads like source: architect-<id>-<sha256>.md -> architect.md. */
+    /** Native output names read like source already: architect.md and
+     * SKILL.md, so the display name is the file name itself. */
     const displayName = (name: string): string => {
       if (name.endsWith(".md")) {
         const stem = name.slice(0, -3);
@@ -442,7 +442,7 @@ const hints: Record<string, string> = {
     };
 
     const updateStages = (): void => {
-      if (state.files.has(".atlante/artifacts/manifest.json")) {
+      if (state.files.has(".atlante/opencode-native.json")) {
         instrument.dataset.stage = "build";
       } else if (state.files.has("atlante.jsonc")) {
         instrument.dataset.stage = "validate";
@@ -454,7 +454,7 @@ const hints: Record<string, string> = {
     const refreshControls = (): void => {
       setBusy(state.running);
       const validateReady = state.files.has("atlante.jsonc");
-      const buildReady = state.files.has(".atlante/artifacts/manifest.json");
+      const buildReady = state.files.has(".atlante/opencode-native.json");
       for (const button of runButtons) {
         if (button.dataset.run === "validate") {
           button.disabled = state.running || !validateReady;
@@ -476,7 +476,11 @@ const hints: Record<string, string> = {
       // previous generation entirely instead of merging beside it.
       if (state.lastCommand === "build" && result.ok) {
         for (const path of [...state.files.keys()]) {
-          if (path.startsWith(".atlante/") || path === "opencode.jsonc") {
+          if (
+            path.startsWith(".atlante/") ||
+            path.startsWith(".opencode/") ||
+            path === "opencode.jsonc"
+          ) {
             state.files.delete(path);
           }
         }

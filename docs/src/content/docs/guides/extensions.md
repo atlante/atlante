@@ -41,23 +41,23 @@ Atlante reads only selected static resources and their transitive dependencies.
 ## Know what is public
 
 The publishable packages are `@atlante/pack`, `@atlante/cli`, and
-`@atlante/opencode`. The `@atlante/resources`, `@atlante/validator`,
-`@atlante/schema`, `@atlante/artifacts`, and `@atlante/builder` workspaces are
+`@atlante/opencode` (the OpenCode host materializer). The `@atlante/resources`,
+`@atlante/validator`, `@atlante/schema`, and `@atlante/builder` workspaces are
 private implementation packages, not public installation targets.
 
 ## Know the runtime boundary
 
 Atlante does not load JavaScript from a Pack, call package registration hooks,
 install dependencies, consult a registry, load URLs, or execute project code.
-The [OpenCode](https://opencode.ai/) adapter reads verified artifacts instead of
-source Packs.
+The [OpenCode](https://opencode.ai/) materializer receives an already-prepared
+project as data instead of reading source Packs.
 
 There is no plugin runtime, registration hook, lifecycle API, or remote registry
 in v0.1. Do not depend on internal loader, resolver, validator, builder, or
-adapter modules as an extension surface. A future version must define and version
-its extension contract while preserving the boundary between static content
-selection, artifact publication, and host execution.
+materializer modules as an extension surface. A future version must define and
+version its extension contract while preserving the boundary between static
+content selection, host materialization, and host execution.
 
 For the authoring workflow, read [Author a pack](/guides/authoring-packs) and
 [Resources](/concepts/resources). For the host boundary, read
-[Artifacts](/concepts/artifacts) and [Use OpenCode](/guides/opencode).
+[Native outputs](/concepts/native-outputs) and [Use OpenCode](/guides/opencode).

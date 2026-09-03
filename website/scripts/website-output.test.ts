@@ -28,7 +28,7 @@ describe.skipIf(process.env.ATLANTE_BUILT_OUTPUT_TESTS !== "1")(
         "Every signal stays visible",
         "Your stars form an agent",
         "Validate before you build",
-        "Only verified artifacts cross the boundary",
+        "The build writes what the host reads",
         "Atlante bears the structure. The host runs it.",
         "Build your constellation",
         "Built for change. Strict by design",

@@ -54,15 +54,17 @@ The lifecycle checks the document in order:
    package metadata, and transitive references.
 3. Resolved validation checks values, effective templates, composition, and
    template-owned input.
-4. Build renders the validated input and publishes the complete artifact tree.
+4. Build renders the validated input into a prepared project and materializes
+   the complete native output set.
 
-`validate` runs the first three stages without rendering or publishing. `build`
+`validate` runs the first three stages without rendering or materializing.
+`build`
 runs all four. Missing targets, invalid locators, malformed schemas, missing
 value references, unsupported fields, incompatible templates, and invalid input
 are reported as [Diagnostics](/reference/diagnostics) with stable codes and
 source locations. The resource system fails closed: invalid input produces no
-canonical document and the builder publishes no partial artifact tree.
+canonical document and the builder materializes no partial output.
 
 Resolution does not execute JavaScript, project code, agents, skills, or model
-inference. It does not install packages or load URLs. [Artifacts](/concepts/artifacts)
-describes the host-neutral result of the final stage.
+inference. It does not install packages or load URLs. [Native outputs](/concepts/native-outputs)
+describes the result of the final stage.

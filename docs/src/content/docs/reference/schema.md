@@ -38,9 +38,11 @@ The document contract accepts these fields:
 | `values` | object | Named string values; source overlays may use `null` to remove inherited values |
 | `agents` | object | Map from non-empty host-agent IDs to bindings or `null` tombstones |
 | `skills` | object | Map from non-empty skill IDs to bindings or `null` tombstones |
+| `hosts` | non-empty string array | Host materialization targets; v0.1 admits only `"opencode"` |
 
 Unknown top-level fields are rejected. Missing `agents` and `skills` maps become
-empty maps in the canonical document.
+empty maps in the canonical document. `hosts` must not contain duplicates, and
+an absent `hosts` field defaults to `["opencode"]` in the canonical document.
 
 ## Binding fields
 
@@ -65,8 +67,9 @@ resource source objects, which require `$template` or `$instance`.
 
 ## Agent and skill maps
 
-Agent map keys remain host-agent IDs. Skill map keys are the `skillId` values used
-by the [OpenCode](https://opencode.ai/) adapter's `atlante_skill` lookup. Both
+Agent map keys remain host-agent IDs and become the names of the materialized
+`.opencode/agents/<id>.md` files. Skill map keys are the `skillId` values that
+name the materialized `.opencode/skills/<skillId>/SKILL.md` files. Both
 binding types require a non-empty `description` after interpolation.
 
 The document schema leaves template-owned fields open. Resource resolution and
@@ -102,6 +105,7 @@ contract. See [Resources](/concepts/resources) for locator behavior.
 
 ## Version boundaries
 
-The document schema version, artifact format version, template input schema, and
-package version evolve independently. An adapter rejects an unsupported document
-schema URI or artifact format instead of inferring a compatible version.
+The document schema version, ownership-manifest format version, template input
+schema, and package version evolve independently. The CLI rejects an
+unsupported document schema URI, and a materializer rejects an unsupported
+manifest format, instead of inferring a compatible version.

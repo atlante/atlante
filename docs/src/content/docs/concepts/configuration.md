@@ -6,16 +6,16 @@ description: The authored document that defines an Atlante harness.
 What should your project keep under version control, and what should Atlante
 generate? Keep the configuration document: it is the authored, versioned source
 for the harness. It selects presets, defines values, and binds agents and skills
-to static resources. The build turns that source into artifacts; artifacts do
-not replace it.
+to static resources. The build turns that source into host-native output;
+generated files do not replace it.
 
-The source-to-artifact flow is:
+The source-to-output flow is:
 
 ```text
 atlante.jsonc or atlante.json
         -> validate and resolve
         -> build
-        -> .atlante/artifacts/
+        -> .opencode/ + .atlante/opencode-native.json
 ```
 
 ## Supported source files
@@ -46,9 +46,13 @@ These are the exact supported top-level fields:
 - `values` defines global named string values.
 - `agents` maps agent IDs to resource bindings.
 - `skills` maps skill IDs to resource bindings.
+- `hosts` optionally selects the host materialization targets; v0.1 admits
+  only `"opencode"`, which is also the default.
 
-Unknown top-level fields are rejected. `extends` cannot be empty, and missing
-`agents` or `skills` maps become empty collections in the canonical document.
+Unknown top-level fields are rejected. `extends` cannot be empty, `hosts`
+cannot be empty or contain duplicates, and missing `agents` or `skills` maps
+become empty collections in the canonical document. An absent `hosts` field
+defaults to `["opencode"]` in the canonical document.
 In a source overlay, `null` can remove an inherited field; it is resolved away
 before the canonical document is used.
 

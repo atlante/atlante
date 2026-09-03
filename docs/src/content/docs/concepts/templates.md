@@ -64,5 +64,5 @@ the current input takes a different schema branch. Missing slots, invalid
 schemas, incompatible input, and circular composition fail before rendering.
 Rendered child Markdown is kept as opaque output rather than interpreted as
 parent template source. See [Resolution](/concepts/resolution) for the stage
-where this graph is checked and the [Artifact](/reference/artifact) reference
-for the resulting output.
+where this graph is checked and the [Materialization](/reference/materialization)
+reference for the resulting output.
