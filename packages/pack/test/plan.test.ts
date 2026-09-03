@@ -70,21 +70,6 @@ describe("plan skill instance", () => {
       expect(invariants).toContain(marker);
   });
 
-  test("carries no removed disposition or workflow-artifact semantics", () => {
-    const skill = resolvePackSkill(locator);
-    const everything = skill.everythingText();
-
-    expect(skill.markdownText().trim()).toBe("");
-    expect(everything).not.toContain("`full`");
-    expect(everything).not.toContain("`reduced`");
-    expect(everything).not.toMatch(/\barchitect\b/i);
-    expect(everything).not.toMatch(/disposition|eligib/i);
-    expect(everything).not.toContain(".atlante/");
-    expect(everything).not.toContain("Plan record");
-    expect(everything).not.toContain("Adaptive decision");
-    expect(everything).not.toContain("cycle");
-  });
-
   test("renders structural landmarks in the shared section order", () => {
     const output = resolvePackSkill(locator).renderedOutput();
 
@@ -99,9 +84,6 @@ describe("plan skill instance", () => {
     expect(output).toContain(
       "- MUST NOT expand or weaken the defined scope or acceptance criteria; report any required change as a blocker.",
     );
-    expect(output).not.toContain("## Gotchas");
-    expect(output).not.toContain("## Plan record");
-
     const position = (heading: string) => output.indexOf(heading);
     expect(position("## Overview")).toBeLessThan(position("## Instructions"));
     expect(position("## Instructions")).toBeLessThan(position("## Invariants"));

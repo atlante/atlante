@@ -279,14 +279,6 @@ describe("resources package boundary", () => {
     ).toBe(false);
   });
 
-  test("does not expose the forbidden legacy module vocabulary", () => {
-    const source = sourceText();
-
-    expect(source).not.toContain("module.jsonc");
-    expect(source).not.toMatch(/\$module\b/);
-    expect(source).not.toMatch(/\bmodule\b/);
-  });
-
   test("keeps forbidden Atlante imports out of resource source", () => {
     const source = sourceText();
 

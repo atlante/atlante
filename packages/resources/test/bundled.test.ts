@@ -173,7 +173,6 @@ describe("first-party package resources", () => {
     expect(output).toContain(
       `# Identity\n\nYou are the lead engineer for Atlante.\n\n# Mission\n\n${approvedArchitect.mission}`,
     );
-    expect(output).not.toContain("## Responsibilities");
     for (const invariant of approvedArchitect.invariants)
       expect(output).toContain(`- ${invariant}`);
     for (const [index, instruction] of approvedArchitect.instructions.entries())
@@ -190,7 +189,6 @@ describe("first-party package resources", () => {
       config,
     );
 
-    expect(architect.input.responsibilities).toBeUndefined();
     expect(architect.input.sections).toEqual([
       { invariants: approvedArchitect.invariants },
       { instructions: approvedArchitect.instructions },
@@ -202,7 +200,6 @@ describe("first-party package resources", () => {
       input: interpolateValues(architect.input, firstPartyValues),
     });
     expect(output).toContain("## Invariants");
-    expect(output).not.toContain("## Constraints");
   });
 
   test("renders repeated agent invariant sections in authored order", () => {

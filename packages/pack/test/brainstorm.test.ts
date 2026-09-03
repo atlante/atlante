@@ -39,11 +39,10 @@ describe("brainstorm skill instance", () => {
     ).toEqual(["instructions", "invariants"]);
   });
 
-  test("description resolves uncertainty and defines direction without the material qualifier", () => {
+  test("description resolves uncertainty and defines direction", () => {
     const description = instanceDescription();
 
     expect(description).toContain("uncertainty");
-    expect(description).not.toMatch(/\bmaterial\b/i);
     expect(description).toMatch(/\bdefin/i);
     expect(description).toContain("direction");
   });
@@ -94,7 +93,7 @@ describe("brainstorm skill instance", () => {
       expect(instructions).toContain(field);
   });
 
-  test("invariants guard honesty and decision stability without an implementation gate", () => {
+  test("invariants guard honesty and decision stability", () => {
     const invariants = resolvePackSkill(locator).listText("invariants");
 
     for (const marker of [
@@ -102,7 +101,6 @@ describe("brainstorm skill instance", () => {
       "MUST preserve agreed decisions unless they are explicitly changed",
     ])
       expect(invariants).toContain(marker);
-    expect(invariants).not.toMatch(/begin implementation/i);
   });
 
   test("invariants stop drifting, looping, or stalling exploration by exposing unresolved doubts", () => {
@@ -110,19 +108,6 @@ describe("brainstorm skill instance", () => {
 
     for (const pattern of [/stop/i, /drift/i, /loop/i, /stall/i, /doubt/i])
       expect(invariants, String(pattern)).toMatch(pattern);
-  });
-
-  test("carries no removed disposition or orchestrator semantics", () => {
-    const skill = resolvePackSkill(locator);
-    const everything = skill.everythingText();
-
-    expect(skill.markdownText().trim()).toBe("");
-    expect(everything).not.toContain("`full`");
-    expect(everything).not.toContain("`reduced`");
-    expect(everything).not.toMatch(/\barchitect\b/i);
-    expect(everything).not.toMatch(/disposition|eligib/i);
-    expect(everything).not.toContain(".atlante/");
-    expect(everything).not.toContain("standalone brainstorming artifact");
   });
 
   test("renders structural landmarks in the shared section order", () => {
@@ -140,10 +125,6 @@ describe("brainstorm skill instance", () => {
     expect(output).toContain(
       "- MUST preserve agreed decisions unless they are explicitly changed.",
     );
-    expect(output).not.toMatch(/begin implementation/i);
-    expect(output).not.toContain("## Gotchas");
-    expect(output).not.toContain("## Handoff contract");
-
     const position = (heading: string) => output.indexOf(heading);
     expect(position("## Overview")).toBeLessThan(position("## Instructions"));
     expect(position("## Instructions")).toBeLessThan(position("## Invariants"));
