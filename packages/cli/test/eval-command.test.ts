@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, spyOn, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import {
   cpSync,
   existsSync,
@@ -15,7 +15,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { HostRunner, RunTrialInput, TrialRun } from "@atlante/eval";
 import { EVAL_SCENARIO_SCHEMA_URI, SCHEMA_URI } from "@atlante/schema";
-import { runEvalCommand } from "../src/commands/eval.js";
+import { createProgressStyler, runEvalCommand } from "../src/commands/eval.js";
 import { runBuild } from "../src/main.js";
 
 const created: string[] = [];
@@ -163,6 +163,18 @@ function reportPaths(project: string): { runId: string; file: string } {
 }
 
 describe("runEvalCommand", () => {
+  // Pin plain-text progress so stderr assertions are deterministic whether
+  // the test runner's stderr is a terminal or a pipe.
+  let previousNoColor: string | undefined;
+  beforeEach(() => {
+    previousNoColor = process.env.NO_COLOR;
+    process.env.NO_COLOR = "1";
+  });
+  afterEach(() => {
+    if (previousNoColor === undefined) delete process.env.NO_COLOR;
+    else process.env.NO_COLOR = previousNoColor;
+  });
+
   test("runs the suite, writes the report, and gitignores it", async () => {
     const project = evalProject();
     await buildFixtureOutputs(project);
@@ -486,6 +498,36 @@ describe("runEvalCommand", () => {
     }
   });
 
+  test("summary repeats aggregates, not the per-trial lines", async () => {
+    const project = evalProject();
+    await buildFixtureOutputs(project);
+    const logs: string[] = [];
+    const logSpy = spyOn(console, "log").mockImplementation(
+      (...parts: unknown[]) => {
+        logs.push(parts.join(" "));
+      },
+    );
+    try {
+      const exit = await runEvalCommand(
+        project,
+        {},
+        undefined,
+        fakeRunner(true),
+      );
+      expect(exit).toBe(0);
+      const stdout = logs.join("\n");
+      // Per-trial verdicts stream live to stderr; the summary must not
+      // repeat them.
+      expect(stdout).not.toContain("trial 0:");
+      // Aggregates, header, and report path stay.
+      expect(stdout).toContain("cli-happy: pass 100% · mean 5ms · p95 5ms");
+      expect(stdout).toContain("host fake · model test/model");
+      expect(stdout).toContain("report ");
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+
   test("--json mode still warns about an unmonitored budget on stderr", async () => {
     const project = evalProject();
     await buildFixtureOutputs(project);
@@ -571,5 +613,60 @@ describe("runEvalCommand", () => {
     const exit = await runEvalCommand(project, {}, undefined, fakeRunner(true));
     expect(exit).toBe(3);
     expect(readdirSync(outside)).toEqual([]);
+  });
+
+  test("progress is dimmed when stderr is an interactive terminal", async () => {
+    const project = evalProject();
+    await buildFixtureOutputs(project);
+    const previousNoColor = process.env.NO_COLOR;
+    delete process.env.NO_COLOR;
+    // Force the TTY branch of the styler regardless of how the tests run.
+    const stderr = process.stderr as unknown as { isTTY?: boolean };
+    const previousIsTTY = stderr.isTTY;
+    Object.defineProperty(stderr, "isTTY", {
+      value: true,
+      configurable: true,
+      writable: true,
+    });
+    const errors: string[] = [];
+    const errorSpy = spyOn(console, "error").mockImplementation(
+      (...parts: unknown[]) => {
+        errors.push(parts.join(" "));
+      },
+    );
+    try {
+      const exit = await runEvalCommand(
+        project,
+        { trials: "1" },
+        undefined,
+        fakeRunner(true),
+      );
+      expect(exit).toBe(0);
+      expect(errors).toContain(`${"\x1b[2m"}== cli-happy${"\x1b[22m"}`);
+    } finally {
+      errorSpy.mockRestore();
+      if (previousNoColor === undefined) delete process.env.NO_COLOR;
+      else process.env.NO_COLOR = previousNoColor;
+      if (previousIsTTY === undefined) delete stderr.isTTY;
+      else stderr.isTTY = previousIsTTY;
+    }
+  });
+});
+
+describe("createProgressStyler", () => {
+  test("dims lines on an interactive stderr", () => {
+    const style = createProgressStyler({ isTTY: true }, {});
+    expect(style("== cli-happy")).toBe("\x1b[2m== cli-happy\x1b[22m");
+  });
+
+  test("keeps plain text for piped stderr and for NO_COLOR", () => {
+    expect(createProgressStyler({ isTTY: false }, {})("== s")).toBe("== s");
+    expect(
+      createProgressStyler({ isTTY: true }, { NO_COLOR: "1" })("== s"),
+    ).toBe("== s");
+    // An empty NO_COLOR value does not opt out (no-color.org).
+    expect(
+      createProgressStyler({ isTTY: true }, { NO_COLOR: "" })("== s"),
+    ).toBe("\x1b[2m== s\x1b[22m");
   });
 });

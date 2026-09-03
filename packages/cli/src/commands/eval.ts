@@ -85,6 +85,7 @@ export async function runEvalCommand(
   }
   let report: RunReport;
   const progressLine = createProgressRenderer();
+  const styleProgress = createProgressStyler();
   try {
     report = await runEval({
       projectRoot: prepared.projectRoot,
@@ -100,7 +101,7 @@ export async function runEvalCommand(
       // Live progress goes to stderr in both output modes; stdout stays
       // reserved for the summary (or the pure JSON report with `--json`).
       onProgress: (progress) => {
-        console.error(progressLine(progress));
+        console.error(styleProgress(progressLine(progress)));
       },
     });
   } catch (cause) {
@@ -471,6 +472,27 @@ function createProgressRenderer(): (progress: EvalProgress) => string {
   };
 }
 
+const PROGRESS_DIM = "\x1b[2m";
+const PROGRESS_RESET = "\x1b[22m";
+
+/**
+ * Dims progress lines on an interactive stderr so live output does not read
+ * like an error; piped stderr and `NO_COLOR` get plain text.
+ */
+export function createProgressStyler(
+  stream: { isTTY?: boolean } = process.stderr,
+  env: NodeJS.ProcessEnv = process.env,
+): (line: string) => string {
+  if (env.NO_COLOR || !stream.isTTY) return (line) => line;
+  return (line) => `${PROGRESS_DIM}${line}${PROGRESS_RESET}`;
+}
+
+/**
+ * End-of-run recap on stdout. Per-trial verdicts already streamed live to
+ * stderr, so the summary repeats only what the logs do not carry: run id,
+ * host identity, warnings, per-scenario aggregate statistics, and the report
+ * location.
+ */
 function printSummary(report: RunReport, reportDir: string): void {
   console.log(`eval ${report.runId}`);
   console.log(
@@ -487,19 +509,6 @@ function printSummary(report: RunReport, reportDir: string): void {
     console.log(
       `${name}: pass ${Math.round(result.passRate * 100)}% · mean ${formatMs(result.meanDurationMs)} · p95 ${formatMs(result.spread.durationP95Ms)}`,
     );
-    for (const trial of result.trials) {
-      const detail = formatTrialDetail(trial);
-      console.log(
-        `  trial ${trial.i}: ${trial.verdict}${detail ? ` (${detail})` : ""}`,
-      );
-      for (const check of trial.checks ?? []) {
-        if (check.verdict !== "pass") {
-          console.log(
-            `    check ${check.index} (${check.type}): ${check.verdict}`,
-          );
-        }
-      }
-    }
   }
   console.log("");
   console.log(`report ${diagnosticPath(join(reportDir, "report.json"))}`);

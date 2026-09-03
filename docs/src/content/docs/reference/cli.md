@@ -170,8 +170,14 @@ cli-happy: 1/1 trials passed
 ```
 
 stdout stays reserved for the final summary (or, with `--json`, the report
-JSON); progress always goes to stderr, in both modes. Redirect stderr
-(`2>/dev/null`) to silence it.
+JSON); progress always goes to stderr, in both modes, so the same trials are
+never printed twice. The summary repeats only what the live lines do not
+carry: run id, host and model, the budget warning when present,
+per-scenario aggregate statistics (pass rate, mean, p95), and the report
+location. On an interactive terminal the progress
+lines render dim so they do not read like errors; set `NO_COLOR` or pipe
+stderr to get plain text. Redirect stderr (`2>/dev/null`) to silence
+progress entirely.
 
 ### Configuration
 
