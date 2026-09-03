@@ -3,17 +3,15 @@ import { dirname, join } from "node:path";
 import type { Plugin } from "@opencode-ai/plugin";
 
 const MODEL_FILE = ".opencode/models.json";
-const DEFAULT_MODEL = "opencode/x-preview-f-free";
+const DEFAULT_MODEL = "zai-coding-plan/glm-5.3-flash";
 const ROLES = ["architect", "general", "explore"] as const;
 
 type Role = (typeof ROLES)[number];
 type RoleOverrides = { model?: string; reasoningEffort?: string };
 type Overrides = Partial<Record<Role, RoleOverrides>>;
 
-const STARTER_DEFAULTS: Record<Role, RoleOverrides> = {
+const STARTER_DEFAULTS: Overrides = {
   architect: { model: DEFAULT_MODEL, reasoningEffort: "xhigh" },
-  general: { model: DEFAULT_MODEL, reasoningEffort: "max" },
-  explore: { model: DEFAULT_MODEL, reasoningEffort: "max" },
 };
 const DEFAULT_FILE = `${JSON.stringify(STARTER_DEFAULTS, null, 2)}\n`;
 const MODEL_ID = /^[^/\s]+\/\S+$/;

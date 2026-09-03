@@ -25,15 +25,23 @@ rejected:
 ```json
 {
   "architect": {
-    "model": "opencode/x-preview-f-free",
+    "model": "zai-coding-plan/glm-5.3-flash",
     "reasoningEffort": "xhigh"
-  },
+  }
+}
+```
+
+To override OpenCode's default sub-agents, add `general` and/or `explore`
+entries when you want them:
+
+```json
+{
   "general": {
-    "model": "opencode/x-preview-f-free",
+    "model": "zai-coding-plan/glm-5.3-flash",
     "reasoningEffort": "max"
   },
   "explore": {
-    "model": "opencode/x-preview-f-free",
+    "model": "zai-coding-plan/glm-5.3-flash",
     "reasoningEffort": "max"
   }
 }
@@ -42,9 +50,12 @@ rejected:
 ## Behavior
 
 - **Generated defaults**: if the file is missing, the plugin creates it with the
-  exact starter above — `opencode/x-preview-f-free` for every role, with
-  `reasoningEffort` `xhigh` for `architect` and `max` for `general`/`explore` —
-  and applies it for the current startup.
+  exact starter above — `zai-coding-plan/glm-5.3-flash` for `architect`, with
+  `reasoningEffort` `xhigh` — and applies it for the current startup. The
+  `general` and `explore` entries are intentionally omitted so OpenCode's
+  default sub-agents remain in control until explicitly configured.
+- **Optional sub-agents**: add `general` and/or `explore` entries to override
+  those default OpenCode sub-agents with a model, reasoning effort, or both.
 - **Partial fallback**: each role and each field is optional; omitted roles and
   omitted fields preserve their values from the merged OpenCode configuration.
 - **Fail-before-mutation validation**: malformed JSON, unknown roles or fields,
