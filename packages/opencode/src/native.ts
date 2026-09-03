@@ -442,6 +442,15 @@ function sha256(value: Uint8Array): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
+function compareCodeUnits(left: string, right: string): number {
+  const length = Math.min(left.length, right.length);
+  for (let index = 0; index < length; index++) {
+    const difference = left.charCodeAt(index) - right.charCodeAt(index);
+    if (difference !== 0) return difference;
+  }
+  return left.length - right.length;
+}
+
 function utf8(value: string): Uint8Array {
   return new TextEncoder().encode(value);
 }
@@ -499,7 +508,7 @@ function desiredFiles(
     }),
   ];
   return files.sort((left, right) =>
-    left.relativePath.localeCompare(right.relativePath),
+    compareCodeUnits(left.relativePath, right.relativePath),
   );
 }
 
