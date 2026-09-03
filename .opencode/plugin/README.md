@@ -26,7 +26,7 @@ rejected:
 {
   "architect": {
     "model": "zai-coding-plan/glm-5.3-flash",
-    "reasoningEffort": "xhigh"
+    "reasoningEffort": "max"
   }
 }
 ```
@@ -51,7 +51,7 @@ entries when you want them:
 
 - **Generated defaults**: if the file is missing, the plugin creates it with the
   exact starter above — `zai-coding-plan/glm-5.3-flash` for `architect`, with
-  `reasoningEffort` `xhigh` — and applies it for the current startup. The
+  `reasoningEffort` `max` — and applies it for the current startup. The
   `general` and `explore` entries are intentionally omitted so OpenCode's
   default sub-agents remain in control until explicitly configured.
 - **Optional sub-agents**: add `general` and/or `explore` entries to override

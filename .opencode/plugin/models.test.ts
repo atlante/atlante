@@ -45,7 +45,7 @@ test("generates an architect-only Z.ai model override", async () => {
       await readFile(join(directory, ".opencode/models.json"), "utf8"),
     ),
   ).toEqual({
-    architect: { model: MODEL, reasoningEffort: "xhigh" },
+    architect: { model: MODEL, reasoningEffort: "max" },
   });
 
   const config = baseConfig();
@@ -55,8 +55,8 @@ test("generates an architect-only Z.ai model override", async () => {
     architect: {
       mode: "primary",
       model: MODEL,
-      variant: "xhigh",
-      options: { reasoningEffort: "xhigh" },
+      variant: "max",
+      options: { reasoningEffort: "max" },
     },
     general: { model: "opencode/default-general" },
     explore: { model: "opencode/default-explore" },
