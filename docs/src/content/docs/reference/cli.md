@@ -182,7 +182,9 @@ Scenario documents validate against
 [`https://atlante.sh/schema/v0.1/eval-scenario.json`](https://atlante.sh/schema/v0.1/eval-scenario.json).
 Each names a fixture directory copied as the sandbox root, a prompt, and at
 least one check (`command`, `file-exists`, `file-absent`, `file-contains`,
-`file-unchanged`, `diff-allowlist`). Fixtures must not ship host-owned files:
+`file-unchanged`, `diff-allowlist`; the diff scan ignores paths under the
+host-owned `.opencode/` directory, where the host installs runtime artifacts
+during the session). Fixtures must not ship host-owned files:
 a fixture `.opencode` file colliding with a native output fails the trial with
 a rename-or-remove diagnostic, and a fixture `opencode.jsonc` is rejected
 because OpenCode would prefer it over the generated `opencode.json` (which

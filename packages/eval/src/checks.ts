@@ -246,12 +246,20 @@ async function diffAllowlistCheck(
       stderr: outputTail(untracked.stderr),
     });
   }
+  // The host owns `.opencode/` inside the sandbox: verified native outputs
+  // are committed at baseline, and the host installs runtime artifacts
+  // (plugin node_modules, its own .gitignore) into the directory during the
+  // session. Those artifacts are not agent edits, so the diff scan ignores
+  // the directory; tampering with native outputs is a separate concern
+  // covered by verifyNativeOutputs at assembly time.
   const changed = [
     ...new Set([
       ...parseGitNameList(committedOrModified.stdout),
       ...parseGitNameList(untracked.stdout),
     ]),
-  ].sort();
+  ]
+    .filter((path) => !path.startsWith(".opencode/"))
+    .sort();
   const allowSet = new Set(allow);
   const unexpected = changed.filter((path) => !allowSet.has(path));
   return unexpected.length === 0

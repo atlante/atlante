@@ -334,6 +334,47 @@ describe("runChecks", () => {
     expect(result?.evidence.unexpected).toContain("ignored-after.ts");
   });
 
+  test("diff-allowlist: ignores host-owned .opencode artifacts", async () => {
+    const root = mkdtempSync(join(tmpdir(), "eval-diff-host-"));
+    cleanup.push(root);
+    const git = async (argv: string[]) => {
+      await Bun.$`git ${argv}`.cwd(root).quiet();
+    };
+    await git(["init"]);
+    await git(["-c", "user.name=t", "-c", "user.email=t@t", "add", "--all"]);
+    await git([
+      "-c",
+      "user.name=t",
+      "-c",
+      "user.email=t@t",
+      "commit",
+      "--allow-empty",
+      "-m",
+      "base",
+    ]);
+    // OpenCode installs plugin node_modules and its own .gitignore into the
+    // project's .opencode dir during the session; none of that is an edit.
+    mkdirSync(join(root, ".opencode", "node_modules"), { recursive: true });
+    writeFileSync(join(root, ".opencode", ".gitignore"), "node_modules\n");
+    writeFileSync(join(root, ".opencode", "node_modules", "pkg.js"), "x\n");
+    const baseline = (await Bun.$`git rev-parse HEAD`.cwd(root).text()).trim();
+
+    const [hostOnly] = await runChecks(
+      { root, snapshot: [], baseline, keep: false },
+      [{ type: "diff-allowlist", allow: ["allowed.ts"] }],
+    );
+    expect(hostOnly?.verdict).toBe("pass");
+
+    // A real out-of-scope edit next to the host noise is still flagged.
+    writeFileSync(join(root, "sneaky.ts"), "scope creep\n");
+    const [withCreep] = await runChecks(
+      { root, snapshot: [], baseline, keep: false },
+      [{ type: "diff-allowlist", allow: ["allowed.ts"] }],
+    );
+    expect(withCreep?.verdict).toBe("fail");
+    expect(withCreep?.evidence.unexpected).toEqual(["sneaky.ts"]);
+  });
+
   test("diff-allowlist: preserves special-character paths", async () => {
     const root = mkdtempSync(join(tmpdir(), "eval-diff-special-"));
     cleanup.push(root);
