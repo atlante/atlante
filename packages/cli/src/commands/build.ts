@@ -1,6 +1,6 @@
 import type { ProjectContext } from "@atlante/builder";
 import { buildProject } from "@atlante/builder";
-import { openCodeMaterializer } from "@atlante/opencode/materialize";
+import { openCodeMaterializer } from "@atlante/opencode";
 import type { ResourceWatchContext } from "@atlante/validator";
 import { firstPartyProjectContext } from "../first-party-pack.js";
 import {

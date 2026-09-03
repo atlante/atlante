@@ -76,14 +76,9 @@ files, host configuration, dependency mutation, and the initial build:
   reconciled). If that reconciliation fails, `init` reports `rollback-failed`
   with manual instructions.
 
-`init` creates or updates `opencode.jsonc` (reusing an existing `opencode.json` when present) while preserving existing settings.
+`init` creates or updates `opencode.jsonc` (reusing an existing `opencode.json` when present) while preserving existing settings; a leftover Atlante-written `@atlante/opencode` plugin registration is removed.
 
-The OpenCode adapter is an artifact-only boundary: it never reads the source
-configuration or installed packs. The artifact format and its verification rules
-are documented in
-[`SPECIFICATION.md`](../../SPECIFICATION.md) §9.1; the fail-closed
-`readArtifacts` reader contract is in
-[`@atlante/artifacts`'s README](../artifacts/README.md#reading-artifacts). Artifact
-format/version is distinct from the document schema version. Artifacts contain
-rendered values and may be sensitive; keep `.atlante/` local and do not publish
-it.
+`build` materializes host-native outputs through the OpenCode adapter: agents
+and skills are written as native host files plus an ownership manifest under
+`.atlante/`. Rendered values may be sensitive; generated outputs stay local
+and are not published.

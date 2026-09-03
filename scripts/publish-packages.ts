@@ -6,7 +6,8 @@ import { withStagedPublishManifest } from "./publish-manifest.js";
 
 const ROOT = join(import.meta.dir, "..");
 // The static pack must be published before the CLI that depends on it. The
-// OpenCode adapter remains the final public package and consumes artifacts only.
+// OpenCode adapter remains the final public package: it ships the build-time
+// native materializer for the host.
 const PACKAGES = ["pack", "cli", "opencode"] as const;
 
 function parseArgs() {
@@ -46,19 +47,14 @@ const REQUIRED_FILES: Record<(typeof PACKAGES)[number], string[]> = {
     "architect/instance.jsonc",
   ],
   cli: ["dist/bin/atlante.js"],
-  opencode: [
-    "dist/index.js",
-    "dist/api.js",
-    "dist/index.d.ts",
-    "dist/api.d.ts",
-  ],
+  opencode: ["dist/index.js", "dist/index.d.ts"],
 };
 
 // Static, offline bundle inspection: follow every relative runtime import
-// reachable from the plugin entry JS files and require each target to exist
-// under dist. Bare specifiers (node builtins, the external @opencode-ai/plugin
-// peer) are skipped; only files inside dist are followed, so nothing outside
-// dist is read and no plugin behavior is invoked.
+// reachable from the adapter entry JS files and require each target to exist
+// under dist. Bare specifiers (node builtins) are skipped; only files inside
+// dist are followed, so nothing outside dist is read and no adapter behavior
+// is invoked.
 const RELATIVE_IMPORT_RE =
   /(?:from\s+|import\s*\(\s*|require\s*\()\s*["'](\.[^"']+)["']/g;
 
@@ -78,7 +74,7 @@ async function pluginImportIssues(
   const issues: string[] = [];
   const distDir = join(dir, "dist");
   const seen = new Set<string>();
-  const queue = ["dist/index.js", "dist/api.js"]
+  const queue = ["dist/index.js"]
     .map((entry) => join(dir, entry))
     .filter((path) => existsSync(path));
 

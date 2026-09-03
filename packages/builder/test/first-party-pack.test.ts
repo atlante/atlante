@@ -9,7 +9,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { openCodeMaterializer } from "@atlante/opencode/materialize";
+import { openCodeMaterializer } from "@atlante/opencode";
 import { SCHEMA_URI } from "@atlante/schema";
 import { buildProject } from "../src/index.js";
 

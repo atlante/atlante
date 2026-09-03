@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildProject, loadProject, prepareProject } from "@atlante/builder";
-import { openCodeMaterializer } from "@atlante/opencode/materialize";
+import { openCodeMaterializer } from "@atlante/opencode";
 import { createProjectResourcePack, loadPresetFacet } from "@atlante/resources";
 import { SCHEMA_URI } from "@atlante/schema";
 import { validateDocumentText } from "@atlante/validator";

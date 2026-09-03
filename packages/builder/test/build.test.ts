@@ -16,7 +16,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { openCodeMaterializer } from "@atlante/opencode/materialize";
+import { openCodeMaterializer } from "@atlante/opencode";
 import { resourceTemplateSelection } from "@atlante/resources";
 import { SCHEMA_URI } from "@atlante/schema";
 import type { Diagnostic } from "@atlante/validator";
@@ -302,8 +302,7 @@ function injectedFailure(code: string, message: string): Diagnostic[] {
 }
 
 // ---------------------------------------------------------------------------
-// Handcrafted legacy `.atlante/artifacts` fixtures. They deliberately avoid
-// @atlante/artifacts helpers so the superseded package stays removable.
+// Handcrafted legacy `.atlante/artifacts` fixtures for the migration path.
 // ---------------------------------------------------------------------------
 
 function legacySlug(id: string): string {

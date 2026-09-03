@@ -36,22 +36,6 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
-    },
-    "./api": {
-      "types": "./dist/api.d.ts",
-      "default": "./dist/api.js"
-    },
-    "./materialize": {
-      "types": "./src/materialize.ts",
-      "default": "./src/materialize.ts"
-    },
-    "./server": "./dist/index.js"
-  },
-  "peerDependencies": {
-    "@opencode-ai/plugin": "^1.18.4"
-  },
-  "devDependencies": {
-    "@atlante/artifacts": "workspace:*",
-    "@opencode-ai/plugin": "^1.18.4"
+    }
   }
 }

@@ -16,7 +16,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { BuildResult } from "@atlante/builder";
 import { buildProject } from "@atlante/builder";
-import { openCodeMaterializer } from "@atlante/opencode/materialize";
+import { openCodeMaterializer } from "@atlante/opencode";
 import { SCHEMA_URI } from "@atlante/schema";
 import {
   type InitDependencies,

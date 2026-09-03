@@ -13,7 +13,7 @@ import {
   buildProject as buildProjectDefault,
   type ProjectContext,
 } from "@atlante/builder";
-import { openCodeMaterializer } from "@atlante/opencode/materialize";
+import { openCodeMaterializer } from "@atlante/opencode";
 import {
   createPackageResourcePack,
   isPackageDeclared,
