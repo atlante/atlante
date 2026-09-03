@@ -59,6 +59,17 @@ export type OpenCodeOwnershipManifest = Readonly<{
   files: readonly OpenCodeOwnedFile[];
 }>;
 
+/** One verified native output returned to local consumers such as eval. */
+export type OpenCodeNativeFile = Readonly<
+  OpenCodeOwnedFile & { bytes: Uint8Array }
+>;
+
+/** The manifest and its verified native output files. */
+export type OpenCodeNativeProject = Readonly<{
+  manifest: OpenCodeOwnershipManifest;
+  files: readonly OpenCodeNativeFile[];
+}>;
+
 export type OpenCodeMaterializationOperation =
   | "ensure-metadata"
   | "create-stage"
@@ -631,6 +642,28 @@ function readPreviousManifest(root: string): PreviousManifest {
   };
 }
 
+function readVerifiedNativeFile(
+  root: string,
+  entry: OpenCodeOwnedFile,
+): OpenCodeNativeFile {
+  validateParentDirectories(root, entry.path);
+  const snapshot = readSnapshot(root, entry.path);
+  if (!snapshot.exists || !snapshot.bytes) {
+    throw invalidManifest(
+      `owned OpenCode target is missing: ${entry.path}`,
+      snapshot.absolutePath,
+    );
+  }
+  if (sha256(snapshot.bytes) !== entry.sha256) {
+    throw new OpenCodeMaterializationError(
+      `owned OpenCode target drifted: ${entry.path}`,
+      "drift",
+      snapshot.absolutePath,
+    );
+  }
+  return { ...entry, bytes: new Uint8Array(snapshot.bytes) };
+}
+
 function trigger(
   dependencies: OpenCodeMaterializerDependencies,
   operation: OpenCodeMaterializationOperation,
@@ -1138,4 +1171,26 @@ export function materializeOpenCode(
     planMaterialization(projectRoot, preparedProject),
     dependencies,
   );
+}
+
+/**
+ * Reads the native outputs produced by a previous materialization after
+ * validating their ownership manifest and content digests.
+ */
+export function readOpenCodeNative(projectRoot: string): OpenCodeNativeProject {
+  const root = assertProjectRoot(projectRoot);
+  validateParentDirectories(root, MANIFEST_PATH);
+  const previous = readPreviousManifest(root);
+  if (!previous.manifest) {
+    throw invalidManifest(
+      "OpenCode ownership manifest is missing",
+      absolutePath(root, MANIFEST_PATH),
+    );
+  }
+  return {
+    manifest: previous.manifest,
+    files: previous.manifest.files.map((entry) =>
+      readVerifiedNativeFile(root, entry),
+    ),
+  };
 }

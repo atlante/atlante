@@ -17,6 +17,7 @@ import {
   OpenCodeMaterializationError,
   type OpenCodeOwnershipManifest,
   type OpenCodePreparedProject,
+  readOpenCodeNative,
 } from "../src/native.js";
 
 const created: string[] = [];
@@ -88,6 +89,23 @@ function nativeBytes(root: string): Array<{ path: string; bytes: Buffer }> {
     }));
 }
 
+function expectMaterializationError(
+  action: () => unknown,
+  code: OpenCodeMaterializationError["code"],
+  path: string,
+): void {
+  try {
+    action();
+    throw new Error("expected OpenCode materialization to fail");
+  } catch (cause) {
+    expect(cause).toBeInstanceOf(OpenCodeMaterializationError);
+    if (cause instanceof OpenCodeMaterializationError) {
+      expect(cause.code).toBe(code);
+      expect(cause.path).toBe(path);
+    }
+  }
+}
+
 describe("materializeOpenCode", () => {
   test("writes deterministic native files and a payload-free manifest", () => {
     const root = project();
@@ -146,6 +164,64 @@ describe("materializeOpenCode", () => {
     expect(second.writtenPaths).toEqual([]);
     expect(second.removedPaths).toEqual([]);
     expect(nativeBytes(root)).toEqual(before);
+  });
+
+  test("reads and verifies the materialized native files", () => {
+    const root = project();
+    materializeOpenCode(root, preparedWithSkill());
+
+    const native = readOpenCodeNative(root);
+
+    expect(native.manifest.format).toBe("atlante-opencode-native");
+    expect(native.files.map(({ path }) => path)).toEqual([
+      ".opencode/agents/reviewer.md",
+      ".opencode/skills/testing/SKILL.md",
+    ]);
+    expect(new TextDecoder().decode(native.files[0]?.bytes)).toContain(
+      "Review the change.",
+    );
+  });
+
+  test("rejects a drifted native file", () => {
+    const root = project();
+    materializeOpenCode(root, prepared());
+    const target = join(root, ".opencode", "agents", "reviewer.md");
+    writeFileSync(target, "drifted\n");
+
+    expectMaterializationError(() => readOpenCodeNative(root), "drift", target);
+  });
+
+  test("rejects a missing manifest or native file", () => {
+    const empty = project();
+    expectMaterializationError(
+      () => readOpenCodeNative(empty),
+      "invalid-manifest",
+      join(empty, ".atlante", "opencode-native.json"),
+    );
+
+    const root = project();
+    materializeOpenCode(root, prepared());
+    rmSync(join(root, ".opencode", "agents", "reviewer.md"));
+    expectMaterializationError(
+      () => readOpenCodeNative(root),
+      "invalid-manifest",
+      join(root, ".opencode", "agents", "reviewer.md"),
+    );
+  });
+
+  test("rejects a symlinked native parent before reading its target", () => {
+    const root = project();
+    materializeOpenCode(root, prepared());
+    const agents = join(root, ".opencode", "agents");
+    const outside = project();
+    rmSync(agents, { recursive: true, force: true });
+    symlinkSync(outside, agents, "dir");
+
+    expectMaterializationError(
+      () => readOpenCodeNative(root),
+      "unsafe-path",
+      agents,
+    );
   });
 
   test("updates owned files, removes stale files, and preserves unrelated files", () => {
