@@ -37,7 +37,7 @@ export function createProgram(): Command {
     .command("build")
     .argument("[path]", "config file or project directory", process.cwd())
     .option("--watch", "rebuild on changes to config and selected resources")
-    .description("build host-independent Atlante artifacts")
+    .description("build host-native Atlante outputs")
     .action((path: string, options: { watch?: boolean }) => {
       if (options.watch) {
         // Fire-and-forget: watch manages its own lifetime via SIGINT.
@@ -79,7 +79,7 @@ export function createProgram(): Command {
     )
     .option("--keep", "keep trial sandboxes for inspection")
     .description(
-      "run eval scenarios against verified artifacts in isolated sandboxes",
+      "run eval scenarios against verified native outputs in isolated sandboxes",
     )
     .action(async (path: string, options: EvalCommandOptions) => {
       process.exitCode = await runEvalCommand(path, options);

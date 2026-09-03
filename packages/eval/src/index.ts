@@ -25,12 +25,12 @@ export type {
 export { EvalRunError, runEval } from "./runner.js";
 export type { Sandbox, SnapshotEntry } from "./sandbox.js";
 export {
-  ArtifactsNotVerifiedError,
   assembleSandbox,
   createRunRoot,
   destroyRunRoot,
   destroySandbox,
-  verifyArtifacts,
+  NativeOutputsNotVerifiedError,
+  verifyNativeOutputs,
 } from "./sandbox.js";
 export type { CommandOutcome } from "./spawn.js";
 export { killTree, runCommand } from "./spawn.js";

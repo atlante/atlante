@@ -16,7 +16,7 @@ import {
   resolveBudget,
   runEval,
   runExitCode,
-  verifyArtifacts,
+  verifyNativeOutputs,
 } from "@atlante/eval";
 import type { EvalConfig } from "@atlante/schema";
 import { EVAL_MAX_TRIALS } from "@atlante/schema";
@@ -44,12 +44,12 @@ export type EvalCommandOptions = {
 };
 
 /**
- * Runs eval scenarios against the project's verified artifacts. `atlante eval`
- * never builds: artifacts must already be published and verified, missing or
- * stale ones are a validation failure with `atlante build` as the recovery
- * action. Exit codes: 0 all trials pass, 1 any trial failed, was skipped, or
- * hit a trial-level infrastructure error, 2 validation errors, 3 a
- * run-preventing infrastructure error.
+ * Runs eval scenarios against the project's verified native outputs. `atlante
+ * eval` never builds: outputs must already be materialized and verified,
+ * missing or stale ones are a validation failure with `atlante build` as the
+ * recovery action. Exit codes: 0 all trials pass, 1 any trial failed, was
+ * skipped, or hit a trial-level infrastructure error, 2 validation errors, 3
+ * a run-preventing infrastructure error.
  */
 export async function runEvalCommand(
   target: string,
@@ -170,15 +170,15 @@ function prepareEval(
   if (scenarios === null) return 2;
 
   try {
-    verifyArtifacts(loaded.projectRoot);
+    verifyNativeOutputs(loaded.projectRoot);
   } catch (cause) {
     printDiagnostics([
       error(
-        "artifacts-not-verified",
+        "native-outputs-not-verified",
         cause instanceof Error ? cause.message : String(cause),
         {
           source: diagnosticPath(join(loaded.projectRoot, ".atlante")),
-          expected: "a verified artifact publication",
+          expected: "verified native OpenCode outputs",
           next: "run `atlante build` and try again",
         },
       ),

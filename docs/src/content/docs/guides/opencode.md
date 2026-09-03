@@ -18,8 +18,8 @@ in a project that has not been re-initialized is inert: OpenCode silently
 drops packages that expose no plugin target.
 
 ## Build the native files
-The optional `atlante eval` command resolves the adapter from the project's
-dependency tree before starting a sandboxed run.
+The optional `atlante eval` command reads the verified native outputs the build
+materialized; the project needs no `@atlante/opencode` dependency.
 
 Run validation and build from the project directory:
 

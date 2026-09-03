@@ -29,7 +29,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@atlante/artifacts": "workspace:*",
+    "@atlante/opencode": "workspace:*",
     "@atlante/schema": "workspace:*",
     "@atlante/validator": "workspace:*"
   }

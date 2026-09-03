@@ -2,21 +2,17 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { cpSync, existsSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-  createArtifacts,
-  publishArtifacts,
-  readArtifacts,
-} from "@atlante/artifacts";
+import { materializeOpenCode } from "@atlante/opencode";
 import { discoverEvalScenarios } from "@atlante/validator";
 import {
-  ArtifactsNotVerifiedError,
   assembleSandbox,
   createRunRoot,
   destroyRunRoot,
   destroySandbox,
+  NativeOutputsNotVerifiedError,
   resolveBudget,
   runCommand,
-  verifyArtifacts,
+  verifyNativeOutputs,
 } from "../src/index.js";
 
 const fixtureProject = join(import.meta.dir, "fixtures", "project");
@@ -27,8 +23,7 @@ let runRoot: string;
 beforeAll(() => {
   projectRoot = mkdtempSync(join(tmpdir(), "eval-sandbox-project-"));
   cpSync(fixtureProject, projectRoot, { recursive: true });
-  // Publish a minimal but fully verified artifact publication.
-  const created = createArtifacts({
+  materializeOpenCode(projectRoot, {
     agents: [
       {
         hostAgentId: "build",
@@ -38,9 +33,7 @@ beforeAll(() => {
     ],
     skills: [],
   });
-  publishArtifacts(projectRoot, created);
-  verifyArtifacts(projectRoot);
-  expect(readArtifacts(projectRoot)?.agents).toHaveLength(1);
+  expect(verifyNativeOutputs(projectRoot).files).toHaveLength(1);
   runRoot = createRunRoot();
 });
 
@@ -73,7 +66,7 @@ function discoverHappyScenario() {
 }
 
 describe("assembleSandbox", () => {
-  test("assembles fixture, artifacts, snapshot, setup, and git baseline", async () => {
+  test("assembles fixture, native outputs, snapshot, setup, and git baseline", async () => {
     const discovered = discoverHappyScenario();
     const budget = resolveBudget({ evalConfig: undefined });
     const sandbox = await assembleSandbox(
@@ -90,7 +83,7 @@ describe("assembleSandbox", () => {
 
     expect(existsSync(join(sandbox.root, "src", "index.ts"))).toBe(true);
     expect(
-      existsSync(join(sandbox.root, ".atlante", "artifacts", "manifest.json")),
+      existsSync(join(sandbox.root, ".opencode", "agents", "build.md")),
     ).toBe(true);
     // Setup ran after the fixture copy and before the snapshot.
     expect(existsSync(join(sandbox.root, "setup-ran.txt"))).toBe(true);
@@ -162,20 +155,42 @@ describe("assembleSandbox", () => {
     }
   });
 
-  test("rejects symlinks in the artifact tree before copying", async () => {
-    const outside = mkdtempSync(join(tmpdir(), "eval-artifact-outside-"));
-    const link = join(projectRoot, ".atlante", "artifacts", "escape");
-    symlinkSync(outside, link, "dir");
-    const base = discoverHappyScenario();
+  test("rejects symlinked native output parents before copying", async () => {
+    const maliciousProject = mkdtempSync(
+      join(tmpdir(), "eval-native-output-project-"),
+    );
+    cpSync(fixtureProject, maliciousProject, { recursive: true });
+    materializeOpenCode(maliciousProject, {
+      agents: [
+        {
+          hostAgentId: "build",
+          description: "Build agent",
+          prompt: "You are a build agent.",
+        },
+      ],
+      skills: [],
+    });
+    const outside = mkdtempSync(join(tmpdir(), "eval-native-output-outside-"));
+    const parent = join(maliciousProject, ".opencode", "agents");
+    rmSync(parent, { recursive: true, force: true });
+    symlinkSync(outside, parent, "dir");
+    const base = discoverEvalScenarios(
+      maliciousProject,
+      "eval/scenarios/*.eval.json",
+    ).scenarios.at(0);
+    if (!base) throw new Error("fixture scenario not discovered");
     try {
       await expect(
         assembleSandbox(
           {
             runRoot,
-            projectRoot,
+            projectRoot: maliciousProject,
             scenario: {
               ...base,
-              scenario: { ...base.scenario, name: "symlinked-artifacts" },
+              scenario: {
+                ...base.scenario,
+                name: "symlinked-native-output",
+              },
             },
             trialIndex: 4,
             budget: resolveBudget({ evalConfig: undefined }),
@@ -183,9 +198,9 @@ describe("assembleSandbox", () => {
           },
           () => {},
         ),
-      ).rejects.toThrow(/artifact.*symbolic link/);
+      ).rejects.toThrow(/native output verification failed:.*symlink/);
     } finally {
-      rmSync(link, { force: true });
+      rmSync(maliciousProject, { recursive: true, force: true });
       rmSync(outside, { recursive: true, force: true });
     }
   });
@@ -257,11 +272,13 @@ describe("assembleSandbox", () => {
   });
 });
 
-describe("verifyArtifacts", () => {
+describe("verifyNativeOutputs", () => {
   test("fails closed when the publication is missing", () => {
     const empty = mkdtempSync(join(tmpdir(), "eval-empty-project-"));
     try {
-      expect(() => verifyArtifacts(empty)).toThrow(ArtifactsNotVerifiedError);
+      expect(() => verifyNativeOutputs(empty)).toThrow(
+        NativeOutputsNotVerifiedError,
+      );
     } finally {
       rmSync(empty, { recursive: true, force: true });
     }

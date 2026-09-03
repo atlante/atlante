@@ -11,7 +11,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createArtifacts, publishArtifacts } from "@atlante/artifacts";
+import { materializeOpenCode } from "@atlante/opencode";
 import {
   createOpenCodeRunner,
   extractModelIdentifiers,
@@ -42,33 +42,16 @@ function writeStub(dir: string, script: string): string {
 beforeAll(() => {
   projectRoot = tempDir("eval-host-project-");
   cpSync(fixtureProject, projectRoot, { recursive: true });
-  publishArtifacts(
-    projectRoot,
-    createArtifacts({
-      agents: [
-        {
-          hostAgentId: "build",
-          description: "Build agent",
-          prompt: "You are a build agent.",
-        },
-      ],
-      skills: [],
-    }),
-  );
-  // Make @atlante/opencode resolvable from the temp project with a minimal
-  // package fixture. This keeps the unit test independent of generated
-  // packages/opencode/dist output, which is only created by the build step.
-  const linkDir = join(projectRoot, "node_modules", "@atlante", "opencode");
-  mkdirSync(join(linkDir, "dist"), { recursive: true });
-  writeFileSync(
-    join(linkDir, "package.json"),
-    `${JSON.stringify({
-      name: "@atlante/opencode",
-      version: "0.0.0-test",
-      exports: { ".": "./dist/index.js" },
-    })}\n`,
-  );
-  writeFileSync(join(linkDir, "dist", "index.js"), "export default {};\n");
+  materializeOpenCode(projectRoot, {
+    agents: [
+      {
+        hostAgentId: "build",
+        description: "Build agent",
+        prompt: "You are a build agent.",
+      },
+    ],
+    skills: [],
+  });
 
   authFile = join(tempDir("eval-host-auth-"), "auth.json");
   writeFileSync(authFile, '{"github":{"type":"token"}}');
@@ -89,12 +72,11 @@ function sandboxFor(sandboxProject: string, state: string) {
 }
 
 describe("prepareHostIntegration", () => {
-  test("rewrites the plugin to an absolute path and merges the baseline", () => {
+  test("merges native agents and the permission baseline", () => {
     writeFileSync(
       join(projectRoot, "opencode.json"),
       JSON.stringify({
         $schema: "https://opencode.ai/config.json",
-        plugin: ["@atlante/opencode"],
         agent: {
           build: { permission: { edit: "deny" } },
         },
@@ -112,10 +94,7 @@ describe("prepareHostIntegration", () => {
       readFileSync(join(project, "opencode.json"), "utf8"),
     );
     expect(written.$schema).toBe("https://opencode.ai/config.json");
-    expect(written.plugin[0]).not.toBe("@atlante/opencode");
-    expect(existsSync(join(String(written.plugin[0]), "package.json"))).toBe(
-      true,
-    );
+    expect(written.plugin).toBeUndefined();
     // The agent's own policy survives unless it is a forced containment key.
     expect(written.agent.build.permission.edit).toBe("deny");
     // Forced denials are always present.
@@ -126,7 +105,7 @@ describe("prepareHostIntegration", () => {
     expect(
       Object.keys(written.agent.build.permission.bash).slice(0, 3),
     ).toEqual(["rm -rf *", "rm -fr *", "sudo *"]);
-    // The artifact agent and the default agent both get blocks.
+    // The native agent and the default agent both get blocks.
     expect(written.agent.build).toBeDefined();
     // Auth injected into the redirected data dir.
     expect(existsSync(join(state, "data", "opencode", "auth.json"))).toBe(true);
@@ -134,7 +113,7 @@ describe("prepareHostIntegration", () => {
 
   test("serializes a __proto__ agent id as an own agent entry", () => {
     const config = join(projectRoot, "opencode.json");
-    writeFileSync(config, JSON.stringify({ plugin: ["@atlante/opencode"] }));
+    writeFileSync(config, JSON.stringify({}));
     try {
       const runner = createOpenCodeRunner({
         projectRoot,
@@ -160,7 +139,7 @@ describe("prepareHostIntegration", () => {
     }
   });
 
-  test("fails with install guidance when the plugin cannot resolve", () => {
+  test("fails closed when native outputs are unavailable", () => {
     const emptyRoot = tempDir("eval-host-empty-");
     const runner = createOpenCodeRunner({
       projectRoot: emptyRoot,
@@ -172,14 +151,14 @@ describe("prepareHostIntegration", () => {
         sandboxFor(project, tempDir("eval-sandbox-nost-")),
         {},
       ),
-    ).toThrow(/@atlante\/opencode/);
+    ).toThrow(/ownership manifest is missing/);
   });
 
   test("fails closed when host auth is missing", () => {
     // Own config: this test must not depend on config left behind by an
     // earlier test in the file.
     const config = join(projectRoot, "opencode.json");
-    writeFileSync(config, JSON.stringify({ plugin: ["@atlante/opencode"] }));
+    writeFileSync(config, JSON.stringify({}));
     try {
       const runner = createOpenCodeRunner({
         projectRoot,
@@ -219,146 +198,15 @@ describe("prepareHostIntegration", () => {
     }
   });
 
-  test("fails closed when the adapter is not registered", () => {
-    const config = join(projectRoot, "opencode.json");
-    writeFileSync(config, JSON.stringify({ plugin: [] }));
-    try {
-      const runner = createOpenCodeRunner({
-        projectRoot,
-        authPath: authFile,
-      });
-      expect(() =>
-        runner.prepareHostIntegration(
-          sandboxFor(
-            tempDir("eval-sandbox-no-plugin-"),
-            tempDir("eval-state-no-plugin-"),
-          ),
-          {},
-        ),
-      ).toThrow(/plugin.*@atlante\/opencode/);
-    } finally {
-      rmSync(config, { force: true });
-    }
-  });
-
-  test.each([
-    ["missing options", ["other-plugin"]],
-    ["null options", ["other-plugin", null]],
-    ["non-object options", ["other-plugin", true]],
-    ["extra tuple items", ["other-plugin", {}, "extra"]],
-    ["object entry", { name: "other-plugin" }],
-  ] as const)("rejects malformed plugin entries: %s", (_kind, malformed) => {
-    const config = join(projectRoot, "opencode.json");
-    writeFileSync(
-      config,
-      JSON.stringify({ plugin: ["@atlante/opencode", malformed] }),
-    );
-    try {
-      const runner = createOpenCodeRunner({
-        projectRoot,
-        authPath: authFile,
-      });
-      expect(() =>
-        runner.prepareHostIntegration(
-          sandboxFor(
-            tempDir("eval-sandbox-malformed-plugin-"),
-            tempDir("eval-state-malformed-plugin-"),
-          ),
-          {},
-        ),
-      ).toThrow(/plugin.*array.*tuples/);
-    } finally {
-      rmSync(config, { force: true });
-    }
-  });
-
-  test("rejects an explicit null plugin field", () => {
-    const config = join(projectRoot, "opencode.json");
-    writeFileSync(config, JSON.stringify({ plugin: null }));
-    try {
-      const runner = createOpenCodeRunner({
-        projectRoot,
-        authPath: authFile,
-      });
-      expect(() =>
-        runner.prepareHostIntegration(
-          sandboxFor(
-            tempDir("eval-sandbox-null-plugin-"),
-            tempDir("eval-state-null-plugin-"),
-          ),
-          {},
-        ),
-      ).toThrow(/plugin.*array.*tuples/);
-    } finally {
-      rmSync(config, { force: true });
-    }
-  });
-
-  test("does not treat a missing absolute adapter path as registered", () => {
-    const config = join(projectRoot, "opencode.json");
-    const missingPath = join(
-      projectRoot,
-      "node_modules",
-      "@atlante",
-      "opencode",
-      "dist",
-      "missing.js",
-    );
-    writeFileSync(config, JSON.stringify({ plugin: [missingPath] }));
-    try {
-      const runner = createOpenCodeRunner({
-        projectRoot,
-        authPath: authFile,
-      });
-      expect(() =>
-        runner.prepareHostIntegration(
-          sandboxFor(
-            tempDir("eval-sandbox-missing-adapter-"),
-            tempDir("eval-state-missing-adapter-"),
-          ),
-          {},
-        ),
-      ).toThrow(/plugin.*@atlante\/opencode/);
-    } finally {
-      rmSync(config, { force: true });
-    }
-  });
-
-  test("accepts an existing absolute adapter package path", () => {
-    const config = join(projectRoot, "opencode.json");
-    const packagePath = join(
-      projectRoot,
-      "node_modules",
-      "@atlante",
-      "opencode",
-    );
-    writeFileSync(config, JSON.stringify({ plugin: [packagePath] }));
-    try {
-      const runner = createOpenCodeRunner({
-        projectRoot,
-        authPath: authFile,
-      });
-      const project = tempDir("eval-sandbox-absolute-adapter-");
-      runner.prepareHostIntegration(
-        sandboxFor(project, tempDir("eval-state-absolute-adapter-")),
-        {},
-      );
-      const written = JSON.parse(
-        readFileSync(join(project, "opencode.json"), "utf8"),
-      );
-      expect(written.plugin).toEqual([packagePath]);
-    } finally {
-      rmSync(config, { force: true });
-    }
-  });
-
   test("accepts JSONC comments in an existing opencode.json", () => {
     const config = join(projectRoot, "opencode.json");
     writeFileSync(
       config,
       `{
   // Existing OpenCode configurations may use JSONC syntax.
-  "plugin": ["@atlante/opencode"],
+  "agent": {
+    "jsonc": { "permission": "deny" },
+  },
 }
 `,
     );
@@ -375,7 +223,7 @@ describe("prepareHostIntegration", () => {
       const written = JSON.parse(
         readFileSync(join(project, "opencode.json"), "utf8"),
       );
-      expect(written.plugin[0]).not.toBe("@atlante/opencode");
+      expect(written.agent.jsonc.permission.edit).toBe("deny");
     } finally {
       rmSync(config, { force: true });
     }
@@ -386,7 +234,6 @@ describe("prepareHostIntegration", () => {
     writeFileSync(
       config,
       JSON.stringify({
-        plugin: ["@atlante/opencode"],
         default_agent: "custom",
         agent: { custom: { permission: "deny" } },
       }),

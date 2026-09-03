@@ -119,10 +119,10 @@ arrives. Stop it with `Ctrl-C`.
 
 ## `atlante eval`
 
-Run eval scenarios against the project's verified artifacts. Each trial runs
-the [OpenCode](https://opencode.ai/) host headless in a disposable sandbox
-(a copy of the scenario fixture plus the artifact publication), then grades
-the sandbox with deterministic, zero-LLM checks.
+Run eval scenarios against the project's verified native OpenCode outputs. Each
+trial runs the [OpenCode](https://opencode.ai/) host headless in a disposable
+sandbox (a copy of the scenario fixture plus the materialized native agent and
+skill files), then grades the sandbox with deterministic, zero-LLM checks.
 
 Containment is tool-level policy, not OS-level isolation: forced permission
 denials close the host's web/search tools and the most destructive shell
@@ -155,8 +155,7 @@ npx @atlante/cli@latest eval [path] --keep
 ### Configuration
 
 `eval` runs require an `eval` section in `atlante.jsonc`, scenario documents,
-a published artifact tree, an installed `@atlante/opencode` adapter, and an
-authenticated OpenCode host:
+materialized native OpenCode outputs, and an authenticated OpenCode host:
 
 ```jsonc
 {
@@ -189,7 +188,7 @@ sources change.
 - `1` at least one trial failed, timed out, exceeded its budget, hit a
   trial-level infrastructure error, or was skipped by the session cap.
 - `2` validation failed: missing or broken configuration or `eval` section,
-  invalid scenario documents, or missing/stale artifacts.
+  invalid scenario documents, or missing/stale native outputs.
 - `3` an infrastructure error prevented the run from executing at all; when a
   run ID exists, the partial report is still written before the error is
   returned.

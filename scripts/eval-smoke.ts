@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { existsSync } from "node:fs";
 // Manual eval smoke: runs the real `atlante eval` pipeline end to end —
-// artifact verification, sandbox assembly, a headless OpenCode session with
+// native-output verification, sandbox assembly, a headless OpenCode session with
 // live credentials, and deterministic grading — against one tiny scenario
 // (1 scenario x 1 trial, trivial prompt, tiny budget).
 //
@@ -20,7 +20,6 @@ const ROOT = join(import.meta.dir, "..");
 // Pinned for the same reason as opencode-smoke.ts: a floating latest would
 // turn upstream changes into unreproducible spend.
 const OPENCODE_PACKAGE_VERSION = "1.18.26";
-const PLUGIN_PACKAGE = join(ROOT, "packages", "opencode");
 const CLI = join(ROOT, "packages", "cli", "dist", "bin", "atlante.js");
 const AUTH_PATH = join(
   process.env.XDG_DATA_HOME ?? join(homedir(), ".local", "share"),
@@ -60,20 +59,14 @@ try {
     .cwd(sandbox)
     .quiet();
 
-  // Author a real eval-enabled project the way `atlante init` would: the
-  // pack AND the opencode adapter are project dependencies (the eval runner
-  // resolves @atlante/opencode from the project, so an initialized project
-  // always has it installed).
+  // Author a real eval-enabled project the way `atlante init` would. The pack
+  // is a project dependency; the CLI bundles the native materializer and eval
+  // reader, so the project does not need a runtime plugin dependency.
   const project = join(sandbox, "project");
   await mkdir(join(project, "node_modules", "@atlante"), { recursive: true });
   await cp(
     join(ROOT, "packages", "pack"),
     join(project, "node_modules", "@atlante", "pack"),
-    { recursive: true },
-  );
-  await cp(
-    join(ROOT, "packages", "opencode"),
-    join(project, "node_modules", "@atlante", "opencode"),
     { recursive: true },
   );
   await Bun.write(
@@ -114,7 +107,6 @@ try {
     join(project, "opencode.json"),
     `${JSON.stringify({
       $schema: "https://opencode.ai/config.json",
-      plugin: [PLUGIN_PACKAGE],
     })}\n`,
   );
   await mkdir(join(project, "eval", "scenarios"), { recursive: true });
@@ -135,7 +127,7 @@ try {
   );
   await mkdir(join(project, "eval", "fixtures", "empty"), { recursive: true });
 
-  // The eval flow refuses to run without a verified artifact publication.
+  // The eval flow refuses to run without verified native outputs.
   await Bun.$`node ${CLI} build`.cwd(project).quiet();
 
   const binDir = join(sandbox, "node_modules", ".bin");

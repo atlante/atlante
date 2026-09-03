@@ -48,7 +48,7 @@ function scenarioDocument(): string {
   })}\n`;
 }
 
-/** Authors a full eval-enabled project; artifacts stay unpublished by default. */
+/** Authors a full eval-enabled project; native outputs stay unbuilt by default. */
 function evalProject(options: { evalSection?: object } = {}): string {
   const project = tempDir();
   const evalSection =
@@ -102,12 +102,10 @@ function evalProject(options: { evalSection?: object } = {}): string {
 }
 
 /**
- * Publishes a real, verified artifact tree through the CLI's own build flow —
- * the eval gate (`verifyArtifacts`) then accepts it. This also keeps the CLI
- * test tree free of full-contract `@atlante/artifacts` imports, which the
- * package-graph governance test forbids.
+ * Builds real, verified native outputs through the CLI's own build flow — the
+ * eval gate (`verifyNativeOutputs`) then accepts them.
  */
-async function publishFixtureArtifacts(project: string): Promise<void> {
+async function buildFixtureOutputs(project: string): Promise<void> {
   const exit = await runBuild(project);
   if (exit !== 0) throw new Error("fixture build failed");
 }
@@ -167,7 +165,7 @@ function reportPaths(project: string): { runId: string; file: string } {
 describe("runEvalCommand", () => {
   test("runs the suite, writes the report, and gitignores it", async () => {
     const project = evalProject();
-    await publishFixtureArtifacts(project);
+    await buildFixtureOutputs(project);
     const exit = await runEvalCommand(project, {}, undefined, fakeRunner(true));
     expect(exit).toBe(0);
     const { runId, file } = reportPaths(project);
@@ -185,7 +183,7 @@ describe("runEvalCommand", () => {
 
   test("exits 1 when a check fails", async () => {
     const project = evalProject();
-    await publishFixtureArtifacts(project);
+    await buildFixtureOutputs(project);
     const exit = await runEvalCommand(
       project,
       {},
@@ -223,7 +221,7 @@ describe("runEvalCommand", () => {
     expect(exit).toBe(2);
   });
 
-  test("exits 2 when artifacts are not published", async () => {
+  test("exits 2 when native outputs are not built", async () => {
     const project = evalProject();
     const exit = await runEvalCommand(project, {}, undefined, fakeRunner(true));
     expect(exit).toBe(2);
@@ -231,7 +229,7 @@ describe("runEvalCommand", () => {
 
   test("exits 2 for an unknown --scenario filter", async () => {
     const project = evalProject();
-    await publishFixtureArtifacts(project);
+    await buildFixtureOutputs(project);
     const exit = await runEvalCommand(
       project,
       { scenario: ["nope"] },
@@ -243,7 +241,7 @@ describe("runEvalCommand", () => {
 
   test("exits 2 for an invalid --trials value", async () => {
     const project = evalProject();
-    await publishFixtureArtifacts(project);
+    await buildFixtureOutputs(project);
     const exit = await runEvalCommand(
       project,
       { trials: "zero" },
@@ -255,7 +253,7 @@ describe("runEvalCommand", () => {
 
   test("--trials overrides the configured trial count", async () => {
     const project = evalProject();
-    await publishFixtureArtifacts(project);
+    await buildFixtureOutputs(project);
     const exit = await runEvalCommand(
       project,
       { trials: "2" },
@@ -274,7 +272,7 @@ describe("runEvalCommand", () => {
 
   test("exits 2 when --trials exceeds the configured maximum", async () => {
     const project = evalProject();
-    await publishFixtureArtifacts(project);
+    await buildFixtureOutputs(project);
     const exit = await runEvalCommand(
       project,
       { trials: "51" },
@@ -292,7 +290,7 @@ describe("runEvalCommand", () => {
         budget: { maxSessions: 1 },
       },
     });
-    await publishFixtureArtifacts(project);
+    await buildFixtureOutputs(project);
     const exit = await runEvalCommand(
       project,
       { trials: "2" },
@@ -310,14 +308,14 @@ describe("runEvalCommand", () => {
 
   test("exits 1 when a host trial throws", async () => {
     const project = evalProject();
-    await publishFixtureArtifacts(project);
+    await buildFixtureOutputs(project);
     const exit = await runEvalCommand(project, {}, undefined, throwingRunner());
     expect(exit).toBe(1);
   });
 
   test("--json prints the report and --out relocates it", async () => {
     const project = evalProject();
-    await publishFixtureArtifacts(project);
+    await buildFixtureOutputs(project);
     const out = tempDir();
     const logs: string[] = [];
     const spy = spyOn(console, "log").mockImplementation(
@@ -348,7 +346,7 @@ describe("runEvalCommand", () => {
 
   test("human summary warns when token usage is unmonitored", async () => {
     const project = evalProject();
-    await publishFixtureArtifacts(project);
+    await buildFixtureOutputs(project);
     const logs: string[] = [];
     const spy = spyOn(console, "log").mockImplementation(
       (...parts: unknown[]) => {
@@ -373,7 +371,7 @@ describe("runEvalCommand", () => {
 
   test("returns 3 when the report cannot be written", async () => {
     const project = evalProject();
-    await publishFixtureArtifacts(project);
+    await buildFixtureOutputs(project);
     const out = join(project, "report-file");
     writeFileSync(out, "not a directory\n");
     const exit = await runEvalCommand(
@@ -387,7 +385,7 @@ describe("runEvalCommand", () => {
 
   test("returns 3 instead of following a symlinked report directory", async () => {
     const project = evalProject();
-    await publishFixtureArtifacts(project);
+    await buildFixtureOutputs(project);
     const outside = tempDir();
     const reportDir = join(project, ".atlante", "eval");
     symlinkSync(outside, reportDir, "dir");

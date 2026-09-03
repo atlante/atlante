@@ -4,7 +4,6 @@
     "zones": [
       { "name": "schema", "patterns": ["packages/schema/**"] },
       { "name": "resources", "patterns": ["packages/resources/**"] },
-      { "name": "artifacts", "patterns": ["packages/artifacts/**"] },
       { "name": "validator", "patterns": ["packages/validator/**"] },
       { "name": "builder", "patterns": ["packages/builder/**"] },
       { "name": "pack", "patterns": ["packages/pack/**"] },
@@ -18,15 +17,14 @@
     "rules": [
       { "from": "schema", "allow": [] },
       { "from": "resources", "allow": [] },
-      { "from": "artifacts", "allow": [] },
       { "from": "validator", "allow": ["schema", "resources"] },
       {
         "from": "builder",
-        "allow": ["schema", "resources", "validator", "artifacts"]
+        "allow": ["schema", "resources", "validator"]
       },
       { "from": "pack", "allow": ["resources", "validator"] },
-      { "from": "opencode", "allow": ["artifacts"] },
-      { "from": "eval", "allow": ["artifacts", "schema", "validator"] },
+      { "from": "opencode", "allow": [] },
+      { "from": "eval", "allow": ["opencode", "schema", "validator"] },
       {
         "from": "cli",
         "allow": [
@@ -35,7 +33,7 @@
           "validator",
           "resources",
           "schema",
-          "artifacts",
+          "opencode",
           "eval"
         ]
       },

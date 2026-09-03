@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { cpSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createArtifacts, publishArtifacts } from "@atlante/artifacts";
+import { materializeOpenCode } from "@atlante/opencode";
 import type { EvalConfig } from "@atlante/schema";
 import {
   type DiscoveredEvalScenario,
@@ -18,7 +18,7 @@ import {
   runExitCode,
   type TrialRun,
   type TrialRunOutcome,
-  verifyArtifacts,
+  verifyNativeOutputs,
 } from "../src/index.js";
 
 const fixtureProject = join(import.meta.dir, "fixtures", "project");
@@ -29,20 +29,17 @@ let scenarios: DiscoveredEvalScenario[];
 beforeAll(() => {
   projectRoot = mkdtempSync(join(tmpdir(), "eval-runner-project-"));
   cpSync(fixtureProject, projectRoot, { recursive: true });
-  publishArtifacts(
-    projectRoot,
-    createArtifacts({
-      agents: [
-        {
-          hostAgentId: "build",
-          description: "Build agent",
-          prompt: "You are a build agent.",
-        },
-      ],
-      skills: [],
-    }),
-  );
-  verifyArtifacts(projectRoot);
+  materializeOpenCode(projectRoot, {
+    agents: [
+      {
+        hostAgentId: "build",
+        description: "Build agent",
+        prompt: "You are a build agent.",
+      },
+    ],
+    skills: [],
+  });
+  verifyNativeOutputs(projectRoot);
   scenarios = discoverEvalScenarios(
     projectRoot,
     "eval/scenarios/*.eval.json",

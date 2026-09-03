@@ -8,39 +8,36 @@ import {
   readFileSync,
   rmSync,
   statSync,
+  writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { isAbsolute, join, relative, sep } from "node:path";
-import { readArtifacts } from "@atlante/artifacts/read-only";
+import { dirname, isAbsolute, join, relative, sep } from "node:path";
+import { type OpenCodeNativeFile, readOpenCodeNative } from "@atlante/opencode";
 import type { DiscoveredEvalScenario } from "@atlante/validator";
 import type { ResolvedBudget } from "./config.js";
 import { runCommand } from "./spawn.js";
 
-/** Thrown when the project's artifacts are missing, stale, or invalid. */
-export class ArtifactsNotVerifiedError extends Error {
+/** Thrown when the project's native OpenCode outputs are missing or stale. */
+export class NativeOutputsNotVerifiedError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = "ArtifactsNotVerifiedError";
+    this.name = "NativeOutputsNotVerifiedError";
   }
 }
 
 /**
- * Verifies the project's artifact publication through the read-only
- * `@atlante/artifacts` API. `atlante eval` never builds: missing or stale
- * artifacts are an error with `atlante build` as the recovery action.
+ * Verifies the project's native OpenCode publication through the adapter's
+ * manifest-backed reader. `atlante eval` never builds: missing or stale
+ * outputs are an error with `atlante build` as the recovery action.
  */
-export function verifyArtifacts(projectRoot: string): void {
-  let verified: ReturnType<typeof readArtifacts>;
+export function verifyNativeOutputs(
+  projectRoot: string,
+): ReturnType<typeof readOpenCodeNative> {
   try {
-    verified = readArtifacts(projectRoot);
+    return readOpenCodeNative(projectRoot);
   } catch (cause) {
-    throw new ArtifactsNotVerifiedError(
-      `artifact verification failed: ${cause instanceof Error ? cause.message : String(cause)}`,
-    );
-  }
-  if (verified === undefined) {
-    throw new ArtifactsNotVerifiedError(
-      "no verified artifacts found under .atlante/artifacts",
+    throw new NativeOutputsNotVerifiedError(
+      `native output verification failed: ${cause instanceof Error ? cause.message : String(cause)}`,
     );
   }
 }
@@ -81,8 +78,8 @@ export function destroyRunRoot(runRoot: string): void {
 
 /**
  * Assembles the sandbox for one scenario × trial: fixture copy, verified
- * artifact publication, host integration, setup commands, baseline snapshot,
- * and the git baseline commit that enables diff checks.
+ * native outputs, host integration, setup commands, baseline snapshot, and
+ * the git baseline commit that enables diff checks.
  */
 export async function assembleSandbox(
   input: AssembleSandboxInput,
@@ -117,12 +114,11 @@ export async function assembleSandbox(
     root,
   );
 
-  // (b) Verified artifact publication, copied as-is for the host plugin.
-  const artifacts = join(input.projectRoot, ".atlante", "artifacts");
-  verifyArtifacts(input.projectRoot);
-  assertNoSymlinks(artifacts, "artifact tree");
-  mkdirSync(join(root, ".atlante"), { recursive: true });
-  cpSync(artifacts, join(root, ".atlante", "artifacts"), { recursive: true });
+  // (b) Verified native outputs, copied from manifest-backed bytes. The
+  // manifest itself stays in the source project; the host only needs the
+  // generated files in the disposable sandbox.
+  const native = verifyNativeOutputs(input.projectRoot);
+  copyNativeFiles(root, native.files);
 
   const sandbox: Sandbox = {
     root,
@@ -279,24 +275,15 @@ function assertNoSymlinkPath(
   }
 }
 
-/** Refuses artifact trees with links before recursive copying can follow them. */
-function assertNoSymlinks(root: string, label: string): void {
-  const rootStat = lstatSync(root, { throwIfNoEntry: false });
-  if (!rootStat?.isDirectory()) {
-    throw new Error(`${label} is not a directory`);
+/** Copies verified native files without following links or overwriting fixtures. */
+function copyNativeFiles(
+  root: string,
+  files: readonly OpenCodeNativeFile[],
+): void {
+  for (const file of files) {
+    const target = join(root, ...file.path.split("/"));
+    assertNoSymlinkPath(root, target, "native output");
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(target, file.bytes, { flag: "wx" });
   }
-  const walk = (directory: string): void => {
-    const entries = readdirSync(directory, {
-      withFileTypes: true,
-      encoding: "utf8",
-    });
-    for (const entry of entries) {
-      const path = join(directory, entry.name);
-      if (entry.isSymbolicLink()) {
-        throw new Error(`${label} contains a symbolic link: ${entry.name}`);
-      }
-      if (entry.isDirectory()) walk(path);
-    }
-  };
-  walk(root);
 }

@@ -6,10 +6,9 @@ import {
   readFileSync,
   writeFileSync,
 } from "node:fs";
-import { createRequire } from "node:module";
 import { homedir } from "node:os";
-import { dirname, isAbsolute, join } from "node:path";
-import { readArtifacts } from "@atlante/artifacts/read-only";
+import { dirname, join } from "node:path";
+import { readOpenCodeNative } from "@atlante/opencode";
 import { parseJsonc } from "@atlante/validator";
 import type {
   HostRunner,
@@ -20,7 +19,6 @@ import type {
 import { killTree, pickAllowedEnv } from "../spawn.js";
 
 export const OPENCODE_BINARY = "opencode";
-const ATLANTE_PLUGIN_NAME = "@atlante/opencode";
 /** Grace window for the SIGTERM → SIGKILL escalation. */
 const KILL_GRACE_MS = 5_000;
 const ERROR_OUTPUT_LIMIT = 2_000;
@@ -92,7 +90,7 @@ function isObject(value: unknown): value is Record<string, unknown> {
 type PermissionMap = Record<string, unknown>;
 
 /**
- * Agent-map access restricted to own properties: an artifact or config agent
+ * Agent-map access restricted to own properties: a native or config agent
  * id like `__proto__` must never read through the prototype or disappear into
  * the prototype setter, or it would silently lose its containment baseline.
  */
@@ -188,119 +186,6 @@ function readHostConfig(projectRoot: string): Record<string, unknown> {
 }
 
 /**
- * Resolves the Atlante opencode plugin to an absolute directory so the
- * sandbox config (which lives in a temp dir with no node_modules) can load
- * it. Resolution uses the package root export and stays strict enough for
- * Node: the `exports` map does not expose `./package.json`, so resolving that
- * subpath would throw `ERR_PACKAGE_PATH_NOT_EXPORTED` in the published CLI
- * even with the package installed. The `"."` entry points at a bundled file
- * inside the package (`dist/`); walk up to the directory owning the manifest.
- */
-function resolvePluginPath(projectRoot: string): string {
-  const require = createRequire(join(projectRoot, "package.json"));
-  let resolved: string;
-  try {
-    resolved = require.resolve(ATLANTE_PLUGIN_NAME);
-  } catch {
-    throw new Error(
-      `the ${ATLANTE_PLUGIN_NAME} package is not installed in this project; run \`atlante init\` or install it and try again`,
-    );
-  }
-  let dir = dirname(resolved);
-  for (let hop = 0; hop < 5; hop++) {
-    if (existsSync(join(dir, "package.json"))) return dir;
-    const parent = dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
-  }
-  throw new Error(
-    `resolved ${ATLANTE_PLUGIN_NAME} to ${resolved} but found no package manifest above it`,
-  );
-}
-
-function isAdapterPackagePath(value: string): boolean {
-  // The entry must name something that actually exists: a missing file below
-  // the adapter package would silently register nothing at runtime.
-  if (!isAbsolute(value) || !existsSync(value)) return false;
-  const hasAdapterManifest = (dir: string): boolean => {
-    try {
-      const manifest = JSON.parse(
-        readFileSync(join(dir, "package.json"), "utf8"),
-      ) as unknown;
-      return isObject(manifest) && manifest.name === ATLANTE_PLUGIN_NAME;
-    } catch {
-      return false;
-    }
-  };
-
-  // An absolute entry may name either the package root or a bundled file.
-  if (hasAdapterManifest(value)) return true;
-  let dir = dirname(value);
-  for (let hop = 0; hop < 6; hop++) {
-    if (hasAdapterManifest(dir)) return true;
-    const parent = dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
-  }
-  return false;
-}
-
-/** Same entry contract as `atlante init`: a name or [name, options] tuple. */
-type PluginEntry = string | [string, Record<string, unknown>];
-
-function isPluginEntry(value: unknown): value is PluginEntry {
-  if (typeof value === "string") return true;
-  return (
-    Array.isArray(value) &&
-    value.length === 2 &&
-    typeof value[0] === "string" &&
-    isObject(value[1])
-  );
-}
-
-function rewritePluginEntries(
-  entries: unknown,
-  projectRoot: string,
-): PluginEntry[] {
-  // An absent "plugin" key is an absent registration, not a malformed value:
-  // it flows into the not-registered error (with install guidance) below.
-  const list = entries === undefined ? [] : entries;
-  if (!Array.isArray(list) || !list.every(isPluginEntry)) {
-    throw new Error(
-      "host configuration plugin must be an array of strings or [name, options-object] tuples",
-    );
-  }
-  let pluginPath: string | undefined;
-  let registered = false;
-  const resolvePath = () => (pluginPath ??= resolvePluginPath(projectRoot));
-  const rewritten = list.map((entry): PluginEntry => {
-    if (typeof entry === "string") {
-      if (entry === ATLANTE_PLUGIN_NAME) {
-        registered = true;
-        return resolvePath();
-      }
-      if (isAdapterPackagePath(entry)) registered = true;
-      return entry;
-    }
-    if (entry[0] === ATLANTE_PLUGIN_NAME) {
-      registered = true;
-      return [resolvePath(), entry[1]];
-    }
-    if (isAdapterPackagePath(entry[0])) registered = true;
-    return entry;
-  });
-  if (!registered) {
-    // Resolve once so a missing project dependency retains actionable install
-    // guidance instead of silently accepting a config without the adapter.
-    resolvePath();
-    throw new Error(
-      `host configuration plugin must register ${ATLANTE_PLUGIN_NAME}`,
-    );
-  }
-  return rewritten;
-}
-
-/**
  * The OpenCode host runner: spawns `opencode run` headless against the
  * sandbox, parses the JSON event stream (cumulative tokens, cost, model
  * identifiers), and enforces the in-flight budget (timeout and maxTokens).
@@ -317,11 +202,10 @@ export function createOpenCodeRunner(
     name: "opencode",
 
     prepareHostIntegration(sandbox, context) {
-      // Sandbox host config first: config errors (unresolvable plugin) must
-      // surface before anything is copied into the sandbox.
+      // Verify the source publication before authoring any sandbox host state.
+      const nativeAgentIds = readNativeAgentIds(projectRoot);
       const config = readHostConfig(projectRoot);
       config.$schema = "https://opencode.ai/config.json";
-      config.plugin = rewritePluginEntries(config.plugin, projectRoot);
 
       // Auth injection: credentials stay with the host; the sandbox data dir
       // is where the redirected XDG_DATA_HOME will look for them.
@@ -346,9 +230,7 @@ export function createOpenCodeRunner(
       if (typeof config.default_agent === "string")
         agentNames.add(config.default_agent);
       for (const name of Object.keys(agents)) agentNames.add(name);
-      for (const artifact of readArtifactAgentIds(projectRoot)) {
-        agentNames.add(artifact);
-      }
+      for (const agent of nativeAgentIds) agentNames.add(agent);
       for (const name of agentNames) {
         const existing = ownAgentEntry(agents, name);
         setOwnAgentEntry(agents, name, {
@@ -421,12 +303,10 @@ export function createOpenCodeRunner(
   };
 }
 
-function readArtifactAgentIds(projectRoot: string): string[] {
-  const artifacts = readArtifacts(projectRoot);
-  if (!artifacts) {
-    throw new Error("verified artifacts became unavailable during host setup");
-  }
-  return artifacts.agents.map((agent) => agent.hostAgentId);
+function readNativeAgentIds(projectRoot: string): string[] {
+  return readOpenCodeNative(projectRoot)
+    .files.filter((file) => file.kind === "agent")
+    .map((file) => file.id);
 }
 
 type HostStreamResult = {
