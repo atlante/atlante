@@ -3,7 +3,6 @@
   "version": "0.1.21",
   "type": "module",
   "description": "Atlante OpenCode host adapter",
-  "main": "dist/index.js",
   "license": "MIT",
   "contributors": [
     {
@@ -31,9 +30,6 @@
     "LICENSE"
   ],
   "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
-    }
+    ".": "./src/index.ts"
   }
 }
