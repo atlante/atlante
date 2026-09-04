@@ -25,30 +25,20 @@ test("the materializer surface keeps its runtime roles", () => {
   expect(typeof entrypoint.openCodeMaterializer.materialize).toBe("function");
 });
 
-// The internal workspace builds dist/ for the CLI bundle: the manifest's main
-// and the single "." export must point at files the build produces.
-test("the workspace manifest resolves its entry into dist", () => {
+// The manifest resolves workspace imports from src — like every other
+// private package — so test processes never load a stale dist. dist/ remains
+// a produced artifact for the CLI bundle; its contract is owned by
+// dist.test.ts.
+test("the workspace manifest resolves its entry from src", () => {
   const packageRoot = fileURLToPath(new URL("..", import.meta.url));
   const manifest = JSON.parse(
     readFileSync(join(packageRoot, "package.json"), "utf8"),
   ) as {
     main?: string;
-    exports?: Record<string, { types?: string; default?: string }>;
+    exports?: Record<string, string>;
   };
 
-  expect(manifest.main).toBe("dist/index.js");
-  expect(manifest.exports).toEqual({
-    ".": {
-      types: "./dist/index.d.ts",
-      default: "./dist/index.js",
-    },
-  });
-  for (const relative of [
-    manifest.main,
-    manifest.exports?.["."]?.types,
-    manifest.exports?.["."]?.default,
-  ]) {
-    if (!relative) continue;
-    expect(existsSync(join(packageRoot, relative)), relative).toBe(true);
-  }
+  expect(manifest.main).toBeUndefined();
+  expect(manifest.exports).toEqual({ ".": "./src/index.ts" });
+  expect(existsSync(join(packageRoot, "src", "index.ts"))).toBe(true);
 });
