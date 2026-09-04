@@ -21,6 +21,9 @@
   ],
   "scripts": {
     "test": "bun test",
+    "test:unit": "bun test .unit.test",
+    "test:integration": "bun test .integration.test",
+    "test:e2e": "bun test .e2e.test",
     "type:check": "tsc --build packages/*/tsconfig.json",
     "lint:check": "biome check .",
     "cli": "bun packages/cli/bin/atlante.ts",
