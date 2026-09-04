@@ -17,6 +17,13 @@ export type StubPackOptions = {
  * tiny templates, so fixture builds exercise the same resolution, binding,
  * and materialization pipeline at a fraction of the per-build cost of the
  * ~12-binding real pack.
+ *
+ * Installing under the first-party name `@atlante/pack` only works when the
+ * fixture avoids injecting `firstPartyProjectContext()` (e.g. calls
+ * `runInitWithDependencies(dir, opts, {})` instead of `runInit`): the bundled
+ * context intercepts that exact name and would shadow the stub with the real
+ * pack — slower, though still passing. A non-first-party name sidesteps the
+ * interception entirely, which is what eval-command tests do.
  */
 function stubPackFiles(name: string): Readonly<Record<string, string>> {
   const ref = (artifact: string): string => `${name}/${artifact}`;
