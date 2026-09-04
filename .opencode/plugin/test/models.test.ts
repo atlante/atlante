@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import modelsPlugin from "./models";
+import modelsPlugin from "../models";
 
 const MODEL = "zai-coding-plan/glm-5.3-flash";
 const createdDirectories: string[] = [];
