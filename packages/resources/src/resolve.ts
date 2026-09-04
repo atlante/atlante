@@ -4,7 +4,6 @@ import { type Slot, slotsOf } from "./composition.js";
 import {
   isResourcePackPathContained,
   type ResourcePack,
-  type ResourceResolutionContext,
   resourcePackMetadataPaths,
   resourcePackWatchRoot,
 } from "./content-root.js";
@@ -37,11 +36,9 @@ import {
   assertResourceGraphStep,
   canonicalGraphKey,
   createResourceGraphState,
-  type ResourceGraph,
   type ResourceGraphState,
   snapshotResourceGraph,
 } from "./graph.js";
-import { jsonValueAtPath } from "./json-path.js";
 import type { JsoncLocation } from "./jsonc.js";
 import { isSafeJsonObject } from "./jsonc.js";
 import { parseResourceLocator } from "./locator.js";
@@ -57,13 +54,81 @@ import {
   type ResourceProvenance,
 } from "./provenance.js";
 import {
-  copyResourceTemplateSelection,
-  copyResourceValueTombstones,
-  resourceTemplateSelection,
-  resourceValueTombstones,
   withResourceTemplateSelection,
   withResourceValueTombstones,
 } from "./resolution.js";
+import type {
+  AuthoringContext,
+  AuthoringProvenance,
+  BindingCollection,
+  EnteredFacet,
+  InstanceTraversal,
+  LoadedFacet,
+  LocatedValue,
+  MergedResourceValue,
+  NormalizedResourceDocument,
+  NormalizedValue,
+  PresetResult,
+  ResolveDocumentRequest,
+  ResolvedResourceBinding,
+  ResolvedResourceDocument,
+  ResolvedResourceInstance,
+  ResolvedTemplate,
+  ResolvedTemplateSlot,
+  ResolveInstanceRequest,
+  ResolveTemplateRequest,
+  ResourceBindingCollectionSpec,
+  ResourceResolveOptions,
+  ResourceTraversal,
+  SlotCandidateContext,
+  SlotGroup,
+  SourceLocalContext,
+  SourceMetadata,
+  SourceResolutionContext,
+  SourceResult,
+  SourceSelection,
+  SourceSelectorContext,
+  TraversalContext,
+  TraversalFailureDetails,
+} from "./resolution-types.js";
+import {
+  addBindingValuesProvenance,
+  appendPointer,
+  authoringContext,
+  cloneObject,
+  cloneValue,
+  composeFailurePointer,
+  contextAt,
+  copySourceValues,
+  descriptorData,
+  escapePointer,
+  graphNode,
+  isBareResourceLocator,
+  isConfiguredSlotValue,
+  isObject,
+  locationsAt,
+  mergeContextMap,
+  pointerForSegments,
+  removeContextMap,
+  removeProvenance,
+  removeProvenanceSubtree,
+  replaceContextSubtree,
+  replaceProvenanceSubtree,
+  schemaPointerForPath,
+  selectedSlotCandidate,
+  selectorKeys,
+  selectorValue,
+  setAt,
+  sliceContextMap,
+  sliceProvenance,
+  sortProvenance,
+  sourceValueTombstones,
+  templateAcceptsArray,
+  templateAcceptsObject,
+  traversalContext,
+  unchangedNormalizedValue,
+  withoutKeys,
+} from "./resolution-values.js";
 import type {
   InstanceFacet,
   JsonObject,
@@ -73,130 +138,24 @@ import type {
   ResourceFailureCode,
   ResourceGraphChain,
   ResourceGraphNode,
-  ResourceLocator,
   ResourceOrigin,
   ResourceWatchRoot,
   TemplateFacet,
 } from "./types.js";
 
-/**
- * Declares one named binding collection of a configuration document so the
- * resolver can materialize and resolve its entries.
- */
-export type ResourceBindingCollectionSpec = Readonly<{
-  /** Document key holding the collection. */
-  readonly key: string;
-  /** Subject label used in diagnostics for entries of this collection. */
-  readonly subject: string;
-  /** Default template locator for root sources that omit a selector. */
-  readonly defaultTemplate?: RawResourceLocator;
-}>;
-
-export type ResourceResolveOptions = Readonly<{
-  /** Existing facet read seam, also used by package metadata reads. */
-  readonly beforeRead?: (path: string) => void;
-  readonly resourceContext?: ResourceResolutionContext;
-  /**
-   * Declared binding collections materialized into the resolved document.
-   * Undeclared collection keys stay ordinary merged document values; a root
-   * binding source without a selector requires its collection's declared
-   * default template.
-   */
-  readonly bindingCollections?: readonly ResourceBindingCollectionSpec[];
-}>;
-
-export type ResolveInstanceRequest = ResourceResolveOptions & {
-  readonly pack: ResourcePack;
-  readonly locator: RawResourceLocator;
-  readonly authoringFile: string;
-};
-
-export type ResolveTemplateRequest = ResourceResolveOptions & {
-  readonly pack: ResourcePack;
-  readonly locator: RawResourceLocator;
-  readonly authoringFile: string;
-};
-
-export type ResolveDocumentRequest = ResourceResolveOptions & {
-  readonly pack: ResourcePack;
-  readonly rootFile: string;
-  /** Optional in-memory authored root used by text-validation callers. */
-  readonly rootDocument?: JsonObject;
-};
-
-export type ResolvedTemplateSlot = Readonly<{
-  readonly slot: Slot;
-  readonly template: ResolvedTemplate;
-}>;
-
-export type ResolvedTemplate = Readonly<{
-  readonly kind: "template";
-  readonly key: string;
-  readonly locator: ResourceLocator;
-  readonly origin: ResourceOrigin;
-  readonly facet: TemplateFacet;
-  readonly locations?: Readonly<Record<string, JsoncLocation>>;
-  readonly slots: readonly ResolvedTemplateSlot[];
-  readonly dependencies: readonly string[];
-  readonly unresolvedParents: readonly string[];
-}>;
-
-export type ResolvedResourceInstance = Readonly<{
-  readonly kind: "instance";
-  readonly key: string;
-  readonly locator: ResourceLocator;
-  readonly origin: ResourceOrigin;
-  readonly facet: InstanceFacet;
-  readonly template: ResolvedTemplate;
-  readonly effectiveTemplate: ResolvedTemplate;
-  readonly input: JsonObject;
-  readonly provenance: ResourceProvenance;
-  readonly graph: ResourceGraph;
-  readonly dependencies: readonly string[];
-  readonly unresolvedParents: readonly string[];
-}>;
-
-export type ResolvedResourceBinding = Readonly<{
-  readonly id: string;
-  readonly kind: string;
-  readonly description: string;
-  readonly template: ResolvedTemplate;
-  readonly input: JsonObject;
-  readonly values?: JsonObject;
-  readonly provenance: ResourceProvenance;
-}>;
-
-export type NormalizedResourceDocument = {
-  readonly [key: string]: unknown;
-  readonly $schema?: string;
-  readonly values?: Record<string, unknown>;
-};
-
-export type ResolvedResourceDocument = Readonly<{
-  /** Authored root overlay, retained for the later semantic layer. */
-  readonly raw: JsonObject;
-  /** Effective root overlay after preset inheritance, still source-shaped. */
-  readonly effectiveRaw: JsonObject;
-  readonly normalized: NormalizedResourceDocument;
-  readonly document: NormalizedResourceDocument;
-  readonly bindings: Readonly<
-    Record<string, Readonly<Record<string, ResolvedResourceBinding>>>
-  >;
-  readonly provenance: ResourceProvenance;
-  readonly graph: ResourceGraph;
-  readonly templates: readonly ResolvedTemplate[];
-  readonly instances: readonly ResolvedResourceInstance[];
-  readonly dependencies: readonly string[];
-  readonly unresolvedParents: readonly string[];
-  readonly trustedRoots: readonly ResourceWatchRoot[];
-}>;
-
-type LoadedFacet<T> = Readonly<{
-  readonly pack: ResourcePack;
-  readonly target: ResolvedResourceTarget;
-  readonly loaded: LoadedResource<T>;
-  readonly authoring: AuthoringContext;
-}>;
+export type {
+  NormalizedResourceDocument,
+  ResolveDocumentRequest,
+  ResolvedResourceBinding,
+  ResolvedResourceDocument,
+  ResolvedResourceInstance,
+  ResolvedTemplate,
+  ResolvedTemplateSlot,
+  ResolveInstanceRequest,
+  ResolveTemplateRequest,
+  ResourceBindingCollectionSpec,
+  ResourceResolveOptions,
+} from "./resolution-types.js";
 
 type FacetCacheKind = "template" | "instance" | "preset";
 
@@ -299,553 +258,8 @@ function inspectFacetCandidatesForCache(
   }
 }
 
-type AuthoringContext = Readonly<{
-  readonly pack: ResourcePack;
-  /** Lexical path used to resolve relative selectors. */
-  readonly file: string;
-  readonly locations?: Readonly<Record<string, JsoncLocation>>;
-}>;
-
-type AuthoringProvenance = Readonly<Record<string, AuthoringContext>>;
-
-type TraversalContext = Readonly<{
-  readonly path: readonly ResourceGraphNode[];
-  readonly hops: number;
-}>;
-
-type TraversalProvenance = Readonly<Record<string, TraversalContext>>;
-
-type EnteredFacet<T extends TemplateFacet | InstanceFacet> = Readonly<{
-  readonly loaded: LoadedFacet<T>;
-  readonly node: ResourceGraphNode;
-  readonly path: readonly ResourceGraphNode[];
-  readonly key: string;
-}>;
-
-type PresetResult = Readonly<{
-  readonly facet: Preset;
-  readonly node: ResourceGraphNode;
-  readonly path: readonly ResourceGraphNode[];
-  readonly effectiveRaw: JsonObject;
-  readonly provenance: ResourceProvenance;
-  readonly authoring: AuthoringProvenance;
-  readonly traversal: TraversalProvenance;
-  /** Total preset hops traversed before resolving root bindings. */
-  readonly effectiveHops: number;
-}>;
-
-type SourceResult = Readonly<{
-  readonly template: ResolvedTemplate;
-  readonly input: JsonObject;
-  readonly provenance: ResourceProvenance;
-  readonly authoring: AuthoringProvenance;
-  readonly path: readonly ResourceGraphNode[];
-  readonly hops: number;
-  readonly description?: string;
-  readonly values?: JsonObject;
-}>;
-
-type SourceSelection = Readonly<{
-  readonly template: ResolvedTemplate;
-  readonly inherited?: JsonObject;
-  readonly inheritedProvenance?: ResourceProvenance;
-  readonly inheritedAuthoring?: AuthoringProvenance;
-  readonly path: readonly ResourceGraphNode[];
-  readonly hops: number;
-}>;
-
-type SourceResolutionContext = Readonly<{
-  readonly pack: ResourcePack;
-  readonly authoringFile: string;
-  readonly path: readonly ResourceGraphNode[];
-  readonly hops: number;
-  readonly origin: ResourceOrigin;
-  readonly subject: string;
-  /** Declared default template for root sources that omit a selector. */
-  readonly defaultTemplate?: RawResourceLocator;
-  readonly sourcePointer: string;
-  readonly sourceProvenance?: ResourceProvenance;
-  readonly sourceAuthoring?: AuthoringProvenance;
-}>;
-
-type SourceSelectorContext = Readonly<{
-  readonly selector?: string;
-  readonly origin: ResourceOrigin;
-  readonly pointer?: string;
-  readonly location?: JsoncLocation;
-  readonly authoring: AuthoringContext;
-}>;
-
-type SourceLocalContext = Readonly<{
-  readonly value: JsonObject;
-  readonly provenance: ResourceProvenance;
-  readonly authoring: AuthoringProvenance;
-}>;
-
-type MergedResourceValue = Readonly<{
-  readonly value: JsonValue | undefined;
-  readonly provenance: ResourceProvenance;
-  readonly authoring: AuthoringProvenance;
-}>;
-
-type ResourceTraversal<T> = Readonly<{
-  readonly value: T;
-  readonly path: readonly ResourceGraphNode[];
-  readonly hops: number;
-}>;
-
-type InstanceTraversal = ResourceTraversal<ResolvedResourceInstance> & {
-  readonly authoring: AuthoringProvenance;
-};
-
-type SourceMetadata = Readonly<{
-  readonly input: JsonObject;
-  readonly provenance: ResourceProvenance;
-  readonly description?: string;
-  readonly values?: JsonObject;
-}>;
-
-function sourceValueTombstones(value: JsonObject): string[] {
-  return (resourceValueTombstones(value) ?? [])
-    .filter((pointer) => pointer.startsWith("/values/"))
-    .map((pointer) => pointer.slice("/values".length));
-}
-
-function copySourceValues(
-  sourceValues: JsonObject,
-  inheritedTombstones: readonly string[],
-): JsonObject {
-  const output: Record<string, JsonValue> = {};
-  const tombstones = new Set<string>(inheritedTombstones);
-  for (const key of Object.keys(sourceValues).sort()) {
-    const child = sourceValues[key] as JsonValue;
-    if (child === null) {
-      tombstones.add(`/${escapePointer(key)}`);
-      continue;
-    }
-    own(output, key, cloneValue(child));
-  }
-
-  for (const pointer of resourceValueTombstones(sourceValues) ?? [])
-    tombstones.add(pointer);
-  return withResourceValueTombstones(
-    output as JsonObject,
-    [...tombstones].sort(),
-  );
-}
-
-type BindingCollection = Readonly<{
-  readonly bindings: Readonly<Record<string, ResolvedResourceBinding>>;
-  readonly normalized: Readonly<Record<string, Record<string, unknown>>>;
-  readonly provenance: Readonly<Record<string, ResourceOrigin>>;
-}>;
-
 /** Neutral subject label for sources resolved outside a declared collection. */
 const neutralBindingSubject = "binding";
-
-function composeFailurePointer(
-  parent: string | undefined,
-  child: string | undefined,
-  scope: string | undefined,
-): string | undefined {
-  if (!parent) return child;
-  if (!child) return parent;
-  if (child === parent || child.startsWith(`${parent}/`)) return child;
-  if (scope && (child === scope || child.startsWith(`${scope}/`))) return child;
-  return `${parent}${child.startsWith("/") ? child : `/${child}`}`;
-}
-
-function pointerForSegments(segments: readonly string[]): string {
-  return segments.reduce(childPointer, "");
-}
-
-function schemaPointerForPath(
-  schema: Record<string, unknown>,
-  path: readonly string[],
-): string {
-  let current: unknown = schema;
-  let pointer = "";
-  for (const segment of path) {
-    if (Array.isArray(current) && /^\d+$/.test(segment)) {
-      pointer = childPointer(pointer, segment);
-      current = current[Number(segment)];
-      continue;
-    }
-    if (!isObject(current)) break;
-    const properties = current.properties;
-    if (isObject(properties) && Object.hasOwn(properties, segment)) {
-      pointer = `${pointer}/properties${childPointer("", segment)}`;
-      current = properties[segment];
-      continue;
-    }
-    if (!Object.hasOwn(current, segment)) break;
-    pointer = childPointer(pointer, segment);
-    current = current[segment];
-  }
-  return pointer;
-}
-
-type NormalizedValue = Readonly<{
-  readonly value: JsonValue;
-  readonly provenance: ResourceProvenance;
-  readonly authoring: AuthoringProvenance;
-}>;
-
-type TraversalFailureDetails = Readonly<{
-  readonly locator?: RawResourceLocator;
-  readonly source?: ResourceOrigin;
-  readonly pointer?: string;
-  readonly location?: JsoncLocation;
-}>;
-
-type LocatedValue = Readonly<{
-  readonly pointer: string;
-  readonly path: readonly string[];
-  readonly value: JsonValue;
-}>;
-
-type SlotGroup = Readonly<{
-  readonly dataPath: readonly string[];
-  readonly slots: readonly ResolvedTemplateSlot[];
-}>;
-
-type SlotCandidateContext = Readonly<{
-  readonly value: JsonValue;
-  readonly provenance: ResourceProvenance;
-  readonly authoring: AuthoringProvenance;
-  readonly slots: readonly ResolvedTemplateSlot[];
-  readonly fallbackPack: ResourcePack;
-  readonly fallbackFile: string;
-  readonly path: readonly ResourceGraphNode[];
-  readonly hops: number;
-  readonly sourcePointer: string;
-}>;
-
-function unchangedNormalizedValue(
-  value: JsonValue,
-  provenance: ResourceProvenance,
-  authoring: AuthoringProvenance,
-): NormalizedValue {
-  return {
-    value: cloneValue(value),
-    provenance: cloneResourceProvenance(provenance),
-    authoring: sliceContextMap(authoring, ""),
-  };
-}
-
-function isObject(value: unknown): value is Record<string, JsonValue> {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    !Array.isArray(value) &&
-    (Object.getPrototypeOf(value) === Object.prototype ||
-      Object.getPrototypeOf(value) === null)
-  );
-}
-
-function selectedSlotCandidate(
-  value: JsonValue,
-  candidates: readonly ResolvedTemplateSlot[],
-): ResolvedTemplateSlot | undefined {
-  const selectedTemplateId = resourceTemplateSelection(value)?.templateId;
-  return candidates.find(({ slot }) => slot.templateId === selectedTemplateId);
-}
-
-function isConfiguredSlotValue(
-  value: JsonValue,
-  candidates: readonly ResolvedTemplateSlot[],
-): boolean {
-  if (isObject(value)) return selectorKeys(value).length > 0;
-  if (typeof value !== "string") return false;
-  return (
-    isBareResourceLocator(value) ||
-    candidates.every(({ template }) => templateAcceptsObject(template))
-  );
-}
-
-function cloneValue(value: JsonValue): JsonValue {
-  if (Array.isArray(value)) {
-    const output = value.map(cloneValue);
-    return copyResourceValueTombstones(
-      value,
-      copyResourceTemplateSelection(value, output),
-    );
-  }
-  if (!isObject(value)) return value;
-  const output: Record<string, unknown> = {};
-  for (const key of Object.keys(value).sort())
-    own(output, key, cloneValue(value[key] as JsonValue));
-  return copyResourceValueTombstones(
-    value,
-    copyResourceTemplateSelection(
-      value,
-      output as { readonly [key: string]: JsonValue },
-    ),
-  );
-}
-
-function cloneObject(value: JsonObject): JsonObject {
-  return cloneValue(value) as JsonObject;
-}
-
-function withoutKeys(
-  value: Record<string, JsonValue>,
-  keys: ReadonlySet<string>,
-): JsonObject {
-  const output: Record<string, unknown> = {};
-  for (const key of Object.keys(value).sort()) {
-    if (!keys.has(key)) own(output, key, cloneValue(value[key] as JsonValue));
-  }
-  return output as JsonObject;
-}
-
-function selectorKeys(value: Record<string, JsonValue>): string[] {
-  return ["$instance", "$template"].filter((key) => Object.hasOwn(value, key));
-}
-
-function selectorValue(
-  value: Record<string, JsonValue>,
-  key: string,
-  origin: ResourceOrigin,
-  pointer: string,
-  location?: JsoncLocation,
-): RawResourceLocator {
-  const selector = value[key];
-  if (typeof selector !== "string" || selector.length === 0) {
-    return failResource(
-      "invalid-resolved-input",
-      `${key} selector must be a non-empty string`,
-      {
-        source: origin,
-        pointer: `${pointer}/${key}`,
-        ...(location ? { location } : {}),
-      },
-    );
-  }
-  return selector;
-}
-
-function removeProvenance(
-  provenance: ResourceProvenance,
-  keys: ReadonlySet<string>,
-): ResourceProvenance {
-  return filterContextMap(provenance, keys);
-}
-
-function sliceProvenance(
-  provenance: ResourceProvenance,
-  prefix: string,
-): ResourceProvenance {
-  const output: Record<string, ResourceOrigin> = {};
-  for (const pointer of Object.keys(provenance).sort()) {
-    if (pointer !== prefix && !pointer.startsWith(`${prefix}/`)) continue;
-    const relative = pointer.slice(prefix.length);
-    own(output, relative === "" ? "" : relative, provenance[pointer]);
-  }
-  return Object.freeze(output);
-}
-
-function authoringContext(
-  pack: ResourcePack,
-  file: string,
-  locations?: Readonly<Record<string, JsoncLocation>>,
-): AuthoringContext {
-  return Object.freeze({
-    pack,
-    file,
-    ...(locations ? { locations } : {}),
-  });
-}
-
-function traversalContext(
-  path: readonly ResourceGraphNode[],
-  hops: number,
-): TraversalContext {
-  return Object.freeze({
-    path: Object.freeze([...path]),
-    hops,
-  });
-}
-
-function sliceContextMap<T>(
-  contexts: Readonly<Record<string, T>> | undefined,
-  prefix: string,
-): Readonly<Record<string, T>> {
-  const output: Record<string, T> = {};
-  for (const pointer of Object.keys(contexts ?? {}).sort()) {
-    if (pointer !== prefix && !pointer.startsWith(`${prefix}/`)) continue;
-    const relative = pointer.slice(prefix.length);
-    own(output, relative === "" ? "" : relative, contexts?.[pointer] as T);
-  }
-  return Object.freeze(output);
-}
-
-function contextAt<T>(
-  contexts: Readonly<Record<string, T>> | undefined,
-  pointer: string,
-): T | undefined {
-  return contexts?.[pointer] ?? contexts?.[""];
-}
-
-function removeContextMap<T>(
-  contexts: Readonly<Record<string, T>> | undefined,
-  keys: ReadonlySet<string>,
-): Readonly<Record<string, T>> {
-  return filterContextMap(contexts, keys);
-}
-
-function filterContextMap<T>(
-  contexts: Readonly<Record<string, T>> | undefined,
-  keys: ReadonlySet<string>,
-): Readonly<Record<string, T>> {
-  const output: Record<string, T> = {};
-  for (const pointer of Object.keys(contexts ?? {}).sort()) {
-    const first = pointer
-      .split("/")[1]
-      ?.replaceAll("~1", "/")
-      .replaceAll("~0", "~");
-    if (!first || !keys.has(first))
-      own(output, pointer, contexts?.[pointer] as T);
-  }
-  return Object.freeze(output);
-}
-
-function mergeContextMap<T>(
-  outputProvenance: ResourceProvenance,
-  localProvenance: ResourceProvenance,
-  local: Readonly<Record<string, T>> | undefined,
-  inherited: Readonly<Record<string, T>> | undefined,
-): Readonly<Record<string, T>> {
-  const output: Record<string, T> = {};
-  for (const pointer of Object.keys(outputProvenance).sort()) {
-    const contexts = Object.hasOwn(localProvenance, pointer)
-      ? local
-      : inherited;
-    const context = contextAt(contexts, pointer);
-    if (context) own(output, pointer, context);
-  }
-  return Object.freeze(output);
-}
-
-function appendPointer(prefix: string, pointer: string): string {
-  if (prefix === "") return pointer;
-  if (pointer === "") return prefix;
-  return `${prefix}${pointer}`;
-}
-
-function removeProvenanceSubtree(
-  output: Record<string, ResourceOrigin>,
-  pointer: string,
-): void {
-  for (const key of Object.keys(output)) {
-    if (key === pointer || key.startsWith(`${pointer}/`)) delete output[key];
-  }
-}
-
-function replaceProvenanceSubtree(
-  output: Record<string, ResourceOrigin>,
-  pointer: string,
-  replacement: ResourceProvenance,
-): void {
-  removeProvenanceSubtree(output, pointer);
-  for (const child of Object.keys(replacement).sort()) {
-    own(
-      output,
-      child === "" ? pointer : `${pointer}${child}`,
-      replacement[child],
-    );
-  }
-}
-
-function replaceContextSubtree<T>(
-  output: Record<string, T>,
-  pointer: string,
-  replacement: Readonly<Record<string, T>>,
-): void {
-  for (const key of Object.keys(output)) {
-    if (key === pointer || key.startsWith(`${pointer}/`)) delete output[key];
-  }
-  for (const child of Object.keys(replacement).sort()) {
-    own(
-      output,
-      child === "" ? pointer : `${pointer}${child}`,
-      replacement[child] as T,
-    );
-  }
-}
-
-function isBareResourceLocator(value: string): boolean {
-  try {
-    parseResourceLocator(value);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function locationsAt(
-  value: JsonValue,
-  path: readonly string[],
-  pointer = "",
-  consumed: readonly string[] = [],
-): LocatedValue[] {
-  const segment = path[0];
-  if (segment === undefined) return [{ pointer, path: consumed, value }];
-  if (Array.isArray(value)) {
-    return value.flatMap((item, index) =>
-      locationsAt(item, path, childPointer(pointer, index), [
-        ...consumed,
-        String(index),
-      ]),
-    );
-  }
-  if (!isObject(value) || !Object.hasOwn(value, segment)) return [];
-  return locationsAt(
-    value[segment] as JsonValue,
-    path.slice(1),
-    childPointer(pointer, segment),
-    [...consumed, segment],
-  );
-}
-
-function setAt(
-  value: JsonValue,
-  path: readonly string[],
-  replacement: JsonValue,
-): void {
-  if (path.length === 0) return;
-  const parentPath = path.slice(0, -1);
-  const key = path.at(-1);
-  if (key === undefined) return;
-  const parent = jsonValueAtPath<JsonValue>(value, parentPath);
-  if (Array.isArray(parent)) {
-    if (/^\d+$/.test(key)) parent[Number(key)] = replacement;
-    return;
-  }
-  if (isObject(parent))
-    own(parent as Record<string, unknown>, key, replacement);
-}
-
-function descriptorData(
-  description: string,
-  input: JsonObject,
-): Record<string, unknown> {
-  const output: Record<string, unknown> = {};
-  own(output, "description", description);
-  for (const key of Object.keys(input).sort())
-    own(output, key, cloneValue(input[key] as JsonValue));
-  return output;
-}
-
-function graphNode(
-  facet: TemplateFacet | InstanceFacet | Preset,
-): ResourceGraphNode {
-  return {
-    kind: facet.kind,
-    locator: facet.locator,
-    origin: facet.origin,
-  } as ResourceGraphNode;
-}
 
 type ResourceRequest = ResourceResolveOptions & {
   readonly pack: ResourcePack;
@@ -3294,31 +2708,6 @@ function requireTarget(
   return resolveResourceLocator(pack, locator, authoringFile, options);
 }
 
-function escapePointer(value: string): string {
-  return value.replaceAll("~", "~0").replaceAll("/", "~1");
-}
-
-function sortProvenance(
-  provenance: Record<string, ResourceOrigin>,
-): Record<string, ResourceOrigin> {
-  const output: Record<string, ResourceOrigin> = {};
-  for (const key of Object.keys(provenance).sort())
-    own(output, key, provenance[key]);
-  return output;
-}
-
-function addBindingValuesProvenance(
-  output: Record<string, ResourceOrigin>,
-  provenance: ResourceProvenance,
-  values: JsonObject | undefined,
-): void {
-  if (!values) return;
-  for (const pointer of Object.keys(provenance).sort()) {
-    if (pointer !== "/values" && !pointer.startsWith("/values/")) continue;
-    own(output, pointer, provenance[pointer]);
-  }
-}
-
 function cloneNormalizedDocument(
   value: Record<string, JsonValue>,
 ): NormalizedResourceDocument {
@@ -3327,20 +2716,6 @@ function cloneNormalizedDocument(
     own(output, key, cloneValue(value[key] as JsonValue));
   }
   return output as NormalizedResourceDocument;
-}
-
-function templateAcceptsArray(template: ResolvedTemplate): boolean {
-  return (
-    isObject(template.facet.inputSchema) &&
-    template.facet.inputSchema.type === "array"
-  );
-}
-
-function templateAcceptsObject(template: ResolvedTemplate): boolean {
-  return (
-    isObject(template.facet.inputSchema) &&
-    template.facet.inputSchema.type === "object"
-  );
 }
 
 function uniqueResolvedSlots(
