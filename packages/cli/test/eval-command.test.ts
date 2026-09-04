@@ -1,4 +1,13 @@
-import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  spyOn,
+  test,
+} from "bun:test";
 import {
   cpSync,
   existsSync,
@@ -12,16 +21,20 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import type { HostRunner, RunTrialInput, TrialRun } from "@atlante/eval";
 import { EVAL_SCENARIO_SCHEMA_URI, SCHEMA_URI } from "@atlante/schema";
 import { createProgressStyler, runEvalCommand } from "../src/commands/eval.js";
 import { runBuild } from "../src/main.js";
+import { installStubPack } from "./stub-pack.js";
+
+/**
+ * Foreign pack name so CLI commands resolve the stub from the fixture's
+ * node_modules instead of intercepting `@atlante/pack` with the bundled
+ * first-party pack.
+ */
+const FIXTURE_PACK = "@fixture/pack";
 
 const created: string[] = [];
-const firstPartyPackRoot = fileURLToPath(
-  new URL("../../pack/", import.meta.url),
-);
 
 afterEach(() => {
   for (const dir of created.splice(0))
@@ -50,7 +63,14 @@ function scenarioDocument(): string {
 
 /** Authors a full eval-enabled project; native outputs stay unbuilt by default. */
 function evalProject(options: { evalSection?: object } = {}): string {
-  const project = tempDir();
+  const project = writeEvalProject(options);
+  created.push(project);
+  return project;
+}
+
+/** Same layout as `evalProject`, but outside the per-test cleanup list. */
+function writeEvalProject(options: { evalSection?: object } = {}): string {
+  const project = mkdtempSync(join(tmpdir(), "atlante-eval-command-"));
   const evalSection =
     options.evalSection === undefined
       ? { host: "opencode", scenarios: "eval/scenarios/*.eval.json" }
@@ -59,7 +79,7 @@ function evalProject(options: { evalSection?: object } = {}): string {
     join(project, "atlante.jsonc"),
     `${JSON.stringify({
       $schema: SCHEMA_URI,
-      extends: "@atlante/pack",
+      extends: "@fixture/pack",
       values: { project: "demo" },
       agents: {
         reviewer: {
@@ -71,19 +91,13 @@ function evalProject(options: { evalSection?: object } = {}): string {
       eval: evalSection,
     })}\n`,
   );
-  cpSync(
-    firstPartyPackRoot,
-    join(project, "node_modules", "@atlante", "pack"),
-    {
-      recursive: true,
-    },
-  );
+  installStubPack(project, { name: FIXTURE_PACK });
   writeFileSync(
     join(project, "package.json"),
     `${JSON.stringify({
       name: "atlante-eval-command-fixture",
       version: "1.0.0",
-      devDependencies: { "@atlante/pack": "workspace:0.1.6" },
+      devDependencies: { [FIXTURE_PACK]: "workspace:0.1.6" },
     })}\n`,
   );
   mkdirSync(join(project, "eval", "scenarios"), { recursive: true });
@@ -108,6 +122,20 @@ function evalProject(options: { evalSection?: object } = {}): string {
 async function buildFixtureOutputs(project: string): Promise<void> {
   const exit = await runBuild(project);
   if (exit !== 0) throw new Error("fixture build failed");
+}
+
+// One built template per file: every test copies it instead of re-running the
+// full build. The template never runs eval, so it never gains run state, and
+// each test mutates only its own copy.
+const templateDirs: string[] = [];
+let builtTemplate: string | undefined;
+
+/** A cheap copy of the built template project, registered for per-test cleanup. */
+function builtProject(): string {
+  if (builtTemplate === undefined) throw new Error("template not built");
+  const project = tempDir();
+  cpSync(builtTemplate, project, { recursive: true });
+  return project;
 }
 
 /** Fake host: `createsFile` decides whether the graded check can pass. */
@@ -166,6 +194,16 @@ describe("runEvalCommand", () => {
   // Pin plain-text progress so stderr assertions are deterministic whether
   // the test runner's stderr is a terminal or a pipe.
   let previousNoColor: string | undefined;
+  beforeAll(async () => {
+    const template = writeEvalProject();
+    templateDirs.push(template);
+    await buildFixtureOutputs(template);
+    builtTemplate = template;
+  });
+  afterAll(() => {
+    for (const dir of templateDirs.splice(0))
+      rmSync(dir, { recursive: true, force: true });
+  });
   beforeEach(() => {
     previousNoColor = process.env.NO_COLOR;
     process.env.NO_COLOR = "1";
@@ -176,8 +214,7 @@ describe("runEvalCommand", () => {
   });
 
   test("runs the suite, writes the report, and gitignores it", async () => {
-    const project = evalProject();
-    await buildFixtureOutputs(project);
+    const project = builtProject();
     const exit = await runEvalCommand(project, {}, undefined, fakeRunner(true));
     expect(exit).toBe(0);
     const { runId, file } = reportPaths(project);
@@ -194,8 +231,7 @@ describe("runEvalCommand", () => {
   });
 
   test("exits 1 when a check fails", async () => {
-    const project = evalProject();
-    await buildFixtureOutputs(project);
+    const project = builtProject();
     const exit = await runEvalCommand(
       project,
       {},
@@ -212,13 +248,13 @@ describe("runEvalCommand", () => {
   });
 
   test("exits 2 when the eval section is missing", async () => {
-    const project = evalProject({ evalSection: undefined });
+    const project = builtProject();
     // Re-author without the eval key entirely.
     writeFileSync(
       join(project, "atlante.jsonc"),
       `${JSON.stringify({
         $schema: SCHEMA_URI,
-        extends: "@atlante/pack",
+        extends: FIXTURE_PACK,
         values: { project: "demo" },
         agents: {
           reviewer: {
@@ -240,8 +276,7 @@ describe("runEvalCommand", () => {
   });
 
   test("exits 2 for an unknown --scenario filter", async () => {
-    const project = evalProject();
-    await buildFixtureOutputs(project);
+    const project = builtProject();
     const exit = await runEvalCommand(
       project,
       { scenario: ["nope"] },
@@ -252,8 +287,7 @@ describe("runEvalCommand", () => {
   });
 
   test("exits 2 for an invalid --trials value", async () => {
-    const project = evalProject();
-    await buildFixtureOutputs(project);
+    const project = builtProject();
     const exit = await runEvalCommand(
       project,
       { trials: "zero" },
@@ -264,8 +298,7 @@ describe("runEvalCommand", () => {
   });
 
   test("--trials overrides the configured trial count", async () => {
-    const project = evalProject();
-    await buildFixtureOutputs(project);
+    const project = builtProject();
     const exit = await runEvalCommand(
       project,
       { trials: "2" },
@@ -283,8 +316,7 @@ describe("runEvalCommand", () => {
   });
 
   test("exits 2 when --trials exceeds the configured maximum", async () => {
-    const project = evalProject();
-    await buildFixtureOutputs(project);
+    const project = builtProject();
     const exit = await runEvalCommand(
       project,
       { trials: "51" },
@@ -319,15 +351,13 @@ describe("runEvalCommand", () => {
   });
 
   test("exits 1 when a host trial throws", async () => {
-    const project = evalProject();
-    await buildFixtureOutputs(project);
+    const project = builtProject();
     const exit = await runEvalCommand(project, {}, undefined, throwingRunner());
     expect(exit).toBe(1);
   });
 
   test("--json prints the report and --out relocates it", async () => {
-    const project = evalProject();
-    await buildFixtureOutputs(project);
+    const project = builtProject();
     const out = tempDir();
     const logs: string[] = [];
     const spy = spyOn(console, "log").mockImplementation(
@@ -357,8 +387,7 @@ describe("runEvalCommand", () => {
   });
 
   test("human summary warns when token usage is unmonitored", async () => {
-    const project = evalProject();
-    await buildFixtureOutputs(project);
+    const project = builtProject();
     const logs: string[] = [];
     const spy = spyOn(console, "log").mockImplementation(
       (...parts: unknown[]) => {
@@ -382,8 +411,7 @@ describe("runEvalCommand", () => {
   });
 
   test("streams progress events to stderr as they arrive", async () => {
-    const project = evalProject();
-    await buildFixtureOutputs(project);
+    const project = builtProject();
     const logs: string[] = [];
     const errors: string[] = [];
     const logSpy = spyOn(console, "log").mockImplementation(
@@ -432,8 +460,7 @@ describe("runEvalCommand", () => {
   });
 
   test("--json keeps stdout pure JSON while progress still streams to stderr", async () => {
-    const project = evalProject();
-    await buildFixtureOutputs(project);
+    const project = builtProject();
     const out = tempDir();
     const logs: string[] = [];
     const errors: string[] = [];
@@ -499,8 +526,7 @@ describe("runEvalCommand", () => {
   });
 
   test("summary repeats aggregates, not the per-trial lines", async () => {
-    const project = evalProject();
-    await buildFixtureOutputs(project);
+    const project = builtProject();
     const logs: string[] = [];
     const logSpy = spyOn(console, "log").mockImplementation(
       (...parts: unknown[]) => {
@@ -529,8 +555,7 @@ describe("runEvalCommand", () => {
   });
 
   test("--json mode still warns about an unmonitored budget on stderr", async () => {
-    const project = evalProject();
-    await buildFixtureOutputs(project);
+    const project = builtProject();
     const out = tempDir();
     const logs: string[] = [];
     const errors: string[] = [];
@@ -564,8 +589,7 @@ describe("runEvalCommand", () => {
   });
 
   test("exits 3 with a diagnostic when the default runner has no host auth", async () => {
-    const project = evalProject();
-    await buildFixtureOutputs(project);
+    const project = builtProject();
     // Point the auth preflight at an empty data dir; injected runners skip
     // the preflight entirely.
     const emptyDataHome = tempDir();
@@ -591,8 +615,7 @@ describe("runEvalCommand", () => {
   });
 
   test("returns 3 when the report cannot be written", async () => {
-    const project = evalProject();
-    await buildFixtureOutputs(project);
+    const project = builtProject();
     const out = join(project, "report-file");
     writeFileSync(out, "not a directory\n");
     const exit = await runEvalCommand(
@@ -605,8 +628,7 @@ describe("runEvalCommand", () => {
   });
 
   test("returns 3 instead of following a symlinked report directory", async () => {
-    const project = evalProject();
-    await buildFixtureOutputs(project);
+    const project = builtProject();
     const outside = tempDir();
     const reportDir = join(project, ".atlante", "eval");
     symlinkSync(outside, reportDir, "dir");
@@ -616,8 +638,7 @@ describe("runEvalCommand", () => {
   });
 
   test("progress is gray when stderr is an interactive terminal", async () => {
-    const project = evalProject();
-    await buildFixtureOutputs(project);
+    const project = builtProject();
     const previousNoColor = process.env.NO_COLOR;
     delete process.env.NO_COLOR;
     // Force the TTY branch of the styler regardless of how the tests run.

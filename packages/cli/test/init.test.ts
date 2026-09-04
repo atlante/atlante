@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import {
-  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -13,7 +12,6 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import type { BuildResult } from "@atlante/builder";
 import { buildProject } from "@atlante/builder";
 import { openCodeMaterializer } from "@atlante/opencode";
@@ -25,18 +23,17 @@ import {
 import type { PackageManagerRunner } from "../src/commands/package-manager.js";
 import { firstPartyProjectContext } from "../src/first-party-pack.js";
 import { runInit, runValidate } from "../src/main.js";
+import { installStubPack } from "./stub-pack.js";
 
 const created: string[] = [];
-const firstPartyPackRoot = fileURLToPath(
-  new URL("../../pack/", import.meta.url),
-);
 
 function tempDir(): string {
   const dir = mkdtempSync(join(tmpdir(), "atlante-init-"));
   created.push(dir);
-  cpSync(firstPartyPackRoot, join(dir, "node_modules", "@atlante", "pack"), {
-    recursive: true,
-  });
+  // A minimal valid pack under the name init extends by default. The real
+  // first-party pack is exercised by the dedicated bundled-pack tests below;
+  // these tests target the init flow, not pack content.
+  installStubPack(dir, { name: "@atlante/pack" });
   writeFileSync(
     join(dir, "package.json"),
     `${JSON.stringify({
@@ -610,7 +607,7 @@ describe("runInit", () => {
 
   test("the bare config has no workflow slot", async () => {
     const dir = tempDir();
-    await runInit(dir, {});
+    await runInitWithDependencies(dir, {}, {});
     const text = readFileSync(join(dir, "atlante.jsonc"), "utf8");
     expect(text).not.toContain("workflow");
   });
@@ -1394,7 +1391,7 @@ describe("runInit", () => {
 
   test("does not register the plugin in a created opencode.jsonc", async () => {
     const dir = tempDir();
-    await runInit(dir, {});
+    await runInitWithDependencies(dir, {}, {});
     const opencode = JSON.parse(
       readFileSync(join(dir, "opencode.jsonc"), "utf8"),
     );
@@ -1421,7 +1418,7 @@ describe("runInit", () => {
 
   test("adds the OpenCode schema to a new opencode.jsonc", async () => {
     const dir = tempDir();
-    await runInit(dir, {});
+    await runInitWithDependencies(dir, {}, {});
     const opencode = JSON.parse(
       readFileSync(join(dir, "opencode.jsonc"), "utf8"),
     );
@@ -1433,7 +1430,7 @@ describe("runInit", () => {
     const path = join(dir, "opencode.jsonc");
     const original = `{ "model": "anthropic/claude-sonnet-5" }`;
     writeFileSync(path, original);
-    await runInit(dir, {});
+    await runInitWithDependencies(dir, {}, {});
     const opencode = JSON.parse(readFileSync(path, "utf8"));
     expect(opencode.model).toBe("anthropic/claude-sonnet-5");
     expect(opencode.plugin).toBeUndefined();
@@ -1448,7 +1445,7 @@ describe("runInit", () => {
       `{ "model": "anthropic/claude-sonnet-5", "plugin": ["@atlante/opencode"] }`,
     );
 
-    expect(await runInit(dir, {})).toBe(0);
+    expect(await runInitWithDependencies(dir, {}, {})).toBe(0);
 
     const opencode = JSON.parse(readFileSync(path, "utf8"));
     expect(opencode.model).toBe("anthropic/claude-sonnet-5");
@@ -1465,7 +1462,7 @@ describe("runInit", () => {
     const originalJson = `{ "model": "google/gemini-3-pro" }`;
     writeFileSync(json, originalJson);
 
-    expect(await runInit(dir, {})).toBe(0);
+    expect(await runInitWithDependencies(dir, {}, {})).toBe(0);
 
     const opencode = JSON.parse(readFileSync(jsonc, "utf8"));
     expect(opencode.model).toBe("anthropic/claude-sonnet-5");
@@ -1517,7 +1514,7 @@ describe("runInit", () => {
     });
     writeFileSync(path, original);
 
-    expect(await runInit(dir, {})).toBe(0);
+    expect(await runInitWithDependencies(dir, {}, {})).toBe(0);
 
     expect(readFileSync(path, "utf8")).toBe(original);
   });
@@ -1534,7 +1531,7 @@ describe("runInit", () => {
 }`,
     );
 
-    expect(await runInit(dir, {})).toBe(0);
+    expect(await runInitWithDependencies(dir, {}, {})).toBe(0);
 
     const text = readFileSync(path, "utf8");
     expect(text).toContain("// Host-owned settings.");
@@ -1552,7 +1549,7 @@ describe("runInit", () => {
       JSON.stringify({ plugin: [["@atlante/opencode", { enabled: true }]] }),
     );
 
-    expect(await runInit(dir, {})).toBe(0);
+    expect(await runInitWithDependencies(dir, {}, {})).toBe(0);
 
     const opencode = JSON.parse(readFileSync(path, "utf8"));
     expect(opencode.plugin).toEqual([]);
@@ -1600,7 +1597,7 @@ describe("runInit", () => {
 
   test("leaves a config without a registration untouched on re-init", async () => {
     const dir = tempDir();
-    await runInit(dir, {});
+    await runInitWithDependencies(dir, {}, {});
     const path = join(dir, "opencode.jsonc");
     const original = readFileSync(path, "utf8");
     const originalGitignore = readFileSync(join(dir, ".gitignore"), "utf8");
@@ -1609,7 +1606,7 @@ describe("runInit", () => {
     const originalLog = console.log;
     console.log = (...args: unknown[]) => written.push(args.join(" "));
     try {
-      expect(await runInit(dir, { force: true })).toBe(0);
+      expect(await runInitWithDependencies(dir, { force: true }, {})).toBe(0);
     } finally {
       console.log = originalLog;
     }
@@ -1629,14 +1626,14 @@ describe("runInit", () => {
     const original = "# Generated outputs\nnode_modules/\n.opencode/agents/\n";
     writeFileSync(gitignore, original);
 
-    expect(await runInit(dir, {})).toBe(0);
+    expect(await runInitWithDependencies(dir, {}, {})).toBe(0);
     expect(readFileSync(gitignore, "utf8")).toBe(
       `${original}\n.opencode/skills/\n.atlante/\n`,
     );
 
     // A second init run is idempotent: nothing is rewritten or duplicated.
     const afterFirst = readFileSync(gitignore, "utf8");
-    expect(await runInit(dir, { force: true })).toBe(0);
+    expect(await runInitWithDependencies(dir, { force: true }, {})).toBe(0);
     expect(readFileSync(gitignore, "utf8")).toBe(afterFirst);
   });
 
@@ -1647,7 +1644,7 @@ describe("runInit", () => {
       ".opencode/agents/\n.opencode/skills/\n.atlante/\n# keep\n";
     writeFileSync(gitignore, original);
 
-    expect(await runInit(dir, {})).toBe(0);
+    expect(await runInitWithDependencies(dir, {}, {})).toBe(0);
     expect(readFileSync(gitignore, "utf8")).toBe(original);
   });
 
@@ -1792,7 +1789,7 @@ describe("runInit", () => {
     const original = console.log;
     console.log = (...args: unknown[]) => written.push(args.join(" "));
     try {
-      await runInit(dir, {});
+      await runInitWithDependencies(dir, {}, {});
     } finally {
       console.log = original;
     }
@@ -1817,7 +1814,7 @@ describe("runInit", () => {
     const original = console.log;
     console.log = (...args: unknown[]) => written.push(args.join(" "));
     try {
-      expect(await runInit(dir, { force: true })).toBe(0);
+      expect(await runInitWithDependencies(dir, { force: true }, {})).toBe(0);
     } finally {
       console.log = original;
     }
@@ -1828,13 +1825,13 @@ describe("runInit", () => {
 
   test("reports that no plugin registration was found on re-init, rather than claiming a removal", async () => {
     const dir = tempDir();
-    await runInit(dir, {});
+    await runInitWithDependencies(dir, {}, {});
 
     const written: string[] = [];
     const original = console.log;
     console.log = (...args: unknown[]) => written.push(args.join(" "));
     try {
-      await runInit(dir, { force: true });
+      await runInitWithDependencies(dir, { force: true }, {});
     } finally {
       console.log = original;
     }
@@ -1845,11 +1842,11 @@ describe("runInit", () => {
 
   test("--force overwrites altered configuration contents", async () => {
     const dir = tempDir();
-    await runInit(dir, {});
+    await runInitWithDependencies(dir, {}, {});
     const target = join(dir, "atlante.jsonc");
     writeFileSync(target, "altered contents");
 
-    expect(await runInit(dir, { force: true })).toBe(0);
+    expect(await runInitWithDependencies(dir, { force: true }, {})).toBe(0);
     const contents = readFileSync(target, "utf8");
     expect(contents).not.toBe("altered contents");
     expect(contents).toContain('"$schema"');
@@ -1858,8 +1855,8 @@ describe("runInit", () => {
 
   test("refuses to overwrite an existing config without --force", async () => {
     const dir = tempDir();
-    await runInit(dir, {});
-    expect(await runInit(dir, {})).toBe(1);
+    await runInitWithDependencies(dir, {}, {});
+    expect(await runInitWithDependencies(dir, {}, {})).toBe(1);
   });
 
   test("refuses when only atlante.json already exists", async () => {
@@ -1877,10 +1874,10 @@ describe("runInit", () => {
 
   test("refuses an ambiguous pre-state without --force", async () => {
     const dir = tempDir();
-    await runInit(dir, {});
+    await runInitWithDependencies(dir, {}, {});
     writeFileSync(join(dir, "atlante.json"), "{}");
 
-    expect(await runInit(dir, {})).toBe(1);
+    expect(await runInitWithDependencies(dir, {}, {})).toBe(1);
     expect(existsSync(join(dir, "atlante.jsonc"))).toBe(true);
     expect(existsSync(join(dir, "atlante.json"))).toBe(true);
   });
@@ -1895,15 +1892,15 @@ describe("runInit", () => {
       }),
     );
 
-    expect(await runInit(dir, { force: true })).toBe(0);
+    expect(await runInitWithDependencies(dir, { force: true }, {})).toBe(0);
     expect(existsSync(join(dir, "atlante.jsonc"))).toBe(true);
     expect(existsSync(join(dir, "atlante.json"))).toBe(false);
-    expect(await runValidate(dir)).toBe(0);
+    expect(await runValidate(dir, {})).toBe(0);
   });
 
   test("--force resolves an ambiguous pre-state without leaving both files", async () => {
     const dir = tempDir();
-    await runInit(dir, {});
+    await runInitWithDependencies(dir, {}, {});
     writeFileSync(
       join(dir, "atlante.json"),
       JSON.stringify({
@@ -1912,14 +1909,14 @@ describe("runInit", () => {
       }),
     );
 
-    expect(await runInit(dir, { force: true })).toBe(0);
+    expect(await runInitWithDependencies(dir, { force: true }, {})).toBe(0);
     expect(existsSync(join(dir, "atlante.jsonc"))).toBe(true);
     expect(existsSync(join(dir, "atlante.json"))).toBe(false);
   });
 
   test("runs the configuration preflight before any pack installation", async () => {
     const dir = tempDir();
-    await runInit(dir, {});
+    await runInitWithDependencies(dir, {}, {});
     const packManager = fakePackageManager(dir, {});
     const before = readFileSync(join(dir, "package.json"), "utf8");
 
