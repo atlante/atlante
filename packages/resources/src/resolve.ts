@@ -5,13 +5,11 @@ import {
   isResourcePackPathContained,
   type ResourcePack,
   resourcePackMetadataPaths,
-  resourcePackWatchRoot,
 } from "./content-root.js";
 import {
   failGraphResource,
   failResource,
   normalizeResourcePaths,
-  normalizeResourceRoots,
   ResourceResolutionError,
 } from "./errors.js";
 import {
@@ -30,18 +28,8 @@ import {
   resolveResourceLocator,
   resourceCandidateWatchPaths,
 } from "./filesystem.js";
-import {
-  addResourceGraphEdge,
-  addResourceGraphNode,
-  assertResourceGraphStep,
-  canonicalGraphKey,
-  createResourceGraphState,
-  type ResourceGraphState,
-  snapshotResourceGraph,
-} from "./graph.js";
 import type { JsoncLocation } from "./jsonc.js";
 import { isSafeJsonObject } from "./jsonc.js";
-import { parseResourceLocator } from "./locator.js";
 import { mergeResourceValues } from "./merge.js";
 import { own } from "./object.js";
 import { createPackageResolutionCache } from "./package-resolution.js";
@@ -57,6 +45,7 @@ import {
   withResourceTemplateSelection,
   withResourceValueTombstones,
 } from "./resolution.js";
+import { ResolutionTraversal } from "./resolution-traversal.js";
 import type {
   AuthoringContext,
   AuthoringProvenance,
@@ -97,7 +86,6 @@ import {
   authoringContext,
   cloneObject,
   cloneValue,
-  composeFailurePointer,
   contextAt,
   copySourceValues,
   descriptorData,
@@ -136,7 +124,6 @@ import type {
   Preset,
   RawResourceLocator,
   ResourceFailureCode,
-  ResourceGraphChain,
   ResourceGraphNode,
   ResourceOrigin,
   ResourceWatchRoot,
@@ -286,10 +273,7 @@ class ResourceResolver {
   private readonly resourceContext: ResourceResolveOptions["resourceContext"];
   private readonly bindingCollections: readonly ResourceBindingCollectionSpec[];
   private readonly packageCache = createPackageResolutionCache();
-  private readonly graph: ResourceGraphState = createResourceGraphState();
-  private readonly dependencies = new Set<string>();
-  private readonly unresolvedParents = new Set<string>();
-  private readonly trustedRoots = new Map<string, ResourceWatchRoot>();
+  private readonly traversal = new ResolutionTraversal();
   /** Output indexes only; traversal never reads these resolved results. */
   private readonly resolvedTemplates = new Map<string, ResolvedTemplate>();
   private readonly resolvedInstances = new Map<
@@ -315,44 +299,24 @@ class ResourceResolver {
     };
   }
 
-  run<T>(action: () => T): T {
-    try {
-      return action();
-    } catch (error) {
-      throw this.decorateFailure(error);
-    }
+  private get dependencies(): ReadonlySet<string> {
+    return this.traversal.dependencyPaths;
   }
 
-  private decorateFailure(error: unknown): ResourceResolutionError | Error {
-    if (!(error instanceof ResourceResolutionError)) {
-      return error instanceof Error ? error : new Error(String(error));
-    }
-    return new ResourceResolutionError(error.failure, {
-      dependencies: [...this.dependencies, ...error.dependencies],
-      unresolvedParents: [
-        ...this.unresolvedParents,
-        ...error.unresolvedParents,
-      ],
-      trustedRoots: normalizeResourceRoots([
-        ...this.trustedRoots.values(),
-        ...error.trustedRoots,
-      ]),
-    });
+  private get unresolvedParents(): ReadonlySet<string> {
+    return this.traversal.unresolvedParentPaths;
+  }
+
+  run<T>(action: () => T): T {
+    return this.traversal.run(action);
   }
 
   private collectPack(pack: ResourcePack): void {
-    if (pack.kind !== "package") return;
-    const root = resourcePackWatchRoot(pack);
-    this.trustedRoots.set(`${root.canonical}\u0000${root.lexical}`, root);
+    this.traversal.collectPack(pack);
   }
 
   private collect<T>(loaded: LoadedResource<T>): void {
-    loaded.dependencies.forEach((path) => {
-      this.dependencies.add(path);
-    });
-    loaded.unresolvedParents.forEach((path) => {
-      this.unresolvedParents.add(path);
-    });
+    this.traversal.collect(loaded);
   }
 
   private enter(
@@ -360,15 +324,7 @@ class ResourceResolver {
     path: readonly ResourceGraphNode[],
     hops: number,
   ): readonly ResourceGraphNode[] {
-    assertResourceGraphStep(path, node, hops);
-    if (path.length > 0) {
-      const parent = path.at(-1);
-      if (parent) addResourceGraphEdge(this.graph, parent, node);
-    } else {
-      addResourceGraphNode(this.graph, node);
-    }
-    addResourceGraphNode(this.graph, node);
-    return [...path, node];
+    return this.traversal.enter(node, path, hops);
   }
 
   private loadedFile<T extends TemplateFacet | InstanceFacet | Preset>(
@@ -551,61 +507,7 @@ class ResourceResolver {
     path: readonly ResourceGraphNode[],
     hops: number,
   ): EnteredFacet<T> {
-    const node = graphNode(loaded.loaded.facet);
-    return {
-      loaded,
-      node,
-      path: this.enter(node, path, hops),
-      key: canonicalGraphKey(node),
-    };
-  }
-
-  private failureNode(
-    kind: ResourceGraphNode["kind"],
-    locator: RawResourceLocator,
-    source: ResourceOrigin | undefined,
-  ): ResourceGraphNode | undefined {
-    if (!source) return undefined;
-    try {
-      const parsed = parseResourceLocator(locator);
-      return {
-        kind,
-        locator: parsed.value,
-        origin: source,
-      } as ResourceGraphNode;
-    } catch {
-      return undefined;
-    }
-  }
-
-  private graphChain(
-    path: readonly ResourceGraphNode[],
-  ): ResourceGraphChain | undefined {
-    return path.length === 0
-      ? undefined
-      : (path as [ResourceGraphNode, ...ResourceGraphNode[]]);
-  }
-
-  private decorateTraversalFailure(
-    error: unknown,
-    path: readonly ResourceGraphNode[],
-    kind: ResourceGraphNode["kind"],
-    locator: RawResourceLocator,
-  ): ResourceResolutionError | Error {
-    if (!(error instanceof ResourceResolutionError)) {
-      return error instanceof Error ? error : new Error(String(error));
-    }
-    const failure = error.failure;
-    if (failure.chain) return error;
-    const node = this.failureNode(kind, locator, failure.source);
-    const chain = this.graphChain(node ? [...path, node] : path);
-    return new ResourceResolutionError(
-      {
-        ...failure,
-        ...(chain ? { chain } : {}),
-      },
-      this.failureContext(error),
-    );
+    return this.traversal.enterLoaded(loaded, path, hops);
   }
 
   private loadForTraversal<T extends TemplateFacet | InstanceFacet | Preset>(
@@ -614,38 +516,7 @@ class ResourceResolver {
     kind: ResourceGraphNode["kind"],
     locator: RawResourceLocator,
   ): LoadedFacet<T> {
-    try {
-      return load();
-    } catch (error) {
-      throw this.decorateTraversalFailure(error, path, kind, locator);
-    }
-  }
-
-  private delegatedFailure(
-    error: ResourceResolutionError,
-    path: readonly ResourceGraphNode[],
-    source: ResourceOrigin | undefined,
-    pointer: string | undefined,
-    location: JsoncLocation | undefined,
-    pointerScope: string | undefined,
-  ): ResourceResolutionError {
-    const failure = error.failure;
-    const chain = failure.chain ?? this.graphChain(path);
-    const failurePointer = composeFailurePointer(
-      pointer,
-      failure.pointer,
-      pointerScope,
-    );
-    return new ResourceResolutionError(
-      {
-        ...failure,
-        ...(source && !failure.source ? { source } : {}),
-        ...(failurePointer ? { pointer: failurePointer } : {}),
-        ...(location && !failure.location ? { location } : {}),
-        ...(chain ? { chain } : {}),
-      },
-      this.failureContext(error),
-    );
+    return this.traversal.loadForTraversal(load, path, kind, locator);
   }
 
   private delegateResource<T>(
@@ -656,19 +527,14 @@ class ResourceResolver {
     location?: JsoncLocation,
     pointerScope?: string,
   ): T {
-    try {
-      return action();
-    } catch (error) {
-      if (!(error instanceof ResourceResolutionError)) throw error;
-      throw this.delegatedFailure(
-        error,
-        path,
-        source,
-        pointer,
-        location,
-        pointerScope,
-      );
-    }
+    return this.traversal.delegateResource(
+      action,
+      path,
+      source,
+      pointer,
+      location,
+      pointerScope,
+    );
   }
 
   private resolveTemplateChild(
@@ -1001,7 +867,7 @@ class ResourceResolver {
       effectiveTemplate: selection.template,
       input: cloneObject(normalized.value),
       provenance: cloneResourceProvenance(normalized.provenance),
-      graph: snapshotResourceGraph(this.graph),
+      graph: this.traversal.snapshotGraph(),
       dependencies: Object.freeze([...this.dependencies].sort()),
       unresolvedParents: Object.freeze([...this.unresolvedParents].sort()),
     });
@@ -1033,17 +899,7 @@ class ResourceResolver {
     readonly unresolvedParents: readonly string[];
     readonly trustedRoots: readonly ResourceWatchRoot[];
   } {
-    return {
-      dependencies: [...this.dependencies, ...(error?.dependencies ?? [])],
-      unresolvedParents: [
-        ...this.unresolvedParents,
-        ...(error?.unresolvedParents ?? []),
-      ],
-      trustedRoots: normalizeResourceRoots([
-        ...this.trustedRoots.values(),
-        ...(error?.trustedRoots ?? []),
-      ]),
-    };
+    return this.traversal.failureContext(error);
   }
 
   private isAbsentSiblingTemplate(loaded: LoadedFacet<InstanceFacet>): boolean {
@@ -1072,13 +928,7 @@ class ResourceResolver {
     context: TraversalContext,
     details: TraversalFailureDetails = {},
   ): never {
-    const chain = this.graphChain(context.path);
-    return failResource(
-      code,
-      message,
-      chain ? { ...details, chain } : details,
-      this.failureContext(),
-    );
+    return this.traversal.failAt(code, message, context, details);
   }
 
   private mergeValues(
@@ -2404,7 +2254,7 @@ class ResourceResolver {
       document: normalized,
       bindings: Object.freeze(bindings),
       provenance: Object.freeze(sortProvenance(resultProvenance)),
-      graph: snapshotResourceGraph(this.graph),
+      graph: this.traversal.snapshotGraph(),
       templates: Object.freeze(
         [...this.resolvedTemplates.entries()]
           .sort(([a], [b]) => a.localeCompare(b))
@@ -2417,9 +2267,7 @@ class ResourceResolver {
       ),
       dependencies: Object.freeze([...this.dependencies].sort()),
       unresolvedParents: Object.freeze([...this.unresolvedParents].sort()),
-      trustedRoots: Object.freeze(
-        normalizeResourceRoots([...this.trustedRoots.values()]),
-      ),
+      trustedRoots: Object.freeze(this.traversal.watchRoots),
     });
     return result;
   }
