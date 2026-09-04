@@ -37,7 +37,10 @@ Schema changes require building and validating (`atlante validate`, `atlante bui
 ## Common commands
 
 ```sh
-bun run test                    # run all tests (bun:test)
+bun run test                    # run all tests (bun:test); tiers below are subsets
+bun run test:unit               # in-memory unit tests only (fast inner loop)
+bun run test:integration        # tests doing real builds / temp-dir filesystem work
+bun run test:e2e                # full command-path tests (CLI spawns, real bun installs)
 bun run type:check              # type-check all packages
 bun run lint:check              # lint + format check
 bun run build                   # build publishable CLI + internal adapter artifacts (pack is static)
@@ -46,6 +49,11 @@ bun run full:check              # build + quick:check (CI gate)
 bun run cli                     # run the CLI (packages/cli/bin/atlante.ts)
 bun run worktree <issue>        # create + bootstrap an isolated worktree (.worktrees/issue-<n>); omit <issue> for a random one
 ```
+
+Test files under `packages/<workspace>/test/` carry a tier suffix
+(`*.unit.test.ts`, `*.integration.test.ts`, `*.e2e.test.ts`) that the tier
+scripts filter on; new test files must pick one. `scripts/`, `docs/`, and
+`website/` tests are unsuffixed and run only via plain `bun run test`.
 
 Bun is the package manager and the build/release/smoke/packaging/test runtime.
 
