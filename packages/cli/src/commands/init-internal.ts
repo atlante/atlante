@@ -36,6 +36,7 @@ import {
   printDiagnostics,
   reportBuildResult,
 } from "../report.js";
+import { createStyler } from "../style.js";
 import { formatInitError } from "./init-error.js";
 import { parsePackLocator, type SelectedPack } from "./pack-locator.js";
 import {
@@ -536,8 +537,9 @@ function buildAndReport(
     return 1;
   }
   reportBuildResult(built);
-  console.log(`created ${target}`);
-  console.log(`built ${built.projectRoot}`);
+  const styler = createStyler();
+  console.log(`${styler.success("created")} ${styler.dim(target)}`);
+  console.log(`${styler.success("built")} ${styler.dim(built.projectRoot)}`);
   return 0;
 }
 

@@ -3,6 +3,7 @@ import { validateProject } from "@atlante/builder";
 import { hasErrors } from "@atlante/validator";
 import { firstPartyProjectContext } from "../first-party-pack.js";
 import { printDiagnostics } from "../report.js";
+import { createStyler } from "../style.js";
 
 /**
  * Validation deliberately stops short of rendering. Going through the build
@@ -19,6 +20,9 @@ export async function runValidate(
   printDiagnostics(validated.diagnostics);
   if (hasErrors(validated.diagnostics)) return 1;
 
-  console.log(`validated ${validated.configPath}`);
+  const styler = createStyler();
+  console.log(
+    `${styler.success("validated")} ${styler.dim(validated.configPath ?? target)}`,
+  );
   return 0;
 }

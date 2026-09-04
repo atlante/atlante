@@ -31,7 +31,7 @@ import {
 import packageJson from "../../package.json" with { type: "json" };
 import { firstPartyProjectContext } from "../first-party-pack.js";
 import { diagnosticPath, printDiagnostics } from "../report.js";
-import { createStyler } from "../style.js";
+import { createStyler, type Styler } from "../style.js";
 
 export type EvalCommandOptions = {
   /** Repeatable `--scenario <name>` filter; absent runs the whole suite. */
@@ -145,11 +145,13 @@ export async function runEvalCommand(
 }
 
 /** `budgetUnmonitored` must reach operators in both output modes. */
+function budgetWarning(styler: Styler): string {
+  return `${styler.warning("warning:")} token budget unmonitored for one or more trials (no usage events were observed)`;
+}
+
 function warnUnmonitoredBudget(report: RunReport): void {
   if (!hasUnmonitoredBudget(report)) return;
-  console.error(
-    "warning: token budget unmonitored for one or more trials (no usage events were observed)",
-  );
+  console.error(budgetWarning(createStyler(process.stderr)));
 }
 
 function hasUnmonitoredBudget(report: RunReport): boolean {
@@ -491,15 +493,14 @@ export function createProgressStyler(
  * location.
  */
 function printSummary(report: RunReport, reportDir: string): void {
+  const styler = createStyler();
   console.log(`eval ${report.runId}`);
   console.log(
     `host ${report.meta.host} · model ${report.meta.model ?? "host default"}`,
   );
   const hasUnmonitored = hasUnmonitoredBudget(report);
   if (hasUnmonitored) {
-    console.log(
-      "warning: token budget unmonitored for one or more trials (no usage events were observed)",
-    );
+    console.log(budgetWarning(styler));
   }
   for (const [name, result] of Object.entries(report.scenarios)) {
     console.log("");
@@ -508,5 +509,7 @@ function printSummary(report: RunReport, reportDir: string): void {
     );
   }
   console.log("");
-  console.log(`report ${diagnosticPath(join(reportDir, "report.json"))}`);
+  console.log(
+    `${styler.success("report")} ${styler.dim(diagnosticPath(join(reportDir, "report.json")))}`,
+  );
 }
