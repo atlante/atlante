@@ -231,10 +231,13 @@ test("publishes a static first-party pack with no executable API", async () => {
     encoding: "utf8",
   });
 
-  const report = JSON.parse(stdout) as Array<{
-    files: Array<{ path: string }>;
-  }>;
-  const files = report[0]?.files.map(({ path }) => path) ?? [];
+  // npm ≤11 emits an array of pack results; npm ≥12 emits an object keyed by
+  // package name. Normalize both so the test follows the ambient npm.
+  const parsed = JSON.parse(stdout) as
+    | Array<{ files: Array<{ path: string }> }>
+    | Record<string, { files: Array<{ path: string }> }>;
+  const entry = Array.isArray(parsed) ? parsed[0] : Object.values(parsed)[0];
+  const files = entry?.files.map(({ path }) => path) ?? [];
   expect(files).toContain("package.json");
   expect(files).toContain("atlante.jsonc");
   expect(files).toContain("agent/template.jsonc");
