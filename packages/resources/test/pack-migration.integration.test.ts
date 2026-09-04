@@ -76,7 +76,7 @@ const expectedPackFiles = [
   "test/harness.unit.test.ts",
   "test/normative-language.unit.test.ts",
   "test/plan.unit.test.ts",
-  "test/preset.unit.test.ts",
+  "test/preset.integration.test.ts",
   "test/review.unit.test.ts",
   "test/selection-fixture.ts",
 ] as const;
