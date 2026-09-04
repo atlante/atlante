@@ -106,6 +106,39 @@ function blockedDescent(input: unknown, path: string[]): boolean {
   return blockedDescent(value, path.slice(1));
 }
 
+type SlotLookup = Readonly<{
+  /** Resolution walk producing the slot inputs for one render. */
+  resolve: () => unknown[];
+  /** Mirror of `resolve` consulted only when it produced zero inputs. */
+  blocked: () => boolean;
+}>;
+
+/**
+ * Selects the slot walk and its mirror blocked-shape check from a single
+ * branch decision, so the ambiguity diagnostic can never desynchronize from
+ * the walk it mirrors. Partial invocations rendered for an item context
+ * (`context !== input`) descend the item path within that context; every other
+ * invocation walks the group's full data path from the template input.
+ */
+function slotLookup(
+  input: unknown,
+  context: unknown,
+  dataPath: string[],
+  itemPath: string[],
+  arrayItems: boolean,
+): SlotLookup {
+  if (context !== input && arrayItems) {
+    return {
+      resolve: () => itemSlotValues(context, itemPath),
+      blocked: () => blockedDescent(context, itemPath),
+    };
+  }
+  return {
+    resolve: () => slotValues(input, dataPath, itemPath, arrayItems),
+    blocked: () => blockedSlotValues(input, dataPath, itemPath, arrayItems),
+  };
+}
+
 function unwrapArrayTemplateInput(
   input: unknown,
   property: string,
@@ -268,17 +301,19 @@ export function renderResolvedTemplate(
 
       const arrayItems = contextSlot.slot.arrayItems === true;
       const itemPath = arrayItems ? (contextSlot.slot.itemPath ?? []) : [];
-      const slotInputsForRender =
-        context !== input && arrayItems
-          ? itemSlotValues(context, itemPath)
-          : slotValues(input, group.path, itemPath, arrayItems);
+      const lookup = slotLookup(
+        input,
+        context,
+        group.path,
+        itemPath,
+        arrayItems,
+      );
+      const slotInputsForRender = lookup.resolve();
       if (
         slotInputsForRender.length === 0 &&
         (isArrayInputSchema(contextChild.facet.inputSchema) ||
           contextSlot.slot.tupleItems !== true) &&
-        (context !== input && arrayItems
-          ? blockedDescent(context, itemPath)
-          : blockedSlotValues(input, group.path, itemPath, arrayItems))
+        lookup.blocked()
       ) {
         throw new AmbiguousSlotInvocationError(partial);
       }
