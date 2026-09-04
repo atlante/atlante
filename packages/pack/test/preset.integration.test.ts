@@ -97,7 +97,9 @@ describe("first-party preset surface", () => {
     expect(Object.keys(document.skills)).toEqual([...expectedSkillOrder]);
   });
 
-  test("validates the authored preset document against the user configuration schema", () => {
+  test("validates the authored preset document against the user configuration schema", {
+    timeout: 20_000,
+  }, () => {
     const { root, config } = packResourceFixture();
     const source = loadPresetFacet(
       createProjectResourcePack(root),

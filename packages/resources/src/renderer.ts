@@ -311,7 +311,8 @@ export function renderResolvedTemplate(
       const slotInputsForRender = lookup.resolve();
       if (
         slotInputsForRender.length === 0 &&
-        isArrayInputSchema(contextChild.facet.inputSchema) &&
+        (isArrayInputSchema(contextChild.facet.inputSchema) ||
+          contextSlot.slot.tupleItems !== true) &&
         lookup.blocked()
       ) {
         throw new AmbiguousSlotInvocationError(partial);

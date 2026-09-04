@@ -10,6 +10,8 @@ export type Slot = {
   arrayItems?: boolean;
   /** Item-relative dataPath suffix for `arrayItems` slots; omitted when empty. */
   itemPath?: string[];
+  /** Whether the slot is nested beneath a tuple/prefixItems position. */
+  tupleItems?: boolean;
 };
 
 type SlotMarker = {
@@ -20,6 +22,7 @@ type SlotMarker = {
   template: unknown;
   topLevel: boolean;
   arrayItems: boolean;
+  tupleItems: boolean;
 };
 
 type MarkerContext = {
@@ -29,6 +32,7 @@ type MarkerContext = {
   property: string;
   topLevel: boolean;
   arrayItems: boolean;
+  tupleItems: boolean;
 };
 
 function isObject(node: unknown): node is Record<string, unknown> {
@@ -69,8 +73,17 @@ function childContext(
   property = context.property,
   arrayItems = context.arrayItems,
   itemPath = context.itemPath,
+  tupleItems = context.tupleItems,
 ): MarkerContext {
-  return { path, dataPath, itemPath, property, topLevel: false, arrayItems };
+  return {
+    path,
+    dataPath,
+    itemPath,
+    property,
+    topLevel: false,
+    arrayItems,
+    tupleItems,
+  };
 }
 
 function visitSchemaNode(node: unknown, context: MarkerContext): SlotMarker[] {
@@ -85,6 +98,7 @@ function visitSchemaNode(node: unknown, context: MarkerContext): SlotMarker[] {
         template: node.template,
         topLevel: context.topLevel,
         arrayItems: context.arrayItems,
+        tupleItems: context.tupleItems,
       },
     ];
   }
@@ -100,6 +114,7 @@ function visitSchemaArray(
   key: string,
   includeDataIndex: boolean,
   arrayItems: boolean,
+  tupleItems = context.tupleItems,
 ): SlotMarker[] {
   return items.flatMap((item, index) =>
     visitSchemaNode(
@@ -117,6 +132,7 @@ function visitSchemaArray(
         // arrays restart the item-relative suffix. Tuple slots themselves still
         // do not resolve against runtime data — their rendering is unchanged.
         includeDataIndex ? [String(index)] : context.itemPath,
+        tupleItems,
       ),
     ),
   );
@@ -143,7 +159,7 @@ function visitProperties(
 
 function visitItems(value: unknown, context: MarkerContext): SlotMarker[] {
   if (Array.isArray(value))
-    return visitSchemaArray(value, context, "items", true, true);
+    return visitSchemaArray(value, context, "items", true, true, true);
   return visitSchemaNode(
     value,
     childContext(
@@ -185,7 +201,14 @@ function visitSchemaEntry(
   if (isCompositionKeyword(key))
     return visitCompositionBranches(key, value, context);
   if (Array.isArray(value))
-    return visitSchemaArray(value, context, key, true, context.arrayItems);
+    return visitSchemaArray(
+      value,
+      context,
+      key,
+      true,
+      context.arrayItems,
+      key === "prefixItems",
+    );
   return visitSchemaNode(
     value,
     childContext(context, [...context.path, key], [...context.dataPath, key]),
@@ -203,6 +226,7 @@ function markersOf(inputSchema: Record<string, unknown>): SlotMarker[] {
           property,
           topLevel: true,
           arrayItems: false,
+          tupleItems: false,
         }),
       )
     : [];
@@ -216,6 +240,7 @@ function markersOf(inputSchema: Record<string, unknown>): SlotMarker[] {
         property: key,
         topLevel: false,
         arrayItems: false,
+        tupleItems: false,
       }),
     );
   return [...propertyMarkers, ...otherMarkers];
@@ -229,6 +254,7 @@ function slotFromMarker(marker: SlotMarker & { template: string }): Slot {
   if (!marker.topLevel) {
     slot.path = marker.path;
     slot.dataPath = marker.dataPath;
+    if (marker.tupleItems) slot.tupleItems = true;
     if (marker.arrayItems) {
       slot.arrayItems = true;
       if (marker.itemPath.length > 0) slot.itemPath = marker.itemPath;
