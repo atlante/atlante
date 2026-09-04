@@ -1,4 +1,5 @@
 import {
+  AmbiguousSlotInvocationError,
   interpolateValues,
   MissingValueError,
   type ResolvedResourceBinding,
@@ -30,7 +31,9 @@ function renderDiagnostic(
   const code =
     cause instanceof MissingValueError
       ? "missing-value"
-      : "template-render-failed";
+      : cause instanceof AmbiguousSlotInvocationError
+        ? "ambiguous-slot-invocation"
+        : "template-render-failed";
   return error(
     code,
     `${subject} "${binding.id}" template "${String(binding.template.locator)}": ${message}`,

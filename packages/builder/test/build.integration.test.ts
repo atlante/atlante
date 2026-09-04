@@ -476,6 +476,63 @@ describe("buildProject", () => {
     expect(materializer.calls).toHaveLength(1);
   });
 
+  test("reports an ambiguous slot invocation under its dedicated code", () => {
+    const { root } = project(
+      JSON.stringify({
+        $schema: SCHEMA_URI,
+        agents: {
+          reviewer: {
+            $template: "./parent",
+            description: "Reviews changes.",
+            // `extra` is not declared by the template schema, so this shape
+            // passes resolved-input validation; the ambiguity is only visible
+            // at render time, when the partial runs with an item context
+            // whose shape blocks the slot walk.
+            extra: { sections: [{ meta: "scalar" }] },
+          },
+        },
+      }),
+    );
+    writeTemplate(
+      root,
+      "parent",
+      {
+        type: "object",
+        properties: {
+          sections: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                meta: {
+                  type: "object",
+                  properties: { markdown: { template: "../blocks" } },
+                },
+              },
+            },
+          },
+        },
+        additionalProperties: true,
+      },
+      `{{#each extra.sections}}{{> slot/sections/meta/markdown}}{{/each}}`,
+    );
+    writeTemplate(
+      root,
+      "blocks",
+      { type: "array", items: { type: "string" } },
+      "[{{#each (input)}}{{this}}{{/each}}]",
+    );
+    const materializer = fakeMaterializer();
+
+    const failed = buildProject(root, {}, { materializers: [materializer] });
+
+    expect(failed.diagnostics).toHaveLength(1);
+    expect(failed.diagnostics[0]?.code).toBe("ambiguous-slot-invocation");
+    expect(failed.diagnostics[0]?.message).toContain("reviewer");
+    expect(failed.diagnostics[0]?.path).toBe("/agents/reviewer");
+    expect(materializer.calls).toHaveLength(0);
+  });
+
   test("validates and builds a custom local template with its relative children and values", () => {
     const { root } = project(
       JSON.stringify({
