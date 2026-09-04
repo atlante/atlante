@@ -442,6 +442,136 @@ describe("resource renderer", () => {
     );
   });
 
+  test("throws for an object-schema child when a plain slot path crosses a scalar", () => {
+    const root = project();
+    writeTemplate(
+      root,
+      "parent",
+      {
+        type: "object",
+        properties: {
+          choice: {
+            type: "object",
+            properties: { payload: { template: "../child" } },
+          },
+        },
+      },
+      partial("choice/payload"),
+    );
+    writeTemplate(
+      root,
+      "child",
+      { type: "object", properties: { value: { type: "string" } } },
+      "{{value}}",
+    );
+
+    expect(() => render(root, "parent", { choice: "scalar" })).toThrow(
+      AmbiguousSlotInvocationError,
+    );
+    expect(render(root, "parent", {})).toBe("");
+  });
+
+  test("throws for an object-schema child when a partial-context item blocks the item path", () => {
+    const root = project();
+    writeTemplate(
+      root,
+      "parent",
+      {
+        type: "object",
+        properties: {
+          sections: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                meta: {
+                  type: "object",
+                  properties: { markdown: { template: "../child" } },
+                },
+              },
+            },
+          },
+        },
+      },
+      `{{#each sections}}${partial("sections/meta/markdown")}{{/each}}`,
+    );
+    writeTemplate(
+      root,
+      "child",
+      { type: "object", properties: { value: { type: "string" } } },
+      "{{value}}",
+    );
+
+    expect(() =>
+      render(root, "parent", { sections: [{ meta: "scalar" }] }),
+    ).toThrow(AmbiguousSlotInvocationError);
+    expect(render(root, "parent", { sections: [{}] })).toBe("");
+  });
+
+  test("keeps tuple-schema slots empty when their data path crosses a scalar", () => {
+    const root = project();
+    writeTemplate(
+      root,
+      "parent",
+      {
+        type: "object",
+        properties: {
+          items: {
+            type: "array",
+            prefixItems: [
+              {
+                type: "object",
+                properties: { payload: { template: "../child" } },
+              },
+            ],
+          },
+        },
+      },
+      partial("items/0/payload"),
+    );
+    writeTemplate(
+      root,
+      "child",
+      { type: "object", properties: { value: { type: "string" } } },
+      "{{value}}",
+    );
+
+    expect(render(root, "parent", { items: "scalar" })).toBe("");
+  });
+
+  test("retains tuple-schema diagnostics for array-schema children", () => {
+    const root = project();
+    writeTemplate(
+      root,
+      "parent",
+      {
+        type: "object",
+        properties: {
+          items: {
+            type: "array",
+            prefixItems: [
+              {
+                type: "object",
+                properties: { payload: { template: "../child" } },
+              },
+            ],
+          },
+        },
+      },
+      partial("items/0/payload"),
+    );
+    writeTemplate(
+      root,
+      "child",
+      { type: "array", items: { type: "string" } },
+      "[{{#each (input)}}{{this}}{{/each}}]",
+    );
+
+    expect(() => render(root, "parent", { items: "scalar" })).toThrow(
+      AmbiguousSlotInvocationError,
+    );
+  });
+
   test("renders empty for absent array-valued slot data without a diagnostic", () => {
     const root = project();
     writeTemplate(

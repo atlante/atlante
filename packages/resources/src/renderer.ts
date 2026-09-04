@@ -274,7 +274,8 @@ export function renderResolvedTemplate(
           : slotValues(input, group.path, itemPath, arrayItems);
       if (
         slotInputsForRender.length === 0 &&
-        isArrayInputSchema(contextChild.facet.inputSchema) &&
+        (isArrayInputSchema(contextChild.facet.inputSchema) ||
+          contextSlot.slot.tupleItems !== true) &&
         (context !== input && arrayItems
           ? blockedDescent(context, itemPath)
           : blockedSlotValues(input, group.path, itemPath, arrayItems))
