@@ -8,6 +8,7 @@ import {
   printDiagnostic,
   reportBuildResult,
 } from "../report.js";
+import { createStyler } from "../style.js";
 
 export type BuildOutcome = Readonly<{
   readonly code: number;
@@ -24,7 +25,8 @@ export function runBuildWithContext(
     });
     if (!reportBuildResult(built))
       return { code: 1, resourceWatch: built.resourceWatch };
-    console.log(`built ${built.projectRoot}`);
+    const styler = createStyler();
+    console.log(`${styler.success("built")} ${styler.dim(built.projectRoot)}`);
     return { code: 0, resourceWatch: built.resourceWatch };
   } catch (cause) {
     printDiagnostic({
