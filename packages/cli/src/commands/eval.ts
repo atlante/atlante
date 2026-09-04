@@ -31,6 +31,7 @@ import {
 import packageJson from "../../package.json" with { type: "json" };
 import { firstPartyProjectContext } from "../first-party-pack.js";
 import { diagnosticPath, printDiagnostics } from "../report.js";
+import { createStyler } from "../style.js";
 
 export type EvalCommandOptions = {
   /** Repeatable `--scenario <name>` filter; absent runs the whole suite. */
@@ -472,9 +473,6 @@ function createProgressRenderer(): (progress: EvalProgress) => string {
   };
 }
 
-const PROGRESS_GRAY = "\x1b[90m";
-const PROGRESS_RESET = "\x1b[0m";
-
 /**
  * Grays progress lines on an interactive stderr so live output does not read
  * like an error; piped stderr and `NO_COLOR` get plain text.
@@ -483,8 +481,7 @@ export function createProgressStyler(
   stream: { isTTY?: boolean } = process.stderr,
   env: NodeJS.ProcessEnv = process.env,
 ): (line: string) => string {
-  if (env.NO_COLOR || !stream.isTTY) return (line) => line;
-  return (line) => `${PROGRESS_GRAY}${line}${PROGRESS_RESET}`;
+  return createStyler(stream, env).dim;
 }
 
 /**

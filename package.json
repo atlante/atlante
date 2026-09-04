@@ -20,10 +20,10 @@
     "docs"
   ],
   "scripts": {
-    "test": "bun test",
-    "test:unit": "bun test .unit.test",
-    "test:integration": "bun test .integration.test",
-    "test:e2e": "bun test .e2e.test",
+    "test": "NO_COLOR=1 bun test",
+    "test:unit": "NO_COLOR=1 bun test .unit.test",
+    "test:integration": "NO_COLOR=1 bun test .integration.test",
+    "test:e2e": "NO_COLOR=1 bun test .e2e.test",
     "type:check": "tsc --build packages/*/tsconfig.json",
     "lint:check": "biome check .",
     "cli": "bun packages/cli/bin/atlante.ts",
