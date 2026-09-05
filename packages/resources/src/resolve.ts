@@ -1,5 +1,6 @@
-import { join, relative } from "node:path";
+import { relative } from "node:path";
 import { authoredValueLayerIssues } from "./authored-values.js";
+import { BindingResolver } from "./binding-resolver.js";
 import { type Slot, slotsOf } from "./composition.js";
 import type { ResourcePack } from "./content-root.js";
 import { failGraphResource, ResourceResolutionError } from "./errors.js";
@@ -12,13 +13,11 @@ import { own } from "./object.js";
 import {
   cloneResourceProvenance,
   mapResourceValuePointers,
-  originAt,
   provenanceForValue,
   type ResourceProvenance,
 } from "./provenance.js";
 import { ResolutionTraversal } from "./resolution-traversal.js";
 import type {
-  AuthoringContext,
   AuthoringProvenance,
   BindingCollection,
   EnteredFacet,
@@ -47,9 +46,6 @@ import {
   authoringContext,
   cloneObject,
   cloneValue,
-  contextAt,
-  descriptorData,
-  escapePointer,
   graphNode,
   isObject,
   mergeContextMap,
@@ -59,8 +55,6 @@ import {
   schemaPointerForPath,
   selectorKeys,
   selectorValue,
-  sliceContextMap,
-  sliceProvenance,
   sortProvenance,
   traversalContext,
   withoutKeys,
@@ -123,6 +117,7 @@ class ResourceResolver {
   private readonly facets: FacetLoader;
   private readonly normalizer: SlotNormalizer;
   private readonly sources: SourceSelector;
+  private readonly bindings: BindingResolver;
   /** Output indexes only; traversal never reads these resolved results. */
   private readonly resolvedTemplates = new Map<string, ResolvedTemplate>();
   private readonly resolvedInstances = new Map<
@@ -215,6 +210,37 @@ class ResourceResolver {
         ),
       requireCompatibleTemplate: (actual, expected, path, sourcePointer) =>
         this.requireCompatibleTemplate(actual, expected, path, sourcePointer),
+    });
+    this.bindings = new BindingResolver(this.traversal, {
+      projectPack: this.projectPack,
+      resolveSource: (
+        source,
+        context,
+        expected,
+        pack,
+        authoringFile,
+        path,
+        hops,
+        origin,
+        spec,
+        sourcePointer,
+        sourceProvenance,
+        sourceAuthoring,
+      ) =>
+        this.resolveSource(
+          source,
+          context,
+          expected,
+          pack,
+          authoringFile,
+          path,
+          hops,
+          origin,
+          spec,
+          sourcePointer,
+          sourceProvenance,
+          sourceAuthoring,
+        ),
     });
   }
 
@@ -767,134 +793,12 @@ class ResourceResolver {
     );
   }
 
-  private resolveBinding(
-    spec: ResourceBindingCollectionSpec,
-    id: string,
-    source: JsonValue,
-    pointer: string,
-    root: PresetResult,
-  ): ResolvedResourceBinding {
-    const origin = originAt(root.provenance, pointer) ?? root.facet.origin;
-    const context =
-      contextAt(root.authoring, pointer) ??
-      contextAt(root.authoring, "") ??
-      authoringContext(
-        this.projectPack,
-        join(this.projectPack.lexicalRoot, "atlante.jsonc"),
-      );
-    const traversal =
-      contextAt(root.traversal, pointer) ??
-      traversalContext(root.path, root.effectiveHops + 1);
-    if (typeof source !== "string" && !isObject(source)) {
-      return this.failAt(
-        "invalid-resolved-input",
-        `${spec.subject} source must be a locator string or object`,
-        traversal,
-        { source: origin, pointer },
-      );
-    }
-    const sourceResult = this.resolveBindingSource(
-      source,
-      spec,
-      origin,
-      context,
-      traversal,
-      pointer,
-      root,
-    );
-    if (!sourceResult.description) {
-      return this.failAt(
-        "invalid-resolved-input",
-        `${spec.subject} description must be a non-empty string after resolution`,
-        traversal,
-        { source: origin, pointer: `${pointer}/description` },
-      );
-    }
-    return Object.freeze({
-      id,
-      kind: spec.subject,
-      description: sourceResult.description,
-      template: sourceResult.template,
-      input: sourceResult.input,
-      ...(sourceResult.values ? { values: sourceResult.values } : {}),
-      provenance: sourceResult.provenance,
-    });
-  }
-
-  private resolveBindingSource(
-    source: string | Record<string, JsonValue>,
-    spec: ResourceBindingCollectionSpec,
-    origin: ResourceOrigin,
-    authoring: AuthoringContext,
-    traversal: TraversalContext,
-    pointer: string,
-    root: PresetResult,
-  ): SourceResult {
-    const sourceValue =
-      typeof source === "string" ? { $instance: source } : source;
-    const sourceProvenance =
-      typeof source === "string"
-        ? provenanceForValue(sourceValue, origin)
-        : sliceProvenance(root.provenance, pointer);
-    const sourceAuthoring =
-      typeof source === "string"
-        ? mapResourceValuePointers(sourceValue, authoring)
-        : sliceContextMap(root.authoring, pointer);
-    return this.resolveSource(
-      sourceValue,
-      "root",
-      undefined,
-      authoring.pack,
-      authoring.file,
-      traversal.path,
-      traversal.hops,
-      origin,
-      spec,
-      pointer,
-      sourceProvenance,
-      sourceAuthoring,
-    );
-  }
-
   private resolveBindingCollection(
     spec: ResourceBindingCollectionSpec,
     collection: JsonValue | undefined,
     root: PresetResult,
   ): BindingCollection {
-    if (collection === undefined) {
-      return { bindings: {}, normalized: {}, provenance: {} };
-    }
-    if (!isObject(collection)) {
-      return this.failAt(
-        "invalid-resolved-input",
-        `${spec.key} must be a JSON object`,
-        traversalContext(root.path, root.effectiveHops),
-        { source: root.facet.origin, pointer: `/${spec.key}` },
-      );
-    }
-
-    const bindings: Record<string, ResolvedResourceBinding> = {};
-    const normalized: Record<string, Record<string, unknown>> = {};
-    const provenance: Record<string, ResourceOrigin> = {};
-    for (const id of Object.keys(collection).sort()) {
-      const binding = this.resolveBinding(
-        spec,
-        id,
-        collection[id] as JsonValue,
-        `/${spec.key}/${escapePointer(id)}`,
-        root,
-      );
-      own(bindings, id, binding);
-      own(normalized, id, descriptorData(binding.description, binding.input));
-      for (const pointer of Object.keys(binding.provenance).sort()) {
-        own(
-          provenance,
-          `/${spec.key}/${escapePointer(id)}${pointer}`,
-          binding.provenance[pointer],
-        );
-      }
-    }
-    return { bindings, normalized, provenance };
+    return this.bindings.resolveBindingCollection(spec, collection, root);
   }
 
   resolveDocument(
