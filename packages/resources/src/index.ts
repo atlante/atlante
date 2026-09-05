@@ -26,19 +26,6 @@ export {
   loadTemplateFacet,
 } from "./facets.js";
 export type {
-  ResolvedResourceTarget,
-  ResourceFile,
-  ResourceFileName,
-  ResourceLocatorOptions,
-  ResourceTargetKind,
-} from "./filesystem.js";
-export {
-  inspectResourceFile,
-  isResourceResolutionError,
-  readResourceFile,
-  resolveResourceLocator,
-} from "./filesystem.js";
-export type {
   ResourceGraph,
   ResourceGraphEdge,
   ResourceGraphState,
@@ -130,7 +117,20 @@ export {
   resolveResourceInstance,
   resolveResourceTemplate,
   resolveTemplate,
-} from "./resolve.js";
+} from "./resolve-requests.js";
+export {
+  inspectResourceFile,
+  isResourceResolutionError,
+  readResourceFile,
+} from "./resource-files.js";
+export type {
+  ResolvedResourceTarget,
+  ResourceFile,
+  ResourceFileName,
+  ResourceLocatorOptions,
+  ResourceTargetKind,
+} from "./resource-targets.js";
+export { resolveResourceLocator } from "./resource-targets.js";
 export {
   JSON_SCHEMA_DRAFT_2020_12_URI,
   TEMPLATE_NAME_PATTERN,
