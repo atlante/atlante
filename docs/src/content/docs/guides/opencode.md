@@ -8,18 +8,9 @@ build materializes your agents and skills as OpenCode-native files; Atlante
 does not use a runtime plugin or an intermediate payload tree. Host-owned
 settings stay under OpenCode's control.
 
-## No registration needed
-
-Atlante does not require an OpenCode plugin registration or an
-`@atlante/opencode` dependency. `atlante init` removes an Atlante-written
-registration from `opencode.jsonc` (or an existing `opencode.json`) while
-preserving other host settings. The harmless `"plugin": []` residue it may
-leave requires no action. A registration that remains before `init` runs is
-inert: OpenCode silently drops packages that expose no plugin target.
-
 ## Build the native files
-The optional `atlante eval` command reads the verified native outputs the build
-materialized; the project needs no `@atlante/opencode` dependency.
+The optional `atlante eval` command reads the verified native outputs produced by
+the build; the project needs no `@atlante/opencode` dependency.
 
 Run validation and build from the project directory:
 
@@ -28,10 +19,9 @@ npx @atlante/cli@latest validate
 npx @atlante/cli@latest build
 ```
 
-The build writes `.opencode/agents/<id>.md`, `.opencode/skills/<id>/SKILL.md`,
-and the ownership manifest `.atlante/opencode-native.json`. It does not read
-or write host configuration: the host owns model, mode, permission, and tool
-settings, and Atlante never touches them.
+The build writes the native files described in
+[Materialization](/reference/materialization). It does not read or write host
+configuration: the host owns model, mode, permission, and tool settings.
 
 A collision with a file Atlante does not own, a drifted generated file, or any
 other materialization failure leaves the previous generated set in place and
@@ -40,17 +30,6 @@ for repair steps.
 
 ## Keep host settings in OpenCode
 
-OpenCode composes its own configuration with the native files when it starts:
-an agent's mode and permission rules from `opencode.json` still apply, while
-its prompt and description come from the native agent file. Atlante does not
-select those settings.
-
-Rebuilds are idempotent: unchanged content is not rewritten. OpenCode reads
-native agents and skills at startup, so restart it to pick up new or changed
-files.
-
-## Skills are files
-
-Each skill binding is materialized as `.opencode/skills/<skillId>/SKILL.md`
-with name and description frontmatter, which OpenCode lists like any native
-skill. Skill content is data; Atlante renders it but does not execute it.
+OpenCode combines its own settings with the native files when it starts. Keep
+model, mode, permission, and tool settings in OpenCode. Restart OpenCode after
+a build to pick up changed agents or skills. Unchanged output is not rewritten.
