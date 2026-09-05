@@ -8,17 +8,14 @@ import type { LoadedResource } from "./facets.js";
 import { inspectResourceFile, resolveResourceLocator } from "./filesystem.js";
 import type { JsoncLocation } from "./jsonc.js";
 import { isSafeJsonObject } from "./jsonc.js";
-import { mergeResourceValues } from "./merge.js";
 import { own } from "./object.js";
 import {
-  childPointer,
   cloneResourceProvenance,
   mapResourceValuePointers,
   originAt,
   provenanceForValue,
   type ResourceProvenance,
 } from "./provenance.js";
-import { withResourceValueTombstones } from "./resolution.js";
 import { ResolutionTraversal } from "./resolution-traversal.js";
 import type {
   AuthoringContext,
@@ -27,7 +24,6 @@ import type {
   EnteredFacet,
   InstanceTraversal,
   LoadedFacet,
-  MergedResourceValue,
   NormalizedResourceDocument,
   NormalizedValue,
   PresetResult,
@@ -42,30 +38,23 @@ import type {
   ResourceBindingCollectionSpec,
   ResourceResolveOptions,
   ResourceTraversal,
-  SourceLocalContext,
-  SourceMetadata,
-  SourceResolutionContext,
   SourceResult,
   SourceSelection,
-  SourceSelectorContext,
   TraversalContext,
   TraversalFailureDetails,
 } from "./resolution-types.js";
 import {
-  addBindingValuesProvenance,
   authoringContext,
   cloneObject,
   cloneValue,
   contextAt,
-  copySourceValues,
   descriptorData,
   escapePointer,
   graphNode,
   isObject,
   mergeContextMap,
+  mergeValues,
   pointerForSegments,
-  removeContextMap,
-  removeProvenance,
   removeProvenanceSubtree,
   schemaPointerForPath,
   selectorKeys,
@@ -73,11 +62,11 @@ import {
   sliceContextMap,
   sliceProvenance,
   sortProvenance,
-  sourceValueTombstones,
   traversalContext,
   withoutKeys,
 } from "./resolution-values.js";
 import { SlotNormalizer } from "./slot-normalizer.js";
+import { SourceSelector } from "./source-selector.js";
 import type {
   InstanceFacet,
   JsonObject,
@@ -106,7 +95,7 @@ export type {
 } from "./resolution-types.js";
 
 /** Neutral subject label for sources resolved outside a declared collection. */
-const neutralBindingSubject = "binding";
+const _neutralBindingSubject = "binding";
 
 type ResourceRequest = ResourceResolveOptions & {
   readonly pack: ResourcePack;
@@ -133,6 +122,7 @@ class ResourceResolver {
   private readonly traversal = new ResolutionTraversal();
   private readonly facets: FacetLoader;
   private readonly normalizer: SlotNormalizer;
+  private readonly sources: SourceSelector;
   /** Output indexes only; traversal never reads these resolved results. */
   private readonly resolvedTemplates = new Map<string, ResolvedTemplate>();
   private readonly resolvedInstances = new Map<
@@ -195,6 +185,36 @@ class ResourceResolver {
           sourceProvenance,
           sourceAuthoring,
         ),
+    });
+    this.sources = new SourceSelector(this.traversal, {
+      resolveTemplateAt: (pack, locator, authoringFile, path, hops, scope) =>
+        this.resolveTemplateAt(pack, locator, authoringFile, path, hops, scope),
+      resolveInstanceAt: (pack, locator, authoringFile, path, hops, scope) =>
+        this.resolveInstanceAt(pack, locator, authoringFile, path, hops, scope),
+      normalizeTemplateInput: (
+        template,
+        input,
+        provenance,
+        authoring,
+        fallbackPack,
+        fallbackFile,
+        path,
+        hops,
+        pointerPrefix,
+      ) =>
+        this.normalizeTemplateInput(
+          template,
+          input,
+          provenance,
+          authoring,
+          fallbackPack,
+          fallbackFile,
+          path,
+          hops,
+          pointerPrefix,
+        ),
+      requireCompatibleTemplate: (actual, expected, path, sourcePointer) =>
+        this.requireCompatibleTemplate(actual, expected, path, sourcePointer),
     });
   }
 
@@ -567,7 +587,7 @@ class ResourceResolver {
       loaded.authoring,
     );
 
-    const merged = this.mergeValues(selection.inherited, localInput, {
+    const merged = mergeValues(selection.inherited, localInput, {
       inheritedProvenance: selection.inheritedProvenance,
       localProvenance,
       inheritedAuthoring: selection.inheritedAuthoring,
@@ -679,40 +699,6 @@ class ResourceResolver {
     return this.traversal.failAt(code, message, context, details);
   }
 
-  private mergeValues(
-    inherited: JsonValue | undefined,
-    local: JsonValue,
-    options: Readonly<{
-      readonly inheritedOrigin?: ResourceOrigin;
-      readonly localOrigin?: ResourceOrigin;
-      readonly inheritedProvenance?: ResourceProvenance;
-      readonly localProvenance: ResourceProvenance;
-      readonly inheritedAuthoring?: AuthoringProvenance;
-      readonly localAuthoring: AuthoringProvenance;
-    }>,
-  ): Readonly<{
-    readonly value: JsonValue | undefined;
-    readonly provenance: ResourceProvenance;
-    readonly authoring: AuthoringProvenance;
-  }> {
-    const merged = mergeResourceValues(inherited, local, {
-      inheritedOrigin: options.inheritedOrigin,
-      localOrigin: options.localOrigin,
-      inheritedProvenance: options.inheritedProvenance,
-      localProvenance: options.localProvenance,
-    });
-    return {
-      value: merged.value,
-      provenance: merged.provenance,
-      authoring: mergeContextMap(
-        merged.provenance,
-        options.localProvenance,
-        options.localAuthoring,
-        options.inheritedAuthoring,
-      ),
-    };
-  }
-
   private normalizeTemplateInput(
     template: ResolvedTemplate,
     input: JsonValue,
@@ -751,388 +737,6 @@ class ResourceResolver {
     );
   }
 
-  private sourceSelector(
-    source: Record<string, JsonValue>,
-    context: SourceResolutionContext,
-  ): SourceSelectorContext {
-    const selector = selectorKeys(source)[0];
-    if (selector === undefined) {
-      return {
-        origin: context.origin,
-        authoring: authoringContext(context.pack, context.authoringFile),
-      };
-    }
-    const selectorPointer = childPointer("", selector);
-    const authoring =
-      contextAt(context.sourceAuthoring, "") ??
-      authoringContext(context.pack, context.authoringFile);
-    return {
-      selector,
-      origin:
-        originAt(context.sourceProvenance, selectorPointer) ?? context.origin,
-      pointer: childPointer(context.sourcePointer, selector),
-      location:
-        authoring.locations?.[childPointer(context.sourcePointer, selector)] ??
-        authoring.locations?.[selectorPointer],
-      authoring:
-        contextAt(context.sourceAuthoring, selectorPointer) ?? authoring,
-    };
-  }
-
-  private selectSource(
-    source: Record<string, JsonValue>,
-    kind: "root" | "nested",
-    sourceContext: SourceResolutionContext,
-  ): SourceSelection {
-    const selectors = selectorKeys(source);
-    if (selectors.length > 1) {
-      return this.failAt(
-        "conflicting-selectors",
-        "a resource source cannot select both $template and $instance",
-        traversalContext(sourceContext.path, sourceContext.hops),
-        {
-          source: sourceContext.origin,
-          pointer: sourceContext.sourcePointer || undefined,
-        },
-      );
-    }
-
-    const selector = this.sourceSelector(source, sourceContext);
-    if (selector.selector === "$instance")
-      return this.selectSourceInstance(
-        source,
-        sourceContext,
-        selector.origin,
-        selector.pointer,
-        selector.location,
-        selector.authoring,
-      );
-    if (selector.selector === "$template")
-      return this.selectSourceTemplate(
-        source,
-        sourceContext,
-        selector.origin,
-        selector.pointer,
-        selector.location,
-        selector.authoring,
-      );
-
-    if (kind === "nested") {
-      return this.failAt(
-        "invalid-resolved-input",
-        "nested source objects require $template or $instance",
-        traversalContext(sourceContext.path, sourceContext.hops),
-        {
-          source: sourceContext.origin,
-          pointer: sourceContext.sourcePointer || undefined,
-        },
-      );
-    }
-
-    if (!sourceContext.defaultTemplate) {
-      return this.failAt(
-        "invalid-resolved-input",
-        "binding source object requires $template, $instance, or a collection default template",
-        traversalContext(sourceContext.path, sourceContext.hops),
-        {
-          source: sourceContext.origin,
-          pointer: sourceContext.sourcePointer || undefined,
-        },
-      );
-    }
-
-    const template = this.resolveTemplateAt(
-      sourceContext.pack,
-      sourceContext.defaultTemplate,
-      sourceContext.authoringFile,
-      sourceContext.path,
-      sourceContext.hops,
-      sourceContext.sourcePointer,
-    );
-    return {
-      template: template.value,
-      path: template.path,
-      hops: template.hops,
-    };
-  }
-
-  private selectSourceInstance(
-    source: Record<string, JsonValue>,
-    sourceContext: SourceResolutionContext,
-    selectorOrigin: ResourceOrigin,
-    selectorPointer: string | undefined,
-    selectorLocation: JsoncLocation | undefined,
-    selectedContext: AuthoringContext,
-  ): SourceSelection {
-    const instance = this.resolveSourceSelector(
-      source,
-      sourceContext,
-      "$instance",
-      selectorOrigin,
-      selectorPointer,
-      selectorLocation,
-      (selected) =>
-        this.resolveInstanceAt(
-          selectedContext.pack,
-          selected,
-          selectedContext.file,
-          sourceContext.path,
-          sourceContext.hops,
-          sourceContext.sourcePointer,
-        ),
-    );
-    return {
-      template: instance.value.template,
-      inherited: instance.value.input,
-      inheritedProvenance: instance.value.provenance,
-      inheritedAuthoring: instance.authoring,
-      path: instance.path,
-      hops: instance.hops,
-    };
-  }
-
-  private selectSourceTemplate(
-    source: Record<string, JsonValue>,
-    sourceContext: SourceResolutionContext,
-    selectorOrigin: ResourceOrigin,
-    selectorPointer: string | undefined,
-    selectorLocation: JsoncLocation | undefined,
-    selectedContext: AuthoringContext,
-  ): SourceSelection {
-    const template = this.resolveSourceSelector(
-      source,
-      sourceContext,
-      "$template",
-      selectorOrigin,
-      selectorPointer,
-      selectorLocation,
-      (selected) =>
-        this.resolveTemplateAt(
-          selectedContext.pack,
-          selected,
-          selectedContext.file,
-          sourceContext.path,
-          sourceContext.hops,
-          sourceContext.sourcePointer,
-        ),
-    );
-    return {
-      template: template.value,
-      path: template.path,
-      hops: template.hops,
-    };
-  }
-
-  private resolveSourceSelector<T extends ResourceTraversal<unknown>>(
-    source: Record<string, JsonValue>,
-    sourceContext: SourceResolutionContext,
-    selector: "$template" | "$instance",
-    selectorOrigin: ResourceOrigin,
-    selectorPointer: string | undefined,
-    selectorLocation: JsoncLocation | undefined,
-    resolve: (locator: RawResourceLocator) => T,
-  ): T {
-    const selected = this.delegateResource(
-      () =>
-        selectorValue(
-          source,
-          selector,
-          selectorOrigin,
-          sourceContext.sourcePointer,
-          selectorLocation,
-        ),
-      sourceContext.path,
-      selectorOrigin,
-      selectorPointer,
-      undefined,
-      sourceContext.sourcePointer,
-    );
-    return this.delegateResource(
-      () => resolve(selected),
-      sourceContext.path,
-      selectorOrigin,
-      selectorPointer,
-      selectorLocation,
-      sourceContext.sourcePointer,
-    );
-  }
-
-  private sourceObject(
-    value: JsonValue | undefined,
-    origin: ResourceOrigin,
-    path: readonly ResourceGraphNode[],
-    hops: number,
-  ): JsonObject {
-    if (isSafeJsonObject(value)) return value;
-    return this.failAt(
-      "invalid-resolved-input",
-      "resolved source input must be a JSON object",
-      traversalContext(path, hops),
-      { source: origin },
-    );
-  }
-
-  private sourceDescription(
-    context: "root" | "nested",
-    value: JsonObject,
-    subject: string,
-    origin: ResourceOrigin,
-    sourcePointer: string,
-    path: readonly ResourceGraphNode[],
-    hops: number,
-  ): string | undefined {
-    const description = value.description;
-    if (context !== "root" && typeof description === "string")
-      return description;
-    if (typeof description === "string" && description.length > 0)
-      return description;
-    if (context === "root")
-      return this.failAt(
-        "invalid-resolved-input",
-        `${subject} description must be a non-empty string after resolution`,
-        traversalContext(path, hops),
-        {
-          source: origin,
-          pointer: sourcePointer
-            ? `${sourcePointer}/description`
-            : "/description",
-        },
-      );
-    return undefined;
-  }
-
-  private sourceValues(
-    value: JsonObject,
-    origin: ResourceOrigin,
-    sourcePointer: string,
-    path: readonly ResourceGraphNode[],
-    hops: number,
-  ): JsonObject | undefined {
-    const valueTombstones = sourceValueTombstones(value);
-    if (!Object.hasOwn(value, "values")) {
-      return valueTombstones.length > 0
-        ? withResourceValueTombstones({}, valueTombstones)
-        : undefined;
-    }
-    if (!isObject(value.values))
-      return this.failAt(
-        "invalid-resolved-input",
-        "binding values must be a JSON object",
-        traversalContext(path, hops),
-        {
-          source: origin,
-          pointer: sourcePointer ? `${sourcePointer}/values` : "/values",
-        },
-      );
-    return copySourceValues(value.values as JsonObject, valueTombstones);
-  }
-
-  private sourceMetadata(
-    context: "root" | "nested",
-    value: JsonObject,
-    provenance: ResourceProvenance,
-    origin: ResourceOrigin,
-    subject: string,
-    sourcePointer: string,
-    path: readonly ResourceGraphNode[],
-    hops: number,
-  ): SourceMetadata {
-    const metadataKeys = new Set(["description", "values"]);
-    const description = this.sourceDescription(
-      context,
-      value,
-      subject,
-      origin,
-      sourcePointer,
-      path,
-      hops,
-    );
-    const values = this.sourceValues(value, origin, sourcePointer, path, hops);
-    return {
-      input:
-        context === "root"
-          ? withoutKeys(value, metadataKeys)
-          : cloneObject(value),
-      provenance:
-        context === "root"
-          ? removeProvenance(provenance, metadataKeys)
-          : provenance,
-      ...(description ? { description } : {}),
-      ...(values ? { values } : {}),
-    };
-  }
-
-  private sourceLocalContext(
-    source: Record<string, JsonValue>,
-    origin: ResourceOrigin,
-    pack: ResourcePack,
-    authoringFile: string,
-    sourceProvenance: ResourceProvenance | undefined,
-    sourceAuthoring: AuthoringProvenance | undefined,
-  ): SourceLocalContext {
-    const value = withoutKeys(source, new Set(["$template", "$instance"]));
-    return {
-      value,
-      provenance: sourceProvenance
-        ? removeProvenance(
-            sourceProvenance,
-            new Set(["$template", "$instance"]),
-          )
-        : provenanceForValue(value, origin),
-      authoring: sourceAuthoring
-        ? removeContextMap(sourceAuthoring, new Set(["$template", "$instance"]))
-        : mapResourceValuePointers(
-            value,
-            authoringContext(pack, authoringFile),
-          ),
-    };
-  }
-
-  private buildSourceResult(
-    selection: SourceSelection,
-    metadata: SourceMetadata,
-    merged: MergedResourceValue,
-    normalized: NormalizedValue,
-    normalizedValue: JsonObject,
-    pack: ResourcePack,
-    authoringFile: string,
-    origin: ResourceOrigin,
-  ): SourceResult {
-    const bindingProvenance: Record<string, ResourceOrigin> = {};
-    const bindingAuthoring: Record<string, AuthoringContext> = {};
-    if (metadata.description) {
-      const descriptionOrigin =
-        originAt(merged.provenance, "/description") ?? origin;
-      own(bindingProvenance, "/description", descriptionOrigin);
-      own(
-        bindingAuthoring,
-        "/description",
-        contextAt(merged.authoring, "/description") ??
-          authoringContext(pack, authoringFile),
-      );
-    }
-    for (const pointer of Object.keys(normalized.provenance).sort()) {
-      own(bindingProvenance, pointer, normalized.provenance[pointer]);
-      const context = contextAt(normalized.authoring, pointer);
-      if (context) own(bindingAuthoring, pointer, context);
-    }
-    addBindingValuesProvenance(
-      bindingProvenance,
-      merged.provenance,
-      metadata.values,
-    );
-    return {
-      template: selection.template,
-      input: cloneObject(normalizedValue),
-      provenance: Object.freeze(sortProvenance(bindingProvenance)),
-      authoring: Object.freeze(bindingAuthoring),
-      path: selection.path,
-      hops: selection.hops,
-      ...(metadata.description ? { description: metadata.description } : {}),
-      ...(metadata.values ? { values: metadata.values } : {}),
-    };
-  }
-
   private resolveSource(
     source: Record<string, JsonValue>,
     context: "root" | "nested",
@@ -1147,90 +751,19 @@ class ResourceResolver {
     sourceProvenance?: ResourceProvenance,
     sourceAuthoring?: AuthoringProvenance,
   ): SourceResult {
-    const subject = spec?.subject ?? neutralBindingSubject;
-    const selection = this.selectSource(source, context, {
+    return this.sources.resolveSource(
+      source,
+      context,
+      expected,
       pack,
       authoringFile,
       path,
       hops,
       origin,
-      subject,
-      ...(spec?.defaultTemplate
-        ? { defaultTemplate: spec.defaultTemplate }
-        : {}),
+      spec,
       sourcePointer,
       sourceProvenance,
       sourceAuthoring,
-    });
-
-    const local = this.sourceLocalContext(
-      source,
-      origin,
-      pack,
-      authoringFile,
-      sourceProvenance,
-      sourceAuthoring,
-    );
-    const merged = this.mergeValues(selection.inherited, local.value, {
-      inheritedProvenance: selection.inheritedProvenance,
-      inheritedAuthoring: selection.inheritedAuthoring,
-      inheritedOrigin: selection.inherited
-        ? (originAt(selection.inheritedProvenance, "") ?? origin)
-        : undefined,
-      localOrigin: origin,
-      localProvenance: local.provenance,
-      localAuthoring: local.authoring,
-    });
-    const mergedValue = this.sourceObject(
-      merged.value,
-      origin,
-      selection.path,
-      selection.hops,
-    );
-
-    if (expected)
-      this.requireCompatibleTemplate(
-        selection.template,
-        [expected],
-        selection.path,
-        sourcePointer,
-      );
-    const metadata = this.sourceMetadata(
-      context,
-      mergedValue,
-      merged.provenance,
-      origin,
-      subject,
-      sourcePointer,
-      selection.path,
-      selection.hops,
-    );
-    const normalized = this.normalizeTemplateInput(
-      selection.template,
-      metadata.input,
-      metadata.provenance,
-      merged.authoring,
-      pack,
-      authoringFile,
-      selection.path,
-      selection.hops,
-      sourcePointer,
-    );
-    const normalizedValue = this.sourceObject(
-      normalized.value,
-      origin,
-      selection.path,
-      selection.hops,
-    );
-    return this.buildSourceResult(
-      selection,
-      metadata,
-      merged,
-      normalized,
-      normalizedValue,
-      pack,
-      authoringFile,
-      origin,
     );
   }
 
@@ -1544,7 +1077,7 @@ class ResourceResolver {
     path: readonly ResourceGraphNode[],
     hops: number,
   ): PresetResult {
-    const merged = this.mergeValues(base?.effectiveRaw, child.effectiveRaw, {
+    const merged = mergeValues(base?.effectiveRaw, child.effectiveRaw, {
       inheritedProvenance: base?.provenance,
       inheritedAuthoring: base?.authoring,
       inheritedOrigin: base?.facet.origin,
@@ -1654,7 +1187,7 @@ class ResourceResolver {
       loaded.loaded.facet.origin,
     );
     const effectiveHops = base?.effectiveHops ?? hops;
-    const merged = this.mergeValues(base?.effectiveRaw, local, {
+    const merged = mergeValues(base?.effectiveRaw, local, {
       inheritedProvenance: base?.provenance,
       inheritedAuthoring: base?.authoring,
       inheritedOrigin: base?.facet.origin,

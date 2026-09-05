@@ -3,6 +3,7 @@ import { failResource } from "./errors.js";
 import { jsonValueAtPath } from "./json-path.js";
 import type { JsoncLocation } from "./jsonc.js";
 import { parseResourceLocator } from "./locator.js";
+import { mergeResourceValues } from "./merge.js";
 import { own } from "./object.js";
 import {
   childPointer,
@@ -20,6 +21,7 @@ import type {
   AuthoringContext,
   AuthoringProvenance,
   LocatedValue,
+  MergedResourceValue,
   NormalizedValue,
   ResolvedTemplate,
   ResolvedTemplateSlot,
@@ -470,4 +472,34 @@ export function isBareResourceLocator(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+export function mergeValues(
+  inherited: JsonValue | undefined,
+  local: JsonValue,
+  options: Readonly<{
+    readonly inheritedOrigin?: ResourceOrigin;
+    readonly localOrigin?: ResourceOrigin;
+    readonly inheritedProvenance?: ResourceProvenance;
+    readonly localProvenance: ResourceProvenance;
+    readonly inheritedAuthoring?: AuthoringProvenance;
+    readonly localAuthoring: AuthoringProvenance;
+  }>,
+): MergedResourceValue {
+  const merged = mergeResourceValues(inherited, local, {
+    inheritedOrigin: options.inheritedOrigin,
+    localOrigin: options.localOrigin,
+    inheritedProvenance: options.inheritedProvenance,
+    localProvenance: options.localProvenance,
+  });
+  return {
+    value: merged.value,
+    provenance: merged.provenance,
+    authoring: mergeContextMap(
+      merged.provenance,
+      options.localProvenance,
+      options.localAuthoring,
+      options.inheritedAuthoring,
+    ),
+  };
 }
