@@ -26,17 +26,7 @@ Custom Pack packages must already be declared and installed by the authoring
 project's package manager before a document references them. Atlante does not
 install packages, consult a registry, load URLs, or load remote Pack content.
 
-An ordinary Pack may look like this:
-
-```text
-review-pack/
-├── package.json          # atlante.format: 1 for a package Pack
-├── atlante.jsonc         # optional preset root
-└── reviewer/
-    ├── template.jsonc
-    ├── template.md
-    └── instance.jsonc     # optional
-```
+For a complete Pack layout, see [Author a pack](/guides/authoring-packs).
 
 A resource may contain either facet or both. A template facet is valid only when
 `template.jsonc` and `template.md` appear together; an instance facet supplies

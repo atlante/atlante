@@ -37,14 +37,9 @@ LLM inference.
 
 A project normally contains one `atlante.jsonc` file. It selects a preset, binds
 agents and skills to static resources, and supplies explicit values for those
-bindings. The build turns that source into host-native output.
-
-```jsonc title="atlante.jsonc"
-{
-  "$schema": "https://atlante.sh/schema/v0.1/schema.json",
-  "extends": "@atlante/pack"
-}
-```
+bindings. The build turns that source into host-native output. See
+[Configuration](/concepts/configuration) for the document model and
+[Getting started](/getting-started) for a minimal configuration.
 
 Read the [Schema](/reference/schema) for the document contract and the
 [Materialization](/reference/materialization) for the generated output contract. The shipped
