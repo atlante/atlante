@@ -55,14 +55,17 @@ describe("brainstorm skill instance", () => {
       "Scale exploration and discussion to the complexity, risk, and uncertainty",
       "increase the depth instead of continuing with an undersized design",
       "Propose a parent-and-child decomposition",
-      "refine one child at a time",
+      "refine each child in order",
+      "asking for approval only when a child introduces a consequential or irreversible action",
       "Ask one focused question at a time",
       "prefer multiple-choice questions",
       "present two or three viable approaches with their trade-offs",
       "lead with a recommendation",
       "Keep the scope minimal with YAGNI",
-      "obtain explicit approval for simple work",
-      "confirm each section before continuing",
+      "Treat a clear request for action as authorization for reversible, read-only, and routine implementation work",
+      "prepare a concrete, reviewable result before asking questions",
+      "Ask for explicit approval only when the action is consequential or irreversible",
+      "ask for confirmation only where an unresolved choice materially changes the outcome, scope, or risk",
       "Assemble the explicitly approved handoff",
       "check it for placeholders, contradictions, ambiguity, and unnecessary scope",
     ])
@@ -121,7 +124,9 @@ describe("brainstorm skill instance", () => {
     ])
       expect(output).toContain(heading);
     expect(output).toContain("Ask one focused question at a time");
-    expect(output).toContain("obtain explicit approval for simple work");
+    expect(output).toContain(
+      "Treat a clear request for action as authorization for reversible, read-only, and routine implementation work",
+    );
     expect(output).toContain(
       "- MUST preserve agreed decisions unless they are explicitly changed.",
     );

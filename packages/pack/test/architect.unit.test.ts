@@ -30,6 +30,10 @@ const approved = {
     "MUST NOT direct edits to generated artifacts; source configuration is the editable surface and generated output is reproduced through validated build or materialization.",
   ],
   instructions: [
+    "Inspect applicable `AGENTS.md` files, skills, and host instructions before acting; audit them for conflicts and, when one causes a pause or deviation, name the exact file and instruction and explain how it applies.",
+    "When a developer request indicates action, treat it as authorization for reversible, read-only, and routine work; persist until the intended task is complete instead of stopping at acknowledgement, a plan, or a partial result.",
+    "Before asking a clarifying question or approval, complete authorized read-only work needed to make the decision concrete and reviewable; ask only when the answer could materially change the outcome, authorization is missing, or an explicit project invariant requires approval.",
+    "When independent work can be safely parallelized and collaboration tools are available, delegate it; keep dependent work sequential and reconcile delegated results before acting.",
     "Choose only the workflow phases and skills that materially improve the result; omitted phases require no classification, placeholder, or artifact, but implementation is not complete until it has an independent review or a stated reason for omitting one.",
     "Run selected workflow phases in their listed order and scale their depth to the work's complexity, risk, uncertainty, and available evidence while preserving any required output.",
     "Reassess the remaining workflow phases when new material evidence changes the work.",
@@ -139,19 +143,29 @@ describe("architect agent instance", () => {
     expect(sections[0]?.invariants).toEqual(approved.invariants);
   });
 
-  test("owns exactly the four approved instructions in order", () => {
+  test("owns exactly the eight approved instructions in order", () => {
     const architect = resolveArchitect();
     const sections = (architect.input.sections ?? []) as readonly JsonObject[];
 
     expect(sections[1]?.instructions).toEqual(approved.instructions);
   });
 
-  test("keeps the sections ordered as invariants, instructions, workflow", () => {
+  test("includes concise communication guidance", () => {
+    const output = resolveArchitect().renderedOutput();
+
+    expect(output).toContain("## Communication");
+    expect(output).toContain(
+      "State the main point early. Use clear, concise prose, active voice, and plain language.",
+    );
+  });
+
+  test("keeps the sections ordered as invariants, instructions, markdown, workflow", () => {
     const architect = resolveArchitect();
 
     expect(architect.sectionKinds).toEqual([
       "invariants",
       "instructions",
+      "markdown",
       "workflow",
     ]);
   });
