@@ -211,7 +211,9 @@ same canonical model. If both files exist and no explicit path was supplied,
 the CLI MUST report an ambiguity rather than choose silently.
 
 The document MUST contain `$schema` and MAY contain `extends`, `values`,
-`agents`, and `skills`. Unknown top-level fields MUST be rejected. `extends`
+`agents`, `skills`, and `eval`. The `eval` section configures the optional
+eval command and is validated against its own schema. Unknown top-level fields
+MUST be rejected. `extends`
 MUST be one non-empty string or a non-empty ordered array of non-empty strings.
 Missing `agents` and `skills` maps MUST normalize to empty collections.
 
