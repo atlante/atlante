@@ -39,7 +39,7 @@ import type {
   TemplateFacet,
 } from "./types.js";
 
-export type FacetCacheKind = "template" | "instance" | "preset";
+type FacetCacheKind = "template" | "instance" | "preset";
 
 type CachedFacetCandidate = Readonly<{
   readonly name: FacetCandidate["name"];

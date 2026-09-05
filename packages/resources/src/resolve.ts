@@ -2,9 +2,7 @@ import { authoredValueLayerIssues } from "./authored-values.js";
 import { BindingResolver } from "./binding-resolver.js";
 import { type Slot, slotsOf } from "./composition.js";
 import type { ResourcePack } from "./content-root.js";
-import type { ResourceResolutionError } from "./errors.js";
 import { FacetLoader } from "./facet-loader.js";
-import type { LoadedResource } from "./facets.js";
 import type { JsoncLocation } from "./jsonc.js";
 import { isSafeJsonObject } from "./jsonc.js";
 import { own } from "./object.js";
@@ -63,7 +61,6 @@ import type {
   ResourceFailureCode,
   ResourceGraphNode,
   ResourceOrigin,
-  ResourceWatchRoot,
   TemplateFacet,
 } from "./types.js";
 
@@ -235,14 +232,6 @@ export class ResourceResolver {
 
   run<T>(action: () => T): T {
     return this.traversal.run(action);
-  }
-
-  private collectPack(pack: ResourcePack): void {
-    this.traversal.collectPack(pack);
-  }
-
-  private collect<T>(loaded: LoadedResource<T>): void {
-    this.traversal.collect(loaded);
   }
 
   private enter(
@@ -561,14 +550,6 @@ export class ResourceResolver {
   ): ResolvedResourceInstance {
     return this.resolveInstanceAt(pack, locator, authoringFile, path, hops)
       .value;
-  }
-
-  private failureContext(error?: ResourceResolutionError): {
-    readonly dependencies: readonly string[];
-    readonly unresolvedParents: readonly string[];
-    readonly trustedRoots: readonly ResourceWatchRoot[];
-  } {
-    return this.traversal.failureContext(error);
   }
 
   private failAt(

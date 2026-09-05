@@ -45,7 +45,7 @@ function fileContext(
   });
 }
 
-export function unsafeRead(
+function unsafeRead(
   locator: RawResourceLocator,
   target?: ResolvedResourceTarget,
   file?: ResourceFile,
@@ -64,7 +64,7 @@ export function unsafeRead(
   );
 }
 
-export function missingFile(
+function missingFile(
   target: ResolvedResourceTarget,
   locator: RawResourceLocator,
   name: ResourceFileName,
@@ -162,7 +162,7 @@ export function inspectResourceFile(
   });
 }
 
-export function assertStableTarget(
+function assertStableTarget(
   target: ResolvedResourceTarget,
   locator: RawResourceLocator,
 ): void {
@@ -188,7 +188,7 @@ export function assertStableTarget(
   }
 }
 
-export function assertStableFile(
+function assertStableFile(
   target: ResolvedResourceTarget,
   file: ResourceFile,
   locator: RawResourceLocator,
@@ -221,7 +221,7 @@ export function assertStableFile(
   }
 }
 
-export function readFlags(): number {
+function readFlags(): number {
   const fsConstants = constants as typeof constants & {
     readonly O_NOFOLLOW?: number;
     readonly O_NONBLOCK?: number;
@@ -233,7 +233,7 @@ export function readFlags(): number {
   );
 }
 
-export function openAndReadResourceFile(
+function openAndReadResourceFile(
   target: ResolvedResourceTarget,
   file: ResourceFile,
   locator: RawResourceLocator,
@@ -284,7 +284,7 @@ export function openAndReadResourceFile(
   }
 }
 
-export function assertStableRead(
+function assertStableRead(
   target: ResolvedResourceTarget,
   file: ResourceFile,
   locator: RawResourceLocator,

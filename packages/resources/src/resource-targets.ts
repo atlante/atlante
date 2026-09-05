@@ -115,12 +115,12 @@ export function targetContext(
   });
 }
 
-export type AuthoringDirectory = Readonly<{
+type AuthoringDirectory = Readonly<{
   readonly canonical: string;
   readonly lexical: string;
 }>;
 
-export function canonicalMissingAuthoringDirectory(
+function canonicalMissingAuthoringDirectory(
   pack: ResourcePack,
   authoringFile: string,
   locator: RawResourceLocator,
@@ -145,7 +145,7 @@ export function canonicalMissingAuthoringDirectory(
   return { canonical: canonicalDirectory, lexical };
 }
 
-export function canonicalAuthoringFile(
+function canonicalAuthoringFile(
   pack: ResourcePack,
   authoringFile: string,
   locator: RawResourceLocator,
@@ -190,7 +190,7 @@ export function canonicalAuthoringFile(
   return { canonical: directory, lexical };
 }
 
-export function targetFailure(
+function targetFailure(
   pack: ResourcePack,
   locator: RawResourceLocator,
   candidate: string,
@@ -224,7 +224,7 @@ export function targetFailure(
   );
 }
 
-export function canonicalAuthoringDirectory(
+function canonicalAuthoringDirectory(
   pack: ResourcePack,
   authoringFile: string,
   locator: RawResourceLocator,
@@ -261,7 +261,7 @@ export function canonicalAuthoringDirectory(
   );
 }
 
-export function canonicalDirectory(
+function canonicalDirectory(
   pack: ResourcePack,
   locator: RawResourceLocator,
   candidate: string,
@@ -312,7 +312,7 @@ export function canonicalDirectory(
   return target;
 }
 
-export type PreparedResourceTarget = Readonly<{
+type PreparedResourceTarget = Readonly<{
   readonly pack: ResourcePack;
   readonly candidate: string;
   readonly lexicalDirectory: string;
@@ -320,7 +320,7 @@ export type PreparedResourceTarget = Readonly<{
   readonly resolutionDependencies: readonly string[];
 }>;
 
-export function prepareResourceTarget(
+function prepareResourceTarget(
   pack: ResourcePack,
   parsed: ReturnType<typeof parseResourceLocator>,
   rawLocator: RawResourceLocator,

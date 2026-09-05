@@ -57,7 +57,7 @@ import type {
 } from "./types.js";
 
 /** Neutral subject label for sources resolved outside a declared collection. */
-export const neutralBindingSubject = "binding";
+const neutralBindingSubject = "binding";
 
 /** Re-entry operations the source selector needs from the coordinator. */
 export type SourceSelectorHost = Readonly<{

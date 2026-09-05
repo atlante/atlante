@@ -19,12 +19,12 @@ type ParentLookup =
   | { readonly kind: "parents"; readonly paths: readonly string[] }
   | { readonly kind: "escaped" };
 
-export type PendingParent = Readonly<{
+type PendingParent = Readonly<{
   readonly lexical: string;
   readonly canonical: string;
 }>;
 
-export type PendingParentLookup =
+type PendingParentLookup =
   | { readonly kind: "parents"; readonly paths: readonly PendingParent[] }
   | { readonly kind: "escaped" };
 
@@ -47,7 +47,7 @@ export function unresolvedParents(
 }
 
 /** Finds all existing in-root directories above a pending lexical target. */
-export function pendingParents(
+function pendingParents(
   pack: ResourcePack,
   candidate: string,
 ): PendingParentLookup {
@@ -93,14 +93,14 @@ export function safeParentFor(pack: ResourcePack, candidate: string): string[] {
   return [pack.root];
 }
 
-export type SymlinkPrefixInspection = Readonly<{
+type SymlinkPrefixInspection = Readonly<{
   readonly target?: string;
   readonly watchTarget?: string;
   readonly missing: boolean;
   readonly escaped: boolean;
 }>;
 
-export function canonicalSymlinkTarget(
+function canonicalSymlinkTarget(
   pack: ResourcePack,
   target: string,
 ): string | undefined {
@@ -117,7 +117,7 @@ export function canonicalSymlinkTarget(
   }
 }
 
-export function inspectSymlinkTarget(
+function inspectSymlinkTarget(
   pack: ResourcePack,
   prefix: string,
 ): SymlinkPrefixInspection {
@@ -152,7 +152,7 @@ export function inspectSymlinkTarget(
   };
 }
 
-export function inspectSymlinkPrefix(
+function inspectSymlinkPrefix(
   pack: ResourcePack,
   prefix: string,
   inspected: Set<string>,
@@ -177,7 +177,7 @@ export function inspectSymlinkPrefix(
   return inspectSymlinkTarget(pack, prefix);
 }
 
-export function inspectCanonicalPrefixes(
+function inspectCanonicalPrefixes(
   pack: ResourcePack,
   root: string,
   normalized: string,
@@ -203,7 +203,7 @@ export function inspectCanonicalPrefixes(
   return true;
 }
 
-export function inspectCanonicalPath(
+function inspectCanonicalPath(
   pack: ResourcePack,
   current: string,
   active: Set<string>,
@@ -245,7 +245,7 @@ export function inspectCanonicalPath(
   return safe;
 }
 
-export function collectLexicalWatchPrefixes(
+function collectLexicalWatchPrefixes(
   pack: ResourcePack,
   root: string,
   normalized: string,
@@ -274,7 +274,7 @@ export function collectLexicalWatchPrefixes(
 }
 
 /** Collects authored watch spellings without making them a safety decision. */
-export function collectLexicalWatchPath(
+function collectLexicalWatchPath(
   pack: ResourcePack,
   current: string,
   paths: Set<string>,
