@@ -2,10 +2,9 @@ import { authoredValueLayerIssues } from "./authored-values.js";
 import { BindingResolver } from "./binding-resolver.js";
 import { type Slot, slotsOf } from "./composition.js";
 import type { ResourcePack } from "./content-root.js";
-import { failGraphResource, ResourceResolutionError } from "./errors.js";
+import type { ResourceResolutionError } from "./errors.js";
 import { FacetLoader } from "./facet-loader.js";
 import type { LoadedResource } from "./facets.js";
-import { inspectResourceFile } from "./filesystem.js";
 import type { JsoncLocation } from "./jsonc.js";
 import { isSafeJsonObject } from "./jsonc.js";
 import { own } from "./object.js";
@@ -26,14 +25,11 @@ import type {
   NormalizedResourceDocument,
   NormalizedValue,
   PresetResult,
-  ResolveDocumentRequest,
   ResolvedResourceBinding,
   ResolvedResourceDocument,
   ResolvedResourceInstance,
   ResolvedTemplate,
   ResolvedTemplateSlot,
-  ResolveInstanceRequest,
-  ResolveTemplateRequest,
   ResourceBindingCollectionSpec,
   ResourceResolveOptions,
   ResourceTraversal,
@@ -52,7 +48,6 @@ import {
   removeProvenanceSubtree,
   schemaPointerForPath,
   selectorKeys,
-  selectorValue,
   sortProvenance,
   traversalContext,
   withoutKeys,
@@ -86,30 +81,8 @@ export type {
   ResourceResolveOptions,
 } from "./resolution-types.js";
 
-/** Neutral subject label for sources resolved outside a declared collection. */
-const _neutralBindingSubject = "binding";
-
-type ResourceRequest = ResourceResolveOptions & {
-  readonly pack: ResourcePack;
-};
-
-function requestWithPack<T extends ResourceRequest>(
-  requestOrPack: T | ResourcePack,
-  fields: Omit<T, "pack">,
-): T {
-  if ("pack" in requestOrPack) return requestOrPack;
-  return { pack: requestOrPack, ...fields } as T;
-}
-
-function runResourceRequest<T extends ResourceRequest, Result>(
-  request: T,
-  action: (resolver: ResourceResolver) => Result,
-): Result {
-  const resolver = new ResourceResolver(request.pack, request);
-  return resolver.run(() => action(resolver));
-}
-
-class ResourceResolver {
+/** Coordinates the resolver collaborators and hosts the traversal core. */
+export class ResourceResolver {
   private readonly bindingCollections: readonly ResourceBindingCollectionSpec[];
   private readonly traversal = new ResolutionTraversal();
   private readonly facets: FacetLoader;
@@ -439,39 +412,6 @@ class ResourceResolver {
       .value;
   }
 
-  private resolveLoadedSelector<T extends ResourceTraversal<unknown>>(
-    loaded: LoadedFacet<InstanceFacet>,
-    selector: "$template" | "$instance",
-    path: readonly ResourceGraphNode[],
-    pointerScope: string | undefined,
-    resolve: (locator: RawResourceLocator) => T,
-  ): T {
-    const origin = loaded.loaded.facet.origin;
-    const selected = this.delegateResource(
-      () =>
-        selectorValue(
-          loaded.loaded.facet.input,
-          selector,
-          origin,
-          "",
-          loaded.loaded.locations?.[`/${selector}`],
-        ),
-      path,
-      origin,
-      `/${selector}`,
-      undefined,
-      pointerScope,
-    );
-    return this.delegateResource(
-      () => resolve(selected),
-      path,
-      origin,
-      `/${selector}`,
-      loaded.loaded.locations?.[`/${selector}`],
-      pointerScope,
-    );
-  }
-
   private selectInstance(
     loaded: LoadedFacet<InstanceFacet>,
     selector: string | undefined,
@@ -479,86 +419,13 @@ class ResourceResolver {
     hops: number,
     pointerScope?: string,
   ): SourceSelection {
-    const origin = loaded.loaded.facet.origin;
-    if (selector === "$template") {
-      const template = this.resolveLoadedSelector(
-        loaded,
-        selector,
-        path,
-        pointerScope,
-        (selected) =>
-          this.resolveTemplateAt(
-            loaded.authoring.pack,
-            selected,
-            loaded.authoring.file,
-            path,
-            hops + 1,
-            pointerScope,
-          ),
-      );
-      return {
-        template: template.value,
-        path: template.path,
-        hops: template.hops,
-      };
-    }
-
-    if (selector === "$instance") {
-      const base = this.resolveLoadedSelector(
-        loaded,
-        selector,
-        path,
-        pointerScope,
-        (selected) =>
-          this.resolveInstanceAt(
-            loaded.authoring.pack,
-            selected,
-            loaded.authoring.file,
-            path,
-            hops + 1,
-            pointerScope,
-          ),
-      );
-      return {
-        template: base.value.template,
-        inherited: base.value.input,
-        inheritedProvenance: base.value.provenance,
-        inheritedAuthoring: base.authoring,
-        path: base.path,
-        hops: base.hops,
-      };
-    }
-
-    try {
-      const sibling = this.resolveTemplateAt(
-        loaded.pack,
-        "./",
-        loaded.authoring.file,
-        path,
-        hops + 1,
-        pointerScope,
-      );
-      return {
-        template: sibling.value,
-        path: sibling.path,
-        hops: sibling.hops,
-      };
-    } catch (error) {
-      if (
-        error instanceof ResourceResolutionError &&
-        error.failure.code === "missing-target" &&
-        this.isAbsentSiblingTemplate(loaded)
-      ) {
-        return failGraphResource(
-          "missing-effective-template",
-          "instance has no effective sibling template facet",
-          path as [ResourceGraphNode, ...ResourceGraphNode[]],
-          { source: origin },
-          this.failureContext(error),
-        );
-      }
-      throw error;
-    }
+    return this.sources.selectInstance(
+      loaded,
+      selector,
+      path,
+      hops,
+      pointerScope,
+    );
   }
 
   private resolveInstanceAt(
@@ -702,20 +569,6 @@ class ResourceResolver {
     readonly trustedRoots: readonly ResourceWatchRoot[];
   } {
     return this.traversal.failureContext(error);
-  }
-
-  private isAbsentSiblingTemplate(loaded: LoadedFacet<InstanceFacet>): boolean {
-    try {
-      return (
-        inspectResourceFile(
-          loaded.target,
-          "template.jsonc",
-          loaded.loaded.facet.locator,
-        ) === undefined
-      );
-    } catch {
-      return false;
-    }
   }
 
   private failAt(
@@ -944,88 +797,3 @@ function cloneNormalizedDocument(
   }
   return output as NormalizedResourceDocument;
 }
-
-export function resolveResourceInstance(
-  request: ResolveInstanceRequest,
-): ResolvedResourceInstance;
-export function resolveResourceInstance(
-  pack: ResourcePack,
-  locator: RawResourceLocator,
-  authoringFile: string,
-  options?: ResourceResolveOptions,
-): ResolvedResourceInstance;
-export function resolveResourceInstance(
-  requestOrPack: ResolveInstanceRequest | ResourcePack,
-  locator?: RawResourceLocator,
-  authoringFile?: string,
-  options: ResourceResolveOptions = {},
-): ResolvedResourceInstance {
-  const request = requestWithPack<ResolveInstanceRequest>(requestOrPack, {
-    locator: locator as RawResourceLocator,
-    authoringFile: authoringFile as string,
-    ...options,
-  });
-  return runResourceRequest(request, (resolver) =>
-    resolver.resolveInstance(
-      request.pack,
-      request.locator,
-      request.authoringFile,
-    ),
-  );
-}
-
-export function resolveResourceTemplate(
-  request: ResolveTemplateRequest,
-): ResolvedTemplate;
-export function resolveResourceTemplate(
-  pack: ResourcePack,
-  locator: RawResourceLocator,
-  authoringFile: string,
-  options?: ResourceResolveOptions,
-): ResolvedTemplate;
-export function resolveResourceTemplate(
-  requestOrPack: ResolveTemplateRequest | ResourcePack,
-  locator?: RawResourceLocator,
-  authoringFile?: string,
-  options: ResourceResolveOptions = {},
-): ResolvedTemplate {
-  const request = requestWithPack<ResolveTemplateRequest>(requestOrPack, {
-    locator: locator as RawResourceLocator,
-    authoringFile: authoringFile as string,
-    ...options,
-  });
-  return runResourceRequest(request, (resolver) =>
-    resolver.resolveTemplate(
-      request.pack,
-      request.locator,
-      request.authoringFile,
-    ),
-  );
-}
-
-export function resolveResourceDocument(
-  request: ResolveDocumentRequest,
-): ResolvedResourceDocument;
-export function resolveResourceDocument(
-  pack: ResourcePack,
-  rootFile: string,
-  options?: ResourceResolveOptions,
-): ResolvedResourceDocument;
-export function resolveResourceDocument(
-  requestOrPack: ResolveDocumentRequest | ResourcePack,
-  rootFile?: string,
-  options: ResourceResolveOptions = {},
-): ResolvedResourceDocument {
-  const request = requestWithPack<ResolveDocumentRequest>(requestOrPack, {
-    rootFile: rootFile as string,
-    ...options,
-  });
-  return runResourceRequest(request, (resolver) =>
-    resolver.resolveDocument(request.rootFile, request.rootDocument),
-  );
-}
-
-export const resolveInstance = resolveResourceInstance;
-export const resolveTemplate = resolveResourceTemplate;
-export const resolveDocument = resolveResourceDocument;
-export const resolveResource = resolveResourceDocument;

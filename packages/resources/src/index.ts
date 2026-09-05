@@ -130,7 +130,7 @@ export {
   resolveResourceInstance,
   resolveResourceTemplate,
   resolveTemplate,
-} from "./resolve.js";
+} from "./resolve-requests.js";
 export {
   JSON_SCHEMA_DRAFT_2020_12_URI,
   TEMPLATE_NAME_PATTERN,

@@ -1,4 +1,6 @@
 import type { ResourcePack } from "./content-root.js";
+import { failGraphResource, ResourceResolutionError } from "./errors.js";
+import { inspectResourceFile } from "./filesystem.js";
 import type { JsoncLocation } from "./jsonc.js";
 import { isSafeJsonObject } from "./jsonc.js";
 import { own } from "./object.js";
@@ -15,6 +17,7 @@ import type {
   AuthoringContext,
   AuthoringProvenance,
   InstanceTraversal,
+  LoadedFacet,
   MergedResourceValue,
   NormalizedValue,
   ResolvedTemplate,
@@ -45,6 +48,7 @@ import {
   withoutKeys,
 } from "./resolution-values.js";
 import type {
+  InstanceFacet,
   JsonObject,
   JsonValue,
   RawResourceLocator,
@@ -483,6 +487,142 @@ export class SourceSelector {
       ...(metadata.description ? { description: metadata.description } : {}),
       ...(metadata.values ? { values: metadata.values } : {}),
     };
+  }
+
+  resolveLoadedSelector<T extends ResourceTraversal<unknown>>(
+    loaded: LoadedFacet<InstanceFacet>,
+    selector: "$template" | "$instance",
+    path: readonly ResourceGraphNode[],
+    pointerScope: string | undefined,
+    resolve: (locator: RawResourceLocator) => T,
+  ): T {
+    const origin = loaded.loaded.facet.origin;
+    const selected = this.traversal.delegateResource(
+      () =>
+        selectorValue(
+          loaded.loaded.facet.input,
+          selector,
+          origin,
+          "",
+          loaded.loaded.locations?.[`/${selector}`],
+        ),
+      path,
+      origin,
+      `/${selector}`,
+      undefined,
+      pointerScope,
+    );
+    return this.traversal.delegateResource(
+      () => resolve(selected),
+      path,
+      origin,
+      `/${selector}`,
+      loaded.loaded.locations?.[`/${selector}`],
+      pointerScope,
+    );
+  }
+
+  selectInstance(
+    loaded: LoadedFacet<InstanceFacet>,
+    selector: string | undefined,
+    path: readonly ResourceGraphNode[],
+    hops: number,
+    pointerScope?: string,
+  ): SourceSelection {
+    const origin = loaded.loaded.facet.origin;
+    if (selector === "$template") {
+      const template = this.resolveLoadedSelector(
+        loaded,
+        selector,
+        path,
+        pointerScope,
+        (selected) =>
+          this.host.resolveTemplateAt(
+            loaded.authoring.pack,
+            selected,
+            loaded.authoring.file,
+            path,
+            hops + 1,
+            pointerScope,
+          ),
+      );
+      return {
+        template: template.value,
+        path: template.path,
+        hops: template.hops,
+      };
+    }
+
+    if (selector === "$instance") {
+      const base = this.resolveLoadedSelector(
+        loaded,
+        selector,
+        path,
+        pointerScope,
+        (selected) =>
+          this.host.resolveInstanceAt(
+            loaded.authoring.pack,
+            selected,
+            loaded.authoring.file,
+            path,
+            hops + 1,
+            pointerScope,
+          ),
+      );
+      return {
+        template: base.value.template,
+        inherited: base.value.input,
+        inheritedProvenance: base.value.provenance,
+        inheritedAuthoring: base.authoring,
+        path: base.path,
+        hops: base.hops,
+      };
+    }
+
+    try {
+      const sibling = this.host.resolveTemplateAt(
+        loaded.pack,
+        "./",
+        loaded.authoring.file,
+        path,
+        hops + 1,
+        pointerScope,
+      );
+      return {
+        template: sibling.value,
+        path: sibling.path,
+        hops: sibling.hops,
+      };
+    } catch (error) {
+      if (
+        error instanceof ResourceResolutionError &&
+        error.failure.code === "missing-target" &&
+        this.isAbsentSiblingTemplate(loaded)
+      ) {
+        return failGraphResource(
+          "missing-effective-template",
+          "instance has no effective sibling template facet",
+          path as [ResourceGraphNode, ...ResourceGraphNode[]],
+          { source: origin },
+          this.traversal.failureContext(error),
+        );
+      }
+      throw error;
+    }
+  }
+
+  isAbsentSiblingTemplate(loaded: LoadedFacet<InstanceFacet>): boolean {
+    try {
+      return (
+        inspectResourceFile(
+          loaded.target,
+          "template.jsonc",
+          loaded.loaded.facet.locator,
+        ) === undefined
+      );
+    } catch {
+      return false;
+    }
   }
 
   resolveSource(
