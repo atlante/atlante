@@ -1,17 +1,17 @@
 # `@atlante/schema`
 
-Document contract for [Atlante](https://github.com/atlante/atlante), including
-TypeScript types, Zod schemas, and the versioned JSON Schema. Requires Node.js
-22 or later.
+Private workspace. The versioned document contract for Atlante: TypeScript
+types, Zod schemas, and the generated JSON Schema documents (including the
+committed `schema/v0.1/schema.json` and the eval-scenario schema).
 
-The package exports `atlanteDocumentSchema`, `agentBindingSchema`,
-`skillBindingSchema`, the shared `bindingDescriptionSchema`, value schemas, their
-TypeScript types, `SCHEMA_URI`, and `documentJsonSchema`. Every agent and skill
-binding requires a non-empty `description`; each binding reserves
-`description`, `$template`, `$instance`, and `values` while leaving its content
-fields to the selected template. A bare resource locator is `$instance`
-shorthand, and `$template`/`$instance` are mutually exclusive.
+## Boundaries
 
-The generated JSON Schema is also available at
-`@atlante/schema/schema.json` (the source generated path is
-`packages/schema/schema/v0.1/schema.json`).
+- Independent of higher orchestration, concrete packs, CLI policy, and host
+  integrations.
+- The committed JSON Schema and generated artifacts are build outputs of the
+  TypeScript source and MUST NOT be edited directly.
+
+## Context
+
+See [`AGENTS.md`](../../AGENTS.md) for the workspace architecture and
+[`SPECIFICATION.md`](../../SPECIFICATION.md) for the normative v0.1 contract.
