@@ -26,9 +26,11 @@ npx @atlante/cli@latest build --watch   # rebuild while you edit
 npx @atlante/cli@latest eval            # optional: run eval scenarios in a sandbox
 ```
 
-`init` writes `atlante.jsonc`, materializes the first native outputs, adds the
-generated folders to `.gitignore`, and preserves existing host settings. To use
-the bare `atlante` command, install the CLI first:
+`init` writes `atlante.jsonc`, materializes the first native outputs, and adds
+the generated folders to `.gitignore`. If an older Atlante version left a
+plugin entry in your OpenCode configuration, `init` removes that entry; every
+other host setting is preserved. To use the bare `atlante` command, install
+the CLI first:
 
 ```bash
 npm install --global @atlante/cli

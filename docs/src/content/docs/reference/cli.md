@@ -39,6 +39,8 @@ npx @atlante/cli@latest init [path] --force
 `.atlante/` without reordering existing content, removes an Atlante-written
 `@atlante/opencode` plugin registration from `opencode.jsonc` (or an existing
 `opencode.json`) while preserving every other host setting, and runs a build.
+It never adds a plugin registration. When no registration exists, it prints
+`no @atlante/opencode plugin registration found …`.
 
 ### Pack installation
 
