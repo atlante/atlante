@@ -50,6 +50,7 @@ describe("docs internal links", () => {
   it("declares every retired route as a redirect or keeps it authored", () => {
     expect(redirectRoutes).toContain("/contributing");
     expect(redirectRoutes).toContain("/guides/extensions");
+    expect(redirectRoutes).toContain("/concepts/native-outputs");
   });
 
   it("resolves every site-absolute link to an authored page or redirect", () => {

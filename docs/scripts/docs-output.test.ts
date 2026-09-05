@@ -163,6 +163,14 @@ describe.skipIf(!runOutputTests)("docs built output", () => {
     );
   });
 
+  it("keeps the native-output route as a redirect", () => {
+    expectStaticRedirect(
+      "/concepts/native-outputs",
+      "/reference/materialization",
+      join("concepts", "native-outputs", "index.html"),
+    );
+  });
+
   it("publishes the branded docs 404 output", () => {
     const notFoundPath = join(outputRoot, "404.html");
     expect(

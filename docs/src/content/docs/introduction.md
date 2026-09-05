@@ -15,17 +15,16 @@ document declares. Packs supply reusable presets,
 templates, and instances; your document supplies the values and bindings that
 make them fit your project.
 
-After the first build, you have an `atlante.jsonc` source document and a set
-of host-native files: OpenCode agents under `.opencode/agents/`, skills under
-`.opencode/skills/`, and an ownership manifest at
-`.atlante/opencode-native.json` that records every generated file.
+After the first build, you have an `atlante.jsonc` source document and
+host-native files for OpenCode. The source remains the place to make changes;
+see [Materialization](/reference/materialization) for the generated output
+contract.
 
 Start with the five-minute [Getting started](/getting-started) path to create
 that first build. Then explore
 [Configuration](/concepts/configuration),
 [Resources](/concepts/resources), [Templates](/concepts/templates),
-[Values](/concepts/values), [Resolution](/concepts/resolution), and
-[Native outputs](/concepts/native-outputs).
+[Values](/concepts/values), and [Resolution](/concepts/resolution).
 
 :::note
 Atlante owns configuration, static content selection, validation,
@@ -38,9 +37,7 @@ LLM inference.
 
 A project normally contains one `atlante.jsonc` file. It selects a preset, binds
 agents and skills to static resources, and supplies explicit values for those
-bindings. The build materializes host-native output: agent and skill files
-where the host discovers them, plus an ownership manifest that records what
-Atlante generated.
+bindings. The build turns that source into host-native output.
 
 ```jsonc title="atlante.jsonc"
 {

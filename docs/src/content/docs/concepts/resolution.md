@@ -66,5 +66,5 @@ source locations. The resource system fails closed: invalid input produces no
 canonical document and the builder materializes no partial output.
 
 Resolution does not execute JavaScript, project code, agents, skills, or model
-inference. It does not install packages or load URLs. [Native outputs](/concepts/native-outputs)
+inference. It does not install packages or load URLs. [Materialization](/reference/materialization)
 describes the result of the final stage.
