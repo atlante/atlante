@@ -155,6 +155,14 @@ describe.skipIf(!runOutputTests)("docs built output", () => {
     );
   });
 
+  it("keeps the extension-boundary route as a redirect", () => {
+    expectStaticRedirect(
+      "/guides/extensions",
+      "/guides/authoring-packs",
+      join("guides", "extensions", "index.html"),
+    );
+  });
+
   it("publishes the branded docs 404 output", () => {
     const notFoundPath = join(outputRoot, "404.html");
     expect(

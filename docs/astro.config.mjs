@@ -10,6 +10,7 @@ export default defineConfig({
     "/index.md": "/introduction.md",
     "/contributing":
       "https://github.com/atlante/atlante/blob/main/CONTRIBUTING.md",
+    "/guides/extensions": "/guides/authoring-packs",
   },
   integrations: [
     starlight({
@@ -88,7 +89,6 @@ export default defineConfig({
             },
             { slug: "guides/opencode", label: "Use OpenCode" },
             { slug: "guides/authoring-packs", label: "Author a pack" },
-            { slug: "guides/extensions", label: "Extension boundary" },
           ],
         },
         {
