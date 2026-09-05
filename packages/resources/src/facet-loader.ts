@@ -18,12 +18,6 @@ import {
   loadPresetFacet,
   loadTemplateFacet,
 } from "./facets.js";
-import {
-  type ResolvedResourceTarget,
-  type ResourceLocatorOptions,
-  resolveResourceLocator,
-  resourceCandidateWatchPaths,
-} from "./filesystem.js";
 import type { JsoncLocation } from "./jsonc.js";
 import { createPackageResolutionCache } from "./package-resolution.js";
 import type { ResolutionTraversal } from "./resolution-traversal.js";
@@ -32,6 +26,12 @@ import type {
   ResourceResolveOptions,
 } from "./resolution-types.js";
 import { authoringContext } from "./resolution-values.js";
+import {
+  type ResolvedResourceTarget,
+  type ResourceLocatorOptions,
+  resolveResourceLocator,
+  resourceCandidateWatchPaths,
+} from "./resource-targets.js";
 import type {
   InstanceFacet,
   Preset,

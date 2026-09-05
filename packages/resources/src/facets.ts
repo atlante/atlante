@@ -11,15 +11,6 @@ import {
   ResourceResolutionError,
 } from "./errors.js";
 import {
-  inspectResourceFile,
-  type ResolvedResourceTarget,
-  type ResourceFile,
-  type ResourceFileName,
-  readResourceFile,
-  resolveResourceLocator,
-  resourceCandidateWatchPaths,
-} from "./filesystem.js";
-import {
   isSafeJsonObject,
   type JsoncLocation,
   JsoncParseError,
@@ -27,6 +18,14 @@ import {
   parseJsonWithLocations,
 } from "./jsonc.js";
 import type { PackageResolutionCache } from "./package-resolution.js";
+import { inspectResourceFile, readResourceFile } from "./resource-files.js";
+import {
+  type ResolvedResourceTarget,
+  type ResourceFile,
+  type ResourceFileName,
+  resolveResourceLocator,
+  resourceCandidateWatchPaths,
+} from "./resource-targets.js";
 import { JSON_SCHEMA_DRAFT_2020_12_URI } from "./schema.js";
 import type {
   InstanceFacet,

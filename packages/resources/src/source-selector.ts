@@ -1,6 +1,5 @@
 import type { ResourcePack } from "./content-root.js";
 import { failGraphResource, ResourceResolutionError } from "./errors.js";
-import { inspectResourceFile } from "./filesystem.js";
 import type { JsoncLocation } from "./jsonc.js";
 import { isSafeJsonObject } from "./jsonc.js";
 import { own } from "./object.js";
@@ -47,6 +46,7 @@ import {
   traversalContext,
   withoutKeys,
 } from "./resolution-values.js";
+import { inspectResourceFile } from "./resource-files.js";
 import type {
   InstanceFacet,
   JsonObject,

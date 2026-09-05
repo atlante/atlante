@@ -4,10 +4,10 @@ import type {
   ResourceResolutionContext,
 } from "./content-root.js";
 import type { LoadedResource } from "./facets.js";
-import type { ResolvedResourceTarget } from "./filesystem.js";
 import type { ResourceGraph } from "./graph.js";
 import type { JsoncLocation } from "./jsonc.js";
 import type { ResourceProvenance } from "./provenance.js";
+import type { ResolvedResourceTarget } from "./resource-targets.js";
 import type {
   InstanceFacet,
   JsonObject,

@@ -1,7 +1,6 @@
 import { relative } from "node:path";
 import { authoredValueLayerIssues } from "./authored-values.js";
 import type { ResourcePack } from "./content-root.js";
-import { resolveResourceLocator } from "./filesystem.js";
 import type { JsoncLocation } from "./jsonc.js";
 import { isSafeJsonObject } from "./jsonc.js";
 import {
@@ -24,6 +23,7 @@ import {
   traversalContext,
   withoutKeys,
 } from "./resolution-values.js";
+import { resolveResourceLocator } from "./resource-targets.js";
 import type {
   JsonObject,
   JsonValue,
