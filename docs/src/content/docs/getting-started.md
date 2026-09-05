@@ -30,10 +30,8 @@ npx atlante init
 
 `init` scaffolds `atlante.jsonc`, materializes the initial native outputs, and
 enforces the ignore policy: `.opencode/agents/`, `.opencode/skills/`, and
-`.atlante/` are added to `.gitignore`, so generated files stay local. If an
-Atlante-written `@atlante/opencode` plugin registration is present, `init`
-removes it. Existing host settings in the OpenCode config are preserved.
-You do not need to create a second onboarding configuration.
+`.atlante/` are added to `.gitignore`, so generated files stay local. You do not
+need to create a second onboarding configuration.
 
 The generated source selects the default first-party preset:
 
@@ -68,33 +66,21 @@ npx @atlante/cli@latest build
 ```
 
 Build repeats validation, renders deterministic Markdown, and materializes
-the host-native files plus the ownership manifest. Both commands report the
-resolved filesystem path they used, so output may be an absolute path rather
-than the shortened examples shown here.
+the host-native files plus the ownership manifest. See
+[Materialization](/reference/materialization) for the generated output contract.
 
-## 4. Inspect the native outputs
+## 4. Open the generated harness
 
-Inspect the generated files after `init` or `build`:
+OpenCode discovers the generated agents and skills when it starts. Restart it to
+pick up new or changed files. Keep generated output local: rendered values may
+contain project-sensitive content, and the output is derived from the source
+configuration. See [Materialization](/reference/materialization) for its paths
+and ownership rules.
 
-```text
-<project>/.opencode/
-├── agents/<id>.md
-└── skills/<id>/SKILL.md
-<project>/.atlante/opencode-native.json
-```
-
-The ownership manifest identifies each generated file with its ID, path, and
-SHA-256 digest. OpenCode discovers these files when it starts; restart it to
-pick up new or changed agents. Keep the generated outputs local: rendered
-values may contain project-sensitive content, and they are generated output
-rather than source configuration (`init` already ignores them in git).
-
-That is the first useful boundary: Atlante renders the prompts and
-materializes the files; the host discovers them and executes agents and
-skills. Atlante does not execute agents, skills, project code, or LLM
-inference.
-The optional `atlante eval` command delegates a sandboxed run to OpenCode;
-Atlante does not perform LLM inference itself.
+Atlante renders the prompts and materializes the files; OpenCode discovers and
+executes the agents and skills. Atlante does not execute agents, skills, project
+code, or LLM inference. The optional `atlante eval` command tests the harness in
+a disposable sandbox using OpenCode.
 
 ## 5. Continue to the harness
 

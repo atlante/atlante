@@ -20,14 +20,7 @@ The published CLI bundles and resolves Atlante's first-party Pack for the
 default setup. Running `npx @atlante/cli@latest init` therefore does not require a
 separate `@atlante/pack` installation. The default preset selection and
 first-party ownership are separate ideas: `init` can select another preset
-explicitly. The generated source can extend the default preset with:
-
-```jsonc
-{
-  "$schema": "https://atlante.sh/schema/v0.1/schema.json",
-  "extends": "@atlante/pack"
-}
-```
+explicitly.
 
 Custom Pack packages must already be declared and installed by the authoring
 project's package manager before a document references them. Atlante does not
