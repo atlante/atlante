@@ -68,10 +68,10 @@ resource source objects, which require `$template` or `$instance`.
 
 ## Agent and skill maps
 
-Agent map keys remain host-agent IDs and become the names of the materialized
-`.opencode/agents/<id>.md` files. Skill map keys are the `skillId` values that
-name the materialized `.opencode/skills/<skillId>/SKILL.md` files. Both
-binding types require a non-empty `description` after interpolation.
+Agent map keys remain host-agent IDs, and skill map keys remain skill IDs. Both
+binding types require a non-empty `description` after interpolation. The
+[Materialization](/reference/materialization) reference explains how those IDs
+become native output paths.
 
 The document schema leaves template-owned fields open. Resource resolution and
 template validation determine whether those fields are valid for the selected
