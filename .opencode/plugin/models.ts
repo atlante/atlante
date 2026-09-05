@@ -11,7 +11,7 @@ type RoleOverrides = { model?: string; reasoningEffort?: string };
 type Overrides = Partial<Record<Role, RoleOverrides>>;
 
 const STARTER_DEFAULTS: Overrides = {
-  architect: { model: DEFAULT_MODEL, reasoningEffort: "max" },
+  architect: { model: DEFAULT_MODEL, reasoningEffort: "high" },
 };
 const DEFAULT_FILE = `${JSON.stringify(STARTER_DEFAULTS, null, 2)}\n`;
 const MODEL_ID = /^[^/\s]+\/\S+$/;
