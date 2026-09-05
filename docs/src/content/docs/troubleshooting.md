@@ -23,18 +23,16 @@ pass an explicit path. Atlante never chooses between both files silently.
 
 ## The CLI says `missing-target`
 
-Check the locator and the file that contains it. Relative locators begin with
-`./` or `../`; package locators use the package name and an optional POSIX
-subpath. A selected target must exist within its trusted Pack root.
+Check the locator and confirm that the selected target exists in its trusted
+Pack root. See [Resources](/concepts/resources) for locator rules.
 
 For a custom Pack, check both package diagnostics:
 
 - `package-not-declared` means the package is not declared by the authoring project.
 - `package-not-installed` means it is declared but cannot be found in the installation.
 
-The published CLI bundles the first-party `@atlante/pack`, so the default preset
-does not need a separate installation. A custom Pack must be declared and
-installed before the CLI can resolve it:
+The published CLI bundles the first-party `@atlante/pack`. A custom Pack must be
+declared and installed before the CLI can resolve it:
 
 ```sh
 npm install --save-dev @acme/review-pack
@@ -43,46 +41,37 @@ npx @atlante/cli@latest validate
 
 ## A locator is rejected
 
-Locators must be containing-file-relative paths beginning with `./` or `../`, or
-package locators of the form `<package-name>` or `<package-name>/<subpath>`.
-Absolute paths, URLs, backslash-separated paths, direct facet filenames, and
-paths that escape the selected Pack root are invalid.
+See [Resources](/concepts/resources) for accepted locator forms and Pack-root
+restrictions. Correct the locator, then run validation again.
 
 ## Template input is rejected
 
-The selected template owns fields after `description`, `$template`, `$instance`,
-and `values`. Read its `template.jsonc` schema, remove unsupported fields, or
-supply the required input. A binding cannot use `$template` and `$instance`
-together.
+Read the selected template's `template.jsonc` schema, remove unsupported fields,
+or supply the required input. See [Templates](/concepts/templates) for selector
+and template-input rules.
 
 ## A value is not replaced
 
 Check the spelling of each `{{values.key}}` reference and confirm that the key is
-present in the global or binding-local `values` map. Values are strings, and a
-missing reference is an error before rendering. The only supported system value
-is `{{sys.cwd.basename}}`; arbitrary filesystem and environment references are
-not available.
+present in the global or binding-local `values` map. See [Values](/concepts/values)
+for interpolation and system-value rules.
 
 ## A one-shot build fails
 
-Fix the first actionable `error` diagnostic, then run validation again:
+Fix the first actionable `error` diagnostic, then run validation and build again:
 
 ```sh
 npx @atlante/cli@latest validate
 npx @atlante/cli@latest build
 ```
 
-`validate` checks source and selected content without rendering. `build` repeats
-validation, renders the output, and materializes no partial output set when a
-failure occurs. For command output structure and locations, read
-[Diagnostics](/reference/diagnostics).
+For command behavior and output, read the [CLI](/reference/cli) and
+[Diagnostics](/reference/diagnostics) references.
 
 ## Watch mode reports a failure
 
-`build --watch` remains active after a validation or build failure. Fix the
-reported source error; the watcher retries on a later change. It leaves the
-previous valid generated set in place and exits with status `0` when stopped with
-`Ctrl-C`. See the [CLI](/reference/cli) for the full watch contract.
+Fix the reported source error; the watcher retries on a later change. See the
+[CLI](/reference/cli) for watch behavior and exit status.
 
 ## The OpenCode agent is not updated
 
@@ -93,36 +82,31 @@ npx @atlante/cli@latest validate
 npx @atlante/cli@latest build
 ```
 
-Then restart OpenCode. It reads `.opencode/agents/` and `.opencode/skills/`
-when it starts, so new or changed native files are picked up only after a
-restart. An idempotent rebuild rewrites nothing, which the CLI shows by
-printing no `wrote` lines for unchanged files.
+Then restart OpenCode to pick up changed native files. See
+[Materialization](/reference/materialization) for output paths and discovery.
 
 ## The build reports `materialization-*`
 
-The materializer fails closed and changes nothing when a target is unsafe:
+See [Materialization](/reference/materialization) for diagnostic meanings and
+the complete publication contract. Common repairs are:
 
-- `materialization-collision`: an unowned file sits at a native path. Remove
-  or rename that file, then run `atlante build` again.
-- `materialization-drift`: a generated file was edited after the last build.
-  Restore it to its last generated state — deleting the drifted file is the
-  simplest repair — then run `atlante build` again.
-- `materialization-invalid-id`: an agent or skill ID is not lowercase
-  kebab-case ASCII of at most 64 characters. Rename the ID in
-  `atlante.jsonc`; materialization never renames IDs.
-- `materialization-invalid-manifest`: `.atlante/opencode-native.json` is
-  corrupt. Delete it to discard Atlante's ownership state, then build again.
-- `materialization-unsafe-path`: a symlink or non-directory blocks a
-  materialization path. Replace it with a real directory, then build again.
-- `materialization-publication-failed`: a staged publication failed; the
-  previous valid generated set is preserved. Fix the reported filesystem
-  condition and build again.
+- `materialization-collision`: remove or rename the unowned file, then build
+  again.
+- `materialization-drift`: restore or delete the edited generated file, then
+  build again.
+- `materialization-invalid-id`: rename the invalid agent or skill ID in
+  `atlante.jsonc`, then build again.
+- `materialization-invalid-manifest`: delete the corrupt
+  `.atlante/opencode-native.json`, then build again.
+- `materialization-unsafe-path`: replace the symlink or blocking path with a
+  real directory, then build again.
+- `materialization-publication-failed`: fix the reported filesystem condition
+  and build again.
 
 ## The build reports `unsupported-host`
 
-The document's `hosts` field names a host with no registered materializer. In
-v0.1 the only admitted value is `"opencode"`. Remove the unknown entry or
-register a materializer for it.
+In v0.1 the only admitted `hosts` value is `"opencode"`. Remove the unknown
+entry and run validation again.
 
 ## `init` touched my OpenCode config or `.gitignore`
 
