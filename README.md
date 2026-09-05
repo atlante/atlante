@@ -4,12 +4,10 @@
 
 <p align="center">The configuration layer for your coding-agent harness.</p>
 
-Atlante gives software architects, engineers, and developers one versioned
-source for the agents, skills, and workflows that make up their coding-agent
-harness, plus evaluation scenarios for it. You author the configuration and
-scenarios in your repository; Atlante validates and composes the selected
-content, materializes host-native files, and provides `atlante eval` to test the
-harness with those scenarios.
+Atlante gives developers a versioned, structured, and composable source for
+their agents and skills. It validates and composes that source, creates the
+files their host discovers, and provides `atlante eval` to test the resulting
+harness, so it can be developed like code.
 
 [OpenCode](https://opencode.ai/) is the only supported host today. Read the
 [documentation](https://docs.atlante.sh) for concepts, guides, and reference.
