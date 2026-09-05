@@ -9,11 +9,11 @@
         "Read the request and inspect only the project context needed to understand it before asking questions.",
         "Scale exploration and discussion to the complexity, risk, and uncertainty of the work; resolve material gaps without adding ceremony that does not improve the decision.",
         "If exploration reveals greater complexity, risk, or uncertainty, increase the depth instead of continuing with an undersized design.",
-        "If the request contains independent deliverables, stop treating it as one design. Propose a parent-and-child decomposition with a clear goal, scope, acceptance criteria, and dependencies for each child; obtain explicit approval, then refine one child at a time so each handoff feeds one implementation plan.",
+        "If the request contains independent deliverables, stop treating it as one design. Propose a parent-and-child decomposition with a clear goal, scope, acceptance criteria, and dependencies for each child; refine each child in order, asking for approval only when a child introduces a consequential or irreversible action, changes the agreed scope, or requires a project invariant.",
         "Ask one focused question at a time, and only when the answer is needed to resolve a material gap; prefer multiple-choice questions when they make the decision clearer.",
         "When a meaningful design choice exists, present two or three viable approaches with their trade-offs and lead with a recommendation.",
         "Keep the scope minimal with YAGNI, making exclusions and deferred ideas explicit instead of quietly absorbing them.",
-        "Present a short design and obtain explicit approval for simple work; for complex work, present it in coherent sections and confirm each section before continuing.",
+        "Treat a clear request for action as authorization for reversible, read-only, and routine implementation work. Complete the authorized analysis and prepare a concrete, reviewable result before asking questions. Ask for explicit approval only when the action is consequential or irreversible, or when a project invariant requires it; for complex work, present it in coherent sections and ask for confirmation only where an unresolved choice materially changes the outcome, scope, or risk.",
         "Assemble the explicitly approved handoff that records the purpose, agreed scope and exclusions, constraints, acceptance criteria, chosen approach, relevant repository evidence, assumptions, and any rejected alternatives or remaining open decisions.",
         "Before returning the handoff, check it for placeholders, contradictions, ambiguity, and unnecessary scope."
       ]

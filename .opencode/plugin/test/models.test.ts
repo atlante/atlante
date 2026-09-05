@@ -45,7 +45,7 @@ test("generates an architect-only Z.ai model override", async () => {
       await readFile(join(directory, ".opencode/models.json"), "utf8"),
     ),
   ).toEqual({
-    architect: { model: MODEL, reasoningEffort: "max" },
+    architect: { model: MODEL, reasoningEffort: "high" },
   });
 
   const config = baseConfig();
@@ -55,8 +55,8 @@ test("generates an architect-only Z.ai model override", async () => {
     architect: {
       mode: "primary",
       model: MODEL,
-      variant: "max",
-      options: { reasoningEffort: "max" },
+      variant: "high",
+      options: { reasoningEffort: "high" },
     },
     general: { model: "opencode/default-general" },
     explore: { model: "opencode/default-explore" },
@@ -84,6 +84,28 @@ test("still applies explicitly configured sub-agent overrides", async () => {
     options: { reasoningEffort: "max" },
   });
   expect(config.agent.explore).toEqual({
+    model: MODEL,
+    variant: "max",
+    options: { reasoningEffort: "max" },
+  });
+});
+
+test("preserves an explicitly configured architect override", async () => {
+  const directory = await createProject();
+  await mkdir(join(directory, ".opencode"));
+  await writeFile(
+    join(directory, ".opencode", "models.json"),
+    JSON.stringify({
+      architect: { model: MODEL, reasoningEffort: "max" },
+    }),
+  );
+
+  const hooks = await loadPlugin(directory);
+  const config = baseConfig();
+  await hooks.config?.(config as never);
+
+  expect(config.agent.architect).toEqual({
+    mode: "primary",
     model: MODEL,
     variant: "max",
     options: { reasoningEffort: "max" },
