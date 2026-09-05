@@ -12,7 +12,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { lockSyncIssues } from "./package-graph";
+import { lockSyncIssues, syncLockToManifests } from "./package-graph";
 
 const ROOT = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 // Packages are listed in architectural layer order, lowest layer first; keep
@@ -197,6 +197,156 @@ test("accepts a synchronized lock", () => {
 }`,
       ),
     ).toEqual([]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+const SYNC_PINS = [
+  { manifest: "website/package.json", dependency: "@atlante/cli" },
+] as const;
+
+test("syncs stale entries in a bun-shaped lock, leaving all other bytes alone", () => {
+  const root = mkdtempSync(join(tmpdir(), "package-graph-sync-"));
+  try {
+    writeLockFixture(
+      root,
+      `{
+  "lockfileVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "atlante",
+      "version": "0.1.0",
+    },
+    "packages/cli": {
+      "name": "@atlante/cli",
+      "version": "0.1.0",
+      "bin": { "atlante": "./dist/bin/atlante.js" },
+      "dependencies": {
+        "@atlante/pack": "workspace:*",
+      },
+    },
+    "packages/schema": {
+      "name": "@atlante/schema",
+      "version": "0.1.0",
+    },
+    "website": {
+      "name": "website",
+      "version": "0.1.0",
+      "dependencies": {
+        "@atlante/cli": "0.1.0",
+        "astro": "^5.0.0",
+      },
+    },
+  },
+  "packages": {
+    "@atlante/cli": ["@atlante/cli@workspace:packages/cli", "", {}, "sha"],
+    "some-pkg": ["some-pkg@0.1.0", "", {}, "sha"],
+  },
+}`,
+    );
+    const { synced, remaining } = syncLockToManifests(
+      { packages: ["cli"], pins: SYNC_PINS },
+      root,
+    );
+
+    expect(synced).toBe(2);
+    expect(remaining).toEqual([]);
+    // The un-synced schema stanza keeps its stale 0.1.0 and its trailing
+    // comma; workspace:* and astro are untouched; formatting is preserved;
+    // the root stanza and the single-line resolution entries (which embed
+    // the same 0.1.0 string) are byte-identical.
+    expect(readFileSync(join(root, "bun.lock"), "utf8")).toBe(`{
+  "lockfileVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "atlante",
+      "version": "0.1.0",
+    },
+    "packages/cli": {
+      "name": "@atlante/cli",
+      "version": "0.2.0",
+      "bin": { "atlante": "./dist/bin/atlante.js" },
+      "dependencies": {
+        "@atlante/pack": "workspace:*",
+      },
+    },
+    "packages/schema": {
+      "name": "@atlante/schema",
+      "version": "0.1.0",
+    },
+    "website": {
+      "name": "website",
+      "version": "0.1.0",
+      "dependencies": {
+        "@atlante/cli": "0.2.0",
+        "astro": "^5.0.0",
+      },
+    },
+  },
+  "packages": {
+    "@atlante/cli": ["@atlante/cli@workspace:packages/cli", "", {}, "sha"],
+    "some-pkg": ["some-pkg@0.1.0", "", {}, "sha"],
+  },
+}`);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("leaves an in-sync lock byte-identical", () => {
+  const root = mkdtempSync(join(tmpdir(), "package-graph-sync-"));
+  try {
+    writeLockFixture(
+      root,
+      `{
+  "workspaces": {
+    "packages/cli": { "version": "0.2.0" },
+    "website": { "dependencies": { "@atlante/cli": "0.2.0" } },
+  },
+}`,
+    );
+    const before = readFileSync(join(root, "bun.lock"), "utf8");
+    const { synced, remaining } = syncLockToManifests(
+      { packages: ["cli"], pins: SYNC_PINS },
+      root,
+    );
+
+    expect(synced).toBe(0);
+    expect(remaining).toEqual([]);
+    expect(readFileSync(join(root, "bun.lock"), "utf8")).toBe(before);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("reports entries it cannot repair and leaves them stale", () => {
+  const root = mkdtempSync(join(tmpdir(), "package-graph-sync-"));
+  try {
+    writeLockFixture(
+      root,
+      `{
+  "workspaces": {
+    "packages/cli": { "name": "@atlante/cli" },
+    "website": {
+      "dependencies": {
+        "@atlante/cli": "0.1.0",
+      },
+    },
+  },
+}`,
+    );
+    const { synced, remaining } = syncLockToManifests(
+      { packages: ["cli"], pins: SYNC_PINS },
+      root,
+    );
+
+    // The pin is repaired; the missing version key has no textual anchor and
+    // is left for the release script to hard-fail on.
+    expect(synced).toBe(1);
+    expect(remaining).toEqual([
+      "packages/cli has version <missing> in bun.lock but packages/cli/package.json declares 0.2.0",
+    ]);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

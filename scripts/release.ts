@@ -2,7 +2,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { lockSyncIssues } from "./package-graph";
+import { syncLockToManifests } from "./package-graph";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 // All eight manifests stay synchronized and version-bumped together; the seven
@@ -179,17 +179,27 @@ async function validateVersion(v: ReturnType<typeof parseVersion>) {
 }
 
 // bun 1.3.x treats manifest-version drift as a no-op and may leave bun.lock
-// untouched (v0.1.21 shipped a stale lock this way). This is the same
-// invariant scripts/package-graph.test.ts enforces, reused via the shared
-// helper; it must fail before any commit or tag exists.
+// untouched (oven-sh/bun#28411, #28935; v0.1.21 shipped a stale lock this
+// way). Detection alone strands the release, so the stale entries are synced
+// in place — the same invariant scripts/package-graph.test.ts enforces — and
+// anything that cannot be repaired fails before any commit or tag exists.
 function validateLock() {
   console.log("\nValidating bun.lock against the bumped manifests...");
-  const issues = lockSyncIssues({ packages: PACKAGES, pins: DEPENDENTS });
-  if (issues.length > 0)
+  const { synced, remaining } = syncLockToManifests({
+    packages: PACKAGES,
+    pins: DEPENDENTS,
+  });
+  if (remaining.length > 0)
     throw new Error(
-      `bun.lock is stale; the release commit and tag were not created:\n${issues
+      `bun.lock is stale; the release commit and tag were not created:\n${remaining
         .map((issue) => `  - ${issue}`)
         .join("\n")}`,
+    );
+  if (synced > 0)
+    console.log(
+      `Synced ${synced} stale bun.lock ${
+        synced === 1 ? "entry" : "entries"
+      } (bun 1.3.x ignores workspace-version drift)`,
     );
   console.log("bun.lock matches the bumped manifests");
 }
