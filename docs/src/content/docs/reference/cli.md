@@ -52,6 +52,12 @@ With `--pack`, installation is part of initialization:
   is the fallback when no lockfile exists), and declared in
   `devDependencies`. Installation is skipped for the bundled first-party pack
   and for packs that are already declared.
+- Installing a custom Pack delegates to the project's package manager and may
+  run package install scripts. Use `--pack` only with packages you trust. The
+  Pack must resolve from the init directory's own `node_modules`; if a workspace
+  hoists it to a shared root, run `init` from the workspace root.
+- The first installation records the Pack version in the lockfile, keeping later
+  runs reproducible. Keep the lockfile with the project.
 - The pack's presets are discovered by convention: the pack root is the
   default preset, and any directory below it that contains `atlante.jsonc` or
   `atlante.json` is a named preset. Selecting `--pack @acme/pack` picks the

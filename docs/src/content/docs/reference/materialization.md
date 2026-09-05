@@ -58,8 +58,8 @@ Each `files` entry has exactly `kind` (`agent` or `skill`), `id`, `path`, and
 `sha256`. The `path` is the native path implied by the kind and ID, and
 `sha256` is the lowercase SHA-256 digest of the file's exact UTF-8 bytes.
 Entries are unique by ID and by path. The manifest records metadata only; it
-never contains prompt or skill payload content. The materializer writes it
-last, and only when its bytes would change.
+never contains prompt or skill payload content. It is bookkeeping, not a trust
+boundary. The materializer writes it last, and only when its bytes would change.
 
 ## Host discovery
 

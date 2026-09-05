@@ -105,7 +105,7 @@ reusable content, read [Author a pack](https://docs.atlante.sh/guides/authoring-
 ## Documentation
 
 - [Getting started](https://docs.atlante.sh/getting-started)
-- Concepts: [Configuration](https://docs.atlante.sh/concepts/configuration), [Templates](https://docs.atlante.sh/concepts/templates), [Values](https://docs.atlante.sh/concepts/values), [Resources](https://docs.atlante.sh/concepts/resources), [Native outputs](https://docs.atlante.sh/concepts/native-outputs)
+- Concepts: [Configuration](https://docs.atlante.sh/concepts/configuration), [Templates](https://docs.atlante.sh/concepts/templates), [Values](https://docs.atlante.sh/concepts/values), [Resources](https://docs.atlante.sh/concepts/resources)
 - Guides: [Build a harness](https://docs.atlante.sh/guides/building-a-harness), [Use OpenCode](https://docs.atlante.sh/guides/opencode), [Author a pack](https://docs.atlante.sh/guides/authoring-packs)
 - Reference: [CLI](https://docs.atlante.sh/reference/cli), [Schema](https://docs.atlante.sh/reference/schema), [Materialization](https://docs.atlante.sh/reference/materialization), [Diagnostics](https://docs.atlante.sh/reference/diagnostics)
 - [Troubleshooting](https://docs.atlante.sh/troubleshooting)
