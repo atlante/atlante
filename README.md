@@ -6,10 +6,10 @@
 
 Atlante gives software architects, engineers, and developers one versioned
 source for the agents, skills, and workflows that make up their coding-agent
-harness, plus scenarios for evaluating it. You author the configuration and
+harness, plus evaluation scenarios for it. You author the configuration and
 scenarios in your repository; Atlante validates and composes the selected
-content, materializes host-native files, and can delegate scenario runs to your
-coding-agent host.
+content, materializes host-native files, and provides `atlante eval` to test the
+harness with those scenarios.
 
 [OpenCode](https://opencode.ai/) is the only supported host today. Read the
 [documentation](https://docs.atlante.sh) for concepts, guides, and reference.
@@ -94,7 +94,8 @@ host-native files; the host executes them.
 Atlante validates, renders, and materializes files. It does not execute agents
 or skills, perform LLM inference, run project code, or own host settings —
 models, permissions, and tools remain owned by OpenCode. The optional
-`atlante eval` command delegates a sandboxed scenario run to OpenCode.
+`atlante eval` command uses OpenCode to run those scenarios in a sandbox and
+check the results.
 
 ## Packages
 

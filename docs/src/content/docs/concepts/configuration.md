@@ -46,6 +46,8 @@ These are the exact supported top-level fields:
 - `values` defines global named string values.
 - `agents` maps agent IDs to resource bindings.
 - `skills` maps skill IDs to resource bindings.
+- `eval` optionally configures `atlante eval` with its OpenCode host,
+  scenario-document glob, and optional model and budget.
 - `hosts` optionally selects the host materialization targets; v0.1 admits
   only `"opencode"`, which is also the default.
 
@@ -60,7 +62,8 @@ Within an agent or skill binding, `description`, `$template`, `$instance`, and
 `values` are document metadata. The selected template owns every other field
 and validates it as its input. A binding must have a non-empty description after
 interpolation. See [Templates](/concepts/templates) for selector behavior and
-[Resources](/concepts/resources) for locator behavior.
+[Resources](/concepts/resources) for locator behavior. See the [CLI reference](/reference/cli#atlante-eval)
+for eval configuration and scenario documents.
 
 The hosted [Schema](https://atlante.sh/schema/v0.1/schema.json) and the
 [generated schema file](https://github.com/atlante/atlante/blob/main/packages/schema/schema/v0.1/schema.json)

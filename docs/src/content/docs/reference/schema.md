@@ -38,6 +38,7 @@ The document contract accepts these fields:
 | `values` | object | Named string values; source overlays may use `null` to remove inherited values |
 | `agents` | object | Map from non-empty host-agent IDs to bindings or `null` tombstones |
 | `skills` | object | Map from non-empty skill IDs to bindings or `null` tombstones |
+| `eval` | object | Optional `atlante eval` configuration: OpenCode host, scenario-document glob, model, and budget |
 | `hosts` | non-empty string array | Host materialization targets; v0.1 admits only `"opencode"` |
 
 Unknown top-level fields are rejected. Missing `agents` and `skills` maps become
@@ -83,8 +84,8 @@ and environment lookups are not part of the document contract.
 ## Canonical form
 
 After resolution, the canonical document contains the schema URI, resolved
-values, agent bindings, and skill bindings. It has no `extends`, `$template`,
-`$instance`, or unresolved `null` removals.
+values, agent bindings, skill bindings, and optional eval configuration. It has
+no `extends`, `$template`, `$instance`, or unresolved `null` removals.
 
 ## Hosted and repository sources
 

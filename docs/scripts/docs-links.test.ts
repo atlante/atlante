@@ -38,7 +38,7 @@ function stripCodeFences(source: string): string {
 
 function internalLinks(source: string): string[] {
   return [
-    ...stripCodeFences(source).matchAll(/\]\((\/[^)\s]*)(?:#[^)\s]*)?\)/g),
+    ...stripCodeFences(source).matchAll(/\]\((\/[^)\s#]*)(?:#[^)\s]*)?\)/g),
   ].map(([, target]) => target);
 }
 
