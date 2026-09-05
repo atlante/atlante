@@ -91,7 +91,9 @@ function resolvedWorkflowInput(): JsonObject {
 describe("architect agent instance", () => {
   afterEach(cleanupPackResourceFixtures);
 
-  test("validates against the composed agent, workflow, and artifact schemas", () => {
+  test("validates against the composed agent, workflow, and artifact schemas", // Full transitive resolution and validation of the architect instance
+  // hovers near bun's 5s default on loaded CI runners.
+  { timeout: 30_000 }, () => {
     const { root, config } = packResourceFixture();
     const document = resolveResourceDocument({
       pack: createProjectResourcePack(root),
