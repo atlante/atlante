@@ -8,6 +8,8 @@ export default defineConfig({
   redirects: {
     "/": "/introduction",
     "/index.md": "/introduction.md",
+    "/contributing":
+      "https://github.com/atlante/atlante/blob/main/CONTRIBUTING.md",
   },
   integrations: [
     starlight({
@@ -99,7 +101,6 @@ export default defineConfig({
           ],
         },
         { slug: "troubleshooting", label: "Troubleshooting" },
-        { slug: "contributing", label: "Contributing" },
       ],
     }),
   ],

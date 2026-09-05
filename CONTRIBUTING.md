@@ -1,11 +1,8 @@
----
-title: Contributing
-description: Make changes to Atlante code, static content, and documentation.
----
+# Contributing
 
 Atlante is developed in a public repository. The source of truth for behavior is
-[`README.md`](https://github.com/atlante/atlante/blob/main/README.md),
-[`SPECIFICATION.md`](https://github.com/atlante/atlante/blob/main/SPECIFICATION.md),
+[`README.md`](README.md),
+[`SPECIFICATION.md`](SPECIFICATION.md),
 tests, and the implementation. Documentation should describe shipped behavior,
 not future capabilities.
 
