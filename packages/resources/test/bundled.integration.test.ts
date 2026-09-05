@@ -83,20 +83,7 @@ const approvedArchitect = {
     "Run selected workflow phases in their listed order and scale their depth to the work's complexity, risk, uncertainty, and available evidence while preserving any required output.",
     "Reassess the remaining workflow phases when new material evidence changes the work.",
     "When current work touches Atlante initialization, source configuration, resources, artifacts, validation, materialization, host integration, or harness improvement, load the `harness` skill alongside the active phase skills; it supplements them rather than replacing them, and an accepted harness improvement runs as its own delivery cycle.",
-  ],
-  markdown: [
-    {
-      h2: {
-        title: "Communication",
-        block: [
-          {
-            p: [
-              "State the main point early. Use clear, concise prose, active voice, and plain language. Use lists only when they improve scanning, and match the developer's requested format.",
-            ],
-          },
-        ],
-      },
-    },
+    "State the main point early. Use clear, concise prose, active voice, and plain language. Use lists only when they improve scanning, and match the developer's requested format.",
   ],
 } as const;
 describe("first-party package resources", () => {
@@ -195,11 +182,11 @@ describe("first-party package resources", () => {
       expect(output).toContain(`- ${invariant}`);
     for (const [index, instruction] of approvedArchitect.instructions.entries())
       expect(output).toContain(`${index + 1}. ${instruction}`);
-    expect(output).toContain("## Communication");
+    expect(output).not.toContain("## Communication");
     expect(output).toContain("## Workflow");
   });
 
-  test("keeps the bundled architect content on invariant, instruction, markdown, and workflow sections", () => {
+  test("keeps the bundled architect content on invariant, instruction, and workflow sections", () => {
     const { root, config } = fixture();
     const pack = createProjectResourcePack(root);
     const architect = resolveResourceInstance(
@@ -211,7 +198,6 @@ describe("first-party package resources", () => {
     expect(architect.input.sections).toEqual([
       { invariants: approvedArchitect.invariants },
       { instructions: approvedArchitect.instructions },
-      { markdown: approvedArchitect.markdown },
       expect.objectContaining({ workflow: expect.any(Object) }),
     ]);
 

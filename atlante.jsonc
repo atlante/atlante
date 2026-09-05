@@ -10,8 +10,6 @@
   "eval": {
     "host": "opencode",
     "scenarios": "eval/scenarios/*.eval.json*",
-    // Keep dogfood results reproducible across host-level model defaults.
-    "model": "zai-coding-plan/glm-5.3-flash",
     "budget": {
       "trials": 2,
       "timeoutMs": 300000,

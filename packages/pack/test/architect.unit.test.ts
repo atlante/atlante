@@ -38,6 +38,7 @@ const approved = {
     "Run selected workflow phases in their listed order and scale their depth to the work's complexity, risk, uncertainty, and available evidence while preserving any required output.",
     "Reassess the remaining workflow phases when new material evidence changes the work.",
     "When current work touches Atlante initialization, source configuration, resources, artifacts, validation, materialization, host integration, or harness improvement, load the `harness` skill alongside the active phase skills; it supplements them rather than replacing them, and an accepted harness improvement runs as its own delivery cycle.",
+    "State the main point early. Use clear, concise prose, active voice, and plain language. Use lists only when they improve scanning, and match the developer's requested format.",
   ],
   phases: ["Brainstorm", "Plan", "Build", "Review"],
 } as const;
@@ -143,29 +144,28 @@ describe("architect agent instance", () => {
     expect(sections[0]?.invariants).toEqual(approved.invariants);
   });
 
-  test("owns exactly the eight approved instructions in order", () => {
+  test("owns exactly the nine approved instructions in order", () => {
     const architect = resolveArchitect();
     const sections = (architect.input.sections ?? []) as readonly JsonObject[];
 
     expect(sections[1]?.instructions).toEqual(approved.instructions);
   });
 
-  test("includes concise communication guidance", () => {
+  test("includes concise communication guidance in the instructions", () => {
     const output = resolveArchitect().renderedOutput();
 
-    expect(output).toContain("## Communication");
     expect(output).toContain(
       "State the main point early. Use clear, concise prose, active voice, and plain language.",
     );
+    expect(output).not.toContain("## Communication");
   });
 
-  test("keeps the sections ordered as invariants, instructions, markdown, workflow", () => {
+  test("keeps the sections ordered as invariants, instructions, workflow", () => {
     const architect = resolveArchitect();
 
     expect(architect.sectionKinds).toEqual([
       "invariants",
       "instructions",
-      "markdown",
       "workflow",
     ]);
   });

@@ -23,23 +23,8 @@
         "Choose only the workflow phases and skills that materially improve the result; omitted phases require no classification, placeholder, or artifact, but implementation is not complete until it has an independent review or a stated reason for omitting one.",
         "Run selected workflow phases in their listed order and scale their depth to the work's complexity, risk, uncertainty, and available evidence while preserving any required output.",
         "Reassess the remaining workflow phases when new material evidence changes the work.",
-        "When current work touches Atlante initialization, source configuration, resources, artifacts, validation, materialization, host integration, or harness improvement, load the `harness` skill alongside the active phase skills; it supplements them rather than replacing them, and an accepted harness improvement runs as its own delivery cycle."
-      ]
-    },
-    {
-      "markdown": [
-        {
-          "h2": {
-            "title": "Communication",
-            "block": [
-              {
-                "p": [
-                  "State the main point early. Use clear, concise prose, active voice, and plain language. Use lists only when they improve scanning, and match the developer's requested format."
-                ]
-              }
-            ]
-          }
-        }
+        "When current work touches Atlante initialization, source configuration, resources, artifacts, validation, materialization, host integration, or harness improvement, load the `harness` skill alongside the active phase skills; it supplements them rather than replacing them, and an accepted harness improvement runs as its own delivery cycle.",
+        "State the main point early. Use clear, concise prose, active voice, and plain language. Use lists only when they improve scanning, and match the developer's requested format."
       ]
     },
     {
