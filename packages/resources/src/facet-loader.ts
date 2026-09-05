@@ -146,8 +146,8 @@ function requireTarget(
   authoringFile: string,
   options: ResourceLocatorOptions = {},
 ): ResolvedResourceTarget {
-  // Kept as a small seam so every facet read still goes through the T3
-  // locator checks before the selected facet loader opens a file.
+  // Kept as a small seam so every facet read still goes through the locator
+  // safety checks before the selected facet loader opens a file.
   return resolveResourceLocator(pack, locator, authoringFile, options);
 }
 

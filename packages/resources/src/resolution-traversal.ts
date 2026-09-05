@@ -57,7 +57,7 @@ export class ResolutionTraversal {
   }
 
   get watchRoots(): readonly ResourceWatchRoot[] {
-    return [...this.trustedRoots.values()];
+    return normalizeResourceRoots([...this.trustedRoots.values()]);
   }
 
   snapshotGraph(): ResourceGraph {
