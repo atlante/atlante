@@ -8,6 +8,10 @@ export default defineConfig({
   redirects: {
     "/": "/introduction",
     "/index.md": "/introduction.md",
+    "/contributing":
+      "https://github.com/atlante/atlante/blob/main/CONTRIBUTING.md",
+    "/guides/extensions": "/guides/authoring-packs",
+    "/concepts/native-outputs": "/reference/materialization",
   },
   integrations: [
     starlight({
@@ -74,7 +78,6 @@ export default defineConfig({
             { slug: "concepts/templates", label: "Templates" },
             { slug: "concepts/values", label: "Values" },
             { slug: "concepts/resolution", label: "Resolution" },
-            { slug: "concepts/native-outputs", label: "Native outputs" },
           ],
         },
         {
@@ -86,7 +89,6 @@ export default defineConfig({
             },
             { slug: "guides/opencode", label: "Use OpenCode" },
             { slug: "guides/authoring-packs", label: "Author a pack" },
-            { slug: "guides/extensions", label: "Extension boundary" },
           ],
         },
         {
@@ -99,7 +101,6 @@ export default defineConfig({
           ],
         },
         { slug: "troubleshooting", label: "Troubleshooting" },
-        { slug: "contributing", label: "Contributing" },
       ],
     }),
   ],

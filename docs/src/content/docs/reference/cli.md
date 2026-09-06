@@ -12,6 +12,12 @@ npx @atlante/cli@latest --help
 npx @atlante/cli@latest --version
 ```
 
+## Output
+
+CLI output is styled on interactive terminals: severity and success lines are
+colored, and `atlante eval` progress lines render gray. Set `NO_COLOR` or pipe
+the output to get plain text.
+
 ## `atlante init`
 
 Scaffold a project configuration, enforce the generated-output ignore policy,
@@ -30,7 +36,7 @@ npx @atlante/cli@latest init [path] --force
 
 `init` validates the selected preset before changing files. It ensures
 `.gitignore` contains `.opencode/agents/`, `.opencode/skills/`, and
-`.atlante/` (existing content is never reordered), removes an Atlante-written
+`.atlante/` without reordering existing content, removes an Atlante-written
 `@atlante/opencode` plugin registration from `opencode.jsonc` (or an existing
 `opencode.json`) while preserving every other host setting, and runs a build.
 It never adds a plugin registration. When no registration exists, it prints
@@ -43,13 +49,15 @@ With `--pack`, installation is part of initialization:
 - A pack that is not declared yet is installed with the project's package
   manager, detected from the lockfile (`bun.lockb`/`bun.lock` → bun,
   `pnpm-lock.yaml` → pnpm, `yarn.lock` → yarn, `package-lock.json` → npm; npm
-  is the fallback when no lockfile exists), and declared in `devDependencies`.
-- Installation is skipped for the bundled first-party pack and for packs that
-  are already declared in `dependencies`, `optionalDependencies`, or
-  `devDependencies` (`peerDependencies` does not resolve and always gains a
-  dev dependency). Existing declarations are never moved between dependency
-  groups or replaced; a declared-but-uninstalled pack is reconciled with a
-  plain package manager install.
+  is the fallback when no lockfile exists), and declared in
+  `devDependencies`. Installation is skipped for the bundled first-party pack
+  and for packs that are already declared.
+- Installing a custom Pack delegates to the project's package manager and may
+  run package install scripts. Use `--pack` only with packages you trust. The
+  Pack must resolve from the init directory's own `node_modules`; if a workspace
+  hoists it to a shared root, run `init` from the workspace root.
+- The first installation records the Pack version in the lockfile, keeping later
+  runs reproducible. Keep the lockfile with the project.
 - The pack's presets are discovered by convention: the pack root is the
   default preset, and any directory below it that contains `atlante.jsonc` or
   `atlante.json` is a named preset. Selecting `--pack @acme/pack` picks the
@@ -58,10 +66,8 @@ With `--pack`, installation is part of initialization:
   `--pack @acme/pack/<preset>`.
 - Initialization is transactional: a failure after the snapshot — including an
   aborted prompt — rolls back the configuration files and restores
-  `package.json` and the lockfile. When the pack was newly added, the detected
-  package manager install is re-run to reconcile `node_modules` (a plain
-  install leaves the state already reconciled). If that reconciliation fails,
-  `init` reports `rollback-failed` with manual instructions.
+  `package.json` and the lockfile. If the rollback itself fails, `init`
+  reports `rollback-failed` with manual instructions.
 
 ## `atlante validate`
 
@@ -106,11 +112,8 @@ or `removed` lines.
 
 ### Watch behavior
 
-`--watch` performs an initial build, keeps the process running, and rebuilds when
-the selected configuration or resources change. It follows the supported config
-filenames, selected resource files and manifests, transitive files, trusted Pack
-roots, and safe unresolved parent directories. It does not watch unrelated
-resource siblings.
+`--watch` performs an initial build, keeps the process running, and rebuilds
+when the selected configuration or any selected resource changes.
 
 A successful rebuild materializes the updated native outputs. A validation or
 build failure reports a diagnostic, leaves the previous valid generated set in

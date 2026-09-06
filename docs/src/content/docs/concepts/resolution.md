@@ -35,14 +35,11 @@ can be loaded.
 Atlante resolves supported system values and substitutes explicit value
 references before selected templates render. A template's JSON Schema can also
 declare a composition slot with `{ "template": "..." }`. The referenced child
-template is resolved, and its rendered Markdown is preserved as output rather
-than interpreted as parent source.
-
-Every declared slot must resolve, including slots in schema branches that are
-not selected by current input. Only present slot values contribute output, and
+template is resolved, and its rendered Markdown remains opaque output rather than
+being interpreted as parent source. Every declared slot must resolve, including
+slots in unselected schema branches; only present values contribute output and
 array order is preserved. Missing slots, incompatible input, invalid schemas,
-and composition cycles fail before rendering. Child Markdown remains opaque
-output; it is not interpreted as parent template source.
+and composition cycles fail before rendering.
 
 ## Validation stages
 
@@ -66,5 +63,5 @@ source locations. The resource system fails closed: invalid input produces no
 canonical document and the builder materializes no partial output.
 
 Resolution does not execute JavaScript, project code, agents, skills, or model
-inference. It does not install packages or load URLs. [Native outputs](/concepts/native-outputs)
+inference. It does not install packages or load URLs. [Materialization](/reference/materialization)
 describes the result of the final stage.

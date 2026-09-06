@@ -11,9 +11,7 @@ validate-and-build loop.
 
 If you have not initialized the project yet, begin with [Getting
 started](/getting-started). `init` creates `atlante.jsonc` and materializes
-the initial native outputs for [OpenCode](https://opencode.ai/). The
-published CLI bundles the first-party `@atlante/pack`, so the default setup does
-not require a separate pack installation.
+the initial native outputs for [OpenCode](https://opencode.ai/).
 
 The default preset provides the `architect` agent, the four phase skills
 `brainstorm`, `plan`, `build`, and `review`, and the additional `harness`
@@ -67,10 +65,7 @@ template. You can select `@atlante/pack/agent` explicitly when you want that
 choice visible in the source. The selected template owns the remaining fields;
 see [Templates](/concepts/templates) for the selection rules.
 
-Values are strings substituted into descriptions and template-owned prompt
-fields. The only supported system value is `{{sys.cwd.basename}}`, which resolves
-to the current working directory's basename. Atlante does not provide arbitrary
-filesystem or environment access.
+For value interpolation and system values, see [Values](/concepts/values).
 
 ## Add a skill
 
@@ -96,9 +91,9 @@ Skills are reusable Markdown guidance addressed by `skillId`, not host-agent IDs
 ```
 
 This selector-less skill uses the first-party skill template. The build
-materializes its content as `.opencode/skills/<skillId>/SKILL.md`, which
-OpenCode discovers; Atlante renders
-the skill but does not execute it.
+materializes it for OpenCode; Atlante renders the skill but does not execute it.
+See [Materialization](/reference/materialization) for the generated output
+contract.
 
 ## Validate and materialize
 
@@ -110,8 +105,9 @@ npx @atlante/cli@latest validate
 npx @atlante/cli@latest build
 ```
 
-Both commands report the resolved filesystem path they used, and `build` adds
-one line per file it wrote or removed. For example:
+Both commands report their result, and `build` lists files it writes or removes.
+For the generated paths and ownership rules, see
+[Materialization](/reference/materialization).
 
 ```text
 validated /Users/example/billing-api/atlante.jsonc
@@ -119,9 +115,6 @@ built /Users/example/billing-api
 wrote opencode: .opencode/agents/reviewer.md
 ```
 
-Inspect `.opencode/` and `.atlante/opencode-native.json` when checking the
-result. The native files are derived output and may contain rendered project
-values, so the ignore policy keeps them local. For continuous editing, use
-`build --watch` as documented in
+For continuous editing, use `build --watch` as documented in
 the [CLI](/reference/cli). Continue to [Use OpenCode](/guides/opencode) when the
 native outputs are in place.

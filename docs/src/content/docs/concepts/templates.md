@@ -58,11 +58,6 @@ collections; nested resource source objects require `$template` or `$instance`.
 ```
 
 This selector-less form is valid. The default template still controls the
-accepted fields and the rendered Markdown. A schema can declare a composition
-slot with `{ "template": "..." }`; every declared slot must resolve, even when
-the current input takes a different schema branch. Missing slots, invalid
-schemas, incompatible input, and circular composition fail before rendering.
-Rendered child Markdown is kept as opaque output rather than interpreted as
-parent template source. See [Resolution](/concepts/resolution) for the stage
-where this graph is checked and the [Materialization](/reference/materialization)
-reference for the resulting output.
+accepted fields and the rendered Markdown. See [Resolution](/concepts/resolution)
+for interpolation, composition, and the validation stage where the resource
+graph is checked.

@@ -39,28 +39,13 @@ The document must declare the exact v0.1 schema URI:
 }
 ```
 
-These are the exact supported top-level fields:
-
-- `$schema` identifies the document contract.
-- `extends` selects one preset or an ordered, non-empty list of presets.
-- `values` defines global named string values.
-- `agents` maps agent IDs to resource bindings.
-- `skills` maps skill IDs to resource bindings.
-- `hosts` optionally selects the host materialization targets; v0.1 admits
-  only `"opencode"`, which is also the default.
-
-Unknown top-level fields are rejected. `extends` cannot be empty, `hosts`
-cannot be empty or contain duplicates, and missing `agents` or `skills` maps
-become empty collections in the canonical document. An absent `hosts` field
-defaults to `["opencode"]` in the canonical document.
-In a source overlay, `null` can remove an inherited field; it is resolved away
-before the canonical document is used.
-
-Within an agent or skill binding, `description`, `$template`, `$instance`, and
-`values` are document metadata. The selected template owns every other field
-and validates it as its input. A binding must have a non-empty description after
-interpolation. See [Templates](/concepts/templates) for selector behavior and
-[Resources](/concepts/resources) for locator behavior.
+At a high level, a document selects presets, defines values, binds agents and
+skills to resources, optionally configures `atlante eval`, and selects a host.
+The [Schema](/reference/schema) reference defines the exact fields, types, and
+constraints. [Templates](/concepts/templates) explains selector behavior,
+[Resources](/concepts/resources) explains locators, and the [CLI
+reference](/reference/cli#atlante-eval) explains eval configuration and scenario
+documents.
 
 The hosted [Schema](https://atlante.sh/schema/v0.1/schema.json) and the
 [generated schema file](https://github.com/atlante/atlante/blob/main/packages/schema/schema/v0.1/schema.json)

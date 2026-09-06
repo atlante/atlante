@@ -16,10 +16,9 @@ npx @atlante/cli@latest init
 ```
 
 The CLI selects the default preset from `@atlante/pack` and writes
-`"extends": "@atlante/pack"` to `atlante.jsonc`. It also registers the
-OpenCode adapter package and builds the initial artifacts. The default initialization
-path resolves the pack from the CLI installation, so it does not require a
-separate `@atlante/pack` installation.
+`"extends": "@atlante/pack"` to `atlante.jsonc`, then materializes the initial
+native outputs. The default initialization path resolves the pack from the CLI
+installation, so it does not require a separate `@atlante/pack` installation.
 
 ## Explicit usage
 

@@ -38,6 +38,7 @@ The document contract accepts these fields:
 | `values` | object | Named string values; source overlays may use `null` to remove inherited values |
 | `agents` | object | Map from non-empty host-agent IDs to bindings or `null` tombstones |
 | `skills` | object | Map from non-empty skill IDs to bindings or `null` tombstones |
+| `eval` | object | Optional `atlante eval` configuration: OpenCode host, scenario-document glob, model, and budget |
 | `hosts` | non-empty string array | Host materialization targets; v0.1 admits only `"opencode"` |
 
 Unknown top-level fields are rejected. Missing `agents` and `skills` maps become
@@ -67,10 +68,10 @@ resource source objects, which require `$template` or `$instance`.
 
 ## Agent and skill maps
 
-Agent map keys remain host-agent IDs and become the names of the materialized
-`.opencode/agents/<id>.md` files. Skill map keys are the `skillId` values that
-name the materialized `.opencode/skills/<skillId>/SKILL.md` files. Both
-binding types require a non-empty `description` after interpolation.
+Agent map keys remain host-agent IDs, and skill map keys remain skill IDs. Both
+binding types require a non-empty `description` after interpolation. The
+[Materialization](/reference/materialization) reference explains how those IDs
+become native output paths.
 
 The document schema leaves template-owned fields open. Resource resolution and
 template validation determine whether those fields are valid for the selected
@@ -83,8 +84,8 @@ and environment lookups are not part of the document contract.
 ## Canonical form
 
 After resolution, the canonical document contains the schema URI, resolved
-values, agent bindings, and skill bindings. It has no `extends`, `$template`,
-`$instance`, or unresolved `null` removals.
+values, agent bindings, skill bindings, and optional eval configuration. It has
+no `extends`, `$template`, `$instance`, or unresolved `null` removals.
 
 ## Hosted and repository sources
 

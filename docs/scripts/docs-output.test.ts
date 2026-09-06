@@ -61,14 +61,24 @@ function staticOutputPath(route: string): string {
     : outputPath(route);
 }
 
-function expectStaticRedirect(route: string, destination: string): void {
-  expect(readFileSync(staticOutputPath(route), "utf8")).toBe(
+function expectStaticRedirect(
+  route: string,
+  destination: string,
+  outputRelativePath?: string,
+): void {
+  const redirectPath = outputRelativePath
+    ? join(outputRoot, outputRelativePath)
+    : staticOutputPath(route);
+  const canonicalHref = /^https?:\/\//.test(destination)
+    ? destination
+    : `https://docs.atlante.sh${destination}`;
+  expect(readFileSync(redirectPath, "utf8")).toBe(
     [
       "<!doctype html>",
       `<title>Redirecting to: ${destination}</title>`,
       `<meta http-equiv="refresh" content="0;url=${destination}">`,
       `<meta name="robots" content="noindex">`,
-      `<link rel="canonical" href="https://docs.atlante.sh${destination}">`,
+      `<link rel="canonical" href="${canonicalHref}">`,
       "<body>",
       `\t<a href="${destination}">Redirecting from <code>${route}</code> to <code>${destination}</code></a>`,
       "</body>",
@@ -135,6 +145,30 @@ describe.skipIf(!runOutputTests)("docs built output", () => {
 
   it("keeps the root route as a redirect", () => {
     expectStaticRedirect("/", "/introduction");
+  });
+
+  it("keeps the contributing route as a redirect", () => {
+    expectStaticRedirect(
+      "/contributing",
+      "https://github.com/atlante/atlante/blob/main/CONTRIBUTING.md",
+      join("contributing", "index.html"),
+    );
+  });
+
+  it("keeps the extension-boundary route as a redirect", () => {
+    expectStaticRedirect(
+      "/guides/extensions",
+      "/guides/authoring-packs",
+      join("guides", "extensions", "index.html"),
+    );
+  });
+
+  it("keeps the native-output route as a redirect", () => {
+    expectStaticRedirect(
+      "/concepts/native-outputs",
+      "/reference/materialization",
+      join("concepts", "native-outputs", "index.html"),
+    );
   });
 
   it("publishes the branded docs 404 output", () => {
