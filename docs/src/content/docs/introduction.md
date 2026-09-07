@@ -1,48 +1,44 @@
 ---
 title: Introduction
-description: Version and publish a coding-agent harness from static, reviewable source.
+description: Give a coding-agent harness a versioned source, deterministic builds, and tests.
 ---
 
-Coding-agent harnesses tend to grow from scattered prompts, one-off skills, and
-host settings that are difficult to review together. Atlante gives that system a
-versioned source in the project repository, so a harness can change alongside the
-code it guides.
+Coding-agent harnesses grow from scattered prompts, one-off skills, and host
+settings that are hard to review together. Atlante gives that system a home in
+your repository: one configuration document that evolves alongside the code it
+guides, with a toolchain that treats the harness like any other build
+artifact.
 
-You describe the harness in one configuration document. Atlante validates it,
-resolves the static content it selects, renders deterministic Markdown into a
-prepared project, and materializes it as host-native files for the hosts the
-document declares. Packs supply reusable presets,
-templates, and instances; your document supplies the values and bindings that
-make them fit your project.
+Three properties make that possible.
 
-After the first build, you have an `atlante.jsonc` source document and
-host-native files for OpenCode. The source remains the place to make changes;
-see [Materialization](/reference/materialization) for the generated output
-contract.
+**One versioned source.** An `atlante.jsonc` document selects a preset, binds
+agents and skills to static resources, and supplies the values that fit your
+project. Packs supply reusable presets, templates, and instances. The source
+stays in the repository and is reviewed like any other code.
 
-Start with the five-minute [Getting started](/getting-started) path to create
-that first build. Then explore
-[Configuration](/concepts/configuration),
-[Resources](/concepts/resources), [Templates](/concepts/templates),
-[Values](/concepts/values), and [Resolution](/concepts/resolution).
+**Deterministic builds.** A build validates the document, resolves the
+selected content, renders Markdown, and materializes host-native files. The
+same source and content produce the same bytes on every run, and a failed
+build writes nothing.
+
+**Verification.** `atlante validate` checks the source without writing
+anything, and the optional `atlante eval` runs scenarios in a disposable
+sandbox and grades them with deterministic checks. Harness changes can be
+tested before they ship.
 
 :::note
-Atlante owns configuration, static content selection, validation,
-interpolation, rendering, and host-native materialization. The host executes
-agents and skills. Atlante does not execute agents, skills, project code, or
-LLM inference.
+Atlante prepares the files; your coding agent runs them. Atlante never
+executes agents or skills, never runs project code, and never calls a model.
 :::
 
-## Source and output
+[OpenCode](https://opencode.ai/) is the supported host in v0.1. A build
+materializes the agent and skill files OpenCode discovers, plus an ownership
+manifest; see [Materialization](/reference/materialization) for the generated
+output contract.
 
-A project normally contains one `atlante.jsonc` file. It selects a preset, binds
-agents and skills to static resources, and supplies explicit values for those
-bindings. The build turns that source into host-native output. See
-[Configuration](/concepts/configuration) for the document model and
-[Getting started](/getting-started) for a minimal configuration.
-
-Read the [Schema](/reference/schema) for the document contract and the
-[Materialization](/reference/materialization) for the generated output contract. The shipped
-implementation, tests, and
-[`SPECIFICATION.md`](https://github.com/atlante/atlante/blob/main/SPECIFICATION.md)
-remain authoritative for v0.1 behavior.
+Start with the five-minute [Getting started](/getting-started) path to create
+that first build. The concepts — [Configuration](/concepts/configuration),
+[Resources](/concepts/resources), [Templates](/concepts/templates),
+[Values](/concepts/values), and [Resolution](/concepts/resolution) — explain
+the model, the guides walk through common work, and the references document
+the contracts exactly.
