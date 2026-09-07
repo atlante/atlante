@@ -705,11 +705,7 @@ failure code (`invalid-input`, `invalid-id`, `invalid-manifest`,
 `unsafe-path`, `collision`, `drift`, `filesystem`, `publication-failed`) and
 one deterministic recovery action.
 
-`atlante init` MUST NOT register a runtime integration for the materializer
-and MUST remove an Atlante-written `@atlante/opencode` plugin registration
-from the host configuration. A stale registration in a project not yet
-re-initialized is inert: the host drops packages that expose no plugin target.
-The removal MAY leave an empty `"plugin": []` field, which requires no action.
+`atlante init` MUST NOT register a runtime integration for the materializer.
 Init MUST also enforce the ignore-by-default git policy: `.gitignore` MUST
 gain `.opencode/agents/`, `.opencode/skills/`, and `.atlante/` when missing,
 and existing `.gitignore` content MUST NOT be reordered.

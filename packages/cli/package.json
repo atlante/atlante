@@ -36,8 +36,7 @@
   },
   "dependencies": {
     "@atlante/pack": "workspace:*",
-    "ajv": "^8.17.1",
-    "jsonc-parser": "^3.3.1"
+    "ajv": "^8.17.1"
   },
   "devDependencies": {
     "@atlante/builder": "workspace:*",
@@ -46,6 +45,7 @@
     "@atlante/resources": "workspace:*",
     "@atlante/schema": "workspace:*",
     "@atlante/validator": "workspace:*",
-    "commander": "^12.1.0"
+    "commander": "^12.1.0",
+    "jsonc-parser": "^3.3.1"
   }
 }

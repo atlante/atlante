@@ -58,10 +58,9 @@ try {
     config.includes('"extends": "@atlante/pack"'),
     "init did not use the installed @atlante/pack preset",
   );
-  const opencode = await Bun.file(join(project, "opencode.jsonc")).text();
   assert(
-    !opencode.includes("@atlante/opencode"),
-    "init registered @atlante/opencode in opencode.jsonc",
+    !(await Bun.file(join(project, "opencode.jsonc")).exists()),
+    "init modified the OpenCode configuration",
   );
 
   await Bun.$`node ${CLI} validate ${project}`.cwd(project);

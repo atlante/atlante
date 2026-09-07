@@ -1389,14 +1389,11 @@ describe("runInit", () => {
     expect(readFileSync(nativeManifest, "utf8")).toBe(originalManifest);
   });
 
-  test("does not register the plugin in a created opencode.jsonc", async () => {
+  test("does not create an OpenCode configuration", async () => {
     const dir = tempDir();
     await runInitWithDependencies(dir, {}, {});
-    const opencode = JSON.parse(
-      readFileSync(join(dir, "opencode.jsonc"), "utf8"),
-    );
-    expect(opencode.plugin).toBeUndefined();
-    expect(JSON.stringify(opencode)).not.toContain("@atlante/opencode");
+    expect(existsSync(join(dir, "opencode.jsonc"))).toBe(false);
+    expect(existsSync(join(dir, "opencode.json"))).toBe(false);
   });
 
   test("creates .gitignore with the ignore policy entries on a fresh init", async () => {
@@ -1416,15 +1413,6 @@ describe("runInit", () => {
     );
   });
 
-  test("adds the OpenCode schema to a new opencode.jsonc", async () => {
-    const dir = tempDir();
-    await runInitWithDependencies(dir, {}, {});
-    const opencode = JSON.parse(
-      readFileSync(join(dir, "opencode.jsonc"), "utf8"),
-    );
-    expect(opencode.$schema).toBe("https://opencode.ai/config.json");
-  });
-
   test("preserves an existing opencode.jsonc without a registration", async () => {
     const dir = tempDir();
     const path = join(dir, "opencode.jsonc");
@@ -1437,187 +1425,26 @@ describe("runInit", () => {
     expect(readFileSync(path, "utf8")).toBe(original);
   });
 
-  test("removes the Atlante plugin entry from an existing opencode.json", async () => {
+  test("preserves an existing host configuration with a stale Atlante plugin", async () => {
     const dir = tempDir();
     const path = join(dir, "opencode.json");
-    writeFileSync(
-      path,
-      `{ "model": "anthropic/claude-sonnet-5", "plugin": ["@atlante/opencode"] }`,
-    );
+    const original = `{ "model": "anthropic/claude-sonnet-5", "plugin": ["@atlante/opencode"] }`;
+    writeFileSync(path, original);
 
     expect(await runInitWithDependencies(dir, {}, {})).toBe(0);
 
-    const opencode = JSON.parse(readFileSync(path, "utf8"));
-    expect(opencode.model).toBe("anthropic/claude-sonnet-5");
-    expect(opencode.plugin).toEqual([]);
+    expect(readFileSync(path, "utf8")).toBe(original);
     expect(existsSync(join(dir, "opencode.jsonc"))).toBe(false);
   });
 
-  test("edits opencode.jsonc, not opencode.json, when both config files exist", async () => {
-    const dir = tempDir();
-    const jsonc = join(dir, "opencode.jsonc");
-    const originalJsonc = `{ "model": "anthropic/claude-sonnet-5", "plugin": ["@atlante/opencode"] }`;
-    writeFileSync(jsonc, originalJsonc);
-    const json = join(dir, "opencode.json");
-    const originalJson = `{ "model": "google/gemini-3-pro" }`;
-    writeFileSync(json, originalJson);
-
-    expect(await runInitWithDependencies(dir, {}, {})).toBe(0);
-
-    const opencode = JSON.parse(readFileSync(jsonc, "utf8"));
-    expect(opencode.model).toBe("anthropic/claude-sonnet-5");
-    expect(opencode.plugin).toEqual([]);
-    expect(readFileSync(json, "utf8")).toBe(originalJson);
-  });
-
-  test("rejects malformed opencode JSONC without modifying it", async () => {
+  test("preserves malformed existing OpenCode configuration", async () => {
     const dir = tempDir();
     const path = join(dir, "opencode.jsonc");
     const original = '{ "model": "demo",';
     writeFileSync(path, original);
 
-    const result = await captureErrors(() => runInit(dir, {}));
-
-    expect(result.result).toBe(1);
-    expect(result.errors.join("\n")).toContain(
-      "invalid-opencode-configuration",
-    );
+    expect(await runInit(dir, {})).toBe(0);
     expect(readFileSync(path, "utf8")).toBe(original);
-    expect(existsSync(join(dir, "atlante.jsonc"))).toBe(false);
-  });
-
-  test.each([
-    ["string-valued", "existing-plugin"],
-    ["object-valued", { name: "existing-plugin" }],
-  ] as const)(
-    "rejects %s plugin values without modifying them",
-    async (_kind, plugin) => {
-      const dir = tempDir();
-      const path = join(dir, "opencode.jsonc");
-      const original = JSON.stringify({ plugin });
-      writeFileSync(path, original);
-
-      const result = await captureErrors(() => runInit(dir, {}));
-
-      expect(result.result).toBe(1);
-      expect(result.errors.join("\n")).toContain("array of strings");
-      expect(readFileSync(path, "utf8")).toBe(original);
-      expect(existsSync(join(dir, "atlante.jsonc"))).toBe(false);
-    },
-  );
-
-  test("preserves tuple plugin entries when no Atlante registration exists", async () => {
-    const dir = tempDir();
-    const path = join(dir, "opencode.jsonc");
-    const original = JSON.stringify({
-      plugin: [["other-plugin", { enabled: true }]],
-    });
-    writeFileSync(path, original);
-
-    expect(await runInitWithDependencies(dir, {}, {})).toBe(0);
-
-    expect(readFileSync(path, "utf8")).toBe(original);
-  });
-
-  test("removes only the Atlante entry from a mixed plugin array", async () => {
-    const dir = tempDir();
-    const path = join(dir, "opencode.jsonc");
-    writeFileSync(
-      path,
-      `{
-  // Host-owned settings.
-  "model": "anthropic/claude-sonnet-5",
-  "plugin": ["@atlante/opencode", "other-plugin", ["another", { "enabled": false }]],
-}`,
-    );
-
-    expect(await runInitWithDependencies(dir, {}, {})).toBe(0);
-
-    const text = readFileSync(path, "utf8");
-    expect(text).toContain("// Host-owned settings.");
-    expect(text).toContain('"model": "anthropic/claude-sonnet-5"');
-    expect(text).not.toContain("@atlante/opencode");
-    expect(text).toContain('"other-plugin"');
-    expect(text).toContain('"another"');
-  });
-
-  test("removes a tuple form of the Atlante plugin registration", async () => {
-    const dir = tempDir();
-    const path = join(dir, "opencode.jsonc");
-    writeFileSync(
-      path,
-      JSON.stringify({ plugin: [["@atlante/opencode", { enabled: true }]] }),
-    );
-
-    expect(await runInitWithDependencies(dir, {}, {})).toBe(0);
-
-    const opencode = JSON.parse(readFileSync(path, "utf8"));
-    expect(opencode.plugin).toEqual([]);
-  });
-
-  test("restores a removed plugin registration when the build fails", async () => {
-    const dir = tempDir();
-    const target = join(dir, "atlante.jsonc");
-    const opencode = join(dir, "opencode.jsonc");
-    const gitignore = join(dir, ".gitignore");
-    const originalOpenCode = `{
-  "model": "demo",
-  "plugin": ["@atlante/opencode", "other-plugin"]
-}`;
-    const originalGitignore = "node_modules/\n";
-    writeFileSync(opencode, originalOpenCode);
-    writeFileSync(gitignore, originalGitignore);
-
-    const result = await captureErrors(() =>
-      runInitWithDependencies(
-        dir,
-        { force: true },
-        {
-          buildProject: () => ({
-            projectRoot: dir,
-            diagnostics: [
-              {
-                severity: "error",
-                code: "injected-build-failure",
-                message: "build failed",
-              },
-            ],
-            materializations: [],
-          }),
-        },
-      ),
-    );
-
-    expect(result.result).toBe(1);
-    expect(result.errors.join("\n")).toContain("injected-build-failure");
-    expect(existsSync(target)).toBe(false);
-    expect(readFileSync(opencode, "utf8")).toBe(originalOpenCode);
-    expect(readFileSync(gitignore, "utf8")).toBe(originalGitignore);
-  });
-
-  test("leaves a config without a registration untouched on re-init", async () => {
-    const dir = tempDir();
-    await runInitWithDependencies(dir, {}, {});
-    const path = join(dir, "opencode.jsonc");
-    const original = readFileSync(path, "utf8");
-    const originalGitignore = readFileSync(join(dir, ".gitignore"), "utf8");
-
-    const written: string[] = [];
-    const originalLog = console.log;
-    console.log = (...args: unknown[]) => written.push(args.join(" "));
-    try {
-      expect(await runInitWithDependencies(dir, { force: true }, {})).toBe(0);
-    } finally {
-      console.log = originalLog;
-    }
-
-    expect(readFileSync(path, "utf8")).toBe(original);
-    expect(readFileSync(join(dir, ".gitignore"), "utf8")).toBe(
-      originalGitignore,
-    );
-    expect(written.join("\n")).toContain(
-      `no @atlante/opencode plugin registration found in ${path}`,
-    );
   });
 
   test("appends only missing .gitignore entries without touching existing content", async () => {
@@ -1646,20 +1473,6 @@ describe("runInit", () => {
 
     expect(await runInitWithDependencies(dir, {}, {})).toBe(0);
     expect(readFileSync(gitignore, "utf8")).toBe(original);
-  });
-
-  test("rejects malformed plugin tuples without changing the target", async () => {
-    const dir = tempDir();
-    const path = join(dir, "opencode.jsonc");
-    const original = JSON.stringify({ plugin: [["other-plugin"]] });
-    writeFileSync(path, original);
-
-    const result = await captureErrors(() => runInit(dir, {}));
-
-    expect(result.result).toBe(1);
-    expect(result.errors.join("\n")).toContain("options-object");
-    expect(readFileSync(path, "utf8")).toBe(original);
-    expect(existsSync(join(dir, "atlante.jsonc"))).toBe(false);
   });
 
   test("turns target write failures into an exit code", async () => {
@@ -1709,58 +1522,6 @@ describe("runInit", () => {
     expect(readFileSync(target, "utf8")).toBe(originalTarget);
   });
 
-  test("turns opencode read failures into an exit code", async () => {
-    const dir = tempDir();
-    const target = join(dir, "atlante.jsonc");
-    const opencode = join(dir, "opencode.jsonc");
-    const originalTarget = "preexisting target";
-    writeFileSync(target, originalTarget);
-    writeFileSync(opencode, "{}");
-    const dependencies: InitDependencies = {
-      readFileSync: (path) => {
-        if (path === opencode)
-          throw new Error("injected opencode read failure");
-        return readFileSync(path, "utf8");
-      },
-    };
-
-    const result = await captureErrors(() =>
-      runInitWithDependencies(dir, { force: true }, dependencies),
-    );
-
-    expect(result.result).toBe(1);
-    expect(result.errors.join("\n")).toContain(
-      "injected opencode read failure",
-    );
-    expect(readFileSync(target, "utf8")).toBe(originalTarget);
-  });
-
-  test("turns host config write failures into an exit code", async () => {
-    const dir = tempDir();
-    const target = join(dir, "atlante.jsonc");
-    const opencode = join(dir, "opencode.jsonc");
-    const originalTarget = "preexisting target";
-    writeFileSync(target, originalTarget);
-    const dependencies: InitDependencies = {
-      writeFileSync: (path, contents) => {
-        if (path === opencode)
-          throw new Error("injected host config write failure");
-        writeFileSync(path, contents);
-      },
-    };
-
-    const result = await captureErrors(() =>
-      runInitWithDependencies(dir, { force: true }, dependencies),
-    );
-
-    expect(result.result).toBe(1);
-    expect(result.errors.join("\n")).toContain(
-      "injected host config write failure",
-    );
-    expect(readFileSync(target, "utf8")).toBe(originalTarget);
-    expect(existsSync(opencode)).toBe(false);
-  });
-
   test("turns alternate unlink failures into an exit code without removing it", async () => {
     const dir = tempDir();
     const alternate = join(dir, "atlante.json");
@@ -1781,63 +1542,6 @@ describe("runInit", () => {
     expect(existsSync(alternate)).toBe(true);
     expect(existsSync(join(dir, "atlante.jsonc"))).toBe(false);
     expect(existsSync(join(dir, "opencode.jsonc"))).toBe(false);
-  });
-
-  test("reports that no plugin registration was found on a fresh init", async () => {
-    const dir = tempDir();
-    const written: string[] = [];
-    const original = console.log;
-    console.log = (...args: unknown[]) => written.push(args.join(" "));
-    try {
-      await runInitWithDependencies(dir, {}, {});
-    } finally {
-      console.log = original;
-    }
-    expect(written.join("\n")).toContain(
-      `no @atlante/opencode plugin registration found in ${join(dir, "opencode.jsonc")}`,
-    );
-    expect(written.join("\n")).toContain(
-      `created ${join(dir, "atlante.jsonc")}`,
-    );
-    expect(written.join("\n")).toContain(".opencode/agents/architect.md");
-    expect(existsSync(join(dir, ".atlante", "opencode-native.json"))).toBe(
-      true,
-    );
-  });
-
-  test("reports a removed plugin registration on re-init", async () => {
-    const dir = tempDir();
-    const path = join(dir, "opencode.jsonc");
-    writeFileSync(path, `{ "plugin": ["@atlante/opencode"] }`);
-
-    const written: string[] = [];
-    const original = console.log;
-    console.log = (...args: unknown[]) => written.push(args.join(" "));
-    try {
-      expect(await runInitWithDependencies(dir, { force: true }, {})).toBe(0);
-    } finally {
-      console.log = original;
-    }
-    expect(written.join("\n")).toContain(
-      `removed the @atlante/opencode plugin registration from ${path}`,
-    );
-  });
-
-  test("reports that no plugin registration was found on re-init, rather than claiming a removal", async () => {
-    const dir = tempDir();
-    await runInitWithDependencies(dir, {}, {});
-
-    const written: string[] = [];
-    const original = console.log;
-    console.log = (...args: unknown[]) => written.push(args.join(" "));
-    try {
-      await runInitWithDependencies(dir, { force: true }, {});
-    } finally {
-      console.log = original;
-    }
-    expect(written.join("\n")).toContain(
-      "no @atlante/opencode plugin registration found",
-    );
   });
 
   test("--force overwrites altered configuration contents", async () => {
