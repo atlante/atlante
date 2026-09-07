@@ -3,8 +3,7 @@
 Atlante is developed in a public repository. The source of truth for behavior
 is [`README.md`](README.md),
 [`SPECIFICATION.md`](SPECIFICATION.md),
-tests, and the implementation. Documentation should describe shipped behavior,
-not future capabilities.
+tests, and the implementation.
 
 ## Set up the repository
 
@@ -152,7 +151,8 @@ to Vercel, so the remote build does not need Bun or access to the repository-lev
 
 ## Write documentation
 
-Use active voice, sentence-case headings, and one primary idea per sentence. Use
+Documentation should describe shipped behavior, not future capabilities. Use
+active voice, sentence-case headings, and one primary idea per sentence. Use
 `configuration` for the authored system, `document` for its parsed data model,
 `native output` for generated host files, `ownership manifest` for the
 generated-file record, and `materializer` for host-specific materialization.

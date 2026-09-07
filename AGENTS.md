@@ -69,12 +69,12 @@ a manual step.
 
 ## Repository conventions
 
-The human-facing contributor process — templates, labels, commit and branch
-conventions, test tiers — is documented in
-[`CONTRIBUTING.md`](CONTRIBUTING.md). Keep the two aligned: when a shared
-convention changes, update CONTRIBUTING.md; keep agent-specific rules here.
+The human-facing contributor process — issue and PR templates, labels and
+types, the open-a-change cycle, commit and branch conventions, test tiers —
+is documented in [`CONTRIBUTING.md`](CONTRIBUTING.md) and is authoritative
+for anything shared. Keep the two aligned: when a shared convention changes,
+update CONTRIBUTING.md. Agent-specific rules:
 
-1. Use templates under `.github/ISSUE_TEMPLATE/` and `.github/PULL_REQUEST_TEMPLATE/` when creating issues or PRs with `gh`. Apply labels (`--label`) and type (`--type`, e.g. `Bug`, `Feature`, `Refactor`, `Docs`, `Chore`) when creating issues.
-2. While working on an issue inside its `.worktrees/` worktree, all work MUST stay inside that worktree: edits, git commands, and checks run there and nowhere else. The root checkout is off-limits during issue work; its only permitted operation is updating `main` after the issue's PR has merged.
-3. Git commits are the project-approved checkpoint mechanism for the workflow's task boundaries: each implementation task MUST end with exactly one commit containing only that task's changes, created after the task's checks pass (and its task review, when run). A task's commit MUST NOT contain unrelated work.
-4. Tasks run sequentially by default and MAY run in parallel only when the plan marks them as independent; each parallel task works in its own worktree branched from the issue worktree and is merged back in plan order, keeping the one-commit-per-task rule above.
+1. While working on an issue inside its `.worktrees/` worktree, all work MUST stay inside that worktree: edits, git commands, and checks run there and nowhere else. The root checkout is off-limits during issue work; its only permitted operation is updating `main` after the issue's PR has merged.
+2. Git commits are the project-approved checkpoint mechanism for the workflow's task boundaries: each implementation task MUST end with exactly one commit containing only that task's changes, created after the task's checks pass (and its task review, when run). A task's commit MUST NOT contain unrelated work.
+3. Tasks run sequentially by default and MAY run in parallel only when the plan marks them as independent; each parallel task works in its own worktree branched from the issue worktree and is merged back in plan order, keeping the one-commit-per-task rule above.

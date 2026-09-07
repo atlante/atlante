@@ -113,6 +113,11 @@ host-native files; the host executes them.
       ],
     },
   },
+  // Test the harness with deterministic scenarios run in a sandbox.
+  "eval": {
+    "host": "opencode",
+    "scenarios": "eval/scenarios/*.eval.json",
+  },
 }
 ```
 
@@ -120,6 +125,45 @@ host-native files; the host executes them.
   it inherits.
 - `$template` binds an agent or skill to a template; the template's schema
   defines the remaining fields.
+
+When configuration grows, move it into a local pack: a folder in your
+repository holding a preset and its resources, referenced through `extends`
+like any other pack. The
+[Author a pack](https://docs.atlante.sh/guides/authoring-packs) guide covers
+the layout.
+
+## Test the harness
+
+`atlante eval` runs scenarios in a sandbox against the built outputs and
+grades deterministic checks; the checks themselves never call a model. A
+scenario that exercises the agent above:
+
+```json
+{
+  "$schema": "https://atlante.sh/schema/v0.1/eval-scenario.json",
+  "version": "0.1",
+  "name": "designs-health-endpoint",
+  "task": {
+    "fixture": "eval/fixtures/empty-app",
+    "agent": "api-designer",
+    "prompt": "Design a GET /health endpoint that returns { \"status\": \"ok\" }."
+  },
+  "checks": [
+    {
+      "type": "file-contains",
+      "path": "src/routes.ts",
+      "pattern": "\"status\": \"ok\""
+    },
+    {
+      "type": "diff-allowlist",
+      "allow": ["src/routes.ts", "src/health.test.ts"]
+    }
+  ]
+}
+```
+
+Each trial runs the prompt in a fresh sandbox seeded with the fixture, and a
+trial counts only when every check passes.
 
 ## Packages
 
