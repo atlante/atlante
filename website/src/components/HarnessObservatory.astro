@@ -8,13 +8,13 @@ const observations = [
     title: "One harness, held together",
     code: "atlante.jsonc",
     detail:
-      "Agents, skills, workflows, values, and selected resources live in one versioned configuration beside your code.",
+      "Agents, skills, values, and eval configuration live in one versioned configuration beside your code.",
   },
   {
     focus: "inputs" as const,
     term: "Stars",
     title: "Every signal stays visible",
-    code: "identity · instructions · constraints · values · policies",
+    code: "named inputs, available to templates only when selected",
     detail:
       "Each reference point remains named, diffable, and available to templates only when explicitly declared.",
   },
@@ -22,7 +22,7 @@ const observations = [
     focus: "agent" as const,
     term: "Constellations",
     title: "Your stars form an agent",
-    code: "agents.<name> + $template",
+    code: "agents.implementer → agents/implementer.md",
     detail:
       "Identity, mission, responsibilities, invariants, and a reusable template combine into one coherent agent.",
   },
@@ -30,7 +30,7 @@ const observations = [
     focus: "validation" as const,
     term: "Coordinates",
     title: "Validate before you build",
-    code: "$schema + template validation",
+    code: "atlante validate",
     detail:
       "Atlante validates the configuration and every selected template before anything can be published.",
   },

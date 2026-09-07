@@ -13,17 +13,17 @@ When documents disagree, apply this order:
 
 **Category:** the configuration and build layer for your coding-agent harness.
 
-**Primary audience:** engineering teams that need explicit structure for the agents, skills, and workflows in a shared coding-agent harness. Adjacent audiences are individual engineers adopting or maintaining a harness, engineering leads defining agent roles, and maintainers packaging reusable harness content.
+**Primary audience:** engineering teams and individual engineers who need explicit structure for a shared or personal coding-agent harness. Adjacent audiences are engineering leads defining agent roles and maintainers packaging reusable harness content.
 
 **Tagline:** Give form to your harness.
 
-Approved positioning: for teams that need a coding-agent harness they can share and evolve, Atlante turns agents, skills, and workflows into one versioned system. Unlike maintaining scattered prompts and host configuration separately, Atlante gives the team an authoritative source in the repository, then materializes it through a host adapter.
+Approved positioning: for engineering teams and individual engineers who need a coding-agent harness they can share or evolve, Atlante turns agents, skills, and workflows into one versioned system. Unlike maintaining scattered prompts and host configuration separately, Atlante gives you an authoritative source in the repository, then materializes it through a host adapter.
 
 Message order:
 
 1. Category: configuration and build layer for the harness.
-2. Team outcome: one shared source inherited through the repository.
-3. System contents: agents, skills, workflows, values, and selected resources.
+2. Authoring outcome: one versioned source you can review and evolve.
+3. System contents: agents, skills, values, and eval configuration.
 4. Destination: materialized through a host adapter; OpenCode is available today.
 5. Supporting proof: composition, validation, deterministic output, artifact verification, and host-setting preservation.
 6. Boundary: Atlante defines orchestration but does not execute agents itself.

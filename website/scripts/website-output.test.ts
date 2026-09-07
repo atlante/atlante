@@ -23,7 +23,12 @@ describe.skipIf(process.env.ATLANTE_BUILT_OUTPUT_TESTS !== "1")(
     it("keeps approved copy and links in built HTML", () => {
       const html = read("dist/index.html");
       for (const text of [
-        "Define, share, and evolve your harness through Atlante with your team.",
+        "Define, test, and evolve your harness like any other code, one versioned source in your repository.",
+        "What it does",
+        "Define agents, skills, values, and eval configuration in one versioned source.",
+        "What it does not",
+        "Perform LLM inference.",
+        "configuration → validate → .opencode/",
         "One harness, held together",
         "Every signal stays visible",
         "Your stars form an agent",
@@ -33,12 +38,10 @@ describe.skipIf(process.env.ATLANTE_BUILT_OUTPUT_TESTS !== "1")(
         "Build your constellation",
         "Built for change. Strict by design",
         "Chart your harness",
-        "Presets compose in declaration order. Your local configuration takes precedence.",
-        "one template → many roles",
-        "Compose roles, not copies",
-        "Reusable templates give agents shared structure without duplicating prompt definitions.",
-        "Run ",
-        ">init</code> to create your configuration and build your first harness.",
+        "Review harness changes like code",
+        "Catch breakage before it ships with eval",
+        "Get the same output from the same source and selected content",
+        "Edit the configuration and press Build to create your first harness.",
         "Learn",
         "Project",
         "Reference",
@@ -54,6 +57,7 @@ describe.skipIf(process.env.ATLANTE_BUILT_OUTPUT_TESTS !== "1")(
         "Keep the last good build",
         "Failed configuration or template validation leaves the current artifact tree untouched.",
         ">init</code> to create your configuration and build your first artifacts.",
+        "Define, share, and evolve your harness through Atlante with your team.",
       ]) {
         expect(html).not.toContain(text);
       }

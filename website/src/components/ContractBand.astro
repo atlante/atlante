@@ -1,0 +1,99 @@
+<section class="contract-band major-divider" aria-label="Product contract">
+  <div class="inner">
+    <div class="contract-grid">
+      <article>
+        <h2>What it does</h2>
+        <ul>
+          <li>Define agents, skills, values, and eval configuration in one versioned source.</li>
+          <li>Validate the configuration and selected templates.</li>
+          <li>Build OpenCode-native files.</li>
+        </ul>
+      </article>
+      <article>
+        <h2>What it does not</h2>
+        <ul>
+          <li>Perform LLM inference.</li>
+          <li>Execute agents, skills, or project code.</li>
+          <li>Own models, effort, permissions, tools, or modes.</li>
+          <li>Support hosts other than OpenCode in v0.1.</li>
+        </ul>
+      </article>
+    </div>
+    <p class="flow">
+      <code>configuration → validate → .opencode/</code>
+    </p>
+  </div>
+</section>
+
+<style>
+  .contract-band {
+    border-block-start: 0;
+  }
+
+  .inner {
+    max-width: var(--container-wide);
+    margin-inline: auto;
+    padding: clamp(var(--space-12), 6vw, var(--space-24)) var(--space-4);
+  }
+
+  .contract-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    border-block: 1px solid var(--ds-border);
+  }
+
+  article {
+    min-height: 100%;
+    padding: var(--space-8);
+  }
+
+  article + article {
+    border-inline-start: 1px solid var(--ds-border-subtle);
+  }
+
+  h2 {
+    margin: 0 0 var(--space-6);
+    font-family: var(--font-display);
+    font-size: clamp(30px, 3vw, 48px);
+    font-weight: 500;
+    line-height: 1.05;
+  }
+
+  ul {
+    display: grid;
+    gap: var(--space-3);
+    margin: 0;
+    padding-inline-start: 1.2em;
+    color: var(--ds-muted);
+    font-family: var(--font-body);
+    font-size: var(--text-ui);
+    line-height: 1.55;
+  }
+
+  li::marker {
+    color: var(--ds-accent);
+  }
+
+  .flow {
+    margin: var(--space-6) 0 0;
+    color: var(--ds-accent);
+    font-family: var(--font-mono);
+    font-size: var(--text-small);
+    text-align: center;
+  }
+
+  @media (max-width: 700px) {
+    .contract-grid {
+      grid-template-columns: 1fr;
+    }
+
+    article + article {
+      border-block-start: 1px solid var(--ds-border-subtle);
+      border-inline-start: 0;
+    }
+
+    article {
+      padding: var(--space-6) var(--space-4);
+    }
+  }
+</style>

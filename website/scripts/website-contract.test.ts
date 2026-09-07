@@ -14,27 +14,27 @@ const observatoryEntries = [
     "Family",
     "One harness, held together",
     "atlante.jsonc",
-    "Agents, skills, workflows, values, and selected resources live in one versioned configuration beside your code.",
+    "Agents, skills, values, and eval configuration live in one versioned configuration beside your code.",
   ],
   [
     "inputs",
     "Stars",
     "Every signal stays visible",
-    "identity · instructions · constraints · values · policies",
+    "named inputs, available to templates only when selected",
     "Each reference point remains named, diffable, and available to templates only when explicitly declared.",
   ],
   [
     "agent",
     "Constellations",
     "Your stars form an agent",
-    "agents.<name> + $template",
+    "agents.implementer → agents/implementer.md",
     "Identity, mission, responsibilities, invariants, and a reusable template combine into one coherent agent.",
   ],
   [
     "validation",
     "Coordinates",
     "Validate before you build",
-    "$schema + template validation",
+    "atlante validate",
     "Atlante validates the configuration and every selected template before anything can be published.",
   ],
   [
@@ -81,22 +81,37 @@ describe("website content contract", () => {
   it("keeps approved source copy and links present", () => {
     const source = [
       read("src/components/Hero.astro"),
+      read("src/components/ContractBand.astro"),
       read("src/components/BuildInstrument.astro"),
       read("src/components/ReviewClose.astro"),
       read("src/components/SiteFooter.astro"),
     ].join("\n");
     for (const text of [
-      "Define, share, and evolve your harness through Atlante with your team.",
+      "Define, test, and evolve your harness like any other code, one versioned source in your repository.",
+      "What it does",
+      "Define agents, skills, values, and eval configuration in one versioned source.",
+      "Validate the configuration and selected templates.",
+      "Build OpenCode-native files.",
+      "What it does not",
+      "Perform LLM inference.",
+      "Execute agents, skills, or project code.",
+      "Own models, effort, permissions, tools, or modes.",
+      "Support hosts other than OpenCode in v0.1.",
+      "configuration → validate → .opencode/",
       "Build your constellation",
-      "Edit the configuration, run the real CLI, and inspect the generated files.",
       "Playground · real CLI · isolated sandbox",
       "Built for change. Strict by design",
       "Chart your harness",
-      "Presets compose in declaration order. Your local configuration takes precedence.",
-      "one template → many roles",
-      "Compose roles, not copies",
-      "Reusable templates give agents shared structure without duplicating prompt definitions.",
-      "Run <code>init</code> to create your configuration and build your first harness.",
+      "reviewable harness",
+      "Review harness changes like code",
+      "Keep harness changes reviewable alongside application code.",
+      "optional eval",
+      "Catch breakage before it ships with eval",
+      "Optional eval scenarios catch breakage before changes reach users.",
+      "same source + selected content",
+      "Get the same output from the same source and selected content",
+      "The same source and selected content produce reproducible host-native output.",
+      "Edit the configuration and press Build to create your first harness.",
       "Documentation",
       "Getting started",
       "GitHub repo",
@@ -112,11 +127,12 @@ describe("website content contract", () => {
       "Keep the last good build",
       "Failed configuration or template validation leaves the current artifact tree untouched.",
       "Run <code>init</code> to create your configuration and build your first artifacts.",
+      "Define, share, and evolve your harness through Atlante with your team.",
     ]) {
       expect(source).not.toContain(text);
     }
     expect(source).not.toContain("Built for change. Strict by design.");
-    expect(source.match(/signal: "/g)).toHaveLength(4);
+    expect(source.match(/signal: "/g)).toHaveLength(3);
     for (const href of [
       "https://docs.atlante.sh",
       "https://docs.atlante.sh/getting-started",
@@ -133,6 +149,25 @@ describe("website content contract", () => {
     );
   });
 
+  it("uses the shared page container for every major section", () => {
+    const global = read("src/styles/global.css");
+    const tokens = read("../brand/atlante-design-tokens.css");
+    expect(tokens).toContain("--container-wide: 1440px");
+    expect(global).not.toContain("--container-hero");
+    expect(global).not.toContain("--container-playground");
+
+    for (const component of [
+      "Hero.astro",
+      "HarnessObservatory.astro",
+      "BuildInstrument.astro",
+      "ReviewClose.astro",
+    ]) {
+      expect(read(`src/components/${component}`)).toContain(
+        "var(--container-wide)",
+      );
+    }
+  });
+
   it("keeps the CTA directly below its supporting sentence and matches hero actions", () => {
     const hero = read("src/components/Hero.astro");
     const reviewClose = read("src/components/ReviewClose.astro");
@@ -145,7 +180,7 @@ describe("website content contract", () => {
     );
 
     expect(nextStep).toMatch(
-      /<p class="literal">[\s\S]*?Run <code>init<\/code> to create your configuration and build your first harness\.[\s\S]*?<\/p>\s*<div class="actions">/,
+      /<p class="literal">[\s\S]*?Edit the configuration and press Build to create your first harness\.[\s\S]*?<\/p>\s*<div class="actions">/,
     );
     expect(nextStep).not.toMatch(
       /<\/div>\s*<div class="actions">[\s\S]*?<\/div>\s*<\/div>\s*$/,
@@ -263,7 +298,7 @@ describe("website content contract", () => {
     expect(mobileStyles).toMatch(/\.link-groups \{[\s\S]*?text-align: center;/);
     expect(footer).toContain("box-sizing: border-box");
     expect(footer).toContain(
-      "width: min(100%, calc(var(--container-hero) + 2 * var(--space-4)))",
+      "width: min(100%, calc(var(--container-wide) + 2 * var(--space-4)))",
     );
   });
 
@@ -357,7 +392,7 @@ describe("website content contract", () => {
       /@media \(max-width: 700px\) \{[\s\S]*?\.intro \{[\s\S]*?text-align: center;[\s\S]*?\.instrument-bar \{[\s\S]*?justify-content: center;[\s\S]*?\.run-hint \{[\s\S]*?text-align: center;[\s\S]*?\.field-map dt,[\s\S]*?\.pipeline small \{[\s\S]*?text-align: center;[\s\S]*?pre\[data-code-view\],[\s\S]*?text-align: start;[\s\S]*?\.docs-link \{[\s\S]*?justify-content: center;/,
     );
     expect(benefits).toMatch(
-      /@media \(max-width: 680px\) \{[\s\S]*?\.intro \{[\s\S]*?text-align: center;[\s\S]*?\.guarantees article \{[\s\S]*?text-align: center;[\s\S]*?\.next-step \{[\s\S]*?text-align: center;[\s\S]*?\.actions \{[\s\S]*?justify-content: center;/,
+      /@media \(max-width: 680px\) \{[\s\S]*?\.intro \{[\s\S]*?text-align: center;[\s\S]*?\.benefits article \{[\s\S]*?text-align: center;[\s\S]*?\.next-step \{[\s\S]*?text-align: center;[\s\S]*?\.actions \{[\s\S]*?justify-content: center;/,
     );
     expect(footer).toMatch(
       /@media \(max-width: 700px\) \{[\s\S]*?\.mark \{[\s\S]*?justify-content: center;/,

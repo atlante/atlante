@@ -1,43 +1,36 @@
 ---
-const guarantees = [
+const benefits = [
   {
-    signal: "extends → local",
-    title: "Know what wins",
+    signal: "reviewable harness",
+    title: "Review harness changes like code",
     detail:
-      "Presets compose in declaration order. Your local configuration takes precedence.",
+      "Keep harness changes reviewable alongside application code.",
   },
   {
-    signal: "one template → many roles",
-    title: "Compose roles, not copies",
+    signal: "optional eval",
+    title: "Catch breakage before it ships with eval",
     detail:
-      "Reusable templates give agents shared structure without duplicating prompt definitions.",
+      "Optional eval scenarios catch breakage before changes reach users.",
   },
   {
-    signal: "same resolved source → same output",
-    title: "Get reproducible outputs",
+    signal: "same source + selected content",
+    title: "Get the same output from the same source and selected content",
     detail:
-      "The same resolved source and selected content produce the same host-native output.",
-  },
-  {
-    signal: "host-owned runtime",
-    title: "Keep control of the runtime",
-    detail:
-      "Models, effort, permissions, tools, and modes remain owned by the host.",
-
+      "The same source and selected content produce reproducible host-native output.",
   },
 ];
 ---
 
-<section class="review-close major-divider" id="guarantees">
+<section class="review-close major-divider" id="benefits">
   <div class="inner">
     <header class="intro">
       <h2>Built for change. Strict by design</h2>
 
     </header>
 
-    <div class="guarantees">
+    <div class="benefits">
       {
-        guarantees.map((item) => (
+        benefits.map((item) => (
           <article>
             <code>{item.signal}</code>
             <h3>{item.title}</h3>
@@ -53,7 +46,7 @@ const guarantees = [
         <p class="next-label">Next step</p>
         <p class="statement">Chart your harness</p>
         <p class="literal">
-          Run <code>init</code> to create your configuration and build your first harness.
+          Edit the configuration and press Build to create your first harness.
         </p>
         <div class="actions">
           <a class="primary" href="#quick-start">Get started</a>
@@ -94,9 +87,9 @@ const guarantees = [
 
 
 
-  .guarantees {
+  .benefits {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     border-block: 1px solid var(--ds-border);
   }
 
@@ -257,7 +250,7 @@ const guarantees = [
   }
 
   @media (max-width: 980px) {
-    .guarantees {
+    .benefits {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
@@ -280,7 +273,7 @@ const guarantees = [
       margin-inline: auto;
     }
 
-    .guarantees {
+    .benefits {
       grid-template-columns: 1fr;
     }
 
@@ -295,13 +288,13 @@ const guarantees = [
       border-block-end: 0;
     }
 
-    .guarantees article {
+    .benefits article {
       text-align: center;
     }
 
-    .guarantees article code,
-    .guarantees article h3,
-    .guarantees article p {
+    .benefits article code,
+    .benefits article h3,
+    .benefits article p {
       margin-inline: auto;
     }
 

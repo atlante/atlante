@@ -65,10 +65,7 @@ body {
 }
 
 :root {
-  /* Reading surfaces stay centered; the playground is intentionally wider. */
-  --container-wide: 1440px;
-  --container-hero: 1280px;
-  --container-playground: 1760px;
+  /* Every major landing-page section shares one reading width. */
   --container-divider: 1200px;
   --container-content: 86ch;
 }
@@ -137,9 +134,9 @@ main section[id] {
 @media (min-width: 1200px) {
   .observatory .instrument,
   .review-close .intro,
-  .review-close .guarantees,
+  .review-close .benefits,
   .review-close .next-step {
-    max-width: min(100%, var(--container-hero));
+    max-width: min(100%, var(--container-wide));
     margin-inline: auto;
   }
 }
