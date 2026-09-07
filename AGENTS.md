@@ -69,7 +69,7 @@ a manual step.
 
 ## Repository conventions
 
-The human-facing contributor process — issue and PR templates, labels and
+The contributor process — issue and PR templates, labels and
 types, the open-a-change cycle, commit and branch conventions, test tiers —
 is documented in [`CONTRIBUTING.md`](CONTRIBUTING.md) and is authoritative
 for anything shared. Keep the two aligned: when a shared convention changes,
