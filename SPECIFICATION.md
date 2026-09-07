@@ -748,15 +748,17 @@ relative to the project root, an optional `model` passed through to the host
 run, and an optional `budget` of `trials`, `timeoutMs`, `maxSessions`, and
 `maxTokens`. Absent budget fields MUST inherit the defaults of 3 trials,
 600000 ms per run, 15 sessions, and 400000 tokens, with at most 50 trials per
-run, and a run MUST stop when its budget is exhausted.
+run, and a run MUST stop when its budget is exhausted. A trial whose host
+emits no usage events MUST be reported as budget-unmonitored: token spend
+cannot be enforced and only the trial timeout bounds it.
 
 Eval scenarios are versioned documents in their own namespace, identified by
 the eval-scenario schema URI
 (`https://atlante.sh/schema/v0.1/eval-scenario.json`). A scenario MUST declare
 version `0.1`, a slug `name` unique across the suite, one `task` consisting of
-a sandbox-relative `fixture`, an optional `setup` command, an optional driving
-`agent`, and a `prompt`, an optional scenario `timeoutMs` override, and at
-least one `check`.
+a sandbox-relative `fixture`, an optional `setup` argv, an optional driving
+`agent`, and a `prompt`, an optional scenario `budget.timeoutMs` override, and
+at least one `check`.
 
 Checks MUST be deterministic and zero-LLM, graded against sandbox state:
 

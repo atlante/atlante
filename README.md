@@ -75,8 +75,8 @@ flowchart LR
   host -.-> eval["eval"]
 ```
 
-The authored source stays in your repository, so the harness is reviewed and
-evolved like any other code. The build materializes deterministic
+The authored source stays in your repository, so you review and evolve the
+harness like any other code. The build materializes deterministic
 host-native files; the host executes them.
 
 ## A first configuration
@@ -99,7 +99,7 @@ host-native files; the host executes them.
       "$template": "@atlante/pack/agent",
       "description": "Designs and reviews the public API surface of {{values.project}}.",
       "identity": "You are the API designer for {{values.project}}.",
-      "mission": "Keep the public API small, consistent, and backwards-compatible.",
+      "mission": "Keep the public API small, consistent, and backward-compatible.",
       "sections": [
         {
           "responsibilities": [

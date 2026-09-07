@@ -60,7 +60,8 @@ Bun is the package manager and the build/release/smoke/packaging/test runtime.
 During implementation, use Fallow for codebase analysis and lightweight
 feedback, and run `bun run quick:check` for fast iteration. Reserve
 `bun run full:check` as the heavyweight final verification before declaring
-work ready. The `smoke:opencode` step inside `full:check` is load-bearing:
+work ready. The OpenCode host smoke that CI runs as its own step after
+`full:check` (`bun scripts/opencode-smoke.ts`) is load-bearing:
 unit tests cover the materializer against synthetic fixtures, so the smoke is
 the only automated check of the real pack → build → materialize → host
 discovery flow (pinned OpenCode in a sandbox) and must never be downgraded to

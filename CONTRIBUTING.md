@@ -43,7 +43,7 @@ Run the root checks before opening a change:
 
 ```sh
 bun run quick:check   # type:check + lint:check + test; fast inner loop
-bun run full:check    # build + quick:check; the CI gate before requesting review
+bun run full:check    # build + quick:check + smoke/docs/website checks; the CI gate
 ```
 
 Tests run on `bun:test` and live next to the code they test:
@@ -57,10 +57,11 @@ Tests run on `bun:test` and live next to the code they test:
   own their tests internally. Do not add tests in ad-hoc locations outside
   these trees.
 
-The `smoke:opencode` step inside `full:check` is load-bearing: unit tests
-cover the materializer against synthetic fixtures, so the smoke is the only
-automated check of the real pack → build → materialize → host discovery flow
-and must never be downgraded to a manual step.
+The OpenCode host smoke that CI runs as its own step after `full:check`
+(`bun scripts/opencode-smoke.ts`) is load-bearing: unit tests cover the
+materializer against synthetic fixtures, so the smoke is the only automated
+check of the real pack → build → materialize → host discovery flow and must
+never be downgraded to a manual step.
 
 ## Architecture constraints
 
@@ -93,8 +94,8 @@ These constraints are reviewed in every change:
 2. **Tasks and commits.** Split the issue into ordered tasks. Each task ends
    with exactly one commit containing only that task's changes, created after
    its checks pass; a commit never carries unrelated work. Commit messages
-   follow Conventional Commits — `feat`, `fix`, `docs`, `refactor`, or
-   `chore`, optionally scoped, as in `fix(cli): ...`.
+   follow Conventional Commits — `feat`, `fix`, `docs`, `refactor`, `chore`,
+   or `release`, optionally scoped, as in `fix(cli): ...`.
 3. **Branch and pull request.** Branches are named `issue-<n>` for issue
    worktrees or `<type>/<slug>` for work without an issue, as in
    `docs/readme-refresh`. Open the pull request with
