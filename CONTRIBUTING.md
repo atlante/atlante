@@ -1,7 +1,7 @@
 # Contributing
 
-Atlante is developed in a public repository. The source of truth for behavior is
-[`README.md`](README.md),
+Atlante is developed in a public repository. The source of truth for behavior
+is [`README.md`](README.md),
 [`SPECIFICATION.md`](SPECIFICATION.md),
 tests, and the implementation. Documentation should describe shipped behavior,
 not future capabilities.
@@ -16,12 +16,96 @@ cd atlante
 bun install
 ```
 
+## Repository layout
+
+Eight toolchain workspaces live under `packages/`:
+
+- `schema` — versioned document contract, TypeScript types, Zod schemas,
+  generated JSON Schema.
+- `resources` — private engine for static source/package loading, resolution,
+  composition, interpolation, and rendering.
+- `validator` — document discovery and parsing, raw and resolved validation,
+  template-input validation, diagnostics.
+- `builder` — private host-neutral preparation and build orchestration.
+- `pack` — first-party static presets, templates, and instances.
+- `opencode` — OpenCode host materializer and the ownership manifest.
+- `eval` — private host-runner orchestration for `atlante eval`.
+- `cli` — user-facing command orchestration, initialization defaults, host
+  registration.
+
+The docs site is the `@atlante/docs` workspace in `docs/`, and `website/`
+hosts the Astro landing site. The publishable packages are `pack` and the
+CLI; the other toolchain workspaces remain private.
+
+## Checks and tests
+
 Run the root checks before opening a change:
 
 ```sh
-bun run quick:check
-bun run full:check
+bun run quick:check   # type:check + lint:check + test; fast inner loop
+bun run full:check    # build + quick:check; the CI gate before requesting review
 ```
+
+Tests run on `bun:test` and live next to the code they test:
+
+- `packages/<workspace>/test/` mirrors `src/`, and every test file carries a
+  tier suffix: `*.unit.test.ts` for in-memory tests, `*.integration.test.ts`
+  for tests doing real builds or temp-directory filesystem work, and
+  `*.e2e.test.ts` for full command-path tests. The tier scripts filter on the
+  suffix, so new test files must pick one.
+- `scripts/*.test.ts` files sit beside their scripts; `docs/` and `website/`
+  own their tests internally. Do not add tests in ad-hoc locations outside
+  these trees.
+
+The `smoke:opencode` step inside `full:check` is load-bearing: unit tests
+cover the materializer against synthetic fixtures, so the smoke is the only
+automated check of the real pack → build → materialize → host discovery flow
+and must never be downgraded to a manual step.
+
+## Architecture constraints
+
+These constraints are reviewed in every change:
+
+- `schema` and `resources` remain independent of higher orchestration,
+  concrete packs, CLI policy, and host integrations.
+- Validation, build, and CLI layers compose lower-layer capabilities but
+  never duplicate their logic.
+- First-party static semantics belong in `pack`; concrete host semantics
+  belong in the corresponding materializer. Generic infrastructure never
+  imports from or encodes semantics for one concrete pack or host.
+- Host materializers receive the prepared project as data and never load
+  source configuration, resolve packs or resources, or import the builder.
+  The builder never imports host packages; the CLI is the composition root
+  that injects the materializers selected by the document's `hosts` field.
+- TypeScript sources, static pack content, authored configuration, and
+  schema-generator inputs are authoritative. The committed JSON Schema
+  (`packages/schema/schema/v0.1/schema.json`), `dist/`, and the generated
+  native outputs are regenerated from their sources and are never edited
+  directly.
+
+## Open a change
+
+1. **Issue.** Open one with the templates under
+   [`.github/ISSUE_TEMPLATE/`](.github/ISSUE_TEMPLATE/), a type (`Bug`,
+   `Feature`, `Refactor`, `Docs`, `Chore`), and an `area:` label. For issue
+   work, create an isolated worktree with `bun run worktree <issue>` and keep
+   all edits, git commands, and checks inside it.
+2. **Tasks and commits.** Split the issue into ordered tasks. Each task ends
+   with exactly one commit containing only that task's changes, created after
+   its checks pass; a commit never carries unrelated work. Commit messages
+   follow Conventional Commits — `feat`, `fix`, `docs`, `refactor`, or
+   `chore`, optionally scoped, as in `fix(cli): ...`.
+3. **Branch and pull request.** Branches are named `issue-<n>` for issue
+   worktrees or `<type>/<slug>` for work without an issue, as in
+   `docs/readme-refresh`. Open the pull request with
+   [`PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) and explain
+   the behavior changed, the verification performed, and any compatibility
+   impact.
+
+Keep source changes and their tests together. Documentation changes should
+include the affected page paths and successful `astro check` and docs build
+results. Schema documentation should link the hosted schema and repository
+source, while schema JSON remains generated from its TypeScript source.
 
 ## Work on the docs
 
@@ -74,12 +158,3 @@ generated-file record, and `materializer` for host-specific materialization.
 
 Metaphor belongs in occasional explanatory copy. Procedures, CLI output, errors,
 schema references, and troubleshooting must remain literal.
-
-## Open a change
-
-Keep source changes and their tests together. Explain the behavior changed, the
-verification performed, and any compatibility impact in the pull request.
-Documentation changes should include the affected page paths and successful
-`astro check` and docs build results. Schema documentation should link the
-hosted schema and repository source, while schema JSON remains generated from
-its TypeScript source.

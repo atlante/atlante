@@ -68,6 +68,11 @@ a manual step.
 
 ## Repository conventions
 
+The human-facing contributor process — templates, labels, commit and branch
+conventions, test tiers — is documented in
+[`CONTRIBUTING.md`](CONTRIBUTING.md). Keep the two aligned: when a shared
+convention changes, update CONTRIBUTING.md; keep agent-specific rules here.
+
 1. Use templates under `.github/ISSUE_TEMPLATE/` and `.github/PULL_REQUEST_TEMPLATE/` when creating issues or PRs with `gh`. Apply labels (`--label`) and type (`--type`, e.g. `Bug`, `Feature`, `Refactor`, `Docs`, `Chore`) when creating issues.
 2. While working on an issue inside its `.worktrees/` worktree, all work MUST stay inside that worktree: edits, git commands, and checks run there and nowhere else. The root checkout is off-limits during issue work; its only permitted operation is updating `main` after the issue's PR has merged.
 3. Git commits are the project-approved checkpoint mechanism for the workflow's task boundaries: each implementation task MUST end with exactly one commit containing only that task's changes, created after the task's checks pass (and its task review, when run). A task's commit MUST NOT contain unrelated work.
