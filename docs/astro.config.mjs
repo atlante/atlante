@@ -11,6 +11,7 @@ export default defineConfig({
     "/contributing":
       "https://github.com/atlante/atlante/blob/main/CONTRIBUTING.md",
     "/guides/extensions": "/guides/authoring-packs",
+    "/guides/opencode": "/guides/building-a-harness",
     "/concepts/native-outputs": "/reference/materialization",
   },
   integrations: [
@@ -87,7 +88,6 @@ export default defineConfig({
               slug: "guides/building-a-harness",
               label: "Build a harness",
             },
-            { slug: "guides/opencode", label: "Use OpenCode" },
             { slug: "guides/authoring-packs", label: "Author a pack" },
           ],
         },

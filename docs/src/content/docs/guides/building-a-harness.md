@@ -115,6 +115,16 @@ built /Users/example/billing-api
 wrote opencode: .opencode/agents/reviewer.md
 ```
 
-For continuous editing, use `build --watch` as documented in
-the [CLI](/reference/cli). Continue to [Use OpenCode](/guides/opencode) when the
-native outputs are in place.
+For continuous editing, use `build --watch` as documented in the
+[CLI](/reference/cli).
+
+## Connect the host
+
+OpenCode discovers the generated files when it starts; restart it to pick up
+new or changed agents and skills. The document never owns host settings:
+model, mode, permission, and tool configuration stays in OpenCode's own
+configuration files.
+
+[Materialization](/reference/materialization) documents the output paths, the
+ownership manifest, and the collision and drift rules that keep a rebuild safe
+next to host-owned files.

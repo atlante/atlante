@@ -163,6 +163,14 @@ describe.skipIf(!runOutputTests)("docs built output", () => {
     );
   });
 
+  it("keeps the OpenCode guide route as a redirect", () => {
+    expectStaticRedirect(
+      "/guides/opencode",
+      "/guides/building-a-harness",
+      join("guides", "opencode", "index.html"),
+    );
+  });
+
   it("keeps the native-output route as a redirect", () => {
     expectStaticRedirect(
       "/concepts/native-outputs",
