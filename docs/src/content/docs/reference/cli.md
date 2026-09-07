@@ -36,11 +36,9 @@ npx @atlante/cli@latest init [path] --force
 
 `init` validates the selected preset before changing files. It ensures
 `.gitignore` contains `.opencode/agents/`, `.opencode/skills/`, and
-`.atlante/` without reordering existing content, removes an Atlante-written
-`@atlante/opencode` plugin registration from `opencode.jsonc` (or an existing
-`opencode.json`) while preserving every other host setting, and runs a build.
-It never adds a plugin registration. When no registration exists, it prints
-`no @atlante/opencode plugin registration found …`.
+`.atlante/` without reordering existing content, does not register or modify a
+runtime integration, and runs a build. Existing host configuration remains
+host-owned.
 
 ### Pack installation
 

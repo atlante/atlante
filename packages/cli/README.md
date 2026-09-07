@@ -35,10 +35,9 @@ atlante init
 `path` defaults to the current directory and may be a configuration file
 (`atlante.jsonc` or `atlante.json`) or a project directory.
 
-`init` adds the generated folders to `.gitignore`, removes any Atlante-written
-`@atlante/opencode` plugin registration from the host configuration while
-preserving every other host setting, and performs a build. Generated outputs
-may embed rendered values, so they stay local: `init` ignores them in git.
+`init` adds the generated folders to `.gitignore`, leaves host configuration
+untouched, and performs a build. Generated outputs may embed rendered values,
+so they stay local: `init` ignores them in git.
 
 ## Packs
 

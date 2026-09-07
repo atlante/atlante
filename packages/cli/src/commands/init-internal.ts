@@ -21,13 +21,6 @@ import {
 import { SCHEMA_URI } from "@atlante/schema";
 import { hasErrors, validateDocumentText } from "@atlante/validator";
 import {
-  applyEdits,
-  modify,
-  type ParseError,
-  parse,
-  printParseErrorCode,
-} from "jsonc-parser";
-import {
   FIRST_PARTY_PACKAGE,
   resolveFirstPartyPack,
 } from "../first-party-pack.js";
@@ -105,25 +98,12 @@ async function defaultPrompt(query: string): Promise<string> {
 
 type Snapshot = { exists: boolean; contents?: string };
 
-const ATLANTE_PLUGIN_ID = "@atlante/opencode";
-
 /** The ignore policy init enforces for generated native outputs and state. */
 const GITIGNORE_ENTRIES: readonly string[] = [
   ".opencode/agents/",
   ".opencode/skills/",
   ".atlante/",
 ];
-
-type PluginOptions = Record<string, unknown>;
-type PluginEntry = string | [string, PluginOptions];
-type PluginPlan = {
-  previous: Snapshot;
-  contents: string;
-  /** An existing Atlante plugin entry was removed from the configuration. */
-  removed: boolean;
-  /** The configuration file must be written: it is created or edited. */
-  write: boolean;
-};
 
 type GitignorePlan = {
   previous: Snapshot;
@@ -150,142 +130,9 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function isPluginEntry(value: unknown): value is PluginEntry {
-  if (typeof value === "string") return true;
-  return (
-    Array.isArray(value) &&
-    value.length === 2 &&
-    typeof value[0] === "string" &&
-    isObject(value[1])
-  );
-}
-
-function pluginId(entry: PluginEntry): string {
-  return typeof entry === "string" ? entry : entry[0];
-}
-
-function parseErrorSummary(text: string, errors: ParseError[]): string {
-  return errors
-    .map((parseError) => {
-      const line = text.slice(0, parseError.offset).split("\n").length;
-      return `${printParseErrorCode(parseError.error)} at line ${line}`;
-    })
-    .join(", ");
-}
-
 function snapshot(path: string, fileSystem: InitFileSystem): Snapshot {
   if (!fileSystem.existsSync(path)) return { exists: false };
   return { exists: true, contents: fileSystem.readFileSync(path, "utf8") };
-}
-
-function parsePluginEntries(
-  path: string,
-  text: string,
-): PluginEntry[] | { error: string } {
-  const parseErrors: ParseError[] = [];
-  const parsed = parse(text, parseErrors, {
-    allowTrailingComma: true,
-    disallowComments: false,
-  });
-
-  if (parseErrors.length > 0 || !isObject(parsed)) {
-    return {
-      error: formatInitError(
-        "invalid-opencode-configuration",
-        "could not update the OpenCode configuration",
-        {
-          source: path,
-          expected:
-            '"plugin" must be an array of strings or [name, options-object] tuples',
-          next: "fix the configuration and run `atlante init` again",
-          cause: parseErrors.length
-            ? `malformed JSONC: ${parseErrorSummary(text, parseErrors)}`
-            : "the document is not a JSON object",
-        },
-      ),
-    };
-  }
-
-  const plugin = parsed.plugin;
-  if (
-    plugin !== undefined &&
-    (!Array.isArray(plugin) || !plugin.every(isPluginEntry))
-  ) {
-    return {
-      error: formatInitError(
-        "invalid-opencode-configuration",
-        "could not update the OpenCode configuration",
-        {
-          source: path,
-          expected:
-            '"plugin" must be an array of strings or [name, options-object] tuples',
-          next: "fix the configuration and run `atlante init` again",
-          cause: 'the "plugin" field has an invalid value',
-        },
-      ),
-    };
-  }
-
-  return Array.isArray(plugin) ? plugin : [];
-}
-
-/**
- * Resolves the OpenCode config file that owns the Atlante plugin registration.
- * Prefers an existing `opencode.jsonc`, falls back to an existing
- * `opencode.json` (OpenCode discovers both, and JSON is valid JSONC), and only
- * defaults to creating `opencode.jsonc` when neither exists.
- */
-function opencodeConfigPath(
-  directory: string,
-  fileSystem: InitFileSystem,
-): string {
-  const jsonc = join(directory, "opencode.jsonc");
-  if (fileSystem.existsSync(jsonc)) return jsonc;
-  const json = join(directory, "opencode.json");
-  if (fileSystem.existsSync(json)) return json;
-  return jsonc;
-}
-
-/**
- * Prepares the plugin-removal edit: on init, a leftover Atlante-written
- * `@atlante/opencode` registration (string or tuple form) is removed while
- * every other plugin entry and all other configuration content stays
- * byte-faithful. A missing configuration file is still created with the
- * template shape, minus any plugin registration.
- */
-function preparePlugin(
-  directory: string,
-  fileSystem: InitFileSystem,
-): PluginPlan | { error: string } {
-  const path = opencodeConfigPath(directory, fileSystem);
-  const previous = snapshot(path, fileSystem);
-
-  const text = previous.exists
-    ? (previous.contents ?? "")
-    : `{
-  "$schema": "https://opencode.ai/config.json"
-}
-`;
-  const entries = parsePluginEntries(path, text);
-  if ("error" in entries) return entries;
-  const remaining = entries.filter(
-    (entry) => pluginId(entry) !== ATLANTE_PLUGIN_ID,
-  );
-
-  if (!previous.exists)
-    return { previous, contents: text, removed: false, write: true };
-  if (remaining.length === entries.length)
-    return { previous, contents: text, removed: false, write: false };
-
-  const edits = modify(text, ["plugin"], remaining, {
-    formattingOptions: { insertSpaces: true, tabSize: 2 },
-  });
-  return {
-    previous,
-    contents: applyEdits(text, edits),
-    removed: true,
-    write: true,
-  };
 }
 
 /**
@@ -419,8 +266,8 @@ function reportRollbackFailures(
 }
 
 /**
- * Restores every snapshotted file (configuration, host configuration,
- * package.json, lockfile) and re-runs the detected package manager install
+ * Restores every snapshotted file (configuration, package.json, lockfile) and
+ * re-runs the detected package manager install
  * when a dependency mutation happened. Failure diagnostics are printed after
  * the filesystem is restored.
  */
@@ -441,18 +288,12 @@ function commitInitFiles(
   flow: InitFlow,
   contents: string,
   before: { target: Snapshot; alternate: Snapshot },
-  plugin: PluginPlan,
   gitignore: GitignorePlan,
 ): { error?: string } {
   const { changes } = flow.state;
   try {
     changes.push({ path: flow.target, before: before.target });
     flow.fileSystem.writeFileSync(flow.target, contents);
-
-    if (plugin.write) {
-      changes.push({ path: flow.opencode, before: plugin.previous });
-      flow.fileSystem.writeFileSync(flow.opencode, plugin.contents);
-    }
 
     if (gitignore.write) {
       changes.push({ path: flow.gitignore, before: gitignore.previous });
@@ -957,7 +798,6 @@ type InitFlow = Readonly<{
   directory: string;
   target: string;
   alternate: string;
-  opencode: string;
   gitignore: string;
   fileSystem: InitFileSystem;
   context: ProjectContext;
@@ -1023,27 +863,23 @@ async function prepareConfiguration(
 }
 
 /**
- * Snapshots the configuration targets, prepares the host plugin-removal edit
- * and the ignore-policy edit, and commits the configuration files. Every
- * snapshotted file is recorded in the shared state, so a later failure
- * restores the whole pre-init state.
+ * Snapshots the configuration targets, prepares the ignore-policy edit, and
+ * commits the configuration files. Every snapshotted file is recorded in the
+ * shared state, so a later failure restores the whole pre-init state.
  */
 function commitConfiguration(
   flow: InitFlow,
   contents: string,
   abort: Abort,
-): number | { plugin: PluginPlan } {
+): number | undefined {
   const before = {
     target: snapshot(flow.target, flow.fileSystem),
     alternate: snapshot(flow.alternate, flow.fileSystem),
   };
-  const plugin = preparePlugin(flow.directory, flow.fileSystem);
-  if ("error" in plugin) return abort(plugin.error);
   const gitignore = prepareGitignore(flow.directory, flow.fileSystem);
 
-  const committed = commitInitFiles(flow, contents, before, plugin, gitignore);
+  const committed = commitInitFiles(flow, contents, before, gitignore);
   if (committed.error) return abort(committed.error);
-  return { plugin };
 }
 
 export async function runInitWithDependencies(
@@ -1059,7 +895,6 @@ export async function runInitWithDependencies(
     directory,
     target: join(directory, "atlante.jsonc"),
     alternate: join(directory, "atlante.json"),
-    opencode: opencodeConfigPath(directory, fileSystem),
     gitignore: join(directory, ".gitignore"),
     fileSystem,
     context: dependencies.context ?? {},
@@ -1080,7 +915,7 @@ export async function runInitWithDependencies(
     if (typeof prepared === "number") return prepared;
 
     const committed = commitConfiguration(flow, prepared.contents, abort);
-    if (typeof committed === "number") return committed;
+    if (committed !== undefined) return committed;
 
     const result = buildAndReport(
       flow.directory,
@@ -1092,11 +927,6 @@ export async function runInitWithDependencies(
       flow.context,
     );
     if (result !== 0) return result;
-    console.log(
-      committed.plugin.removed
-        ? `removed the @atlante/opencode plugin registration from ${flow.opencode}`
-        : `no @atlante/opencode plugin registration found in ${flow.opencode}`,
-    );
     return 0;
   } catch (cause) {
     return abort(

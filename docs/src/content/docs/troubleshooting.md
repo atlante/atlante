@@ -110,10 +110,8 @@ entry and run validation again.
 
 ## `init` touched my OpenCode config or `.gitignore`
 
-`init` does not register a plugin. It removes only the Atlante-written
-`@atlante/opencode` entry from `opencode.jsonc` (or an existing
-`opencode.json`); the removal may leave an empty `"plugin": []`, which is
-harmless and requires no action. Every other host setting is preserved.
+`init` leaves the OpenCode configuration untouched. It only appends the
+generated-output entries to `.gitignore` when they are missing.
 
 The generated-output ignore policy appends `.opencode/agents/`,
 `.opencode/skills/`, and `.atlante/` to `.gitignore` when missing. Because a
