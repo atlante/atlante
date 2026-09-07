@@ -27,11 +27,11 @@ const config = `{
       </p>
     </header>
 
-    <div class="build-instrument" data-playground>
+    <div class="build-instrument" data-playground data-initial-config={config}>
       <div class="instrument-bar">
         <p>
           <span class="status-dot" data-status-dot></span>
-          Playground · real CLI · isolated sandbox
+          Playground
         </p>
       </div>
 
@@ -63,12 +63,19 @@ const config = `{
             </div>
           </div>
 
-          <textarea
-            data-code-editor
-            spellcheck="false"
-            wrap="off"
-            aria-label="Edit configuration"
-          >{config}</textarea>
+          <div class="editor-shell" data-editor-shell>
+            <div class="line-numbers" data-line-numbers aria-hidden="true"></div>
+            <div class="editor-code">
+              <div
+                data-code-editor
+                class="code-editor"
+                spellcheck="false"
+                role="textbox"
+                aria-multiline="true"
+                aria-label="Edit configuration"
+              >{config}</div>
+            </div>
+          </div>
         </div>
 
         <div class="output-pane">
@@ -124,21 +131,26 @@ const config = `{
 Press Build to run the real CLI in an isolated sandbox.</pre>
       </div>
 
-      <a class="docs-link" href="https://docs.atlante.sh">
-        Read the documentation <span aria-hidden="true">↗</span>
-      </a>
     </div>
   </div>
 </section>
 
 <script>
+  import { CodeJar } from "codejar";
   import { playgroundFallback } from "../data/playground-fallback";
 
   const instrument = document.querySelector<HTMLElement>("[data-playground]");
 
   if (instrument) {
-    const editor = instrument.querySelector<HTMLTextAreaElement>(
+    const initialConfig = instrument.dataset.initialConfig ?? "";
+    const editor = instrument.querySelector<HTMLElement>(
       "[data-code-editor]",
+    );
+    const editorShell = instrument.querySelector<HTMLElement>(
+      "[data-editor-shell]",
+    );
+    const lineNumbers = instrument.querySelector<HTMLElement>(
+      "[data-line-numbers]",
     );
     const sourceCopy = instrument.querySelector<HTMLButtonElement>(
       "[data-source-copy]",
@@ -188,6 +200,24 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
       );
     };
 
+    const editorHighlighter = (element: HTMLElement): void => {
+      element.innerHTML = highlightJson(element.textContent ?? "");
+    };
+
+    const jar = editor
+      ? CodeJar(editor, editorHighlighter, {
+          spellcheck: false,
+          tab: "  ",
+        })
+      : null;
+    if (editor) {
+      jar?.updateCode(initialConfig, false);
+      editorHighlighter(editor);
+    }
+
+    const editorSource = (): string =>
+      jar?.toString() ?? editor?.textContent ?? "";
+
     const highlightMarkdown = (source: string): string =>
       escapeHtml(source)
         .replace(
@@ -215,8 +245,23 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
       return escapeHtml(content);
     };
 
+    const syncEditorScroll = (): void => {
+      if (!editor) return;
+      if (lineNumbers) lineNumbers.scrollTop = editor.scrollTop;
+    };
+
+    const syncLineNumbers = (source = editorSource()): void => {
+      const lines = source.split("\n");
+      if (lineNumbers) {
+        lineNumbers.innerHTML = lines
+          .map((_, index) => `<span>${index + 1}</span>`)
+          .join("");
+      }
+      syncEditorScroll();
+    };
+
     const nativeOutput = (path: string): boolean =>
-      path.startsWith(".opencode/");
+      path.startsWith(".opencode/") || path === ".atlante/opencode-native.json";
 
     const displayPath = (path: string): string =>
       path.replace(/^\.opencode\//, "");
@@ -238,10 +283,6 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
       }
       return String(hash >>> 0);
     };
-
-    const sessionId =
-      globalThis.crypto?.randomUUID?.() ??
-      `playground-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
     const state = {
       files: new Map<string, string>(),
@@ -354,7 +395,7 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
 
     const build = async (): Promise<void> => {
       if (!editor || state.running) return;
-      const source = editor.value;
+      const source = editorSource();
       const sequence = ++state.requestSequence;
       setBusy(true);
       if (runHint) {
@@ -365,7 +406,7 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
 
       try {
         const sourceHash = await hashSource(source);
-        if (source !== editor.value) {
+        if (source !== editorSource()) {
           showTerminal(
             "Build skipped because the source changed while preparing the request.",
             "idle",
@@ -388,13 +429,14 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
           return;
         }
 
+        // The playground deliberately does not retry an unchanged source,
+        // including after a failed or unavailable build.
         state.lastAttemptHash = sourceHash;
         const response = await fetch("/api/playground", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
             step: "build",
-            sessionId,
             files: [{ path: "atlante.jsonc", content: source }],
           }),
         });
@@ -430,6 +472,11 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
           result.ok === undefined
         ) {
           showFallback("The playground returned an unexpected response.");
+          return;
+        }
+
+        if (result.timedOut) {
+          showFallback("The playground build timed out.");
           return;
         }
 
@@ -472,9 +519,11 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
       }
     };
 
-    editor?.addEventListener("input", () => {
-      if (sourceCopy) sourceCopy.dataset.copyText = editor.value;
+    jar?.onUpdate((source) => {
+      if (sourceCopy) sourceCopy.dataset.copyText = source;
+      syncLineNumbers(source);
     });
+    editor?.addEventListener("scroll", syncEditorScroll);
     buildButton?.addEventListener("click", () => {
       void build();
     });
@@ -484,6 +533,9 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
       renderSelector();
     });
 
+    editorShell?.classList.add("is-enhanced");
+    if (editor) editor.style.whiteSpace = "pre";
+    syncLineNumbers(initialConfig);
     render();
     showTerminal(
       "Press Build to run the real CLI in an isolated sandbox.",
@@ -667,7 +719,36 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
     color: var(--ds-fg);
   }
 
-  textarea[data-code-editor],
+  .editor-shell {
+    display: grid;
+    grid-template-columns: 3.5rem minmax(0, 1fr);
+    min-height: 480px;
+    border-block-end: 1px solid var(--ds-border-subtle);
+  }
+
+  .line-numbers {
+    max-height: 640px;
+    padding: var(--space-8) var(--space-3);
+    overflow: hidden;
+    background: color-mix(in oklab, var(--ds-bg) 94%, var(--ds-fg));
+    color: var(--ds-muted);
+    font-family: var(--font-mono);
+    font-size: clamp(11px, 0.85vw, 14px);
+    line-height: 1.8;
+    text-align: end;
+    user-select: none;
+  }
+
+  .line-numbers :global(span) {
+    display: block;
+  }
+
+  .editor-code {
+    min-width: 0;
+    max-height: 640px;
+  }
+
+  .code-editor,
   pre[data-output-view] {
     display: block;
     box-sizing: border-box;
@@ -685,15 +766,13 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
     tab-size: 2;
   }
 
-  textarea[data-code-editor] {
-    border-block-end: 1px solid var(--ds-border-subtle);
+  .code-editor {
     overflow: auto;
-    resize: vertical;
     white-space: pre;
   }
 
-  textarea[data-code-editor]:focus-visible {
-    outline: 3px solid var(--ds-fg);
+  .code-editor:focus-visible {
+    outline: 3px solid var(--ds-fg) !important;
     outline-offset: 2px;
   }
 
@@ -708,25 +787,28 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
     min-width: 100%;
   }
 
-  pre :global(.token-key) {
+  .code-editor :global(.token-key),
+  pre[data-output-view] :global(.token-key) {
     color: var(--ds-warning);
     font-weight: 650;
   }
 
-  pre :global(.token-string) {
+  .code-editor :global(.token-string),
+  pre[data-output-view] :global(.token-string) {
     color: var(--ds-accent);
   }
 
-  pre :global(.token-literal) {
+  .code-editor :global(.token-literal),
+  pre[data-output-view] :global(.token-literal) {
     color: var(--ds-warning);
   }
 
-  pre :global(.token-md-heading) {
+  pre[data-output-view] :global(.token-md-heading) {
     color: var(--ds-accent);
     font-weight: 650;
   }
 
-  pre :global(.token-md-item) {
+  pre[data-output-view] :global(.token-md-item) {
     color: var(--ds-muted);
   }
 
@@ -826,27 +908,6 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
     overflow-wrap: anywhere;
   }
 
-  .docs-link {
-    display: inline-flex;
-    align-items: center;
-    justify-content: space-between;
-    min-height: var(--control-min);
-    padding-inline: var(--space-4);
-    border-block-start: 1px solid var(--ds-border);
-    background: transparent;
-    color: var(--ds-fg);
-    font-family: var(--font-ui);
-    font-size: var(--text-small);
-    font-weight: 650;
-    text-decoration: none;
-  }
-
-  .docs-link:hover,
-  .docs-link:focus-visible {
-    background: var(--ds-fg);
-    color: var(--ds-bg);
-  }
-
   @media (max-width: 980px) {
     .workspace {
       grid-template-columns: minmax(0, 1fr);
@@ -857,7 +918,8 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
       border-block-end: 1px solid var(--ds-border);
     }
 
-    textarea[data-code-editor],
+    .editor-shell,
+    .code-editor,
     pre[data-output-view] {
       min-height: 0;
     }
@@ -922,7 +984,7 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
       justify-content: center;
     }
 
-    textarea[data-code-editor],
+    .code-editor,
     pre[data-output-view],
     pre[data-terminal-out] {
       padding-inline: var(--space-4);
@@ -930,10 +992,11 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
       text-align: start;
     }
 
-    .docs-link {
-      justify-content: center;
-      text-align: center;
+    .line-numbers {
+      padding-inline: var(--space-2);
+      font-size: clamp(11px, 0.85vw, 14px);
     }
+
   }
 
   @media (max-width: 480px) {
@@ -951,7 +1014,7 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
       font-size: var(--text-meta);
     }
 
-    textarea[data-code-editor],
+    .code-editor,
     pre[data-output-view] {
       min-height: 320px;
       padding-block: var(--space-4);
@@ -964,6 +1027,10 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
 
     .output-selector label {
       text-align: center;
+    }
+
+    .line-numbers {
+      padding-block: var(--space-4);
     }
   }
 </style>

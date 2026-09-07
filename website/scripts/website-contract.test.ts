@@ -1,6 +1,8 @@
 import { describe, expect, it } from "bun:test";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { playgroundFallback } from "../src/data/playground-fallback";
 
 const websiteRoot = join(import.meta.dirname, "..");
 
@@ -97,9 +99,8 @@ describe("website content contract", () => {
       "Execute agents, skills, or project code.",
       "Own models, effort, permissions, tools, or modes.",
       "Support hosts other than OpenCode in v0.1.",
-      "configuration → validate → .opencode/",
+      "Playground",
       "Build your constellation",
-      "Playground · real CLI · isolated sandbox",
       "Built for change. Strict by design",
       "Chart your harness",
       "reviewable harness",
@@ -128,6 +129,8 @@ describe("website content contract", () => {
       "Failed configuration or template validation leaves the current artifact tree untouched.",
       "Run <code>init</code> to create your configuration and build your first artifacts.",
       "Define, share, and evolve your harness through Atlante with your team.",
+      "configuration → validate → .opencode/",
+      "Read the documentation",
     ]) {
       expect(source).not.toContain(text);
     }
@@ -180,7 +183,16 @@ describe("website content contract", () => {
       "data-output-view",
       "data-output-selector",
       "data-file-select",
+      "data-line-numbers",
+      "data-initial-config={config}",
+      "CodeJar",
+      "instrument.dataset.initialConfig",
+      "syncLineNumbers(initialConfig)",
+      ".line-numbers :global(span)",
       '"$template": "@atlante/pack/agent"',
+      ".atlante/opencode-native.json",
+      "result.timedOut",
+      "The playground build timed out.",
     ]) {
       expect(playground).toContain(text);
     }
@@ -190,6 +202,8 @@ describe("website content contract", () => {
       'data-action="edit"',
       'data-action="save"',
       'data-action="revert"',
+      "<textarea",
+      'editor.setAttribute("contenteditable", "true")',
       "Scaffolds a real project",
       '"extends": "@atlante/pack"',
       'class="field-map"',
@@ -201,7 +215,7 @@ describe("website content contract", () => {
     }
 
     expect(request).toContain('step must be "build"');
-    expect(request).toContain("sessionId");
+    expect(request).not.toContain("sessionId");
     expect(request).not.toContain('step !== "init"');
     expect(request).not.toContain('step !== "validate"');
     expect(playground).toContain(
@@ -212,9 +226,43 @@ describe("website content contract", () => {
 
   it("applies the session budget to the development playground route", () => {
     const devConfig = read("astro.config.mjs");
-    expect(devConfig).toContain('"/api/_lib/session-budget.ts"');
-    expect(devConfig).toContain("consumeSessionBuild(parsed.sessionId)");
-    expect(devConfig).toContain("playground session build limit reached");
+    expect(devConfig).toContain('"/api/playground.ts"');
+    expect(devConfig).toContain("await playgroundHandler(req, res)");
+  });
+
+  it("keeps the contract band borderless while retaining its divider", () => {
+    const contract = read("src/components/ContractBand.astro");
+    expect(contract).not.toContain("configuration → validate → .opencode/");
+    expect(contract).not.toContain("border-block: 1px solid var(--ds-border)");
+    expect(contract).toContain("article + article");
+    expect(contract).toContain(
+      "border-inline-start: 1px solid var(--ds-border-subtle)",
+    );
+  });
+
+  it("keeps the static playground fallback manifest self-consistent", () => {
+    const manifestFile = playgroundFallback.files.find(
+      (file) => file.path === ".atlante/opencode-native.json",
+    );
+    expect(manifestFile).toBeDefined();
+    const manifest = JSON.parse(manifestFile?.content ?? "{}");
+
+    for (const entry of manifest.files) {
+      const file = playgroundFallback.files.find(
+        (candidate) => candidate.path === entry.path,
+      );
+      expect(file).toBeDefined();
+      expect(entry.path).toBe(
+        entry.kind === "agent"
+          ? `.opencode/agents/${entry.id}.md`
+          : `.opencode/skills/${entry.id}/SKILL.md`,
+      );
+      expect(entry.sha256).toBe(
+        createHash("sha256")
+          .update(file?.content ?? "")
+          .digest("hex"),
+      );
+    }
   });
 
   it("keeps the CTA directly below its supporting sentence and matches hero actions", () => {
@@ -385,7 +433,7 @@ describe("website content contract", () => {
       /\.build-controls\s*\{[\s\S]*?text-align: center;/,
     );
     expect(mobileStyles).toMatch(
-      /textarea\[data-code-editor\],[\s\S]*?pre\[data-output-view\],[\s\S]*?pre\[data-terminal-out\][\s\S]*?text-align: start;/,
+      /\.code-editor,[\s\S]*?pre\[data-output-view\],[\s\S]*?pre\[data-terminal-out\][\s\S]*?text-align: start;/,
     );
     expect(playground).toMatch(
       /\.pane-actions button\s*\{[\s\S]*?min-height: 44px;/,
@@ -427,7 +475,7 @@ describe("website content contract", () => {
       /@media \(max-width: 680px\) \{[\s\S]*?article \{[\s\S]*?display: block;[\s\S]*?text-align: center;[\s\S]*?\.mobile-symbol \{[\s\S]*?margin-inline: auto;[\s\S]*?h3 \{[\s\S]*?margin-inline: auto;[\s\S]*?article code,[\s\S]*?\.detail \{[\s\S]*?margin-inline: auto;/,
     );
     expect(playground).toMatch(
-      /@media \(max-width: 700px\) \{[\s\S]*?\.intro \{[\s\S]*?text-align: center;[\s\S]*?\.instrument-bar \{[\s\S]*?justify-content: center;[\s\S]*?\.run-hint \{[\s\S]*?text-align: center;[\s\S]*?textarea\[data-code-editor\],[\s\S]*?pre\[data-output-view\],[\s\S]*?pre\[data-terminal-out\][\s\S]*?text-align: start;[\s\S]*?\.docs-link \{[\s\S]*?justify-content: center;/,
+      /@media \(max-width: 700px\) \{[\s\S]*?\.intro \{[\s\S]*?text-align: center;[\s\S]*?\.instrument-bar \{[\s\S]*?justify-content: center;[\s\S]*?\.run-hint \{[\s\S]*?text-align: center;[\s\S]*?\.code-editor,[\s\S]*?pre\[data-output-view\],[\s\S]*?pre\[data-terminal-out\][\s\S]*?text-align: start;/,
     );
     expect(benefits).toMatch(
       /@media \(max-width: 680px\) \{[\s\S]*?\.intro \{[\s\S]*?text-align: center;[\s\S]*?\.benefits article \{[\s\S]*?text-align: center;[\s\S]*?\.next-step \{[\s\S]*?text-align: center;[\s\S]*?\.actions \{[\s\S]*?justify-content: center;/,
@@ -462,9 +510,9 @@ describe("website content contract", () => {
     expect(observatory).toContain('window.addEventListener("resize"');
   });
 
-  it("uses one narrower shared rule for major dividers", () => {
+  it("uses one shared content-width rule for major dividers", () => {
     const global = read("src/styles/global.css");
-    expect(global).toContain("--container-divider: 1200px");
+    expect(global).toContain("--container-divider: var(--container-wide)");
     expect(global).toContain(".major-divider::before");
     expect(global).toContain("var(--container-divider)");
 

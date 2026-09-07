@@ -22,7 +22,6 @@ export interface PlaygroundFile {
 
 export interface PlaygroundRequest {
   step: PlaygroundStep;
-  sessionId: string;
   files: PlaygroundFile[];
 }
 
@@ -42,6 +41,7 @@ const MAX_OUTPUT_BYTES = 64 * 1024;
 const MAX_TREE_FILES = 24;
 const MAX_TREE_FILE_BYTES = 64 * 1024;
 const STEP_TIMEOUT_MS = 20_000;
+const NATIVE_MANIFEST_PATH = ".atlante/opencode-native.json";
 
 const require = createRequire(import.meta.url);
 
@@ -70,13 +70,6 @@ export function parsePlaygroundRequest(raw: unknown): PlaygroundRequest {
   if (step !== "build") {
     throw new Error('step must be "build"');
   }
-  const sessionId = body.sessionId;
-  if (
-    typeof sessionId !== "string" ||
-    !/^[A-Za-z0-9_-]{8,128}$/.test(sessionId)
-  ) {
-    throw new Error("sessionId must be a non-empty string");
-  }
   const rawFiles = body.files ?? [];
   if (!Array.isArray(rawFiles) || rawFiles.length > MAX_FILES) {
     throw new Error(`files must be an array of at most ${MAX_FILES}`);
@@ -98,7 +91,7 @@ export function parsePlaygroundRequest(raw: unknown): PlaygroundRequest {
     }
     files.push({ path, content });
   }
-  return { step, sessionId, files };
+  return { step, files };
 }
 
 interface ExecResult {
@@ -146,6 +139,18 @@ function execBuild(dir: string): Promise<ExecResult> {
 
 async function collectTree(root: string): Promise<PlaygroundFile[]> {
   const files: PlaygroundFile[] = [];
+  try {
+    const manifest = await readFile(
+      join(root, ...NATIVE_MANIFEST_PATH.split("/")),
+    );
+    files.push({
+      path: NATIVE_MANIFEST_PATH,
+      content: manifest.subarray(0, MAX_TREE_FILE_BYTES).toString("utf8"),
+    });
+  } catch {
+    // The manifest is only present after a successful native materialization.
+  }
+
   async function walk(dir: string): Promise<void> {
     if (files.length >= MAX_TREE_FILES) return;
     for (const entry of await readdir(dir, { withFileTypes: true })) {
@@ -153,6 +158,9 @@ async function collectTree(root: string): Promise<PlaygroundFile[]> {
       const full = join(dir, entry.name);
       if (entry.isDirectory()) {
         await walk(full);
+        continue;
+      }
+      if (relative(root, full).split("\\").join("/") === NATIVE_MANIFEST_PATH) {
         continue;
       }
       const buffer = await readFile(full);

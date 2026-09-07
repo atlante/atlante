@@ -19,17 +19,10 @@
         </ul>
       </article>
     </div>
-    <p class="flow">
-      <code>configuration → validate → .opencode/</code>
-    </p>
   </div>
 </section>
 
 <style>
-  .contract-band {
-    border-block-start: 0;
-  }
-
   .inner {
     max-width: var(--container-wide);
     margin-inline: auto;
@@ -39,7 +32,6 @@
   .contract-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    border-block: 1px solid var(--ds-border);
   }
 
   article {
@@ -72,14 +64,6 @@
 
   li::marker {
     color: var(--ds-accent);
-  }
-
-  .flow {
-    margin: var(--space-6) 0 0;
-    color: var(--ds-accent);
-    font-family: var(--font-mono);
-    font-size: var(--text-small);
-    text-align: center;
   }
 
   @media (max-width: 700px) {

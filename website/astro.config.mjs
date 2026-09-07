@@ -8,39 +8,21 @@ function playgroundDevApi() {
     configureServer(server) {
       server.middlewares.use("/api/playground", (req, res) => {
         void (async () => {
-          const send = (status, payload) => {
-            res.statusCode = status;
-            res.setHeader(
-              "content-type",
-              "application/json; charset=utf-8",
-            );
-            res.end(JSON.stringify(payload));
-          };
-          if (req.method !== "POST") {
-            send(405, { error: "method not allowed" });
-            return;
-          }
-          const chunks = [];
-          for await (const chunk of req) chunks.push(chunk);
           try {
-            const { parsePlaygroundRequest, runPlaygroundStep } =
-              await server.ssrLoadModule("/api/_lib/playground.ts");
-            const { consumeSessionBuild } = await server.ssrLoadModule(
-              "/api/_lib/session-budget.ts",
+            const { default: playgroundHandler } = await server.ssrLoadModule(
+              "/api/playground.ts",
             );
-            const parsed = parsePlaygroundRequest(
-              JSON.parse(Buffer.concat(chunks).toString("utf8")),
-            );
-            if (!consumeSessionBuild(parsed.sessionId).allowed) {
-              send(429, { error: "playground session build limit reached" });
-              return;
-            }
-            send(200, await runPlaygroundStep(parsed));
+            await playgroundHandler(req, res);
           } catch (error) {
-            send(400, {
-              error:
-                error instanceof Error ? error.message : "playground failure",
-            });
+            if (res.headersSent) return;
+            res.statusCode = 500;
+            res.setHeader("content-type", "application/json; charset=utf-8");
+            res.end(
+              JSON.stringify({
+                error:
+                  error instanceof Error ? error.message : "playground failure",
+              }),
+            );
           }
         })();
       });

@@ -28,7 +28,7 @@ describe.skipIf(process.env.ATLANTE_BUILT_OUTPUT_TESTS !== "1")(
         "Define agents, skills, values, and eval configuration in one versioned source.",
         "What it does not",
         "Perform LLM inference.",
-        "configuration → validate → .opencode/",
+        "Playground",
         "One harness, held together",
         "Every signal stays visible",
         "Your stars form an agent",
@@ -64,6 +64,9 @@ describe.skipIf(process.env.ATLANTE_BUILT_OUTPUT_TESTS !== "1")(
         "Define, share, and evolve your harness through Atlante with your team.",
         "Scaffolds a real project",
         'data-run="init"',
+        "configuration → validate → .opencode/",
+        "Playground · real CLI · isolated sandbox",
+        "Read the documentation",
       ]) {
         expect(html).not.toContain(text);
       }
