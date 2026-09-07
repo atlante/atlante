@@ -66,8 +66,7 @@ boundary. The materializer writes it last, and only when its bytes would change.
 OpenCode discovers native agents and skills from the paths above when it starts.
 Host-owned settings in `opencode.jsonc` or `opencode.json`, such as model, mode,
 permissions, and tools, remain under OpenCode's control. Restart OpenCode to
-pick up new or changed native files. Atlante renders the files but does not
-execute the resulting agents or skills.
+pick up new or changed native files.
 
 ## Publication contract
 

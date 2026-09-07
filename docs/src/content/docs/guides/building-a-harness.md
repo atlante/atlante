@@ -59,11 +59,10 @@ Add project values and a reviewer to the generated document:
 }
 ```
 
-This binding intentionally omits a selector. A top-level agent or skill binding
-without `$template` or `$instance` uses the applicable first-party default
-template. You can select `@atlante/pack/agent` explicitly when you want that
-choice visible in the source. The selected template owns the remaining fields;
-see [Templates](/concepts/templates) for the selection rules.
+A top-level agent or skill binding without `$template` or `$instance` uses the
+applicable first-party default template. Select `@atlante/pack/agent` explicitly
+when you want that choice visible in the source. The selected template owns the
+remaining fields; see [Templates](/concepts/templates) for the selection rules.
 
 For value interpolation and system values, see [Values](/concepts/values).
 

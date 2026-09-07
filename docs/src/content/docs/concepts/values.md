@@ -3,10 +3,10 @@ title: Values
 description: Explicit string values and interpolation in an Atlante document.
 ---
 
-Which pieces of your prompt should change from one project or binding to
-another? Values give those pieces names. They are explicit string inputs: a
-document can define global values for all bindings, and a binding can define
-local values that override matching global keys for that binding only.
+Values name the pieces of a prompt that change from one project or binding to
+another. They are explicit string inputs: a document can define global values
+for all bindings, and a binding can define local values that override matching
+global keys for that binding only.
 
 ```jsonc
 {

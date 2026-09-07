@@ -3,12 +3,11 @@ title: Templates
 description: Templates, instances, bindings, and template-owned input.
 ---
 
-How do you reuse prompt structure without putting prompt-specific fields into
-the document schema? Use a template. A template owns an input contract and a
-Markdown renderer. Its resource has two required facets: `template.jsonc`, a
-JSON Schema Draft 2020-12 document, and `template.md`, the renderer. The schema
-owns the names, types, and composition slots of the input that the renderer
-receives.
+Use a template to reuse prompt structure without putting prompt-specific fields
+into the document schema. A template owns an input contract and a Markdown
+renderer. Its resource has two required facets: `template.jsonc`, a JSON Schema
+Draft 2020-12 document, and `template.md`, the renderer. The schema owns the
+names, types, and composition slots of the input that the renderer receives.
 
 An instance is different: it is reusable configured input for one template. It
 lives in `instance.jsonc` and resolves to exactly one effective template. A
@@ -58,6 +57,7 @@ collections; nested resource source objects require `$template` or `$instance`.
 ```
 
 This selector-less form is valid. The default template still controls the
-accepted fields and the rendered Markdown. See [Resolution](/concepts/resolution)
+accepted fields and the rendered Markdown. See [Template syntax](/reference/template-syntax)
+for the renderer's Handlebars surface. See [Resolution](/concepts/resolution)
 for interpolation, composition, and the validation stage where the resource
 graph is checked.

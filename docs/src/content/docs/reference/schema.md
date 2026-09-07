@@ -77,6 +77,8 @@ The document schema leaves template-owned fields open. Resource resolution and
 template validation determine whether those fields are valid for the selected
 resource.
 
+See [Eval](/reference/eval) for the configuration and scenario contract.
+
 Values are strings. The only supported system value is `{{sys.cwd.basename}}`,
 which resolves to the current working directory's basename. Arbitrary filesystem
 and environment lookups are not part of the document contract.

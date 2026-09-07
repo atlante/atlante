@@ -3,12 +3,10 @@ title: Resolution
 description: The deterministic pipeline from authored source to validated input.
 ---
 
-What happens between the file you edit and the Markdown an adapter consumes?
-Resolution is the middle of that journey. It combines authored configuration
-with selected Pack content, validates the result, and produces a canonical
-document plus resolved template inputs. The same source and selected content
-produce the same result, apart from the supported system value described in
-[Values](/concepts/values).
+Resolution combines authored configuration with selected Pack content, validates
+the result, and produces a canonical document plus resolved template inputs.
+The same source and selected content produce the same result, apart from the
+supported system value described in [Values](/concepts/values).
 
 ## Precedence and inheritance
 

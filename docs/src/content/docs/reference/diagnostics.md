@@ -1,9 +1,13 @@
 ---
 title: Diagnostics
-description: Read Atlante errors and warnings by severity, code, location, and recovery action.
+description: Parse Atlante errors and warnings by severity, code, location, and recovery action.
 ---
 
-Atlante diagnostics are structured for terminal output and stable automation.
+Diagnostics are the stable error contract emitted by validation, build, watch,
+and materialization commands. Use this page when a person or a CI tool needs to
+parse command output; use [Troubleshooting](/troubleshooting) when you need a
+recovery path.
+
 Each diagnostic has a severity, stable code, and message. It may also carry a
 stable source identity, a JSON Pointer, a one-based source location, a resource
 reference chain, an expected contract, a recovery action, and a normalized cause:
@@ -24,10 +28,9 @@ The terminal lines have a fixed order:
 5. `next:` one recovery action, when available.
 6. `cause:` normalized low-level cause, last when available.
 
-Diagnostics use project-relative or stable package-qualified source identities. A
-normal diagnostic does not expose a machine-specific absolute path. CLI success
-lines separately report resolved filesystem paths for the configuration and the
-materialized outputs.
+Diagnostics use project-relative or stable package-qualified source identities.
+They do not expose machine-specific absolute paths. CLI success lines separately
+report resolved filesystem paths for the configuration and materialized outputs.
 
 ## Diagnostic fields
 
@@ -46,8 +49,8 @@ materialized outputs.
 
 ## Common codes
 
-This table lists common codes and is not exhaustive. Other validation, resource,
-watch, and publication failures can produce additional stable codes.
+This table lists common codes and is not exhaustive. Validation, resource, watch,
+and publication failures can produce additional stable codes.
 
 | Code | Meaning |
 | --- | --- |
@@ -67,16 +70,16 @@ watch, and publication failures can produce additional stable codes.
 
 Validation and build diagnostics are written before the command's success line.
 An `error` diagnostic produces exit status `1` for a one-shot command. Warnings
-can be reported after successful publication without changing the successful
-result. Watch-mode errors keep the process active and are retried after changes.
+can follow successful publication without changing the result. Watch-mode errors
+keep the process active and are retried after changes.
 
 ## JSON Pointers and locations
 
 When an issue belongs to document data, `at:` may include an RFC 6901 JSON
-Pointer such as `/agents/reviewer/mission`. Preserve the pointer exactly when
-using it to locate the invalid field. A location, when present, uses one-based
-line and column numbers.
+Pointer such as `/agents/reviewer/mission`. Use the pointer to locate the
+invalid field. A location, when present, uses one-based line and column numbers.
 
 For resource failures, the structured diagnostic can include the selected source
-and a resource-traversal chain. Fix the first actionable error, then run the same
-CLI command again. See [Troubleshooting](/troubleshooting) for recovery paths.
+and a resource-traversal chain. See [Troubleshooting](/troubleshooting) for
+recovery paths. See [Eval](/reference/eval) for scenario validation and exit
+statuses.

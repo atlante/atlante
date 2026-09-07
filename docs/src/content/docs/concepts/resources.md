@@ -3,11 +3,11 @@ title: Resources
 description: Static packs, presets, and locators in the Atlante resource model.
 ---
 
-Where does a referenced preset, template, or instance come from? A Pack is a
-static content distribution with one trusted root. It can contain preset
-documents, resources, and the supporting files those resources reference. A
-Pack is Atlante content, not a runtime API: it has no JavaScript entry point,
-registration hook, or executable API.
+A referenced preset, template, or instance comes from a Pack: a static content
+distribution with one trusted root. It can contain preset documents, resources,
+and the supporting files those resources reference. A Pack is Atlante content,
+not a runtime API: it has no JavaScript entry point, registration hook, or
+executable API.
 
 Do not confuse a Pack with a package. A package is the installation and
 distribution container that may carry a Pack. Atlante recognizes a package Pack

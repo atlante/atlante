@@ -3,14 +3,17 @@ title: CLI
 description: Command reference for init, validate, build, and eval.
 ---
 
-The published package is `@atlante/cli`. It requires [Node.js](https://nodejs.org/)
-22 or later. The published CLI bundles the first-party `@atlante/pack`; users do
-not need to install that Pack separately for the default preset.
+The published package is `@atlante/cli`. Use it from the project you want to
+configure:
 
 ```sh
 npx @atlante/cli@latest --help
 npx @atlante/cli@latest --version
 ```
+
+The CLI requires [Node.js](https://nodejs.org/) 22 or later. It bundles the
+first-party `@atlante/pack`, so the default preset needs no separate Pack
+installation.
 
 ## Output
 
@@ -120,17 +123,11 @@ arrives. Stop it with `Ctrl-C`.
 
 ## `atlante eval`
 
-Run eval scenarios against the project's verified native OpenCode outputs. Each
-trial runs the [OpenCode](https://opencode.ai/) host headless in a disposable
-sandbox (a copy of the scenario fixture plus the materialized native agent and
-skill files), then grades the sandbox with deterministic, zero-LLM checks.
-
-Containment is tool-level policy, not OS-level isolation: forced permission
-denials close the host's web/search tools and the most destructive shell
-commands, and the trial process inherits only an allowlisted environment
-(your shell secrets stay with the host). The host's shell tool still has
-ordinary user access to the network and machine, so only run scenarios whose
-fixture content you trust.
+Run scenario documents against the project's verified native OpenCode outputs.
+Each trial runs the host in a disposable sandbox and grades the result with
+deterministic checks. Eval never builds; run `atlante build` first. See
+[Eval](/reference/eval) for the configuration, scenario syntax, checks,
+containment rules, and exit statuses.
 
 ```sh
 npx @atlante/cli@latest eval [path]
@@ -181,62 +178,12 @@ lines render gray (ANSI bright black) so they do not read like errors; set
 stderr to get plain text. Redirect stderr (`2>/dev/null`) to silence
 progress entirely.
 
-### Configuration
-
-`eval` runs require an `eval` section in `atlante.jsonc`, scenario documents,
-materialized native OpenCode outputs, and an authenticated OpenCode host:
-
-```jsonc
-{
-  "eval": {
-    "host": "opencode",
-    // Scenario documents may be .json or .jsonc; a trailing star matches both.
-    "scenarios": "eval/scenarios/*.eval.json*",
-    "model": "anthropic/claude-sonnet-4-5",
-    "budget": {
-      "trials": 3,
-      "timeoutMs": 600000,
-      "maxSessions": 15,
-      "maxTokens": 400000
-    }
-  }
-}
-```
-
-Scenario documents validate against
-[`https://atlante.sh/schema/v0.1/eval-scenario.json`](https://atlante.sh/schema/v0.1/eval-scenario.json).
-Each names a fixture directory copied as the sandbox root, a prompt, and at
-least one check (`command`, `file-exists`, `file-absent`, `file-contains`,
-`file-unchanged`, `diff-allowlist`; the diff scan ignores paths under the
-host-owned `.opencode/` directory, where the host installs runtime artifacts
-during the session). Fixtures must not ship host-owned files:
-a fixture `.opencode` file colliding with a native output fails the trial with
-a rename-or-remove diagnostic, and a fixture `opencode.jsonc` is rejected
-because OpenCode would prefer it over the generated `opencode.json` (which
-always wins over a fixture-provided `opencode.json`). The report is written to
-`<project>/.atlante/eval/<run-id>/report.json`; that location is gitignored.
-`atlante eval` never builds: run `atlante build` first, and again whenever the
-sources change.
-
-### Exit status
-
-- `0` every executed trial passed.
-- `1` at least one trial failed, timed out, exceeded its budget, hit a
-  trial-level infrastructure error, or was skipped by the session cap.
-- `2` validation failed: missing or broken configuration or `eval` section,
-  invalid scenario documents, or missing/stale native outputs.
-- `3` an infrastructure error prevented the run from executing at all —
-  including an unauthenticated host, which is reported before any trial runs;
-  when a run ID exists, the partial report is still written before the error
-  is returned.
-
 ## Exit status
 
 - `0` means the command completed without errors. In watch mode, interruption also produces exit status `0`.
 - `1` means validation or build failed for a one-shot command.
 
-`atlante eval` has its own, finer-grained exit statuses; see
-[`atlante eval`](#atlante-eval) above.
+Eval has its own exit statuses; see [Eval](/reference/eval#reports-and-exit-status).
 
 Warnings do not make a successful build fail. A failed build materializes no
 partial output set. Watch-mode failures are reported while the process remains
