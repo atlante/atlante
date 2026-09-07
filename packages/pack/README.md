@@ -38,17 +38,22 @@ Then extend the preset and select a reusable template in `atlante.jsonc`:
     "project": "my-app",
   },
   "agents": {
-    "reviewer": {
+    // A project-specific agent: the preset already provides the
+    // general-purpose architect, so add the roles your project needs.
+    "migration-writer": {
       "$template": "@atlante/pack/agent",
-      "description": "Reviews changes for defects and design issues.",
-      "identity": "You are a thorough code reviewer on {{values.project}}.",
-      "mission": "Find defects and design risks before changes are merged.",
+      "description": "Writes and reviews schema migrations for {{values.project}}.",
+      "identity": "You are the migration specialist on {{values.project}}.",
+      "mission": "Ship safe, reversible, and tested schema migrations.",
       "sections": [
         {
           "responsibilities": [
-            "Review implementations for bugs and design issues",
-            "Check that project invariants remain satisfied.",
+            "Write forward and rollback migrations for schema changes",
+            "Review migrations for data-loss risks before they merge",
           ],
+        },
+        {
+          "invariants": ["Every migration ships with a tested rollback path."],
         },
       ],
     },

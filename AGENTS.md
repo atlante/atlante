@@ -47,7 +47,7 @@ bun run build                   # build publishable CLI + internal adapter artif
 bun run quick:check             # type:check + lint:check + test
 bun run full:check              # build + quick:check (CI gate)
 bun run cli                     # run the CLI (packages/cli/bin/atlante.ts)
-bun run worktree <issue>        # create + bootstrap an isolated worktree (.worktrees/issue-<n>); omit <issue> for a random one
+bun run worktree <issue|branch> # create + bootstrap an isolated worktree (.worktrees/issue-<n>; pass an existing branch to adopt it; omit for a random one)
 ```
 
 Test files under `packages/<workspace>/test/` carry a tier suffix
@@ -60,7 +60,8 @@ Bun is the package manager and the build/release/smoke/packaging/test runtime.
 During implementation, use Fallow for codebase analysis and lightweight
 feedback, and run `bun run quick:check` for fast iteration. Reserve
 `bun run full:check` as the heavyweight final verification before declaring
-work ready. The `smoke:opencode` step inside `full:check` is load-bearing:
+work ready. The OpenCode host smoke that CI runs as its own step after
+`full:check` (`bun scripts/opencode-smoke.ts`) is load-bearing:
 unit tests cover the materializer against synthetic fixtures, so the smoke is
 the only automated check of the real pack → build → materialize → host
 discovery flow (pinned OpenCode in a sandbox) and must never be downgraded to
@@ -68,7 +69,12 @@ a manual step.
 
 ## Repository conventions
 
-1. Use templates under `.github/ISSUE_TEMPLATE/` and `.github/PULL_REQUEST_TEMPLATE/` when creating issues or PRs with `gh`. Apply labels (`--label`) and type (`--type`, e.g. `Bug`, `Feature`, `Refactor`, `Docs`, `Chore`) when creating issues.
-2. While working on an issue inside its `.worktrees/` worktree, all work MUST stay inside that worktree: edits, git commands, and checks run there and nowhere else. The root checkout is off-limits during issue work; its only permitted operation is updating `main` after the issue's PR has merged.
-3. Git commits are the project-approved checkpoint mechanism for the workflow's task boundaries: each implementation task MUST end with exactly one commit containing only that task's changes, created after the task's checks pass (and its task review, when run). A task's commit MUST NOT contain unrelated work.
-4. Tasks run sequentially by default and MAY run in parallel only when the plan marks them as independent; each parallel task works in its own worktree branched from the issue worktree and is merged back in plan order, keeping the one-commit-per-task rule above.
+The contributor process — issue and PR templates, labels and
+types, the open-a-change cycle, commit and branch conventions, test tiers —
+is documented in [`CONTRIBUTING.md`](CONTRIBUTING.md) and is authoritative
+for anything shared. Keep the two aligned: when a shared convention changes,
+update CONTRIBUTING.md. Agent-specific rules:
+
+1. While working inside a `.worktrees/` worktree — issue-driven or not — all work MUST stay inside that worktree: edits, git commands, and checks run there and nowhere else. The root checkout is off-limits during worktree work; its only permitted operation is updating `main` after the PR has merged.
+2. Git commits are the project-approved checkpoint mechanism for the workflow's task boundaries: each implementation task MUST end with exactly one commit containing only that task's changes, created after the task's checks pass (and its task review, when run). A task's commit MUST NOT contain unrelated work.
+3. Tasks run sequentially by default and MAY run in parallel only when the plan marks them as independent; each parallel task works in its own worktree branched from the issue worktree and is merged back in plan order, keeping the one-commit-per-task rule above.

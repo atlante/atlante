@@ -36,15 +36,20 @@ Version 0.1 defines:
 - deterministic resolution, validation, and rendering of an in-memory prepared
   project;
 - build-time materialization of the prepared project into host-native files
-  through injected host materializers; and
-- an OpenCode materializer profile for the first supported host.
+  through injected host materializers;
+- an OpenCode materializer profile for the first supported host; and
+- an optional eval contract that validates an `eval` configuration section and
+  versioned scenario documents, delegates scenario execution to the declared
+  host runner in a disposable sandbox, and grades deterministic zero-LLM
+  checks (section 12).
 
 Version 0.1 MUST NOT define or imply:
 
 - model selection, effort, permissions, tools, modes, or other host settings;
 - JavaScript imports, executable pack hooks, or arbitrary project-code execution;
 - package installation, registry lookup, URL loading, or remote content loading;
-- LLM inference, direct agent execution, or skill execution;
+- LLM inference, or direct agent or skill execution, performed by Atlante
+  itself rather than delegated to the declared host;
 - runtime workflow state, checkpoints, locks, or scheduling; or
 - preset export, sharing, or a remote registry.
 
@@ -212,8 +217,8 @@ the CLI MUST report an ambiguity rather than choose silently.
 
 The document MUST contain `$schema` and MAY contain `extends`, `values`,
 `agents`, `skills`, and `eval`. The `eval` section configures the optional
-eval command and is validated against its own schema. Unknown top-level fields
-MUST be rejected. `extends`
+eval command and is validated against its own schema (section 12). Unknown
+top-level fields MUST be rejected. `extends`
 MUST be one non-empty string or a non-empty ordered array of non-empty strings.
 Missing `agents` and `skills` maps MUST normalize to empty collections.
 
@@ -619,6 +624,15 @@ released schema URIs MUST be immutable. Template input schemas MUST declare JSON
 Schema Draft 2020-12. Ownership-manifest `format` and numeric `version` identify
 the materialization contract independently of the document schema.
 
+The specification version identifies the contract revision. Released document
+and eval-scenario schema URIs MUST carry that version as their version segment,
+and an implementation MUST accept or reject whole specification versions rather
+than blending them. Package versions of an implementation are release metadata
+for the tool itself: they MUST NOT imply a specification version. A package
+MUST increment its major version when it removes support for a specification
+version it previously supported; adding support for a new specification version
+MAY ship in any release.
+
 A materializer MUST reject unsupported ownership manifest formats and versions,
 and the CLI MUST reject unsupported document schema URIs, rather than guessing.
 Package versions are installation metadata and MUST NOT become part of authored
@@ -647,7 +661,10 @@ name.
 ### Rationale
 
 Independent version domains let documents, templates, packs, and native outputs
-evolve without making one release boundary govern every other contract.
+evolve without making one release boundary govern every other contract. The
+specification version is one of those domains, not the master clock for package
+releases; the only coupling is the major version a tool owes when it drops a
+contract version.
 
 ## 11. OpenCode Materializer Profile
 
@@ -715,7 +732,108 @@ A build-time materializer keeps host integration narrow: no runtime plugin, no
 persisted payload tree, and no source loading past the builder boundary, while
 hash-gated updates keep every change to generated files intentional.
 
-## 12. Acceptance Criteria
+## 12. Eval
+
+### Goal
+
+Make harness behavior testable through declarative scenarios, deterministic
+checks, and host-delegated execution, without making Atlante an inference
+runtime.
+
+### Contract
+
+The document MAY declare an `eval` section. It MUST match the eval schema: a
+`host` field admitting only `"opencode"` in version 0.1, a `scenarios` glob
+relative to the project root, an optional `model` passed through to the host
+run, and an optional `budget` of `trials`, `timeoutMs`, `maxSessions`, and
+`maxTokens`. Absent budget fields MUST inherit the defaults of 3 trials,
+600000 ms per run, 15 sessions, and 400000 tokens, with at most 50 trials per
+run, and a run MUST stop when its budget is exhausted. A trial whose host
+emits no usage events MUST be reported as budget-unmonitored: token spend
+cannot be enforced and only the trial timeout bounds it.
+
+Eval scenarios are versioned documents in their own namespace, identified by
+the eval-scenario schema URI
+(`https://atlante.sh/schema/v0.1/eval-scenario.json`). A scenario MUST declare
+version `0.1`, a slug `name` unique across the suite, one `task` consisting of
+a sandbox-relative `fixture`, an optional `setup` argv, an optional driving
+`agent`, and a `prompt`, an optional scenario `budget.timeoutMs` override, and
+at least one `check`.
+
+Checks MUST be deterministic and zero-LLM, graded against sandbox state:
+
+- `command` runs argv directly in the sandbox root, never through a shell, and
+  asserts the exit code and, optionally, an output pattern;
+- `file-exists`, `file-absent`, and `file-unchanged` assert sandbox file state;
+- `file-contains` matches literal text by default, with regular expressions
+  opt-in and compiled at validation time; and
+- `diff-allowlist` restricts the paths the session may modify.
+
+Fixture, check, and allowlist paths MUST resolve inside the sandbox: absolute
+paths, path traversal, and `.git` or `node_modules` segments MUST be rejected.
+
+Eval MUST NOT build. It runs against the verified native outputs of a prior
+build, and every validation failure — including an invalid check pattern —
+MUST fail before any host run or model call. Atlante MUST NOT perform LLM
+inference or execute agents itself; scenario execution is delegated to the
+declared host runner in a disposable sandbox, and run reports are local
+artifacts under the project's `.atlante/eval` directory.
+
+### Examples
+
+```jsonc
+{
+  "eval": {
+    "host": "opencode",
+    "scenarios": "eval/scenarios/*.eval.jsonc",
+    "budget": {
+      "trials": 3,
+      "timeoutMs": 600000,
+      "maxSessions": 15,
+      "maxTokens": 400000
+    }
+  }
+}
+```
+
+```jsonc
+{
+  "$schema": "https://atlante.sh/schema/v0.1/eval-scenario.json",
+  "version": "0.1",
+  "name": "adds-health-endpoint",
+  "task": {
+    "fixture": "eval/fixtures/empty-app",
+    "prompt": "Add a GET /health endpoint that returns { \"status\": \"ok\" }."
+  },
+  "checks": [
+    { "type": "command", "run": ["bun", "test", "health"] },
+    {
+      "type": "file-contains",
+      "path": "src/routes.ts",
+      "pattern": "\"status\": \"ok\""
+    },
+    {
+      "type": "diff-allowlist",
+      "allow": ["src/routes.ts", "src/health.test.ts"]
+    }
+  ]
+}
+```
+
+### Edge cases
+
+Duplicate scenario names MUST fail at discovery. An unsupported eval host MUST
+fail with a stable diagnostic instead of being ignored. A scenario-level
+timeout override replaces the configured budget timeout for that scenario.
+Check regular expressions MUST compile before any model call.
+
+### Rationale
+
+Declarative scenarios and deterministic checks turn the harness into testable
+output while execution stays host-owned behind a narrow runner seam: Atlante
+validates and grades, the declared host runs.
+
+## 13. Acceptance Criteria
 
 ### Goal
 
@@ -739,9 +857,13 @@ A conforming implementation MUST be able to:
 9. scaffold from the first-party `@atlante/pack` default preset through
    `atlante init`, enforce the ignore-by-default git policy, and rebuild
    through `atlante build`;
-10. remove stale generated outputs and preserve host-owned files; and
+10. remove stale generated outputs and preserve host-owned files;
 11. preserve the previous valid generated set whenever validation or
-    materialization fails.
+    materialization fails;
+12. validate `eval` configuration and scenario documents, including check
+    patterns, before any host run; and
+13. run eval scenarios in a host-delegated sandbox under budget enforcement
+    and grade deterministic zero-LLM checks into a local run report.
 
 ### Examples
 
