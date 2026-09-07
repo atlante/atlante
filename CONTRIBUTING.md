@@ -41,8 +41,8 @@ CLI; the other toolchain workspaces remain private.
 Run the root checks before opening a change:
 
 ```sh
-bun run quick:check   # type:check + lint:check + test; fast inner loop
-bun run full:check    # build + quick:check + smoke/docs/website checks; the CI gate
+bun run quick:check   # type:check + lint:check + test:unit; fast inner loop
+bun run full:check    # build + complete checks/tests + smoke/docs/website checks; the CI gate
 ```
 
 Tests run on `bun:test` and live next to the code they test:

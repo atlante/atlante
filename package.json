@@ -34,8 +34,8 @@
     "docs:build": "bun run --cwd docs build",
     "docs:check": "bun run --cwd docs check",
     "website:check": "bun run --cwd website check",
-    "quick:check": "bun scripts/parallel.ts type:check lint:check test",
-    "full:check": "bun run build && bun scripts/parallel.ts quick:check smoke:test docs:check website:check",
+    "quick:check": "bun scripts/parallel.ts type:check lint:check test:unit",
+    "full:check": "bun run build && bun scripts/parallel.ts type:check lint:check test smoke:test docs:check website:check",
     "prepack": "bun run build",
     "release": "bun scripts/release.ts",
     "worktree": "bun scripts/worktree.ts"

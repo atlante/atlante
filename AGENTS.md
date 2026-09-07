@@ -44,8 +44,8 @@ bun run test:e2e                # full command-path tests (CLI spawns, real bun 
 bun run type:check              # type-check all packages
 bun run lint:check              # lint + format check
 bun run build                   # build publishable CLI + internal adapter artifacts (pack is static)
-bun run quick:check             # type:check + lint:check + test
-bun run full:check              # build + quick:check (CI gate)
+bun run quick:check             # type:check + lint:check + test:unit (fast inner loop)
+bun run full:check              # build + complete checks/tests + smoke/docs/website checks (CI gate)
 bun run cli                     # run the CLI (packages/cli/bin/atlante.ts)
 bun run worktree <issue|branch> # create + bootstrap an isolated worktree (.worktrees/issue-<n>; pass an existing branch to adopt it; omit for a random one)
 ```
