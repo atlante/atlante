@@ -9,13 +9,22 @@ their agents and skills. It validates and composes that source, creates the
 files their host discovers, and provides `atlante eval` to test the resulting
 harness, so it can be developed like code.
 
-[OpenCode](https://opencode.ai/) is the only supported host today. Read the
-[documentation](https://docs.atlante.sh) for concepts, guides, and reference.
+> [!NOTE]
+> [OpenCode](https://opencode.ai/) is the only supported host today. Read the
+> [documentation](https://docs.atlante.sh) for concepts, guides, and reference.
+
+## Scope
+
+| Atlante does | Atlante doesn't |
+| --- | --- |
+| Validates and composes a versioned JSONC source for agents and skills | Executes agents or skills, or performs LLM inference |
+| Renders deterministic prompt and skill content | Runs your project code |
+| Materializes host-native files, guarded by an ownership manifest | Owns host settings — models, permissions, and tools remain with OpenCode |
+| Tests the harness with `atlante eval`, delegated to the host in a sandbox | Manages runtime workflow state, checkpoints, or scheduling |
 
 ## Quick start
 
-Requires [Node.js](https://nodejs.org) 22 or newer. Run the CLI from the
-project you want to configure:
+Run the CLI from the project you want to configure:
 
 ```bash
 npx @atlante/cli@latest init            # scaffold atlante.jsonc and build the first outputs
@@ -25,7 +34,13 @@ npx @atlante/cli@latest build --watch   # rebuild while you edit
 npx @atlante/cli@latest eval            # optional: run eval scenarios in a sandbox
 ```
 
-`init` writes `atlante.jsonc`, materializes the first native outputs, and adds
+> [!NOTE]
+> Requires [Node.js](https://nodejs.org) 22 or newer.
+
+`init` writes `atlante.jsonc` extending the bundled first-party
+[`@atlante/pack`](https://www.npmjs.com/package/@atlante/pack) preset; no other
+pack is installed or selected. Pass `--pack <locator>` to start from a
+different pack instead. It also materializes the first native outputs and adds
 the generated folders to `.gitignore`. To use the bare `atlante` command,
 install the CLI first:
 
@@ -39,12 +54,25 @@ starts; restart it to pick up new or changed files.
 
 ## How it works
 
+1. **Author** `atlante.jsonc`: extend a preset, bind agents and skills to
+   templates, and define values.
+2. **Validate** checks the source, selected resources, and template input
+   without writing anything.
+3. **Build** runs the same validation first, then renders deterministic
+   host-native files plus an ownership manifest; on any failure it writes
+   nothing.
+4. **Discover**: the host reads the generated agents and skills when it
+   starts.
+5. **Evaluate** (optional): `atlante eval` runs scenarios in a sandbox and
+   grades deterministic checks.
+
 ```mermaid
 flowchart LR
-  source["atlante.jsonc<br/>versioned source"] --> validate["validate"]
-  validate --> build["build"]
+  source["atlante.jsonc<br/>versioned source"] --> validate["validate<br/>(checks only)"]
+  source --> build["build<br/>(validates, then materializes)"]
   build --> native[".opencode/ + manifest<br/>native outputs"]
   native --> host["OpenCode"]
+  host -.-> eval["eval"]
 ```
 
 The authored source stays in your repository, so the harness is reviewed and
@@ -56,22 +84,27 @@ host-native files; the host executes them.
 ```jsonc
 {
   "$schema": "https://atlante.sh/schema/v0.1/schema.json",
+  // The first-party preset: the general-purpose architect agent and the
+  // workflow skills (brainstorm, plan, build, review, harness).
   "extends": "@atlante/pack",
   "values": {
     "project": "my-app",
-    "apiRule": "All public APIs must have JSDoc."
+    // Referenced below as {{values.apiRule}}.
+    "apiRule": "All public APIs must have JSDoc.",
   },
   "agents": {
-    "implementer": {
+    // A project-specific agent: the preset already provides the
+    // general-purpose architect, so add the roles your project needs.
+    "api-designer": {
       "$template": "@atlante/pack/agent",
-      "description": "Implements requested changes in the project.",
-      "identity": "You are a senior implementer on {{values.project}}.",
-      "mission": "Write clean, tested, production-ready code.",
+      "description": "Designs and reviews the public API surface of {{values.project}}.",
+      "identity": "You are the API designer for {{values.project}}.",
+      "mission": "Keep the public API small, consistent, and backwards-compatible.",
       "sections": [
         {
           "responsibilities": [
-            "Implement features following the spec",
-            "Write unit and integration tests",
+            "Design new endpoints and their request and response contracts",
+            "Review breaking changes before they merge",
           ],
         },
         {
@@ -83,24 +116,23 @@ host-native files; the host executes them.
 }
 ```
 
-- `extends` selects a preset to build on; local configuration wins over what it inherits.
-- `$template` binds an agent or skill to a template; the template's schema defines the remaining fields.
-- `values` defines named inputs referenced as `{{values.project}}`.
-
-## Boundary
-
-Atlante validates, renders, and materializes files. It does not execute agents
-or skills, perform LLM inference, run project code, or own host settings —
-models, permissions, and tools remain owned by OpenCode. The optional
-`atlante eval` command uses OpenCode to run those scenarios in a sandbox and
-check the results.
+- `extends` selects a preset to build on; local configuration wins over what
+  it inherits.
+- `$template` binds an agent or skill to a template; the template's schema
+  defines the remaining fields.
 
 ## Packages
 
-Atlante publishes two packages to npm: [`@atlante/cli`](https://www.npmjs.com/package/@atlante/cli)
-(`init`, `validate`, `build`, `eval`) and [`@atlante/pack`](https://www.npmjs.com/package/@atlante/pack)
-(the first-party presets, templates, and instances). To publish your own
-reusable content, read [Author a pack](https://docs.atlante.sh/guides/authoring-packs).
+Atlante publishes two packages to npm:
+
+- [`@atlante/cli`](https://www.npmjs.com/package/@atlante/cli) — the `init`,
+  `validate`, `build`, and `eval` commands.
+- [`@atlante/pack`](https://www.npmjs.com/package/@atlante/pack) — the
+  first-party presets, the `agent` and `skill` templates, and their
+  instances.
+
+To publish your own reusable content, read
+[Author a pack](https://docs.atlante.sh/guides/authoring-packs).
 
 ## Documentation
 
