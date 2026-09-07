@@ -168,6 +168,55 @@ describe("website content contract", () => {
     }
   });
 
+  it("presents a build-only playground", () => {
+    const playground = read("src/components/BuildInstrument.astro");
+    const request = read("api/_lib/playground.ts");
+
+    for (const text of [
+      "Edit the configuration, build it, and inspect the generated files.",
+      "data-code-editor",
+      "data-build",
+      "Press Build to inspect generated native files.",
+      "data-output-view",
+      "data-output-selector",
+      "data-file-select",
+      '"$template": "@atlante/pack/agent"',
+    ]) {
+      expect(playground).toContain(text);
+    }
+    for (const text of [
+      'data-run="init"',
+      'data-run="validate"',
+      'data-action="edit"',
+      'data-action="save"',
+      'data-action="revert"',
+      "Scaffolds a real project",
+      '"extends": "@atlante/pack"',
+      'class="field-map"',
+      'class="pipeline"',
+      "data-pipeline-stage",
+      "data-tree-list",
+    ]) {
+      expect(playground).not.toContain(text);
+    }
+
+    expect(request).toContain('step must be "build"');
+    expect(request).toContain("sessionId");
+    expect(request).not.toContain('step !== "init"');
+    expect(request).not.toContain('step !== "validate"');
+    expect(playground).toContain(
+      "grid-template-columns: repeat(2, minmax(0, 1fr));",
+    );
+    expect(playground).toContain("font-size: clamp(11px, 0.85vw, 14px);");
+  });
+
+  it("applies the session budget to the development playground route", () => {
+    const devConfig = read("astro.config.mjs");
+    expect(devConfig).toContain('"/api/_lib/session-budget.ts"');
+    expect(devConfig).toContain("consumeSessionBuild(parsed.sessionId)");
+    expect(devConfig).toContain("playground session build limit reached");
+  });
+
   it("keeps the CTA directly below its supporting sentence and matches hero actions", () => {
     const hero = read("src/components/Hero.astro");
     const reviewClose = read("src/components/ReviewClose.astro");
@@ -323,7 +372,7 @@ describe("website content contract", () => {
     const playground = read("src/components/BuildInstrument.astro");
     const mobileStyles = playground.slice(
       playground.indexOf("  @media (max-width: 700px)"),
-      playground.indexOf("  @media (max-width: 440px)"),
+      playground.indexOf("  @media (max-width: 480px)"),
     );
 
     expect(mobileStyles).toMatch(
@@ -333,26 +382,15 @@ describe("website content contract", () => {
       /\.terminal-head\s*\{[\s\S]*?justify-content: center;/,
     );
     expect(mobileStyles).toMatch(
-      /\.terminal-actions\s*\{[\s\S]*?justify-content: center;/,
+      /\.build-controls\s*\{[\s\S]*?text-align: center;/,
     );
     expect(mobileStyles).toMatch(
-      /\.tree-label\s*\{[\s\S]*?text-align: center;/,
-    );
-    expect(mobileStyles).toMatch(
-      /\[data-tree-list\][\s\S]*?\.tree-folder\)[\s\S]*?\{[\s\S]*?text-align: center;/,
-    );
-    expect(mobileStyles).toMatch(
-      /\[data-tree-list\][\s\S]*?button\)[\s\S]*?\{[\s\S]*?justify-content: center;[\s\S]*?text-align: center;/,
-    );
-    expect(mobileStyles).toMatch(
-      /pre\[data-code-view\],[\s\S]*?pre\[data-terminal-out\],[\s\S]*?textarea\[data-code-editor\][\s\S]*?text-align: start;/,
+      /textarea\[data-code-editor\],[\s\S]*?pre\[data-output-view\],[\s\S]*?pre\[data-terminal-out\][\s\S]*?text-align: start;/,
     );
     expect(playground).toMatch(
       /\.pane-actions button\s*\{[\s\S]*?min-height: 44px;/,
     );
-    expect(playground).toMatch(
-      /\.terminal button\s*\{[\s\S]*?min-height: var\(--control-min\);/,
-    );
+    expect(playground).toMatch(/\.build-button\s*\{[\s\S]*?min-width: 120px;/);
   });
 
   it("centers the footer mobile treatment in one column", () => {
@@ -389,7 +427,7 @@ describe("website content contract", () => {
       /@media \(max-width: 680px\) \{[\s\S]*?article \{[\s\S]*?display: block;[\s\S]*?text-align: center;[\s\S]*?\.mobile-symbol \{[\s\S]*?margin-inline: auto;[\s\S]*?h3 \{[\s\S]*?margin-inline: auto;[\s\S]*?article code,[\s\S]*?\.detail \{[\s\S]*?margin-inline: auto;/,
     );
     expect(playground).toMatch(
-      /@media \(max-width: 700px\) \{[\s\S]*?\.intro \{[\s\S]*?text-align: center;[\s\S]*?\.instrument-bar \{[\s\S]*?justify-content: center;[\s\S]*?\.run-hint \{[\s\S]*?text-align: center;[\s\S]*?\.field-map dt,[\s\S]*?\.pipeline small \{[\s\S]*?text-align: center;[\s\S]*?pre\[data-code-view\],[\s\S]*?text-align: start;[\s\S]*?\.docs-link \{[\s\S]*?justify-content: center;/,
+      /@media \(max-width: 700px\) \{[\s\S]*?\.intro \{[\s\S]*?text-align: center;[\s\S]*?\.instrument-bar \{[\s\S]*?justify-content: center;[\s\S]*?\.run-hint \{[\s\S]*?text-align: center;[\s\S]*?textarea\[data-code-editor\],[\s\S]*?pre\[data-output-view\],[\s\S]*?pre\[data-terminal-out\][\s\S]*?text-align: start;[\s\S]*?\.docs-link \{[\s\S]*?justify-content: center;/,
     );
     expect(benefits).toMatch(
       /@media \(max-width: 680px\) \{[\s\S]*?\.intro \{[\s\S]*?text-align: center;[\s\S]*?\.benefits article \{[\s\S]*?text-align: center;[\s\S]*?\.next-step \{[\s\S]*?text-align: center;[\s\S]*?\.actions \{[\s\S]*?justify-content: center;/,

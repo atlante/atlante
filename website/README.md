@@ -38,8 +38,10 @@ The build instrument on the landing page runs the published
 `@atlante/cli` for real. `website/api/playground.ts` is a stateless
 Vercel function: each request writes the visitor's files into
 an isolated temp directory, executes one CLI command, and returns the
-actual output and generated file tree. Nothing is stored between
-requests, and the CLI never executes project code. `bun run dev` serves
+actual output and generated file tree. A process-local session counter limits
+repeated builds on warm instances, but user files and outputs are not retained
+between requests; the counter is not a deployment-wide abuse boundary. The
+CLI never executes project code. `bun run dev` serves
 the same endpoint in-process through a dev-only Vite middleware, so the
 playground works locally; `astro preview` stays static and shows a
 friendly offline message instead.

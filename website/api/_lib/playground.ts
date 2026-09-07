@@ -13,7 +13,7 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 
-export type PlaygroundStep = "init" | "validate" | "build";
+export type PlaygroundStep = "build";
 
 export interface PlaygroundFile {
   path: string;
@@ -22,8 +22,8 @@ export interface PlaygroundFile {
 
 export interface PlaygroundRequest {
   step: PlaygroundStep;
+  sessionId: string;
   files: PlaygroundFile[];
-  force: boolean;
 }
 
 export interface PlaygroundResult {
@@ -67,8 +67,15 @@ export function parsePlaygroundRequest(raw: unknown): PlaygroundRequest {
   }
   const body = raw as Record<string, unknown>;
   const step = body.step;
-  if (step !== "init" && step !== "validate" && step !== "build") {
-    throw new Error("step must be init, validate, or build");
+  if (step !== "build") {
+    throw new Error('step must be "build"');
+  }
+  const sessionId = body.sessionId;
+  if (
+    typeof sessionId !== "string" ||
+    !/^[A-Za-z0-9_-]{8,128}$/.test(sessionId)
+  ) {
+    throw new Error("sessionId must be a non-empty string");
   }
   const rawFiles = body.files ?? [];
   if (!Array.isArray(rawFiles) || rawFiles.length > MAX_FILES) {
@@ -91,11 +98,7 @@ export function parsePlaygroundRequest(raw: unknown): PlaygroundRequest {
     }
     files.push({ path, content });
   }
-  const force = body.force === true;
-  if (force && step !== "init") {
-    throw new Error("force is only supported for init");
-  }
-  return { step, files, force };
+  return { step, sessionId, files };
 }
 
 interface ExecResult {
@@ -104,17 +107,9 @@ interface ExecResult {
   output: string;
 }
 
-function execStep(
-  dir: string,
-  step: PlaygroundStep,
-  force: boolean,
-): Promise<ExecResult> {
+function execBuild(dir: string): Promise<ExecResult> {
   return new Promise((resolve) => {
-    const args =
-      step === "init"
-        ? ["init", ".", ...(force ? ["--force"] : [])]
-        : [step, "."];
-    const child = spawn(process.execPath, [cliEntry(), ...args], {
+    const child = spawn(process.execPath, [cliEntry(), "build", "."], {
       cwd: dir,
       env: { ...process.env, NO_COLOR: "1" },
       stdio: ["ignore", "pipe", "pipe"],
@@ -201,7 +196,7 @@ export async function runPlaygroundStep(
       await writeFile(join(dir, file.path), file.content, "utf8");
     }
     const started = Date.now();
-    const run = await execStep(dir, request.step, request.force);
+    const run = await execBuild(dir);
 
     const files = run.exitCode === 0 ? await collectTree(dir) : [];
     return {

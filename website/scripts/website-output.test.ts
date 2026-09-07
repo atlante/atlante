@@ -36,6 +36,10 @@ describe.skipIf(process.env.ATLANTE_BUILT_OUTPUT_TESTS !== "1")(
         "The build writes what the host reads",
         "Atlante bears the structure. The host runs it.",
         "Build your constellation",
+        "Edit the configuration, build it, and inspect the generated files.",
+        "Press Build to inspect generated native files.",
+        "Generated files",
+        "Build",
         "Built for change. Strict by design",
         "Chart your harness",
         "Review harness changes like code",
@@ -58,6 +62,8 @@ describe.skipIf(process.env.ATLANTE_BUILT_OUTPUT_TESTS !== "1")(
         "Failed configuration or template validation leaves the current artifact tree untouched.",
         ">init</code> to create your configuration and build your first artifacts.",
         "Define, share, and evolve your harness through Atlante with your team.",
+        "Scaffolds a real project",
+        'data-run="init"',
       ]) {
         expect(html).not.toContain(text);
       }

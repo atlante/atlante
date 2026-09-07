@@ -25,9 +25,16 @@ function playgroundDevApi() {
           try {
             const { parsePlaygroundRequest, runPlaygroundStep } =
               await server.ssrLoadModule("/api/_lib/playground.ts");
+            const { consumeSessionBuild } = await server.ssrLoadModule(
+              "/api/_lib/session-budget.ts",
+            );
             const parsed = parsePlaygroundRequest(
               JSON.parse(Buffer.concat(chunks).toString("utf8")),
             );
+            if (!consumeSessionBuild(parsed.sessionId).allowed) {
+              send(429, { error: "playground session build limit reached" });
+              return;
+            }
             send(200, await runPlaygroundStep(parsed));
           } catch (error) {
             send(400, {
@@ -50,4 +57,3 @@ export default defineConfig({
     plugins: [playgroundDevApi()],
   },
 });
-

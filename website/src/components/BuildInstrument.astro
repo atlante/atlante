@@ -1,9 +1,6 @@
 ---
-import { getScrollBehavior } from "../lib/scroll";
-
 const config = `{
   "$schema": "https://atlante.sh/schema/v0.1/schema.json",
-  "extends": "@atlante/pack",
   "values": {
     "project": "my-app"
   },
@@ -19,39 +16,6 @@ const config = `{
     }
   }
 }`;
-
-const escapedConfig = config
-  .replaceAll("&", "&amp;")
-  .replaceAll("<", "&lt;")
-  .replaceAll(">", "&gt;");
-const highlightedConfig = escapedConfig.replace(
-  /("(?:\\.|[^"\\])*")(?=\s*:)|("(?:\\.|[^"\\])*")|(\b(?:true|false|null)\b|-?\d+(?:\.\d+)?)/g,
-  (token, key?: string, stringValue?: string) => {
-    if (key) return `<span class="token-key">${token}</span>`;
-    if (stringValue) return `<span class="token-string">${token}</span>`;
-    return `<span class="token-literal">${token}</span>`;
-  },
-);
-
-const fields = [
-  { name: "$schema", detail: "Structural contract" },
-  { name: "extends", detail: "Ordered composition" },
-  { name: "values", detail: "Explicit inputs" },
-  { name: "agents", detail: "Bound templates" },
-];
-
-const pipeline = [
-  { id: "source", label: "Source", value: "atlante.jsonc" },
-  { id: "validate", label: "Contract", value: "document + templates" },
-  { id: "build", label: "Native outputs", value: ".opencode/" },
-  { id: "adapter", label: "Manifest", value: ".atlante/opencode-native.json" },
-];
-
-const hints: Record<string, string> = {
-  init: "Scaffolds a real project, materializes the first native agent and skill files, and enforces the ignore policy.",
-  validate: "Checks the document and every selected template before materialization.",
-  build: "Renders and materializes the host-native files and the ownership manifest.",
-};
 ---
 
 <section class="workbench major-divider" id="quick-start">
@@ -59,11 +23,11 @@ const hints: Record<string, string> = {
     <header class="intro">
       <h2>Build your constellation</h2>
       <p>
-        Edit the configuration, run the real CLI, and inspect the generated files.
+        Edit the configuration, build it, and inspect the generated files.
       </p>
     </header>
 
-    <div class="build-instrument" data-playground data-stage="idle">
+    <div class="build-instrument" data-playground>
       <div class="instrument-bar">
         <p>
           <span class="status-dot" data-status-dot></span>
@@ -75,22 +39,15 @@ const hints: Record<string, string> = {
         <div class="configuration-pane">
           <div class="pane-head">
             <div>
-              <span data-pane-label>Reference</span>
-              <strong data-pane-name>atlante.jsonc</strong>
+              <span>Source</span>
+              <strong>atlante.jsonc</strong>
             </div>
             <div class="pane-actions">
-              <button type="button" data-action="reference" hidden>
-                Reference
-              </button>
-              <button type="button" data-action="edit" hidden>Edit</button>
-
-              <button type="button" data-action="save" hidden>Save</button>
-              <button type="button" data-action="revert" hidden>Revert</button>
               <button
                 type="button"
                 aria-label="Copy configuration"
                 data-copy-text={config}
-                data-pane-copy
+                data-source-copy
               >
                 <svg
                   viewBox="0 0 24 24"
@@ -104,97 +61,105 @@ const hints: Record<string, string> = {
                 </svg>
               </button>
             </div>
-
           </div>
-          <pre data-code-view><code set:html={highlightedConfig} /></pre>
+
           <textarea
             data-code-editor
             spellcheck="false"
             wrap="off"
             aria-label="Edit configuration"
-            hidden></textarea>
-
-          <dl class="field-map">
-            {
-              fields.map((field) => (
-                <div>
-                  <dt>{field.name}</dt>
-                  <dd>{field.detail}</dd>
-                </div>
-              ))
-            }
-          </dl>
+          >{config}</textarea>
         </div>
 
-        <div class="command-pane">
-          <div class="command-selector" aria-label="Run a CLI command">
-            <button type="button" data-run="init">init</button>
-            <button type="button" data-run="validate" disabled>validate</button>
-            <button type="button" data-run="build" disabled>build</button>
-          </div>
-
-          <p class="run-hint" data-run-hint>
-            {hints.init}
-            Each command runs the published CLI in an isolated sandbox.
-          </p>
-
-          <div class="terminal" aria-live="polite">
-            <div class="terminal-head">
-              <span>Terminal</span>
-              <span data-exit hidden>exit 0</span>
-              <span class="terminal-actions">
-                <button type="button" data-action="reset">Reset</button>
-              </span>
+        <div class="output-pane">
+          <div class="pane-head">
+            <div>
+              <span>Generated</span>
+              <strong data-output-name>Build to inspect</strong>
             </div>
-            <pre data-terminal-out>$ npx @atlante/cli@latest init</pre>
+            <div class="pane-actions">
+              <button
+                type="button"
+                aria-label="Copy generated file"
+                data-copy-text=""
+                data-output-copy
+                disabled
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  aria-hidden="true"
+                >
+                  <rect x="4" y="4" width="12" height="12" rx="2"></rect>
+                  <rect x="8" y="8" width="12" height="12" rx="2"></rect>
+                </svg>
+              </button>
+            </div>
           </div>
 
-          <div class="file-tree" data-file-tree hidden>
-            <p class="tree-label">Generated files</p>
-            <ul data-tree-list></ul>
-          </div>
+          <pre data-output-view aria-live="polite"><code>Press Build to inspect generated native files.</code></pre>
 
-          <a class="docs-link" href="https://docs.atlante.sh">
-            Read the documentation <span aria-hidden="true">↗</span>
-          </a>
+          <div class="output-selector" data-output-selector hidden>
+            <label for="generated-file">Generated files</label>
+            <select id="generated-file" data-file-select aria-label="Select generated file"></select>
+          </div>
         </div>
       </div>
 
-      <div class="pipeline" aria-label="Configuration build path">
-        {
-          pipeline.map((item) => (
-            <div class="pipeline-item" data-pipeline-stage={item.id}>
-              <span class="pipeline-marker"></span>
-              <small>{item.label}</small>
-              <code>{item.value}</code>
-            </div>
-          ))
-        }
+      <div class="build-controls">
+        <button type="button" class="build-button" data-build>Build</button>
+        <p class="run-hint" data-run-hint>
+          Build validates the configuration and materializes native files in an isolated sandbox.
+        </p>
       </div>
+
+      <div class="terminal" aria-live="polite">
+        <div class="terminal-head">
+          <span>Build log</span>
+          <span data-exit hidden>exit 0</span>
+        </div>
+        <pre data-terminal-out>$ npx @atlante/cli@latest build
+Press Build to run the real CLI in an isolated sandbox.</pre>
+      </div>
+
+      <a class="docs-link" href="https://docs.atlante.sh">
+        Read the documentation <span aria-hidden="true">↗</span>
+      </a>
     </div>
   </div>
 </section>
 
 <script>
-  const hints: Record<string, string> = {
-    init: "Scaffolds a real project, materializes the first native agent and skill files, and enforces the ignore policy.",
-    validate:
-      "Checks the document and every selected template before materialization.",
-    build: "Renders and materializes the host-native files and the ownership manifest.",
-  };
+  import { playgroundFallback } from "../data/playground-fallback";
 
   const instrument = document.querySelector<HTMLElement>("[data-playground]");
 
   if (instrument) {
-    const codeView = instrument.querySelector<HTMLElement>("[data-code-view]");
-    const codeEditor = instrument.querySelector<HTMLTextAreaElement>(
+    const editor = instrument.querySelector<HTMLTextAreaElement>(
       "[data-code-editor]",
     );
-    const paneLabel = instrument.querySelector<HTMLElement>("[data-pane-label]");
-
-    const paneName = instrument.querySelector<HTMLElement>("[data-pane-name]");
-    const paneCopy = instrument.querySelector<HTMLButtonElement>(
-      "[data-pane-copy]",
+    const sourceCopy = instrument.querySelector<HTMLButtonElement>(
+      "[data-source-copy]",
+    );
+    const buildButton = instrument.querySelector<HTMLButtonElement>(
+      "[data-build]",
+    );
+    const outputView = instrument.querySelector<HTMLElement>(
+      "[data-output-view]",
+    );
+    const outputName = instrument.querySelector<HTMLElement>(
+      "[data-output-name]",
+    );
+    const outputCopy = instrument.querySelector<HTMLButtonElement>(
+      "[data-output-copy]",
+    );
+    const outputSelector = instrument.querySelector<HTMLElement>(
+      "[data-output-selector]",
+    );
+    const fileSelect = instrument.querySelector<HTMLSelectElement>(
+      "[data-file-select]",
     );
     const runHint = instrument.querySelector<HTMLElement>("[data-run-hint]");
     const statusDot = instrument.querySelector<HTMLElement>("[data-status-dot]");
@@ -202,18 +167,6 @@ const hints: Record<string, string> = {
     const terminalOut = instrument.querySelector<HTMLElement>(
       "[data-terminal-out]",
     );
-    const fileTree = instrument.querySelector<HTMLElement>("[data-file-tree]");
-    const treeList = instrument.querySelector<HTMLElement>("[data-tree-list]");
-    const runButtons = instrument.querySelectorAll<HTMLButtonElement>(
-      "[data-run]",
-    );
-    const action = (name: string): HTMLButtonElement | null =>
-      instrument.querySelector<HTMLButtonElement>(`[data-action="${name}"]`);
-
-    // The server renders the highlighted reference specimen; reset restores
-    // it verbatim, so the specimen survives any generated-file viewing.
-    const referenceHtml = codeView?.innerHTML ?? "";
-    const referenceCopy = paneCopy?.dataset.copyText ?? "";
 
     const escapeHtml = (value: string): string =>
       value
@@ -235,7 +188,7 @@ const hints: Record<string, string> = {
       );
     };
 
-    const escapeMarkdown = (source: string): string =>
+    const highlightMarkdown = (source: string): string =>
       escapeHtml(source)
         .replace(
           /^(#{1,6} .*)$/gm,
@@ -257,276 +210,192 @@ const hints: Record<string, string> = {
         return highlightJson(content);
       }
       if (name.endsWith(".md")) {
-        return escapeMarkdown(content);
+        return highlightMarkdown(content);
       }
       return escapeHtml(content);
     };
 
+    const nativeOutput = (path: string): boolean =>
+      path.startsWith(".opencode/");
 
+    const displayPath = (path: string): string =>
+      path.replace(/^\.opencode\//, "");
 
-    const EDITABLE = new Set(["atlante.jsonc", "opencode.jsonc"]);
+    const hashSource = async (source: string): Promise<string> => {
+      const subtle = globalThis.crypto?.subtle;
+      if (subtle) {
+        const bytes = new TextEncoder().encode(source);
+        const digest = await subtle.digest("SHA-256", bytes);
+        return [...new Uint8Array(digest)]
+          .map((byte) => byte.toString(16).padStart(2, "0"))
+          .join("");
+      }
+
+      let hash = 2166136261;
+      for (const byte of new TextEncoder().encode(source)) {
+        hash ^= byte;
+        hash = Math.imul(hash, 16777619);
+      }
+      return String(hash >>> 0);
+    };
+
+    const sessionId =
+      globalThis.crypto?.randomUUID?.() ??
+      `playground-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
     const state = {
       files: new Map<string, string>(),
       activePath: null as string | null,
-      editing: false,
-      dirty: false,
       running: false,
-      lastCommand: "init",
+      lastAttemptHash: null as string | null,
+      requestSequence: 0,
+      hasGoodOutput: false,
     };
 
+    const showTerminal = (
+      output: string,
+      status: "success" | "error" | "fallback" | "idle",
+      exitCode: number | null = null,
+    ): void => {
+      if (!terminalOut || !exitLabel || !statusDot) return;
+      terminalOut.textContent = `$ npx @atlante/cli@latest build\n${output}`;
+      exitLabel.hidden = status === "idle";
+      exitLabel.textContent =
+        status === "fallback"
+          ? "fallback"
+          : exitCode === null
+            ? status === "success"
+              ? "exit 0"
+              : "no exit code"
+            : `exit ${exitCode}`;
+      statusDot.style.background =
+        status === "success"
+          ? "var(--ds-success)"
+          : status === "idle"
+            ? "var(--ds-muted)"
+            : "var(--ds-error)";
+    };
+
+    const renderOutput = (): void => {
+      const path = state.activePath;
+      const content = path ? state.files.get(path) : undefined;
+      const hasOutput = path !== null && content !== undefined;
+
+      if (outputName) {
+        outputName.textContent = hasOutput
+          ? displayPath(path)
+          : "Build to inspect";
+      }
+      if (outputCopy) {
+        outputCopy.disabled = !hasOutput;
+        outputCopy.dataset.copyText = content ?? "";
+      }
+      if (outputView) {
+        outputView.innerHTML = hasOutput
+          ? `<code>${highlightFile(path, content)}</code>`
+          : "<code>Press Build to inspect generated native files.</code>";
+      }
+    };
+
+    const renderSelector = (): void => {
+      if (!outputSelector || !fileSelect) return;
+      fileSelect.replaceChildren();
+
+      for (const path of [...state.files.keys()].sort()) {
+        const option = document.createElement("option");
+        option.value = path;
+        option.textContent = displayPath(path);
+        option.selected = state.activePath === path;
+        fileSelect.append(option);
+      }
+
+      outputSelector.hidden = state.files.size === 0;
+    };
+
+    const render = (): void => {
+      renderOutput();
+      renderSelector();
+    };
 
     const setBusy = (busy: boolean): void => {
       state.running = busy;
-      for (const button of runButtons) {
-        const step = button.dataset.run;
-        if (step === "init") {
-          const scaffolded = state.files.has("atlante.jsonc");
-          button.disabled = busy || (scaffolded && !state.dirty);
-        } else {
-          button.disabled = busy || !state.files.has("atlante.jsonc");
-        }
-      }
+      if (!buildButton) return;
+      buildButton.disabled = busy;
+      buildButton.textContent = busy ? "Building…" : "Build";
     };
 
-
-    const renderPane = (): void => {
-      if (!codeView || !paneLabel || !paneName) return;
-
-      const generated = state.activePath !== null;
-      paneLabel.textContent = generated ? "Generated" : "Reference";
-      paneName.textContent = state.activePath
-        ? displayName(state.activePath.slice(state.activePath.lastIndexOf("/") + 1))
-        : "atlante.jsonc";
-
-      const editable =
-        state.activePath !== null && EDITABLE.has(state.activePath);
-      if (state.editing && editable) {
-        codeView.hidden = true;
-        codeEditor.hidden = false;
-        if (document.activeElement !== codeEditor) {
-          codeEditor.value = state.files.get(state.activePath) ?? "";
+    const showFallback = (reason: string): void => {
+      if (!state.hasGoodOutput) {
+        state.files.clear();
+        for (const file of playgroundFallback.files) {
+          if (nativeOutput(file.path)) state.files.set(file.path, file.content);
         }
-      } else {
-        codeEditor.hidden = true;
-        codeView.hidden = false;
-        if (generated) {
-          const content = state.files.get(state.activePath) ?? "";
-          codeView.innerHTML = `<code>${highlightFile(state.activePath, content)}</code>`;
-          if (paneCopy) paneCopy.dataset.copyText = content;
-        } else {
-          codeView.innerHTML = referenceHtml;
-          if (paneCopy) paneCopy.dataset.copyText = referenceCopy;
-        }
+        state.activePath = [...state.files.keys()][0] ?? null;
+        render();
       }
-      const edit = action("edit");
-      const save = action("save");
-      const revert = action("revert");
-      const reference = action("reference");
-      if (edit) edit.hidden = !editable || state.editing;
-      if (save) save.hidden = !state.editing;
-      if (revert) revert.hidden = !state.editing;
-      if (reference) reference.hidden = state.activePath === null;
-    };
-
-
-
-    const openFile = (path: string): void => {
-      if (!state.files.has(path)) return;
-      state.activePath = path;
-      state.editing = false;
-      renderPane();
-      // The two panes stack on mobile; bring the opened file into view.
-      if (matchMedia("(max-width: 980px)").matches) {
-        instrument
-          ?.querySelector(".configuration-pane")
-          ?.scrollIntoView({
-            behavior: getScrollBehavior(
-              matchMedia("(prefers-reduced-motion: reduce)").matches,
-            ),
-            block: "start",
-          });
-      }
-    };
-
-
-    /** Native output names read like source already: architect.md and
-     * SKILL.md, so the display name is the file name itself. */
-    const displayName = (name: string): string => {
-      if (name.endsWith(".md")) {
-        const stem = name.slice(0, -3);
-        const trimmed = stem.replace(/-[0-9a-f]{8,}.*$/i, "");
-        return `${trimmed || stem}.md`;
-      }
-      return name;
-    };
-
-    const renderTree = (): void => {
-      if (!fileTree || !treeList) return;
-      const groups = new Map<string, { path: string; name: string }[]>();
-      for (const path of [...state.files.keys()].sort()) {
-        const rawName = path.slice(path.lastIndexOf("/") + 1);
-        const dir = path.includes("/")
-          ? path.slice(0, path.lastIndexOf("/"))
-          : ".";
-        const entry = { path, name: displayName(rawName) };
-        const group = groups.get(dir);
-        if (group) group.push(entry);
-        else groups.set(dir, [entry]);
-      }
-
-      treeList.replaceChildren();
-      const dirs = [...groups.keys()].sort((a, b) =>
-        a === "." ? -1 : b === "." ? 1 : a.localeCompare(b),
-      );
-      for (const dir of dirs) {
-        const group = document.createElement("li");
-        group.className = "tree-group";
-        if (dir !== ".") {
-          const label = document.createElement("p");
-          label.className = "tree-folder";
-          label.textContent = `${dir}/`;
-          group.append(label);
-        }
-
-        const list = document.createElement("ul");
-        for (const file of groups.get(dir) ?? []) {
-          const item = document.createElement("li");
-          const button = document.createElement("button");
-          button.type = "button";
-          button.title = file.path;
-          button.classList.toggle(
-            "tree-active",
-            state.activePath === file.path,
-          );
-          const nameSpan = document.createElement("span");
-          nameSpan.className = "tree-name";
-          nameSpan.textContent = file.name;
-          button.append(nameSpan);
-          button.addEventListener("click", () => {
-            if (state.activePath === file.path) {
-              state.activePath = null;
-              state.editing = false;
-              renderPane();
-              refreshControls();
-              return;
-            }
-            openFile(file.path);
-          });
-          item.append(button);
-          list.append(item);
-        }
-        group.append(list);
-        treeList.append(group);
-      }
-      fileTree.hidden = state.files.size === 0;
-    };
-    const showTerminal = (
-      command: string,
-      output: string,
-      ok: boolean,
-      exitCode: number | null,
-      timedOut: boolean,
-    ): void => {
-      if (!terminalOut || !exitLabel || !statusDot) return;
-      terminalOut.textContent = `$ npx @atlante/cli@latest ${command}\n${output}`;
-      exitLabel.hidden = false;
-      exitLabel.textContent = timedOut
-        ? "timed out"
-        : exitCode === null
-          ? "no exit code"
-          : `exit ${exitCode}`;
-      statusDot.style.background = ok
-        ? "var(--ds-success)"
-        : "var(--ds-error)";
-    };
-
-    const updateStages = (): void => {
-      if (state.files.has(".atlante/opencode-native.json")) {
-        instrument.dataset.stage = "build";
-      } else if (state.files.has("atlante.jsonc")) {
-        instrument.dataset.stage = "validate";
-      } else {
-        instrument.dataset.stage = "idle";
-      }
-    };
-
-    const refreshControls = (): void => {
-      setBusy(state.running);
-      const validateReady = state.files.has("atlante.jsonc");
-      const buildReady = state.files.has(".atlante/opencode-native.json");
-      for (const button of runButtons) {
-        if (button.dataset.run === "validate") {
-          button.disabled = state.running || !validateReady;
-        }
-        if (button.dataset.run === "build") {
-          button.disabled = state.running || !buildReady;
-        }
-      }
-    };
-
-    const applyResult = (result: {
-      ok: boolean;
-      exitCode: number | null;
-      timedOut: boolean;
-      output: string;
-      files: { path: string; content: string }[];
-    }): void => {
-      // Each command runs in a fresh sandbox, so its output replaces the
-      // previous generation entirely instead of merging beside it.
-      if (state.lastCommand === "build" && result.ok) {
-        for (const path of [...state.files.keys()]) {
-          if (
-            path.startsWith(".atlante/") ||
-            path.startsWith(".opencode/") ||
-            path === "opencode.jsonc"
-          ) {
-            state.files.delete(path);
-          }
-        }
-      }
-      if (state.lastCommand === "init" && result.ok) state.files.clear();
-      for (const file of result.files) state.files.set(file.path, file.content);
       showTerminal(
-        state.lastCommand,
-        result.output,
-        result.ok,
-        result.exitCode,
-        result.timedOut,
+        `${reason}\n${playgroundFallback.output}`,
+        "fallback",
       );
-      if (result.ok) {
-        const generated = result.files.find(
-          (file) => file.path === "atlante.jsonc",
-        );
-        if (generated) state.activePath = generated.path;
-        state.editing = false;
-        if (state.lastCommand === "init") state.dirty = false;
+      if (runHint) {
+        runHint.textContent = state.hasGoodOutput
+          ? "The live playground is unavailable. The last successful output remains visible."
+          : "The live playground is unavailable. Showing a static example.";
       }
-
-      renderTree();
-      renderPane();
-      updateStages();
     };
 
-    const run = async (step: string): Promise<void> => {
-      if (state.running) return;
-      state.lastCommand = step;
-      state.running = true;
-      refreshControls();
-      if (runHint) runHint.textContent = hints[step] ?? "";
-      if (terminalOut) {
-        terminalOut.textContent = `$ npx @atlante/cli@latest ${step}\nRunning…`;
+    const showBuildFailure = (output: string, exitCode: number | null): void => {
+      showTerminal(output, "error", exitCode);
+      if (runHint) {
+        runHint.textContent =
+          "Build failed. The last successful output remains visible.";
       }
+    };
+
+    const build = async (): Promise<void> => {
+      if (!editor || state.running) return;
+      const source = editor.value;
+      const sequence = ++state.requestSequence;
+      setBusy(true);
+      if (runHint) {
+        runHint.textContent =
+          "Validating and materializing the configuration in an isolated sandbox…";
+      }
+      showTerminal("Building…", "idle");
+
       try {
+        const sourceHash = await hashSource(source);
+        if (source !== editor.value) {
+          showTerminal(
+            "Build skipped because the source changed while preparing the request.",
+            "idle",
+          );
+          if (runHint) {
+            runHint.textContent =
+              "The source changed while preparing the build. Press Build again.";
+          }
+          return;
+        }
+        if (sourceHash === state.lastAttemptHash) {
+          showTerminal(
+            "Build skipped: this source was already attempted. Edit it before building again.",
+            "idle",
+          );
+          if (runHint) {
+            runHint.textContent =
+              "This source has already been built. Edit it before building again.";
+          }
+          return;
+        }
+
+        state.lastAttemptHash = sourceHash;
         const response = await fetch("/api/playground", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
-            step,
-            force: step === "init" && state.dirty,
-            files: [...state.files]
-              .filter(([path]) => EDITABLE.has(path))
-              .map(([path, content]) => ({ path, content })),
+            step: "build",
+            sessionId,
+            files: [{ path: "atlante.jsonc", content: source }],
           }),
         });
         const text = await response.text();
@@ -534,8 +403,11 @@ const hints: Record<string, string> = {
         try {
           payload = JSON.parse(text);
         } catch {
-          throw new Error(`playground unavailable (HTTP ${response.status})`);
+          showFallback(`Playground unavailable (HTTP ${response.status}).`);
+          return;
         }
+
+        if (sequence !== state.requestSequence) return;
         const result = payload as {
           ok?: boolean;
           exitCode?: number | null;
@@ -544,103 +416,79 @@ const hints: Record<string, string> = {
           files?: { path: string; content: string }[];
           error?: string;
         };
+
         if (!response.ok || result.error) {
-          showTerminal(
-            step,
-            `! ${result.error ?? response.statusText}`,
-            false,
-            response.status,
-            false,
+          showFallback(
+            result.error ?? `Playground unavailable (HTTP ${response.status}).`,
           );
-        } else if (result.output !== undefined && result.files !== undefined) {
-          applyResult(result as {
-            ok: boolean;
-            exitCode: number | null;
-            timedOut: boolean;
-            output: string;
-            files: { path: string; content: string }[];
-          });
-        } else {
-          throw new Error("unexpected playground response");
+          return;
         }
 
+        if (
+          result.output === undefined ||
+          result.files === undefined ||
+          result.ok === undefined
+        ) {
+          showFallback("The playground returned an unexpected response.");
+          return;
+        }
+
+        if (!result.ok) {
+          showBuildFailure(result.output, result.exitCode ?? null);
+          return;
+        }
+
+        state.files.clear();
+        const files = result.files.filter((file) => nativeOutput(file.path));
+        for (const file of files) state.files.set(file.path, file.content);
+        state.activePath =
+          files
+            .slice()
+            .sort((left, right) => {
+              const leftAgent = left.path.includes(".opencode/agents/")
+                ? 0
+                : 1;
+              const rightAgent = right.path.includes(".opencode/agents/")
+                ? 0
+                : 1;
+              return leftAgent - rightAgent || left.path.localeCompare(right.path);
+            })[0]?.path ?? null;
+        state.hasGoodOutput = true;
+        render();
+        showTerminal(result.output, "success", result.exitCode ?? 0);
+        if (runHint) {
+          runHint.textContent =
+            "Build complete. Select a generated native file to inspect it.";
+        }
       } catch (error) {
-        showTerminal(
-          step,
-          `! ${error instanceof Error ? error.message : "network error"}`,
-          false,
-          null,
-          false,
+        if (sequence !== state.requestSequence) return;
+        showFallback(
+          error instanceof Error
+            ? `Playground unavailable: ${error.message}`
+            : "Playground unavailable.",
         );
       } finally {
-        state.running = false;
-        refreshControls();
+        if (sequence === state.requestSequence) setBusy(false);
       }
     };
 
-    for (const button of runButtons) {
-      button.addEventListener("click", () => {
-        if (button.dataset.run) run(button.dataset.run);
-      });
-    }
-
-    action("reference")?.addEventListener("click", () => {
-      state.activePath = null;
-      state.editing = false;
-      renderPane();
-      refreshControls();
+    editor?.addEventListener("input", () => {
+      if (sourceCopy) sourceCopy.dataset.copyText = editor.value;
+    });
+    buildButton?.addEventListener("click", () => {
+      void build();
+    });
+    fileSelect?.addEventListener("change", () => {
+      state.activePath = fileSelect.value;
+      renderOutput();
+      renderSelector();
     });
 
-    action("edit")?.addEventListener("click", () => {
-
-      if (!state.activePath || !EDITABLE.has(state.activePath)) return;
-      state.editing = true;
-      renderPane();
-      if (codeEditor) {
-        codeEditor.focus();
-        const end = codeEditor.value.length;
-        codeEditor.setSelectionRange(end, end);
-      }
-    });
-
-    action("save")?.addEventListener("click", () => {
-      if (!codeEditor || !state.activePath || !state.editing) return;
-      state.files.set(state.activePath, codeEditor.value);
-      state.dirty = true;
-      state.editing = false;
-      renderPane();
-      refreshControls();
-      if (runHint) {
-        runHint.textContent =
-          "Edits detected — init now re-scaffolds with --force, or run validate and build.";
-      }
-
-    });
-
-    action("revert")?.addEventListener("click", () => {
-      if (!state.editing) return;
-      state.editing = false;
-      renderPane();
-    });
-
-    action("reset")?.addEventListener("click", () => {
-      state.files.clear();
-      state.activePath = null;
-      state.editing = false;
-      state.dirty = false;
-      state.lastCommand = "init";
-
-      renderPane();
-      renderTree();
-      updateStages();
-      refreshControls();
-      if (exitLabel) exitLabel.hidden = true;
-      if (statusDot) statusDot.style.background = "";
-      if (terminalOut) terminalOut.textContent = "$ npx @atlante/cli@latest init";
-      if (runHint) runHint.textContent = hints.init;
-    });
-
-    refreshControls();
+    render();
+    showTerminal(
+      "Press Build to run the real CLI in an isolated sandbox.",
+      "idle",
+    );
   }
 </script>
 
@@ -650,7 +498,7 @@ const hints: Record<string, string> = {
     background: color-mix(in oklab, var(--ds-bg) 96%, var(--ds-fg));
   }
 
-   .inner {
+  .inner {
     max-width: var(--container-wide);
     margin-inline: auto;
     padding: clamp(var(--space-24), 9vw, 168px) var(--space-4);
@@ -706,10 +554,6 @@ const hints: Record<string, string> = {
     margin: 0;
   }
 
-  .instrument-bar > span {
-    color: var(--ds-muted);
-  }
-
   .status-dot {
     width: 8px;
     height: 8px;
@@ -718,12 +562,18 @@ const hints: Record<string, string> = {
 
   .workspace {
     display: grid;
-    grid-template-columns: minmax(0, 1.5fr) minmax(340px, 0.5fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .configuration-pane {
     min-width: 0;
     border-inline-end: 1px solid var(--ds-border);
+  }
+
+  .output-pane {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
   }
 
   .pane-head {
@@ -738,6 +588,7 @@ const hints: Record<string, string> = {
 
   .pane-head > div:first-child {
     display: flex;
+    min-width: 0;
     flex-direction: column;
     gap: 2px;
   }
@@ -751,14 +602,18 @@ const hints: Record<string, string> = {
   }
 
   .pane-head strong {
+    overflow: hidden;
     font-family: var(--font-mono);
     font-size: var(--text-small);
     font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .pane-actions {
     display: flex;
     flex-wrap: wrap;
+    flex-shrink: 0;
     gap: var(--space-2);
   }
 
@@ -795,40 +650,62 @@ const hints: Record<string, string> = {
     padding-inline: var(--space-3);
   }
 
-  .pane-actions [data-pane-copy] {
+  .pane-actions [data-source-copy],
+  .pane-actions [data-output-copy] {
     min-width: var(--control-min);
     padding-inline: 0;
   }
 
-  .pane-actions [data-pane-copy] svg {
+  .pane-actions svg {
     width: 18px;
     height: 18px;
   }
 
-  .pane-actions [data-pane-copy]:hover:not(:disabled),
-  .pane-actions [data-pane-copy]:focus-visible:not(:disabled) {
+  .pane-actions button:hover:not(:disabled),
+  .pane-actions button:focus-visible:not(:disabled) {
     background: transparent;
     color: var(--ds-fg);
   }
 
-  pre[data-code-view] {
+  textarea[data-code-editor],
+  pre[data-output-view] {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
     min-height: 480px;
     max-height: 640px;
     margin: 0;
     padding: var(--space-8) clamp(var(--space-4), 3vw, var(--space-12));
-    overflow: auto;
+    border: 0;
+    background: transparent;
+    color: var(--ds-fg);
     font-family: var(--font-mono);
-    font-size: clamp(12px, 1.05vw, 16px);
+    font-size: clamp(11px, 0.85vw, 14px);
     line-height: 1.8;
     tab-size: 2;
   }
 
-  pre[data-code-view] code {
+  textarea[data-code-editor] {
+    border-block-end: 1px solid var(--ds-border-subtle);
+    overflow: auto;
+    resize: vertical;
+    white-space: pre;
+  }
+
+  textarea[data-code-editor]:focus-visible {
+    outline: 3px solid var(--ds-fg);
+    outline-offset: 2px;
+  }
+
+  pre[data-output-view] {
+    flex: 1;
+    overflow: auto;
+  }
+
+  pre[data-output-view] code {
     display: block;
     width: max-content;
     min-width: 100%;
-    color: var(--ds-fg);
-    font-family: inherit;
   }
 
   pre :global(.token-key) {
@@ -853,97 +730,58 @@ const hints: Record<string, string> = {
     color: var(--ds-muted);
   }
 
-
-  textarea[data-code-editor] {
-    display: block;
-    width: 100%;
-    box-sizing: border-box;
-    min-height: 480px;
-    margin: 0;
-    padding: var(--space-8) var(--space-4);
-    border: 0;
-    border-block-end: 1px solid var(--ds-border-subtle);
-    background: transparent;
-    color: var(--ds-fg);
-    font-family: var(--font-mono);
-    font-size: clamp(12px, 1.05vw, 16px);
-    line-height: 1.8;
-    tab-size: 2;
-    overflow: auto;
-    white-space: pre;
-    resize: vertical;
-  }
-
-
-
-  textarea[data-code-editor]:focus-visible {
-    outline: 3px solid var(--ds-fg);
-    outline-offset: 2px;
-  }
-
-  .field-map {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    margin: 0;
+  .output-selector {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
     border-block-start: 1px solid var(--ds-border);
   }
 
-  .field-map > div {
-    min-width: 0;
-    padding: var(--space-4);
-    border-inline-end: 1px solid var(--ds-border-subtle);
-  }
-
-  .field-map > div:last-child {
-    border-inline-end: 0;
-  }
-
-  .field-map dt,
-  .field-map dd {
-    margin: 0;
-  }
-
-  .field-map dt {
-    overflow: hidden;
-    margin-block-end: var(--space-1);
-    font-family: var(--font-mono);
-    font-size: var(--text-small);
-    font-weight: 600;
-    text-overflow: ellipsis;
-  }
-
-  .field-map dd {
+  .output-selector label {
     color: var(--ds-muted);
     font-family: var(--font-ui);
+    font-size: var(--text-meta);
+    font-weight: 650;
+    letter-spacing: 0.1em;
+  }
+
+  .output-selector select {
+    min-width: 0;
+    flex: 1;
+    min-height: var(--control-min);
+    padding: 0 var(--space-3);
+    border: 1px solid var(--ds-border);
+    border-radius: 0;
+    background: var(--ds-bg);
+    color: var(--ds-fg);
+    font-family: var(--font-mono);
     font-size: var(--text-small);
-    line-height: 1.35;
   }
 
-  .command-pane {
+  .build-controls {
     display: flex;
-    min-height: 100%;
-    flex-direction: column;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-4);
+    border-block-start: 1px solid var(--ds-border);
   }
 
-  .command-selector {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    border-block-end: 1px solid var(--ds-border);
+  .build-button {
+    flex: 0 0 auto;
+    min-width: 120px;
+    background: var(--ds-fg);
+    color: var(--ds-bg);
   }
 
-  .command-selector button {
-    border: 0;
-    border-inline-end: 1px solid var(--ds-border-subtle);
-  }
-
-  .command-selector button:last-child {
-    border-inline-end: 0;
+  .build-button:hover:not(:disabled),
+  .build-button:focus-visible:not(:disabled) {
+    background: transparent;
+    color: var(--ds-fg);
   }
 
   .run-hint {
     margin: 0;
-    padding: var(--space-4);
-    border-block-end: 1px solid var(--ds-border-subtle);
     color: var(--ds-muted);
     font-family: var(--font-body);
     font-size: var(--text-small);
@@ -953,10 +791,8 @@ const hints: Record<string, string> = {
   .terminal {
     display: flex;
     min-width: 0;
-    max-width: 100%;
-    flex: 1 1 320px;
     flex-direction: column;
-    align-self: stretch;
+    margin: var(--space-4);
     border: 1px solid var(--ds-border-subtle);
     background: color-mix(in oklab, var(--ds-bg) 96%, var(--ds-fg));
   }
@@ -976,29 +812,9 @@ const hints: Record<string, string> = {
     letter-spacing: 0.1em;
   }
 
-  .terminal-actions {
-    display: flex;
-    gap: var(--space-2);
-  }
-
-  .terminal button {
-    min-height: var(--control-min);
-    padding-inline: var(--space-2);
-    border-color: color-mix(in oklab, var(--ds-fg) 40%, transparent);
-    color: var(--ds-fg);
-    font-size: var(--text-meta);
-  }
-
-  .terminal button:hover:not(:disabled),
-  .terminal button:focus-visible:not(:disabled) {
-    background: var(--ds-fg);
-    color: var(--ds-bg);
-  }
-
   pre[data-terminal-out] {
-    flex: 1;
-    min-height: 220px;
-    max-height: 320px;
+    min-height: 160px;
+    max-height: 280px;
     margin: 0;
     padding: var(--space-3);
     overflow: auto;
@@ -1010,105 +826,11 @@ const hints: Record<string, string> = {
     overflow-wrap: anywhere;
   }
 
-  .file-tree {
-    overflow: hidden;
-    border-block-start: 1px solid var(--ds-border);
-  }
-
-
-  .tree-label {
-    margin: 0;
-    padding: var(--space-3) var(--space-4) 0;
-    color: var(--ds-muted);
-    font-family: var(--font-ui);
-    font-size: var(--text-meta);
-    font-weight: 650;
-    letter-spacing: 0.1em;
-  }
-
-  [data-tree-list] {
-    margin: 0;
-    padding: var(--space-1) var(--space-4) var(--space-3);
-    list-style: none;
-    max-width: 100%;
-  }
-
-  [data-tree-list] :global(.tree-group) {
-    min-width: 0;
-  }
-
-  [data-tree-list] :global(.tree-folder) {
-    margin: var(--space-2) 0 0;
-    color: var(--ds-muted);
-    font-family: var(--font-mono);
-    font-size: var(--text-small);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  [data-tree-list] :global(.tree-group > ul) {
-    margin: 0;
-    padding-inline-start: var(--space-6);
-    list-style: disc;
-  }
-
-  [data-tree-list] :global(.tree-group > ul > li) {
-    min-width: 0;
-  }
-
-  [data-tree-list] :global(.tree-group > ul > li)::marker {
-    color: var(--ds-muted);
-  }
-
-  [data-tree-list] :global(button) {
-    display: flex;
-    width: 100%;
-    min-width: 0;
-    max-width: 100%;
-    min-height: var(--control-min);
-    justify-content: flex-start;
-    border: 0;
-    padding-inline: 0;
-    color: var(--ds-fg);
-    font-family: var(--font-mono);
-    font-size: var(--text-small);
-    font-weight: 650;
-    text-align: start;
-    text-decoration: underline;
-    text-decoration-color: var(--ds-border-subtle);
-    text-underline-offset: 0.25em;
-  }
-
-
-
-  [data-tree-list] :global(.tree-name) {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  [data-tree-list] :global(button:hover:not(:disabled)),
-  [data-tree-list] :global(button:focus-visible:not(:disabled)) {
-    color: var(--ds-fg);
-    text-decoration-color: var(--ds-border);
-  }
-
-
-
-
-  [data-tree-list] :global(button.tree-active .tree-name) {
-    text-decoration-color: var(--ds-fg);
-    text-decoration-thickness: 2px;
-  }
-
   .docs-link {
     display: inline-flex;
     align-items: center;
     justify-content: space-between;
     min-height: var(--control-min);
-    margin-block-start: auto;
     padding-inline: var(--space-4);
     border-block-start: 1px solid var(--ds-border);
     background: transparent;
@@ -1125,97 +847,18 @@ const hints: Record<string, string> = {
     color: var(--ds-bg);
   }
 
-  .pipeline {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    border-block-start: 1px solid var(--ds-border);
-  }
-
-  .pipeline-item {
-    position: relative;
-    display: flex;
-    min-width: 0;
-    flex-direction: column;
-    gap: var(--space-1);
-    padding: var(--space-6) var(--space-4) var(--space-4);
-    border-inline-end: 1px solid var(--ds-border-subtle);
-    opacity: 0.35;
-    transition: opacity var(--duration-editorial) var(--ease-standard);
-  }
-
-  .pipeline-item:last-child {
-    border-inline-end: 0;
-  }
-
-  .pipeline-marker {
-    position: absolute;
-    inset-block-start: -6px;
-    inset-inline-start: var(--space-4);
-    width: 10px;
-    height: 10px;
-    border: 1px solid var(--ds-border);
-    background: var(--ds-bg);
-  }
-
-  .pipeline small {
-    font-family: var(--font-ui);
-    font-size: var(--text-meta);
-    font-weight: 650;
-    letter-spacing: 0.08em;
-  }
-
-  .pipeline code {
-    overflow: hidden;
-    font-family: var(--font-mono);
-    font-size: var(--text-small);
-    text-overflow: ellipsis;
-  }
-
-  .build-instrument[data-stage="init"] .pipeline-item,
-  .build-instrument[data-stage="validate"]
-    :is(
-      [data-pipeline-stage="source"],
-      [data-pipeline-stage="validate"]
-    ),
-  .build-instrument[data-stage="build"]
-    :is(
-      [data-pipeline-stage="source"],
-      [data-pipeline-stage="validate"],
-      [data-pipeline-stage="build"]
-    ) {
-    opacity: 1;
-  }
-
-  .build-instrument[data-stage="init"] .pipeline-marker,
-  .build-instrument[data-stage="validate"]
-    :is(
-      [data-pipeline-stage="source"],
-      [data-pipeline-stage="validate"]
-    )
-    .pipeline-marker,
-  .build-instrument[data-stage="build"]
-    :is(
-      [data-pipeline-stage="source"],
-      [data-pipeline-stage="validate"],
-      [data-pipeline-stage="build"]
-    )
-    .pipeline-marker {
-    background: var(--ds-success);
-  }
-
   @media (max-width: 980px) {
     .workspace {
       grid-template-columns: minmax(0, 1fr);
     }
-
 
     .configuration-pane {
       border-inline-end: 0;
       border-block-end: 1px solid var(--ds-border);
     }
 
-    pre[data-code-view],
-    textarea[data-code-editor] {
+    textarea[data-code-editor],
+    pre[data-output-view] {
       min-height: 0;
     }
   }
@@ -1256,6 +899,16 @@ const hints: Record<string, string> = {
       width: 100%;
     }
 
+    .build-controls {
+      align-items: stretch;
+      flex-direction: column;
+      text-align: center;
+    }
+
+    .build-button {
+      width: 100%;
+    }
+
     .run-hint {
       text-align: center;
     }
@@ -1265,88 +918,21 @@ const hints: Record<string, string> = {
       text-align: center;
     }
 
-    .terminal-actions {
+    .output-selector {
       justify-content: center;
     }
 
-    .field-map,
-    .pipeline {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .field-map dt,
-    .field-map dd,
-    .pipeline small {
-      text-align: center;
-    }
-
-    .pipeline-item {
-      align-items: center;
-    }
-
-    .pipeline code {
-      width: 100%;
-      text-align: start;
-    }
-
-    .field-map > div:nth-child(2),
-    .pipeline-item:nth-child(2) {
-      border-inline-end: 0;
-    }
-
-    .field-map > div:nth-child(-n + 2),
-    .pipeline-item:nth-child(-n + 2) {
-      border-block-end: 1px solid var(--ds-border-subtle);
-    }
-
-    pre[data-code-view],
-    pre[data-terminal-out],
-    textarea[data-code-editor] {
+    textarea[data-code-editor],
+    pre[data-output-view],
+    pre[data-terminal-out] {
       padding-inline: var(--space-4);
-      font-size: clamp(12px, 1.05vw, 16px);
+      font-size: clamp(11px, 0.85vw, 14px);
       text-align: start;
-
-    }
-
-    .instrument-bar > span {
-      display: none;
-    }
-
-    .tree-label {
-      text-align: center;
-    }
-
-    [data-tree-list] {
-      text-align: center;
-    }
-
-    [data-tree-list] :global(.tree-folder) {
-      text-align: center;
-    }
-
-    [data-tree-list] :global(button) {
-      justify-content: center;
-      text-align: center;
     }
 
     .docs-link {
       justify-content: center;
       text-align: center;
-    }
-  }
-
-  @media (max-width: 440px) {
-    .command-selector {
-      grid-template-columns: 1fr;
-    }
-
-    .command-selector button {
-      border-inline-end: 0;
-      border-block-end: 1px solid var(--ds-border-subtle);
-    }
-
-    .command-selector button:last-child {
-      border-block-end: 0;
     }
   }
 
@@ -1365,17 +951,19 @@ const hints: Record<string, string> = {
       font-size: var(--text-meta);
     }
 
-    pre[data-code-view],
-    textarea[data-code-editor] {
+    textarea[data-code-editor],
+    pre[data-output-view] {
       min-height: 320px;
       padding-block: var(--space-4);
     }
 
-    [data-tree-list] :global(button),
-    [data-tree-list] :global(.tree-folder) {
-      font-size: var(--text-meta);
-      line-height: 32px;
+    .output-selector {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .output-selector label {
+      text-align: center;
     }
   }
-
 </style>

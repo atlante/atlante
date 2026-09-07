@@ -4,6 +4,7 @@ import {
   parsePlaygroundRequest,
   runPlaygroundStep,
 } from "./_lib/playground.js";
+import { consumeSessionBuild } from "./_lib/session-budget.js";
 
 const MAX_BODY_BYTES = 256 * 1024;
 
@@ -72,6 +73,12 @@ export default async function handler(
     send(400, {
       error: error instanceof Error ? error.message : "invalid request",
     });
+    return;
+  }
+
+  const budget = consumeSessionBuild(parsed.sessionId);
+  if (!budget.allowed) {
+    send(429, { error: "playground session build limit reached" });
     return;
   }
 
