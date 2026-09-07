@@ -97,6 +97,7 @@ export default defineConfig({
             { slug: "reference/cli", label: "CLI" },
             { slug: "reference/eval", label: "Eval" },
             { slug: "reference/schema", label: "Schema" },
+            { slug: "reference/template-syntax", label: "Template syntax" },
             { slug: "reference/materialization", label: "Materialization" },
             { slug: "reference/diagnostics", label: "Diagnostics" },
           ],
