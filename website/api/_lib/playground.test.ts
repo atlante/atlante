@@ -20,7 +20,7 @@ describe("playground request contract", () => {
     timeout: 30_000,
   }, async () => {
     const agents = Object.fromEntries(
-      Array.from({ length: 30 }, (_, index) => {
+      Array.from({ length: 24 }, (_, index) => {
         const id = `agent-${String(index).padStart(2, "0")}`;
         return [
           id,
@@ -49,6 +49,7 @@ describe("playground request contract", () => {
     });
 
     expect(result.ok).toBe(true);
+    expect(result.files).toHaveLength(24);
     expect(
       result.files.some(
         (file) => file.path === ".atlante/opencode-native.json",
