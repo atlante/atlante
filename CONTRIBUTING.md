@@ -87,9 +87,11 @@ These constraints are reviewed in every change:
 
 1. **Issue.** Open one with the templates under
    [`.github/ISSUE_TEMPLATE/`](.github/ISSUE_TEMPLATE/), a type (`Bug`,
-   `Feature`, `Refactor`, `Docs`, `Chore`), and an `area:` label. For issue
-   work, create an isolated worktree with `bun run worktree <issue>` and keep
-   all edits, git commands, and checks inside it.
+   `Feature`, `Refactor`, `Docs`, `Chore`), and an `area:` label. Then work in
+   an isolated worktree: `bun run worktree <issue>` for issue work,
+   `bun run worktree <branch>` to adopt an existing branch, or bare
+   `bun run worktree` for a scratch one. Keep all edits, git commands, and
+   checks inside the worktree.
 2. **Tasks and commits.** Split the issue into ordered tasks. Each task ends
    with exactly one commit containing only that task's changes, created after
    its checks pass; a commit never carries unrelated work. Commit messages
