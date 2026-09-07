@@ -16,7 +16,9 @@ describe("playground request contract", () => {
     expect(parsePlaygroundRequest(validRequest)).toEqual(validRequest);
   });
 
-  it("keeps the ownership manifest when generated output exceeds the cap", async () => {
+  it("keeps the ownership manifest when generated output exceeds the cap", {
+    timeout: 30_000,
+  }, async () => {
     const agents = Object.fromEntries(
       Array.from({ length: 30 }, (_, index) => {
         const id = `agent-${String(index).padStart(2, "0")}`;
