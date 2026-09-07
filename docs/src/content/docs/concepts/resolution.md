@@ -60,6 +60,6 @@ are reported as [Diagnostics](/reference/diagnostics) with stable codes and
 source locations. The resource system fails closed: invalid input produces no
 canonical document and the builder materializes no partial output.
 
-Resolution does not execute JavaScript, project code, agents, skills, or model
-inference. It does not install packages or load URLs. [Materialization](/reference/materialization)
-describes the result of the final stage.
+See the [Introduction](/introduction) for Atlante's execution boundary.
+[Materialization](/reference/materialization) describes the result of the final
+stage.

@@ -18,8 +18,9 @@ stays in the repository and is reviewed like any other code.
 
 **Deterministic builds.** A build validates the document, resolves the
 selected content, renders Markdown, and materializes host-native files. The
-same source and content produce the same bytes on every run, and a failed
-build writes nothing.
+same source and content produce the same bytes on every run, apart from the
+supported `{{sys.cwd.basename}}` system value described in [Values](/concepts/values),
+and a failed build writes nothing.
 
 **Verification.** `atlante validate` checks the source without writing
 anything, and the optional `atlante eval` runs scenarios in a disposable

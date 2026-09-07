@@ -90,9 +90,9 @@ Skills are reusable Markdown guidance addressed by `skillId`, not host-agent IDs
 ```
 
 This selector-less skill uses the first-party skill template. The build
-materializes it for OpenCode; Atlante renders the skill but does not execute it.
-See [Materialization](/reference/materialization) for the generated output
-contract.
+materializes it for OpenCode. See the [Introduction](/introduction) for
+Atlante's execution boundary and [Materialization](/reference/materialization)
+for the generated output contract.
 
 ## Validate and materialize
 

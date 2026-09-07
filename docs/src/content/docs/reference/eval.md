@@ -56,11 +56,13 @@ A run needs all of the following:
 | `trials` | 3 | Trials per scenario; at most 50 per run |
 | `timeoutMs` | 600000 | Wall-clock limit per trial; at most 3600000 |
 | `maxSessions` | 15 | Host sessions per run; the run stops when exhausted |
-| `maxTokens` | 400000 | Token spend per run, enforced from host usage events |
+| `maxTokens` | 400000 | Token spend per trial, enforced from host usage events |
 
-A run stops when its budget is exhausted. A trial whose host emits no usage
-events is reported with `budgetUnmonitored: true`: `maxTokens` cannot be
-enforced for it and only the trial timeout bounds its spend.
+`maxTokens` is enforced separately for each trial; it is not an aggregate run
+cap. A run can therefore consume up to that amount for each executed trial. A
+trial whose host emits no usage events is reported with `budgetUnmonitored: true`:
+`maxTokens` cannot be enforced for it and only the trial timeout bounds its
+spend.
 
 ## Scenario documents
 
@@ -152,7 +154,7 @@ fixture content you trust.
 The report is written to `<project>/.atlante/eval/<run-id>/report.json`; that
 location is gitignored. `--out <dir>` relocates it and `--keep` preserves the
 trial sandboxes; see [CLI](/reference/cli#atlante-eval) for flags and progress
-output.
+output, and [Diagnostics](/reference/diagnostics) for the error envelope.
 
 | Exit status | Meaning |
 | --- | --- |
