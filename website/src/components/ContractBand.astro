@@ -4,18 +4,20 @@
       <article>
         <h2>What it does</h2>
         <ul>
-          <li>Define agents, skills, values, and eval configuration in one versioned source.</li>
-          <li>Validate the configuration and selected templates.</li>
-          <li>Build OpenCode-native files.</li>
+          <li>Compose and reuse presets and templates for agents and skills.</li>
+          <li>Validate and build deterministic OpenCode-native agent and skill files with <code>atlante build</code>.</li>
+          <li>Test your harness in OpenCode with versioned scenarios and <code>atlante eval</code>.</li>
+          <li>Share your harness as a Pack, installable with <code>atlante init --pack &lt;your-pack&gt;</code>.</li>
         </ul>
       </article>
       <article>
         <h2>What it does not</h2>
         <ul>
-          <li>Perform LLM inference.</li>
-          <li>Execute agents, skills, or project code.</li>
-          <li>Own models, effort, permissions, tools, or modes.</li>
-          <li>Support hosts other than OpenCode in v0.1.</li>
+          <li>Perform LLM inference or run agents and skills.</li>
+          <li>Execute your project code.</li>
+          <li>Choose models, effort, permissions, tools, or modes.</li>
+          <li>Manage runtime state, checkpoints, or scheduling.</li>
+          <li>Support hosts other than OpenCode in the current version.</li>
         </ul>
       </article>
     </div>
@@ -63,6 +65,21 @@
 
   li::marker {
     color: var(--ds-accent);
+  }
+
+  li code {
+    display: inline-block;
+    max-width: 100%;
+    padding: 0.12em 0.4em;
+    border: 1px solid rgb(160 160 160 / 0.5);
+    border-radius: 4px;
+    background: color-mix(in oklab, var(--ds-bg) 96%, var(--ds-fg));
+    color: var(--ds-fg);
+    font-family: var(--font-mono);
+    font-size: var(--text-small);
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+    vertical-align: baseline;
   }
 
   @media (max-width: 700px) {
