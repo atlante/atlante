@@ -482,6 +482,7 @@ describe("website content contract", () => {
       contract.indexOf("  @media (max-width: 700px)"),
     );
 
+    expect(contract).not.toContain("min-height: 100%;");
     expect(mobileStyles).toMatch(
       /article\s*\{[\s\S]*?padding: var\(--space-4\);/,
     );
