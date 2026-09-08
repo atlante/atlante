@@ -1035,6 +1035,11 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
       font-size: var(--text-meta);
     }
 
+    .pane-actions [data-source-copy],
+    .pane-actions [data-output-copy] {
+      flex: 0 0 var(--control-min);
+    }
+
     .code-editor,
     pre[data-output-view] {
       min-height: 240px;

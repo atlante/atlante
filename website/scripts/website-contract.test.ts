@@ -451,6 +451,9 @@ describe("website content contract", () => {
       playground.indexOf("  @media (max-width: 700px)"),
       playground.indexOf("  @media (max-width: 480px)"),
     );
+    const compactStyles = playground.slice(
+      playground.indexOf("  @media (max-width: 480px)"),
+    );
 
     expect(mobileStyles).toMatch(
       /\.pane-actions\s*\{[\s\S]*?justify-content: center;/,
@@ -474,6 +477,9 @@ describe("website content contract", () => {
       /\.pane-actions button\s*\{[\s\S]*?min-height: 44px;/,
     );
     expect(playground).toMatch(/\.build-button\s*\{[\s\S]*?min-width: 120px;/);
+    expect(compactStyles).toMatch(
+      /\.pane-actions \[data-source-copy\],\s*\.pane-actions \[data-output-copy\]\s*\{[\s\S]*?flex: 0 0 var\(--control-min\);/,
+    );
   });
 
   it("keeps the mobile contract pair compact and separated", () => {
@@ -490,7 +496,7 @@ describe("website content contract", () => {
       /article \+ article\s*\{[\s\S]*?border-block-start: 1px solid var\(--ds-border-subtle\);/,
     );
     expect(mobileStyles).toMatch(
-      /article \+ article\s*\{[\s\S]*?margin-block-start: var\(--space-3\);/,
+      /article \+ article\s*\{[\s\S]*?margin-block-start: var\(--space-6\);/,
     );
   });
 
