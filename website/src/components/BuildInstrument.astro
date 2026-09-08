@@ -560,7 +560,7 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
   }
 
   .inner {
-    max-width: var(--container-wide);
+    max-width: var(--container-playground);
     margin-inline: auto;
     padding: clamp(var(--space-24), 9vw, 168px) var(--space-4);
   }
@@ -591,6 +591,7 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
 
   .build-instrument {
     border: 1px solid var(--ds-border);
+    border-radius: 4px;
     background: var(--ds-bg);
   }
 
@@ -685,7 +686,7 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
     min-height: var(--control-min);
     padding-inline: var(--space-4);
     border: 1px solid var(--ds-border);
-    border-radius: 0;
+    border-radius: 4px;
     background: transparent;
     color: var(--ds-fg);
     font-family: var(--font-ui);
@@ -849,7 +850,7 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
     min-height: var(--control-min);
     padding: 0 var(--space-3);
     border: 1px solid var(--ds-border);
-    border-radius: 0;
+    border-radius: 4px;
     background: var(--ds-bg);
     color: var(--ds-fg);
     font-family: var(--font-mono);
@@ -867,14 +868,15 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
   .build-button {
     flex: 0 0 auto;
     min-width: 120px;
+    border: 0;
     background: var(--ds-fg);
     color: var(--ds-bg);
   }
 
   .build-button:hover:not(:disabled),
   .build-button:focus-visible:not(:disabled) {
-    background: transparent;
-    color: var(--ds-fg);
+    background: var(--ds-button-hover);
+    color: var(--ds-bg);
   }
 
   .run-hint {
@@ -891,6 +893,7 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
     flex-direction: column;
     margin: var(--space-4);
     border: 1px solid var(--ds-border-subtle);
+    border-radius: 4px;
     background: color-mix(in oklab, var(--ds-bg) 96%, var(--ds-fg));
   }
 
@@ -960,20 +963,20 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
     }
 
     .pane-head {
-      align-items: flex-start;
-      flex-direction: column;
+      align-items: center;
+      flex-direction: row;
       padding-block: var(--space-4);
     }
 
     .pane-head > div:first-child {
-      align-items: center;
-      width: 100%;
-      text-align: center;
+      align-items: flex-start;
+      width: auto;
+      text-align: start;
     }
 
     .pane-actions {
-      justify-content: center;
-      width: 100%;
+      justify-content: flex-end;
+      width: auto;
     }
 
     .build-controls {
@@ -1026,7 +1029,7 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
     }
 
     .pane-actions {
-      width: 100%;
+      width: auto;
     }
 
     .pane-actions button {

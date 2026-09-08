@@ -94,6 +94,7 @@
     /* Light theme semantics. Components consume --ds-* only. */
     --ds-bg: var(--atlante-linen);
     --ds-fg: var(--atlante-jet);
+    --ds-button-hover: color-mix(in oklab, var(--ds-fg) 88%, var(--ds-bg));
     --ds-muted: oklch(24.5% 0.044 254.7 / 0.68); /* Prussian Blue at 68%, 5.28:1 */
     --ds-border: var(--atlante-bronze); /* non-text rules and details */
     --ds-border-subtle: oklch(72.9% 0.100 81.7 / 0.35);
@@ -111,6 +112,7 @@
   [data-theme="dark"] {
     --ds-bg: var(--atlante-jet);
     --ds-fg: var(--atlante-linen); /* 13.90:1 */
+    --ds-button-hover: color-mix(in oklab, var(--ds-fg) 88%, var(--ds-bg));
     --ds-muted: oklch(94.7% 0.014 67.7 / 0.55); /* 5.11:1 */
     --ds-border: var(--atlante-bronze); /* 6.71:1 */
     --ds-border-subtle: oklch(72.9% 0.100 81.7 / 0.35);

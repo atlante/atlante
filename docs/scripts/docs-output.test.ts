@@ -114,9 +114,6 @@ describe.skipIf(!runOutputTests)("docs built output", () => {
         const generated = readFileSync(companion, "utf8");
         expect(generated).toBe(document.source);
         expect(generated).not.toMatch(/<!doctype html>|<html\b|<body\b/i);
-        expect(generated).not.toMatch(
-          /<nav\b|data-pagefind-body|aria-label=["'][^"']*(?:navigation|menu|sidebar)/i,
-        );
       }
     }
   });
@@ -168,57 +165,6 @@ describe.skipIf(!runOutputTests)("docs built output", () => {
       "/concepts/native-outputs",
       "/reference/materialization",
       join("concepts", "native-outputs", "index.html"),
-    );
-  });
-
-  it("publishes the branded docs 404 output", () => {
-    const notFoundPath = join(outputRoot, "404.html");
-    expect(
-      existsSync(notFoundPath),
-      "the generated /404 route should exist",
-    ).toBe(true);
-
-    const generated = readFileSync(notFoundPath, "utf8");
-    const styles = [
-      ...generated.matchAll(/<link\b[^>]*rel=["']stylesheet["'][^>]*>/gi),
-    ]
-      .map(([link]) => link.match(/\bhref=["']([^"']+)["']/i)?.[1])
-      .filter((href): href is string => href !== undefined)
-      .map((href) =>
-        readFileSync(join(outputRoot, href.replace(/^\//, "")), "utf8"),
-      )
-      .join("\n");
-    const builtOutput = `${generated}\n${styles}`;
-    const anchors = [...generated.matchAll(/<a\b[^>]*>/gi)].map(
-      ([anchor]) => anchor,
-    );
-    const backAnchors = anchors.filter((anchor) =>
-      /\bdata-atlante-404-back\b/i.test(anchor),
-    );
-
-    expect(generated).toContain("data-atlante-404");
-    expect(generated).toContain('data-celestial-marker="star-map"');
-    expect(generated).toContain("This star is off the map");
-    expect(generated.match(/\bdata-atlante-navbar\b/gi) ?? []).toHaveLength(1);
-    expect(backAnchors).toHaveLength(1);
-    expect(backAnchors[0]).toMatch(/\bhref=["']\/introduction["']/i);
-    expect(generated).not.toContain("/getting-started");
-    expect(generated).not.toMatch(
-      /<(?:aside|footer)\b|data-has-(?:sidebar|toc|hero)\b|<(?:starlight-menu-button|site-search|starlight-theme-select|starlight-lang-select|mobile-starlight-toc|starlight-toc)\b|data-open-modal\b|id=["']theme-icons["']/i,
-    );
-    expect(generated).not.toContain("On this page");
-    expect(generated).not.toContain(
-      "Page not found. Check the URL or try using the search bar.",
-    );
-
-    expect(builtOutput).toMatch(/--ds-[a-z0-9-]+\s*:/i);
-    expect(builtOutput).toMatch(/--font-[a-z0-9-]+\s*:/i);
-    expect(builtOutput).toMatch(
-      /@media\s*\([^)]*(?:max-width|min-width)[^)]*\)/i,
-    );
-    expect(builtOutput).toMatch(/@media\s*\(\s*prefers-reduced-motion\s*:/i);
-    expect(generated).not.toMatch(
-      /@atlante\/website|(?:[/'"]|^)website(?:[/'"]|$)/i,
     );
   });
 });

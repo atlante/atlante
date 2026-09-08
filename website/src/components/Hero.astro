@@ -162,6 +162,7 @@ import glyphDark from "../assets/atlante-glyph-reverse.svg";
     align-items: center;
     min-height: var(--control-min);
     padding-inline: var(--space-8);
+    border-radius: 4px;
     font-family: var(--font-ui);
     font-size: var(--text-small);
     font-weight: 520;
@@ -172,14 +173,13 @@ import glyphDark from "../assets/atlante-glyph-reverse.svg";
   .primary {
     background: var(--ds-fg);
     color: var(--ds-bg);
-    border: 1px solid var(--ds-border);
+    border: 0;
   }
 
   .primary:hover,
   .primary:focus-visible {
-    background: transparent;
-    color: var(--ds-fg);
-    border-color: var(--ds-border);
+    background: var(--ds-button-hover);
+    color: var(--ds-bg);
   }
 
   .secondary {
@@ -209,7 +209,8 @@ import glyphDark from "../assets/atlante-glyph-reverse.svg";
     min-width: 0;
     max-width: 100%;
     padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3);
-    border: 1px solid var(--ds-border-subtle);
+    border: 1px solid rgb(160 160 160 / 0.5);
+    border-radius: 4px;
     background: color-mix(in oklab, var(--ds-bg) 96%, var(--ds-fg));
   }
 

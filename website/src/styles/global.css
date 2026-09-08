@@ -66,8 +66,10 @@ body {
 
 :root {
   /* Every major landing-page section shares one reading width. */
+  --container-wide: 1200px;
+  --container-playground: 1440px;
   --container-divider: var(--container-wide);
-  --container-content: 86ch;
+  --container-content: 70ch;
 }
 
 :root {
