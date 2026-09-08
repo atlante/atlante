@@ -489,6 +489,9 @@ describe("website content contract", () => {
     expect(mobileStyles).toMatch(
       /article \+ article\s*\{[\s\S]*?border-block-start: 1px solid var\(--ds-border-subtle\);/,
     );
+    expect(mobileStyles).toMatch(
+      /article \+ article\s*\{[\s\S]*?margin-block-start: var\(--space-3\);/,
+    );
   });
 
   it("centers the footer mobile treatment in one column", () => {
