@@ -39,7 +39,7 @@
   --font-body: var(--font-ui);
   --sl-font-system: var(--font-ui);
   --sl-font-mono: var(--font-mono);
-  --sl-text-h1: clamp(56px, 7vw, 104px);
+  --sl-text-h1: var(--text-heading-1);
   --sl-text-h2: clamp(1.75rem, 3vw, 2.25rem);
   --sl-text-h3: clamp(1.375rem, 2vw, 1.75rem);
   --sl-text-h4: 1.2rem;

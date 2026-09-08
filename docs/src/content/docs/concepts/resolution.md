@@ -1,65 +1,142 @@
 ---
-title: Resolution
-description: The deterministic pipeline from authored source to validated input.
+title: Inheritance and resolution
+description: How presets, local overrides, and selected resources become the effective configuration of a harness.
 ---
 
-Resolution combines authored configuration with selected Pack content, validates
-the result, and produces a canonical document plus resolved template inputs.
-The same source and selected content produce the same result, apart from the
-supported system value described in [Values](/concepts/values).
+Inheritance lets a configuration reuse existing choices and override only
+the parts that differ for a project. Resolution follows those inherited
+choices and selected resources to determine the effective configuration
+that a build will render.
 
-## Precedence and inheritance
+## Preset order and local choices
 
-`extends` accepts one locator or an ordered, non-empty list. Each preset resolves
-its own inheritance first. Atlante merges preset layers from left to right, then
-applies the local document last, so local configuration takes precedence.
+`extends` selects one preset or an ordered list, with each preset resolving
+its own inherited configuration first. Atlante combines the presets from
+left to right, then applies the project configuration as the final layer.
 
-The merge rules are:
+```text
+base preset + another preset + project configuration
+                         ↓
+              effective configuration
+```
+
+Later layers replace conflicting scalar values, while fields they leave
+unspecified can retain the values inherited from earlier layers.
+
+## What an override changes
+
+The following excerpts show only the fields involved in a project override
+of a local review preset. Other binding fields, such as its template
+selection and identity, are omitted from these excerpts.
+
+The preset supplies shared values and an initial set of instructions for
+the reviewer agent:
+
+```jsonc title="packs/review/atlante.jsonc — excerpt"
+{
+  "values": {
+    "project": "shared-project",
+    "language": "TypeScript",
+    "legacyRule": "Prefer callbacks."
+  },
+  "agents": {
+    "reviewer": {
+      "mission": "Find defects before merge.",
+      "sections": [
+        { "instructions": ["Review error handling.", "Check public APIs."] }
+      ]
+    }
+  }
+}
+```
+
+The project changes the name and review focus, replaces the sections, and
+removes a value it no longer needs:
+
+```jsonc title="atlante.jsonc — excerpt"
+{
+  "extends": "./packs/review",
+  "values": {
+    "project": "billing-api",
+    "legacyRule": null
+  },
+  "agents": {
+    "reviewer": {
+      "mission": "Find breaking API changes before merge.",
+      "sections": [
+        { "instructions": ["Check database migrations."] }
+      ]
+    }
+  }
+}
+```
+
+The effective fields combine inherited values with the project's overrides,
+while the removed value disappears from the result:
+
+```jsonc title="Effective configuration — excerpt"
+{
+  "values": {
+    "project": "billing-api",
+    "language": "TypeScript"
+  },
+  "agents": {
+    "reviewer": {
+      "mission": "Find breaking API changes before merge.",
+      "sections": [
+        { "instructions": ["Check database migrations."] }
+      ]
+    }
+  }
+}
+```
+
+The example illustrates four merge rules that apply throughout configuration
+inheritance, rather than only to agent bindings:
 
 - Objects merge recursively.
-- Arrays replace inherited arrays.
+- Arrays replace inherited arrays rather than appending to them.
 - Scalars replace inherited scalars.
-- `null` removes an inherited field as a source overlay.
-- Binding-local values override global values for that binding.
+- `null` removes an inherited field.
 
-The result is a canonical document without `extends`, source selectors, or
-unresolved removals. It contains the resolved values, agent bindings, and skill
-bindings that the build will render. [Configuration](/concepts/configuration)
-describes the authored shape; [Resources](/concepts/resources) describes what
-can be loaded.
+Replacing `sections` removes the earlier instructions from this reviewer;
+it does not add migration checks to the inherited list. Removing a value
+also removes it as a possible input, so remaining references to that name
+need another value in scope.
 
-## Interpolation and composition
+## Inheritance and value scope
 
-Atlante resolves supported system values and substitutes explicit value
-references before selected templates render. A template's JSON Schema can also
-declare a composition slot with `{ "template": "..." }`. The referenced child
-template is resolved, and its rendered Markdown remains opaque output rather than
-being interpreted as parent source. Every declared slot must resolve, including
-slots in unselected schema branches; only present values contribute output and
-array order is preserved. Missing slots, incompatible input, invalid schemas,
-and composition cycles fail before rendering.
+Preset precedence determines the global configuration and the fields of
+each binding after its inherited layers have combined. Binding-local values
+then provide a separate scope for interpreting references within that
+binding, overriding matching global keys.
 
-## Validation stages
+[Values](/concepts/values) shows why a project-name override for one reviewer
+leaves other agents and skills unchanged.
 
-The lifecycle checks the document in order:
+## From selected content to native output
 
-1. Raw structural validation parses JSON or JSONC and checks the document shape,
-   schema URI, containers, inheritance, and selectors.
-2. Resource resolution loads selected presets, resources, instances, templates,
-   package metadata, and transitive references.
-3. Resolved validation checks values, effective templates, composition, and
-   template-owned input.
-4. Build renders the validated input into a prepared project and materializes
-   the complete native output set.
+Resolution also follows resource selections, combines instance content with
+binding overrides, and determines the effective template for each binding.
+Value interpolation and template-input validation establish the content
+that the selected renderers will receive.
 
-`validate` runs the first three stages without rendering or materializing.
-`build`
-runs all four. Missing targets, invalid locators, malformed schemas, missing
-value references, unsupported fields, incompatible templates, and invalid input
-are reported as [Diagnostics](/reference/diagnostics) with stable codes and
-source locations. The resource system fails closed: invalid input produces no
-canonical document and the builder materializes no partial output.
+The resolved configuration is called the canonical document: it contains
+effective bindings rather than inheritance instructions or unresolved
+source selectors. [Templates and instances](/concepts/templates) explains how
+template composition then turns validated input into Markdown.
 
-See the [Introduction](/introduction) for Atlante's execution boundary.
-[Materialization](/reference/materialization) describes the result of the final
-stage.
+`atlante validate` checks source structure, resolves selected content, and
+validates effective input without rendering or materializing native files.
+`atlante build` includes those checks, renders the content, and materializes
+native output through the selected host adapter.
+
+The same inputs produce the same resolved content, including any working
+directory value described in [Values](/concepts/values#the-working-directory-value).
+[Materialization](/reference/materialization) describes the generated files,
+while [Evaluation](/concepts/evaluation) explains how a built harness is
+assessed on tasks.
+
+The [Schema reference](/reference/schema#defaults-and-precedence) defines
+the exact precedence rules, and [Diagnostics](/reference/diagnostics)
+documents failures encountered during validation and resolution.

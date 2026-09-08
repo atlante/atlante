@@ -1,45 +1,63 @@
 ---
 title: Introduction
-description: Give a coding-agent harness a versioned source, deterministic builds, and tests.
+description: A structured, versioned source for your coding agents and skills, with native OpenCode builds and scenario-based evaluation.
 ---
 
-Coding-agent harnesses grow from scattered prompts, one-off skills, and host
-settings that are hard to review together. Atlante gives that system a home in
-your repository: one configuration document that evolves alongside the code it
-guides, with a toolchain that treats the harness like any other build
-artifact.
+Atlante is the configuration and build layer for your coding-agent harness.
+It gives your agents and skills a structured, versioned source, with
+scenario-based evaluation to test the resulting harness.
 
-Three properties make that possible.
+A coding agent’s results depend on
+[more than the model you choose](https://blog.langchain.com/improving-deep-agents-with-harness-engineering/).
+The instructions around it shape how it approaches tasks, applies project
+rules, and checks its work. Changing those instructions changes the system
+you rely on to write code.
 
-**One versioned source.** An `atlante.jsonc` document selects a preset, binds
-agents and skills to static resources, and supplies the values that fit your
-project. Packs supply reusable presets, templates, and instances. The source
-stays in the repository and is reviewed like any other code.
+Whether you write that guidance yourself or ask an agent to generate it, it
+deserves the same discipline as your code. It needs clear structure,
+reviewable changes, and tests that help you assess the effect of each
+revision. Reading a prompt diff tells you what changed, but not whether the
+agent will produce better results.
 
-**Deterministic builds.** A build validates the document, resolves the
-selected content, renders Markdown, and materializes host-native files. The
-same source and content produce the same bytes on every run, apart from the
-supported `{{sys.cwd.basename}}` system value described in [Values](/concepts/values),
-and a failed build writes nothing.
+Atlante brings configuration, builds, and evaluation into one toolchain you
+can use from your repository. You compose reusable guidance, build native
+OpenCode files, and use [`atlante eval`](/reference/eval) to assess the
+harness against defined scenarios. OpenCode runs those scenarios, and
+deterministic checks grade the results against expectations you specify.
 
-**Verification.** `atlante validate` checks the source without writing
-anything, and the optional `atlante eval` runs scenarios in a disposable
-sandbox and grades them with deterministic checks. Harness changes can be
-tested before they ship.
+## One source for your harness
 
-:::note
-Atlante prepares the files; your coding agent runs them. Atlante never
-executes agents or skills, never runs project code, and never calls a model.
-:::
+Your `atlante.jsonc` brings together the configuration and resources that
+define your project’s agents and skills. You can build on a preset, compose
+content through templates, and supply project-specific values.
 
-[OpenCode](https://opencode.ai/) is the supported host in v0.1. A build
-materializes the agent and skill files OpenCode discovers, plus an ownership
-manifest; see [Materialization](/reference/materialization) for the generated
-output contract.
+The configuration and its resources remain the source you review, while
+generated host files are derived output. You can inspect changes, compare
+revisions, and evolve the harness alongside the code it guides.
 
-Start with the five-minute [Getting started](/getting-started) path to create
-that first build. The concepts — [Configuration](/concepts/configuration),
-[Resources](/concepts/resources), [Templates](/concepts/templates),
-[Values](/concepts/values), and [Resolution](/concepts/resolution) — explain
-the model, the guides walk through common work, and the references document
-the contracts exactly.
+## Build and test the harness
+
+Atlante validates your configuration, composes the selected content, and
+generates native agent and skill files through a host adapter.
+[OpenCode](https://opencode.ai/) is currently the only supported host and
+discovers those files when it starts.
+
+Validation checks the configuration before a build writes anything, while
+deterministic rendering makes the native output reproducible from its inputs.
+
+You can also test the built harness with [`atlante eval`](/reference/eval),
+which launches OpenCode to run scenarios in disposable sandboxes. Atlante
+then grades the results with deterministic checks, so you can assess changes
+against explicit expectations.
+
+## Where Atlante stops
+
+Atlante defines instructions for agents; the host and model remain
+responsible for carrying them out. Model calls, permissions, and tool use
+belong to OpenCode, not to Atlante’s configuration and build layer.
+
+Workflows describe a process for the model to follow; Atlante does not track
+their progress or schedule their execution.
+
+Follow [Getting started](/getting-started) to create your first configuration
+and build its native OpenCode files.

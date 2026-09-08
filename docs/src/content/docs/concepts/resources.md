@@ -1,45 +1,52 @@
 ---
-title: Resources
-description: Static packs, presets, and locators in the Atlante resource model.
+title: Packs and resources
+description: How packs organize reusable configuration, templates, and instances for a harness.
 ---
 
-A referenced preset, template, or instance comes from a Pack: a static content
-distribution with one trusted root. It can contain preset documents, resources,
-and the supporting files those resources reference. A Pack is Atlante content,
-not a runtime API: it has no JavaScript entry point, registration hook, or
-executable API.
+A resource supplies a template, configured input, or both for use in your
+harness. A pack groups resources and reusable configuration so you can
+maintain related content together or use it across projects.
 
-Do not confuse a Pack with a package. A package is the installation and
-distribution container that may carry a Pack. Atlante recognizes a package Pack
-only when its readable `package.json` declares numeric `atlante.format: 1`.
-The Pack itself is still the static content inside that package.
+The relationship between a pack and its contents is:
 
-## First-party and custom Packs
+```text
+pack
+├── presets: reusable configuration
+└── resources
+    ├── templates: input contracts and renderers
+    └── instances: configured input
+```
 
-The published CLI bundles and resolves Atlante's first-party Pack for the
-default setup. Running `npx @atlante/cli@latest init` therefore does not require a
-separate `@atlante/pack` installation. The default preset selection and
-first-party ownership are separate ideas: `init` can select another preset
-explicitly.
+A preset can select several agents and skills, while a resource supplies
+content for an individual selection or a composed template. Selecting one
+resource does not select every agent, skill, or preset in its pack.
 
-Custom Pack packages must already be declared and installed by the authoring
-project's package manager before a document references them. Atlante does not
-install packages, consult a registry, load URLs, or load remote Pack content.
+## Packs and packages
 
-For a complete Pack layout, see [Author a pack](/guides/authoring-packs).
+A pack is the Atlante content; a package is one way to distribute that
+content through a package manager. A local pack can instead live inside
+your repository, keeping a project-specific preset and its resources together.
 
-A resource may contain either facet or both. A template facet is valid only when
-`template.jsonc` and `template.md` appear together; an instance facet supplies
-configured input for one effective template.
+A package pack identifies its content through a readable `package.json`
+declaring numeric `atlante.format: 1`. Custom package packs are available to
+resolution through the authoring project's declared, installed dependencies.
 
-## Resource locators
+The published CLI bundles the first-party `@atlante/pack`, so its default
+harness needs no separate pack installation. That bundled content is a
+starting point; a configuration can select other presets and resources.
 
-A resource locator identifies a preset, template, or instance by either:
+[Author a pack](/guides/authoring-packs) describes local and package layouts,
+including the files that make a resource a template or instance.
 
-- A path relative to the file containing the locator, beginning with `./` or
-  `../`.
-- A package name, or a package name with an optional POSIX subpath, such as
-  `@acme/review-pack` or `@acme/review-pack/reviewer`.
+## Locators connect configuration to content
+
+A locator identifies the preset or resource a configuration selects, using
+a relative path or a package name. Relative paths begin with `./` or `../`
+and resolve from the file containing the locator, not necessarily the
+project root.
+
+This configuration excerpt selects two reviewer instances from different
+locations, giving each its own agent ID:
 
 ```jsonc
 {
@@ -50,20 +57,24 @@ A resource locator identifies a preset, template, or instance by either:
 }
 ```
 
-Absolute paths, URLs, NUL-containing strings, backslash-separated paths, direct
-facet filenames such as `template.md`, and paths that escape the selected Pack
-root after normalization and realpath checks are not valid locators. Relative
-paths must begin with `./` or `../`; package locators must use the package form
-above. See [Configuration](/concepts/configuration) for where locators occur in
-the document.
+The local locator selects a resource relative to this document; the package
+locator selects `reviewer` inside an installed pack. A package locator can
+also name the package alone, such as `@acme/review-pack`, to select its root.
+
+Template and instance locators identify resource directories rather than
+individual files such as `template.md` or `instance.jsonc`.
+[Templates and instances](/concepts/templates) explains how a binding selects
+the content available at that location.
 
 ## Selected content only
 
-Atlante reads selected metadata, the selected resource and its facet files, and
-their transitive dependencies. Unselected sibling resources and unrelated
-package directories are outside the resolution graph. A malformed unselected
-sibling therefore does not invalidate a valid selected resource. This boundary
-keeps a Pack reusable without scanning or executing an installed package.
+Atlante reads the content you select and the resources that content refers
+to, including nested template dependencies. An unused sibling resource is
+outside that selection, so a malformed unused resource does not invalidate
+the reviewer you selected.
 
-The selected resource becomes a template or instance through the rules in
-[Templates](/concepts/templates), then enters [Resolution](/concepts/resolution).
+Each pack has a root that contains its presets, resources, and referenced
+files, including the resolved targets of symlinks. Locators stay within that
+root after path resolution; absolute paths and URLs are not resource locators.
+The [locator contract](https://github.com/atlante/atlante/blob/main/SPECIFICATION.md#5-packs-and-resolution)
+defines the complete path grammar and containment rules.

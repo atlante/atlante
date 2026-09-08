@@ -3,9 +3,9 @@ title: Getting started
 description: Build a versioned coding-agent harness with the published CLI.
 ---
 
-Atlante requires [Node.js](https://nodejs.org/) 22 or later. Run the CLI from the
-project you want to configure. The published CLI bundles the first-party
-`@atlante/pack`, so the default path does not require a separate pack install.
+Run the CLI from the project you want to configure. The published CLI bundles
+the first-party `@atlante/pack`, so the default path does not require a
+separate pack install.
 
 **By the end:** you will have a versioned `atlante.jsonc` and host-native agent
 and skill files that OpenCode can discover.
