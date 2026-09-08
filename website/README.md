@@ -5,8 +5,8 @@ The public landing page for [atlante.sh](https://atlante.sh), built with
 tokens are derived from
 [`brand/atlante-design-tokens.css`](../brand/atlante-design-tokens.css), so the
 page cannot drift from approved brand values. The site loads the four approved
-families — Bodoni Moda for the wordmark, Source Sans 3 for display headings
-and interface text, Source Serif 4 for editorial text, and JetBrains Mono for
+families — Bodoni Moda for the wordmark, Source Serif 4 for display headings
+and editorial text, Source Sans 3 for interface text, and JetBrains Mono for
 code and diagnostics.
 
 ## Commands
