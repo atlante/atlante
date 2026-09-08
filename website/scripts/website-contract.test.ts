@@ -238,7 +238,7 @@ describe("website content contract", () => {
   it("keeps landing-page headings readable at the approved heading family", () => {
     const tokens = read("../brand/atlante-design-tokens.css");
     expect(tokens).toContain(
-      '--font-heading: "Source Serif 4", "Iowan Old Style", Georgia, serif;',
+      '--font-heading: "Source Sans 3", system-ui, sans-serif;',
     );
     for (const component of [
       "Hero.astro",
