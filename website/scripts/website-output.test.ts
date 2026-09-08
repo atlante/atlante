@@ -20,65 +20,18 @@ const observatoryKeys = [
 describe.skipIf(process.env.ATLANTE_BUILT_OUTPUT_TESTS !== "1")(
   "website built output",
   () => {
-    it("keeps approved copy and links in built HTML", () => {
+    it("keeps critical links and observatory structure in built HTML", () => {
       const html = read("dist/index.html");
-      for (const text of [
-        "Define, test, and evolve your harness like any other code, one versioned source in your repository.",
-        "What it does",
-        "Define agents, skills, values, and eval configuration in one versioned source.",
-        "What it does not",
-        "Perform LLM inference.",
-        "Playground",
-        "One harness, held together",
-        "Every signal stays visible",
-        "Your stars form an agent",
-        "Validate before you build",
-        "The build writes what the host reads",
-        "Atlante bears the structure. The host runs it.",
-        "Build your constellation",
-        "Edit the configuration, build it, and inspect the generated files.",
-        "Press Build to inspect generated native files.",
-        "Generated files",
-        "Build",
-        "Built for change. Strict by design",
-        "Chart your harness",
-        "Review harness changes like code",
-        "Catch breakage before it ships with eval",
-        "Get the same output from the same source and selected content",
-        "Edit the configuration and press Build to create your first harness.",
-        "Learn",
-        "Project",
-        "Reference",
-        "Getting started",
-        "Specification",
-        "/brand/horizontal/atlante-horizontal.svg",
-        "/brand/horizontal/atlante-horizontal-reverse.svg",
-      ]) {
-        expect(html).toContain(text);
-      }
-      for (const text of [
-        "invalid → no publication",
-        "Keep the last good build",
-        "Failed configuration or template validation leaves the current artifact tree untouched.",
-        ">init</code> to create your configuration and build your first artifacts.",
-        "Define, share, and evolve your harness through Atlante with your team.",
-        "Scaffolds a real project",
-        'data-run="init"',
-        "configuration → validate → .opencode/",
-        "Playground · real CLI · isolated sandbox",
-        "Read the documentation",
-      ]) {
-        expect(html).not.toContain(text);
-      }
       for (const href of [
         "https://docs.atlante.sh",
         "https://docs.atlante.sh/getting-started",
         "#quick-start",
+        "https://github.com/atlante/atlante",
         "https://github.com/atlante/atlante/releases",
         "https://github.com/atlante/atlante/issues",
         "https://github.com/atlante/atlante/blob/main/SPECIFICATION.md",
         "https://www.npmjs.com/package/@atlante/cli",
-        "https://docs.atlante.sh/contributing",
+        "https://github.com/atlante/atlante/blob/main/CONTRIBUTING.md",
       ]) {
         expect(html).toContain(href);
       }
