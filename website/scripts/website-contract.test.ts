@@ -193,6 +193,11 @@ describe("website content contract", () => {
       ".atlante/opencode-native.json",
       "result.timedOut",
       "The playground build timed out.",
+      'editor.addEventListener("pointerdown"',
+      'editor.addEventListener("keydown"',
+      'editor.addEventListener("blur"',
+      "data-pointer-focus",
+      ".code-editor[data-pointer-focus]:focus",
     ]) {
       expect(playground).toContain(text);
     }
@@ -222,6 +227,30 @@ describe("website content contract", () => {
       "grid-template-columns: repeat(2, minmax(0, 1fr));",
     );
     expect(playground).toContain("font-size: clamp(11px, 0.85vw, 14px);");
+    expect(playground).toMatch(
+      /\.code-editor:focus-visible\s*\{[\s\S]*?outline: 3px solid var\(--ds-fg\) !important;/,
+    );
+    expect(playground).toMatch(
+      /\.code-editor\[data-pointer-focus\]:focus\s*\{[\s\S]*?outline: none !important;/,
+    );
+  });
+
+  it("keeps landing-page headings readable at the approved heading family", () => {
+    const tokens = read("../brand/atlante-design-tokens.css");
+    expect(tokens).toContain(
+      '--font-heading: "Source Serif 4", "Iowan Old Style", Georgia, serif;',
+    );
+    for (const component of [
+      "Hero.astro",
+      "ContractBand.astro",
+      "HarnessObservatory.astro",
+      "BuildInstrument.astro",
+      "ReviewClose.astro",
+    ]) {
+      const source = read(`src/components/${component}`);
+      expect(source).toContain("font-family: var(--font-heading);");
+      expect(source).toContain("font-weight: 600;");
+    }
   });
 
   it("applies the session budget to the development playground route", () => {
@@ -435,10 +464,30 @@ describe("website content contract", () => {
     expect(mobileStyles).toMatch(
       /\.code-editor,[\s\S]*?pre\[data-output-view\],[\s\S]*?pre\[data-terminal-out\][\s\S]*?text-align: start;/,
     );
+    expect(mobileStyles).toMatch(
+      /\.code-editor,\s*pre\[data-output-view\]\s*\{[\s\S]*?min-height: 280px;[\s\S]*?max-height: 420px;/,
+    );
+    expect(playground).toMatch(
+      /@media \(max-width: 480px\) \{[\s\S]*?\.code-editor,[\s\S]*?pre\[data-output-view\][\s\S]*?min-height: 240px;[\s\S]*?max-height: 360px;/,
+    );
     expect(playground).toMatch(
       /\.pane-actions button\s*\{[\s\S]*?min-height: 44px;/,
     );
     expect(playground).toMatch(/\.build-button\s*\{[\s\S]*?min-width: 120px;/);
+  });
+
+  it("keeps the mobile contract pair compact and separated", () => {
+    const contract = read("src/components/ContractBand.astro");
+    const mobileStyles = contract.slice(
+      contract.indexOf("  @media (max-width: 700px)"),
+    );
+
+    expect(mobileStyles).toMatch(
+      /article\s*\{[\s\S]*?padding: var\(--space-4\);/,
+    );
+    expect(mobileStyles).toMatch(
+      /article \+ article\s*\{[\s\S]*?border-block-start: 1px solid var\(--ds-border-subtle\);/,
+    );
   });
 
   it("centers the footer mobile treatment in one column", () => {

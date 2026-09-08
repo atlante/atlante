@@ -213,6 +213,15 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
     if (editor) {
       jar?.updateCode(initialConfig, false);
       editorHighlighter(editor);
+      editor.addEventListener("pointerdown", () => {
+        editor.dataset.pointerFocus = "true";
+      });
+      editor.addEventListener("keydown", () => {
+        delete editor.dataset.pointerFocus;
+      });
+      editor.addEventListener("blur", () => {
+        delete editor.dataset.pointerFocus;
+      });
     }
 
     const editorSource = (): string =>
@@ -571,10 +580,10 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
   h2 {
     max-width: 12ch;
     margin: 0;
-    font-family: var(--font-display);
+    font-family: var(--font-heading);
     font-optical-sizing: auto;
     font-size: clamp(44px, 5vw, 84px);
-    font-weight: 500;
+    font-weight: 600;
     line-height: 1.04;
     letter-spacing: -0.015em;
     text-wrap: balance;
@@ -774,6 +783,12 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
   .code-editor:focus-visible {
     outline: 3px solid var(--ds-fg) !important;
     outline-offset: 2px;
+  }
+
+  /* Editable regions can match :focus-visible even for pointer activation.
+     Keep the keyboard ring, but do not add an outer border while clicking. */
+  .code-editor[data-pointer-focus]:focus {
+    outline: none !important;
   }
 
   pre[data-output-view] {
@@ -985,6 +1000,12 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
     }
 
     .code-editor,
+    pre[data-output-view] {
+      min-height: 280px;
+      max-height: 420px;
+    }
+
+    .code-editor,
     pre[data-output-view],
     pre[data-terminal-out] {
       padding-inline: var(--space-4);
@@ -1016,7 +1037,8 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
 
     .code-editor,
     pre[data-output-view] {
-      min-height: 320px;
+      min-height: 240px;
+      max-height: 360px;
       padding-block: var(--space-4);
     }
 
