@@ -32,6 +32,15 @@ The documentation follows the repository's terminology contract. Procedures,
 references, diagnostics, and troubleshooting use implementation-aligned names
 and do not rely on brand metaphor.
 
+Use these lightweight page patterns when adding or revising content:
+
+- Guides orient the reader, state the outcome, show a complete example, explain
+  the result, name important caveats, and link to the next step.
+- References define the subject, show its syntax or shape, document fields and
+  defaults, include a minimal example, describe failures, and link related pages.
+- Use admonitions only for material risks or exceptions; keep ordinary
+  explanations in the main flow.
+
 ## Brand assets
 
 `bun run sync:brand` copies approved favicon and logo exports, self-hosted fonts,

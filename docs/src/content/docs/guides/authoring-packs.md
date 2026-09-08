@@ -9,6 +9,8 @@ may also use a local Pack to keep a growing `atlante.jsonc` readable. A Pack is
 Atlante static content, not a JavaScript plugin.
 
 Choose the form that fits the boundary:
+**By the end:** you will have a trusted static Pack layout, a template and
+instance contract, and a local validate-and-build path.
 
 | Form | Use it when | Source |
 | --- | --- | --- |

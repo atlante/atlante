@@ -7,6 +7,9 @@ You do not need to design the whole harness before you start. Add one useful
 role, keep the source beside your code, and let each change go through the same
 validate-and-build loop.
 
+**By the end:** you will have a project-specific agent or skill, validated
+source, and a successful build that materializes the native output.
+
 ## Start with the generated source
 
 If you have not initialized the project yet, begin with [Getting
