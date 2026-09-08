@@ -79,6 +79,7 @@ export default defineConfig({
             { slug: "concepts/templates", label: "Templates" },
             { slug: "concepts/values", label: "Values" },
             { slug: "concepts/resolution", label: "Resolution" },
+            { slug: "concepts/evaluation", label: "Evaluation" },
           ],
         },
         {
