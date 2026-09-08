@@ -54,8 +54,8 @@ With `--pack`, installation is part of initialization:
   `devDependencies`. Installation is skipped for the bundled first-party pack
   and for packs that are already declared.
 - Installing a custom Pack delegates to the project's package manager and may
-  run package install scripts. Use `--pack` only with packages you trust. The
-  Pack must resolve from the init directory's own `node_modules`; if a workspace
+  run package install scripts. The Pack must resolve from the init directory's
+  own `node_modules`; if a workspace
   hoists it to a shared root, run `init` from the workspace root.
 - The first installation records the Pack version in the lockfile, keeping later
   runs reproducible. Keep the lockfile with the project.
@@ -69,6 +69,12 @@ With `--pack`, installation is part of initialization:
   aborted prompt — rolls back the configuration files and restores
   `package.json` and the lockfile. If the rollback itself fails, `init`
   reports `rollback-failed` with manual instructions.
+
+:::caution
+Use `--pack` only with packages you trust. Custom Pack installation can run
+package-manager install scripts before Atlante validates the installed Pack or
+selects a preset.
+:::
 
 ## `atlante validate`
 
@@ -197,3 +203,10 @@ When a path is one of those files, Atlante reads it directly. If both files are
 present in a discovered project, the CLI reports `ambiguous-config` rather than
 choosing one silently. Validation and build success lines report resolved
 filesystem paths, even when the command received a relative path.
+
+## Next steps
+
+- [Configuration](/concepts/configuration) explains the source document.
+- [Materialization](/reference/materialization) documents native output paths
+  and ownership rules.
+- [Diagnostics](/reference/diagnostics) explains structured failures.

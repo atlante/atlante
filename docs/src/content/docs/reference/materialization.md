@@ -39,6 +39,8 @@ by the rendered skill content.
 `.atlante/opencode-native.json` is UTF-8 JSON with exactly `format`,
 `version`, and `files`:
 
+The following is a minimal ownership manifest:
+
 ```json
 {
   "format": "atlante-opencode-native",
@@ -69,6 +71,13 @@ permissions, and tools, remain under OpenCode's control. Restart OpenCode to
 pick up new or changed native files.
 
 ## Publication contract
+
+:::caution
+Native files and the ownership manifest are derived output. Atlante refuses
+collisions and drift, and attempts to restore the previous generated set if
+publication fails. If restoration cannot complete, the failure may require
+manual recovery. Each file is atomic; the whole output tree is not.
+:::
 
 Planning completes before anything is written. For every target and every
 previously generated file, the materializer captures a byte snapshot, then:
@@ -106,3 +115,9 @@ Materialization failures carry a `materialization-` prefix:
 Each diagnostic names the affected path and one deterministic recovery action.
 Keep rendered outputs local: values may contain sensitive content. `atlante init`
 adds `.opencode/agents/`, `.opencode/skills/`, and `.atlante/` to `.gitignore`.
+
+## Next steps
+
+- [CLI](/reference/cli) lists the commands that validate and materialize output.
+- [Diagnostics](/reference/diagnostics) explains the structured failure format.
+- [Troubleshooting](/troubleshooting) gives recovery paths for failed builds.

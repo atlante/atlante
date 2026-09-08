@@ -80,6 +80,13 @@ Pointer such as `/agents/reviewer/mission`. Use the pointer to locate the
 invalid field. A location, when present, uses one-based line and column numbers.
 
 For resource failures, the structured diagnostic can include the selected source
-and a resource-traversal chain. See [Troubleshooting](/troubleshooting) for
-recovery paths. See [Eval](/reference/eval) for scenario validation and exit
-statuses.
+and a resource-traversal chain. Fix the first actionable error, then run the same
+CLI command again. See [Troubleshooting](/troubleshooting) for recovery paths.
+
+## Next steps
+
+- [CLI](/reference/cli) documents the commands that emit diagnostics.
+- [Materialization](/reference/materialization) lists output-specific failure
+  codes.
+- [Troubleshooting](/troubleshooting) organizes recovery paths by symptom.
+- [Eval](/reference/eval) documents scenario validation and exit statuses.
