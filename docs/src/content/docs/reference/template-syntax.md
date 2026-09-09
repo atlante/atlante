@@ -60,16 +60,16 @@ The renderer registers five helpers on top of the Handlebars built-ins:
 | --- | --- |
 | `{{increment n}}` | `n + 1`; typically `{{increment @index}}` for 1-based numbering |
 | `{{input}}` | The whole template input, for passing to a partial |
-| `{{isEqual a b}}` | `true` when `a` and `b` are equal |
-| `{{anyEqual list path expected}}` | `true` when any item of `list` has a `path` value equal to `expected` |
-| `{{anyTruthy value list path}}` | `true` when `value` is an object with at least one truthy member, or any item of `list` has one at `path` |
+| `{{isEqual a b}}` | `true` when `a === b` |
+| `{{anyEqual list path expected}}` | `true` when `list` is an array and an item has a `path` value strictly equal to `expected` |
+| `{{anyTruthy value list path}}` | `true` when `value` is a plain object with a truthy member, or `list` is an array with an item whose plain object at `path` has a truthy member |
 
 ## Composition slots
 
-`template.jsonc` declares a composition slot wherever a field's schema uses
-the marker `{ "template": "<locator>" }`. Each declared slot becomes a partial
-named `slot/<path>` in the renderer, and invoking it renders the referenced
-child template:
+`template.jsonc` declares a composition slot wherever a field's schema uses the
+exact marker object `{ "template": "<locator>" }`. The object must have no
+other keys. Each declared slot becomes a partial named `slot/<path>` in the
+renderer, and invoking it renders the referenced child template:
 
 ```jsonc title="template.jsonc — composition excerpt"
 {
@@ -97,13 +97,17 @@ child template:
 
 An invocation may pass the slot value explicitly, as above, or let the
 renderer resolve it from the input: `{{> slot/phases/output}}`. An
-array-valued slot that resolves ambiguously fails the render with a diagnostic
-that names the explicit form to use.
+array-valued slot that resolves ambiguously fails with
+`ambiguous-slot-invocation`, which names the explicit form to use. Other
+renderer failures use `template-render-failed`.
 
 Composition rules:
 
 - Every declared slot must resolve to an available template, including slots
   in schema branches a particular input does not select.
+- When schema branches declare several templates at the same data path,
+  normalized input records the selected template. Without a recorded
+  selection, rendering uses the lexicographically first template ID.
 - Composed child Markdown is opaque output; it is never interpreted as parent
   template source.
 - Circular composition is rejected.

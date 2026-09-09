@@ -44,16 +44,18 @@ include absolute paths in both `source` and the message. See
 | `code` | Stable machine-readable diagnostic code |
 | `message` | Human-readable failure statement |
 | `source` | Source identity or filesystem path, which may be absolute |
-| `path` / `pointer` | JSON Pointer into document data, when applicable |
+| `path` | Primary JSON Pointer into document data, when applicable |
+| `pointer` | Explicit JSON Pointer alias used by source and resource diagnostics |
 | `location` | One-based `{ line, column }`, when available |
 | `chain` | Preset, instance, or template traversal that caused a resource failure |
-| `expected` | Contract the authored input must satisfy |
+| `expected` | Expected contract or runtime condition |
 | `next` | Deterministic recovery action |
 | `cause` | Normalized low-level cause |
 
 Only `severity`, `code`, and `message` are required. The resource traversal
 `chain` is structured metadata; the terminal formatter does not print it as
-a separate line.
+a separate line. When both `path` and `pointer` are present, the formatter uses
+`path`.
 
 ## Common codes
 
@@ -65,16 +67,17 @@ and publication failures can produce additional stable codes.
 | `config-not-found` | Neither supported configuration filename was found |
 | `ambiguous-config` | Both `atlante.jsonc` and `atlante.json` were found |
 | `missing-target` | A selected preset, template, or instance target is missing |
-| `package-not-declared` | A package locator is not declared by the authoring project |
+| `package-not-declared` | A package locator lacks an admitted declaration: project references use `dependencies`, `optionalDependencies`, or `devDependencies`; pack-to-pack references use runtime dependencies |
 | `package-not-installed` | A declared package cannot be found in the installation |
-| `malformed-jsonc` | A selected JSONC source is malformed |
+| `invalid-json` | A configuration or scenario document is malformed JSON or JSONC |
+| `malformed-jsonc` | A selected resource JSONC file is malformed |
 | `invalid-resolved-input` | Resolved document or template-owned input is invalid |
 | `conflicting-selectors` | A source uses `$template` and `$instance` together |
-| `build-failed` | A build could not complete after the reported failure |
+| `build-failed` | The CLI caught an unexpected exception from the build operation; ordinary failures retain their specific code |
 | `unsupported-host` | The document declares a host with no registered materializer |
 | `materialization-*` | An OpenCode materialization failure; see [Materialization](/reference/materialization) for the code list |
-| `watch-build-failed` | A watch-mode rebuild failed and will be retried |
-| `watch-inputs-failed` | Watch mode could not update its watched files and will retry |
+| `watch-build-failed` | The watch wrapper's build function threw unexpectedly; ordinary failed rebuilds retain their underlying code |
+| `watch-inputs-failed` | Watch mode caught an exception while resolving or reconciling watched inputs |
 
 Validation and build warnings appear before a success line. Errors produce
 exit status `1` for one-shot validation and build commands, without a success

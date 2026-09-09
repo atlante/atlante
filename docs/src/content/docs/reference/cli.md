@@ -51,10 +51,12 @@ Selecting a custom package pack requires a `package.json` in the target
 project. Installation is part of initialization and can change dependencies
 before preset validation:
 
-- An undeclared pack is installed and added to `devDependencies`. A declared
-  pack missing from `node_modules` triggers a package-manager install. A pack
-  already declared and installed is reused. The bundled first-party pack
-  needs no installation.
+- An undeclared pack is installed and added to `devDependencies`. Declarations
+  in `dependencies`, `optionalDependencies`, and `devDependencies` count; a
+  declaration only in `peerDependencies` does not. A declared pack missing
+  from `node_modules` triggers a package-manager install. A pack already
+  declared and installed is reused. The bundled first-party pack needs no
+  installation.
 - A recognized `packageManager` field takes precedence over lockfile
   detection. Otherwise, the nearest lockfile directory determines the manager:
   `bun.lockb` or `bun.lock` selects Bun, `pnpm-lock.yaml` selects pnpm, and
@@ -65,12 +67,16 @@ before preset validation:
   hoists it to a shared root, run `init` from the workspace root.
 - The package manager records the installed version in the lockfile. Keep the
   lockfile with the project to reproduce that dependency selection.
-- The pack's presets are discovered by convention: the pack root is the
-  default preset, and any directory below it that contains `atlante.jsonc` or
-  `atlante.json` is a named preset. Selecting `--pack @acme/pack` picks the
-  only preset automatically and prompts when the pack provides several;
-  when several presets are available, non-interactive terminals require an
-  explicit selection such as `--pack @acme/pack/<preset>`.
+- The installed pack must have a `package.json` whose `name` matches the
+  requested package, whose `version` is strict semver, and whose
+  `atlante.format` is the number `1`.
+- Presets are discovered by convention in every directory except
+  `node_modules` that contains `atlante.jsonc` or `atlante.json`. The pack root
+  is the default preset only when it contains one of those files; subdirectories
+  are named presets. Selecting `--pack @acme/pack` picks the only discovered
+  preset automatically and prompts when the pack provides several. With
+  several presets, non-interactive terminals require an explicit selection
+  such as `--pack @acme/pack/<preset>`.
 - Initialization is transactional: a failure after the snapshot — including an
   aborted prompt — rolls back the configuration files and restores
   `package.json` and the lockfile. If the rollback itself fails, `init`
@@ -110,8 +116,9 @@ npx atlante build [path]
 npx atlante build [path] --watch
 ```
 
-A successful one-shot command lists written paths, then removed paths, for
-each host. The final line reports the resolved project path:
+A successful one-shot command lists written agent and skill paths, then removed
+agent and skill paths, for each host. It does not list ownership-manifest
+publication. The final line reports the resolved project path:
 
 ```text
 wrote opencode: .opencode/agents/architect.md
@@ -128,9 +135,11 @@ or `removed` lines.
 when the selected configuration or any selected resource changes.
 
 A successful rebuild materializes the updated native outputs. A validation or
-build failure reports a diagnostic, leaves the previous valid generated set in
-place, and keeps the watcher running. The watcher retries when a later change
-arrives. Stop it with `Ctrl-C`.
+preparation failure reports a diagnostic and leaves the previous generated set
+in place. A publication failure attempts to restore that set; incomplete
+restoration requires the recovery reported by the diagnostic. In either case,
+the watcher stays active and retries after a later change. Stop it with
+`Ctrl-C`.
 
 ## `atlante eval`
 
@@ -187,7 +196,7 @@ warnings and diagnostics written to that stream.
 ## Exit status
 
 - `0` means the command completed without errors. In watch mode, interruption also produces exit status `0`.
-- `1` means validation or build failed for a one-shot command.
+- `1` means `init`, `validate`, or `build` failed for a one-shot command.
 
 Eval has its own exit statuses; see [Eval](/reference/eval#reports-and-exit-status).
 

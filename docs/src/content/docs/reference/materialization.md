@@ -10,9 +10,9 @@ formats, ownership records, and publication rules.
 ## Host selection
 
 The document's `hosts` field selects the materialization targets. Version 0.1
-admits only `"opencode"`, and `["opencode"]` is the canonical default. Each
-declared host must have a registered materializer; an unknown host fails the
-build with `unsupported-host`.
+admits only `"opencode"`, and `["opencode"]` is the canonical default. Schema
+validation rejects another value with `invalid-document`. After validation, a
+declared host without an injected materializer fails with `unsupported-host`.
 
 ## Native output paths
 
@@ -30,7 +30,8 @@ ID fails the build with `materialization-invalid-id`.
 
 An agent file is a YAML frontmatter `description` followed by the rendered
 prompt. A skill file is a YAML frontmatter `name` and `description` followed
-by the rendered skill content.
+by the rendered skill content. Frontmatter values use JSON-quoted YAML scalars.
+Atlante appends rendered content verbatim and does not add a trailing newline.
 
 ## Ownership manifest
 
@@ -58,8 +59,9 @@ Each `files` entry has exactly `kind` (`agent` or `skill`), `id`, `path`, and
 `sha256` is the lowercase SHA-256 digest of the file's exact UTF-8 bytes.
 Entries are unique by `(kind, id)` and by path, so an agent and skill can
 share an ID. The manifest contains metadata, not prompt or skill content.
-It records ownership rather than establishing a trust boundary. The
-materializer writes it last, and only when its bytes would change.
+Entries are sorted by path. The manifest uses two-space-indented JSON and ends
+with a newline. It records ownership rather than establishing a trust boundary.
+The materializer writes it last, and only when its bytes would change.
 
 ## Host discovery
 
@@ -86,6 +88,8 @@ previously generated file, the materializer captures a byte snapshot, then:
   never replaced or removed. The build fails with `materialization-drift`.
 - **Stale cleanup** — a generated file the source no longer declares is
   removed only when its bytes still match the manifest digest.
+- **Unrelated files** — files outside the desired and manifest-owned paths are
+  not publication targets and remain untouched.
 - **Unsafe paths** — a symlinked project root, parent directory, or target
   fails with `materialization-unsafe-path`.
 - **Staged writes** — bytes are staged, flushed, and published per file by
@@ -103,6 +107,7 @@ Materialization failures carry a `materialization-` prefix:
 
 | Code | Meaning |
 | --- | --- |
+| `materialization-invalid-input` | The prepared project violated the materializer contract; this indicates a builder defect |
 | `materialization-invalid-id` | An agent or skill ID violates the native ID grammar |
 | `materialization-collision` | An unowned file occupies a target path |
 | `materialization-drift` | A generated file no longer matches its recorded digest |
