@@ -1,43 +1,36 @@
 ---
-const guarantees = [
+const benefits = [
   {
-    signal: "extends → local",
-    title: "Know what wins",
+    signal: "security review",
+    title: "Keep review rules consistent",
     detail:
-      "Presets compose in declaration order. Your local configuration takes precedence.",
+      "Define a no-secrets policy once, reuse it across review agents, and validate every binding before you build.",
   },
   {
-    signal: "one template → many roles",
-    title: "Compose roles, not copies",
+    signal: "team-wide pack",
+    title: "Give every project the same starting point",
     detail:
-      "Reusable templates give agents shared structure without duplicating prompt definitions.",
+      "Package your team's agents, skills, values, and policies once, then initialize new repositories from the reviewed pack.",
   },
   {
-    signal: "same resolved source → same output",
-    title: "Get reproducible outputs",
+    signal: "versioned eval",
+    title: "Catch breakage before sharing",
     detail:
-      "The same resolved source and selected content produce the same host-native output.",
-  },
-  {
-    signal: "host-owned runtime",
-    title: "Keep control of the runtime",
-    detail:
-      "Models, effort, permissions, tools, and modes remain owned by the host.",
-
+      "Run a scenario through OpenCode in a sandbox, grade deterministic checks, and catch regressions before sharing.",
   },
 ];
 ---
 
-<section class="review-close major-divider" id="guarantees">
+<section class="review-close major-divider" id="benefits">
   <div class="inner">
     <header class="intro">
-      <h2>Built for change. Strict by design</h2>
+      <h2>Use it for real work</h2>
 
     </header>
 
-    <div class="guarantees">
+    <div class="benefits">
       {
-        guarantees.map((item) => (
+        benefits.map((item) => (
           <article>
             <code>{item.signal}</code>
             <h3>{item.title}</h3>
@@ -51,13 +44,13 @@ const guarantees = [
       <span class="next-star" aria-hidden="true"></span>
       <div class="next-copy">
         <p class="next-label">Next step</p>
-        <p class="statement">Chart your harness</p>
+        <p class="statement">Build your harness</p>
         <p class="literal">
-          Run <code>init</code> to create your configuration and build your first harness.
+          Follow the getting started guide, or explore the source on GitHub.
         </p>
         <div class="actions">
-          <a class="primary" href="#quick-start">Get started</a>
-          <a class="secondary" href="https://docs.atlante.sh">Documentation</a>
+          <a class="primary" href="https://docs.atlante.sh/getting-started">Get started</a>
+          <a class="secondary" href="https://github.com/atlante/atlante">View on GitHub</a>
         </div>
       </div>
     </div>
@@ -83,10 +76,10 @@ const guarantees = [
   h2 {
     max-width: 13ch;
     margin: 0;
-    font-family: var(--font-display);
+    font-family: var(--font-heading);
     font-optical-sizing: auto;
     font-size: clamp(44px, 5vw, 84px);
-    font-weight: 500;
+    font-weight: 600;
     line-height: 1.04;
     letter-spacing: -0.015em;
     text-wrap: balance;
@@ -94,9 +87,9 @@ const guarantees = [
 
 
 
-  .guarantees {
+  .benefits {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     border-block: 1px solid var(--ds-border);
   }
 
@@ -121,10 +114,10 @@ const guarantees = [
   h3 {
     max-width: 14ch;
     margin: var(--space-12) 0 var(--space-4);
-    font-family: var(--font-display);
+    font-family: var(--font-heading);
     font-size: clamp(26px, 2.2vw, 36px);
 
-    font-weight: 500;
+    font-weight: 600;
     line-height: 1.02;
   }
 
@@ -154,9 +147,9 @@ const guarantees = [
   .statement {
     max-width: 11ch;
     margin: 0 0 var(--space-8);
-    font-family: var(--font-display);
+    font-family: var(--font-heading);
     font-size: clamp(44px, 5.5vw, 88px);
-    font-weight: 500;
+    font-weight: 600;
     line-height: 1.04;
     letter-spacing: -0.02em;
     text-wrap: balance;
@@ -213,6 +206,7 @@ const guarantees = [
     justify-content: center;
     min-height: var(--control-min);
     padding-inline: var(--space-8);
+    border-radius: 4px;
     font-family: var(--font-ui);
     font-size: var(--text-small);
     font-weight: 520;
@@ -221,7 +215,7 @@ const guarantees = [
   }
 
   .primary {
-    border: 1px solid var(--ds-border);
+    border: 0;
     background: var(--ds-fg);
     color: var(--ds-bg);
   }
@@ -233,9 +227,8 @@ const guarantees = [
 
   .primary:hover,
   .primary:focus-visible {
-    background: transparent;
-    color: var(--ds-fg);
-    border-color: var(--ds-border);
+    background: var(--ds-button-hover);
+    color: var(--ds-bg);
   }
 
   .secondary:hover,
@@ -257,7 +250,7 @@ const guarantees = [
   }
 
   @media (max-width: 980px) {
-    .guarantees {
+    .benefits {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
@@ -280,7 +273,7 @@ const guarantees = [
       margin-inline: auto;
     }
 
-    .guarantees {
+    .benefits {
       grid-template-columns: 1fr;
     }
 
@@ -295,13 +288,13 @@ const guarantees = [
       border-block-end: 0;
     }
 
-    .guarantees article {
+    .benefits article {
       text-align: center;
     }
 
-    .guarantees article code,
-    .guarantees article h3,
-    .guarantees article p {
+    .benefits article code,
+    .benefits article h3,
+    .benefits article p {
       margin-inline: auto;
     }
 

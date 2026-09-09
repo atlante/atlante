@@ -16,9 +16,8 @@ const groups = [
   {
     label: "Project",
     links: [
-      { label: "GitHub repo", href: github },
+      { label: "GitHub", href: github },
       { label: "Releases", href: `${github}/releases` },
-      { label: "v0.1", href: `${github}/releases/latest` },
       { label: "Issues", href: `${github}/issues` },
     ],
   },
@@ -30,7 +29,7 @@ const groups = [
         href: `${github}/blob/main/SPECIFICATION.md`,
       },
       { label: "npm", href: "https://www.npmjs.com/package/@atlante/cli" },
-      { label: "Contributing", href: "https://docs.atlante.sh/contributing" },
+      { label: "Contributing", href: `${github}/blob/main/CONTRIBUTING.md` },
       { label: "MIT", href: `${github}/blob/main/LICENSE` },
     ],
   },
@@ -115,7 +114,7 @@ const groups = [
 
 <style>
   .site-footer {
-    width: min(100%, calc(var(--container-hero) + 2 * var(--space-4)));
+    width: min(100%, calc(var(--container-wide) + 2 * var(--space-4)));
     box-sizing: border-box;
     margin-inline: auto;
     padding: 0 var(--space-4) var(--space-8);
@@ -249,13 +248,7 @@ const groups = [
 
   @media (max-width: 700px) {
     .footer-controls {
-      display: flex;
-      justify-content: center;
-      margin-block-start: var(--space-4);
-    }
-
-    .planet {
-      display: grid;
+      display: none;
     }
 
     .mark {

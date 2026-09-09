@@ -1,0 +1,82 @@
+<button
+  class="back-to-top"
+  type="button"
+  data-back-to-top
+  aria-label="Back to top"
+  hidden
+>
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="1.5"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    aria-hidden="true"
+  >
+    <path d="m6 14 6-6 6 6"></path>
+    <path d="M12 8v10"></path>
+  </svg>
+</button>
+
+<script>
+  import { getScrollBehavior } from "../lib/scroll";
+
+  const button = document.querySelector<HTMLButtonElement>("[data-back-to-top]");
+
+  if (button) {
+    const syncVisibility = (): void => {
+      button.hidden = window.scrollY <= window.innerHeight;
+    };
+
+    button.addEventListener("click", () => {
+      window.scrollTo({
+        top: 0,
+        behavior: getScrollBehavior(
+          window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+        ),
+      });
+    });
+    window.addEventListener("scroll", syncVisibility, { passive: true });
+    window.addEventListener("resize", syncVisibility);
+    syncVisibility();
+  }
+</script>
+
+<style>
+  .back-to-top {
+    position: fixed;
+    inset-inline-end: var(--space-4);
+    inset-block-end: var(--space-4);
+    z-index: 50;
+    display: none;
+    place-items: center;
+    width: var(--control-min);
+    height: var(--control-min);
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: var(--ds-fg);
+    color: var(--ds-bg);
+    cursor: pointer;
+  }
+
+  .back-to-top:hover,
+  .back-to-top:focus-visible {
+    background: var(--ds-button-hover);
+    color: var(--ds-bg);
+  }
+
+  .back-to-top svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  @media (max-width: 700px) {
+    .back-to-top {
+      display: grid;
+      inset-inline-end: var(--space-3);
+      inset-block-end: var(--space-3);
+    }
+  }
+</style>

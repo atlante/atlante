@@ -13,7 +13,7 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 
-export type PlaygroundStep = "init" | "validate" | "build";
+export type PlaygroundStep = "build";
 
 export interface PlaygroundFile {
   path: string;
@@ -23,7 +23,6 @@ export interface PlaygroundFile {
 export interface PlaygroundRequest {
   step: PlaygroundStep;
   files: PlaygroundFile[];
-  force: boolean;
 }
 
 export interface PlaygroundResult {
@@ -42,6 +41,7 @@ const MAX_OUTPUT_BYTES = 64 * 1024;
 const MAX_TREE_FILES = 24;
 const MAX_TREE_FILE_BYTES = 64 * 1024;
 const STEP_TIMEOUT_MS = 20_000;
+const NATIVE_MANIFEST_PATH = ".atlante/opencode-native.json";
 
 const require = createRequire(import.meta.url);
 
@@ -67,8 +67,8 @@ export function parsePlaygroundRequest(raw: unknown): PlaygroundRequest {
   }
   const body = raw as Record<string, unknown>;
   const step = body.step;
-  if (step !== "init" && step !== "validate" && step !== "build") {
-    throw new Error("step must be init, validate, or build");
+  if (step !== "build") {
+    throw new Error('step must be "build"');
   }
   const rawFiles = body.files ?? [];
   if (!Array.isArray(rawFiles) || rawFiles.length > MAX_FILES) {
@@ -91,11 +91,7 @@ export function parsePlaygroundRequest(raw: unknown): PlaygroundRequest {
     }
     files.push({ path, content });
   }
-  const force = body.force === true;
-  if (force && step !== "init") {
-    throw new Error("force is only supported for init");
-  }
-  return { step, files, force };
+  return { step, files };
 }
 
 interface ExecResult {
@@ -104,17 +100,9 @@ interface ExecResult {
   output: string;
 }
 
-function execStep(
-  dir: string,
-  step: PlaygroundStep,
-  force: boolean,
-): Promise<ExecResult> {
+function execBuild(dir: string): Promise<ExecResult> {
   return new Promise((resolve) => {
-    const args =
-      step === "init"
-        ? ["init", ".", ...(force ? ["--force"] : [])]
-        : [step, "."];
-    const child = spawn(process.execPath, [cliEntry(), ...args], {
+    const child = spawn(process.execPath, [cliEntry(), "build", "."], {
       cwd: dir,
       env: { ...process.env, NO_COLOR: "1" },
       stdio: ["ignore", "pipe", "pipe"],
@@ -151,6 +139,18 @@ function execStep(
 
 async function collectTree(root: string): Promise<PlaygroundFile[]> {
   const files: PlaygroundFile[] = [];
+  try {
+    const manifest = await readFile(
+      join(root, ...NATIVE_MANIFEST_PATH.split("/")),
+    );
+    files.push({
+      path: NATIVE_MANIFEST_PATH,
+      content: manifest.subarray(0, MAX_TREE_FILE_BYTES).toString("utf8"),
+    });
+  } catch {
+    // The manifest is only present after a successful native materialization.
+  }
+
   async function walk(dir: string): Promise<void> {
     if (files.length >= MAX_TREE_FILES) return;
     for (const entry of await readdir(dir, { withFileTypes: true })) {
@@ -158,6 +158,9 @@ async function collectTree(root: string): Promise<PlaygroundFile[]> {
       const full = join(dir, entry.name);
       if (entry.isDirectory()) {
         await walk(full);
+        continue;
+      }
+      if (relative(root, full).split("\\").join("/") === NATIVE_MANIFEST_PATH) {
         continue;
       }
       const buffer = await readFile(full);
@@ -201,7 +204,7 @@ export async function runPlaygroundStep(
       await writeFile(join(dir, file.path), file.content, "utf8");
     }
     const started = Date.now();
-    const run = await execStep(dir, request.step, request.force);
+    const run = await execBuild(dir);
 
     const files = run.exitCode === 0 ? await collectTree(dir) : [];
     return {

@@ -1,0 +1,101 @@
+<section class="contract-band major-divider" aria-label="Product contract">
+  <div class="inner">
+    <div class="contract-grid">
+      <article>
+        <h2>Capabilities</h2>
+        <ul>
+          <li>Compose reusable presets and templates for agents and skills.</li>
+          <li>Build deterministic OpenCode-native files with <code>atlante build</code>.</li>
+          <li>Evaluate harnesses in OpenCode with versioned scenarios and <code>atlante eval</code>.</li>
+          <li>Initialize projects from shared harness packs with <code>atlante init --pack &lt;your-pack&gt;</code>.</li>
+        </ul>
+      </article>
+      <article>
+        <h2>Boundaries</h2>
+        <ul>
+          <li>No LLM inference or agent/skill execution.</li>
+          <li>No project-code execution.</li>
+          <li>No model, effort, permission, tool, or mode selection.</li>
+          <li>No runtime-state, checkpoint, or scheduling management.</li>
+          <li>OpenCode is the only supported host for now.</li>
+        </ul>
+      </article>
+    </div>
+  </div>
+</section>
+
+<style>
+  .inner {
+    max-width: var(--container-wide);
+    margin-inline: auto;
+    padding: clamp(var(--space-12), 6vw, var(--space-24)) var(--space-4);
+  }
+
+  .contract-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  article {
+    padding: var(--space-8);
+  }
+
+  article + article {
+    border-inline-start: 1px solid var(--ds-border-subtle);
+  }
+
+  h2 {
+    margin: 0 0 var(--space-6);
+    font-family: var(--font-heading);
+    font-size: clamp(30px, 3vw, 48px);
+    font-weight: 600;
+    line-height: 1.05;
+  }
+
+  ul {
+    display: grid;
+    gap: var(--space-3);
+    margin: 0;
+    padding-inline-start: 1.2em;
+    color: var(--ds-muted);
+    font-family: var(--font-body);
+    font-size: var(--text-ui);
+    line-height: 1.55;
+  }
+
+  li::marker {
+    color: var(--ds-accent);
+  }
+
+  li code {
+    display: inline-block;
+    max-width: 100%;
+    padding: 0.12em 0.4em;
+    border: 1px solid rgb(160 160 160 / 0.5);
+    border-radius: 4px;
+    background: color-mix(in oklab, var(--ds-bg) 96%, var(--ds-fg));
+    color: var(--ds-fg);
+    font-family: var(--font-mono);
+    font-size: var(--text-small);
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+    vertical-align: baseline;
+  }
+
+  @media (max-width: 700px) {
+    .contract-grid {
+      grid-template-columns: 1fr;
+    }
+
+    article {
+      padding-block: var(--space-8);
+      padding-inline: var(--space-4);
+    }
+
+    article + article {
+      margin-block-start: 0;
+      border-block-start: 1px solid var(--ds-border-subtle);
+      border-inline-start: 0;
+    }
+  }
+</style>

@@ -118,8 +118,7 @@ const description = "The page you requested was not found.";
     align-items: center;
     justify-content: center;
     padding-inline: var(--space-6);
-    border: 1px solid var(--ds-border);
-    border-radius: 0;
+    border-radius: 4px;
     color: var(--ds-fg);
     font-family: var(--font-ui);
     font-size: var(--text-small);
@@ -128,13 +127,18 @@ const description = "The page you requested was not found.";
   }
 
   .primary {
+    border: 0;
     background: var(--ds-fg);
     color: var(--ds-bg) !important;
   }
 
-  .actions a:hover,
-  .actions a:focus-visible {
-    background: var(--ds-fg);
+  .secondary {
+    border: 1px solid var(--ds-border);
+  }
+
+  .primary:hover,
+  .primary:focus-visible {
+    background: var(--ds-button-hover);
     color: var(--ds-bg);
   }
 
