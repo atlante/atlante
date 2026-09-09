@@ -125,6 +125,28 @@ test("the built launcher runs with Node when Bun is unavailable", () => {
   expect(result.stdout.trim()).toBe(packageJson.version);
 });
 
+test("the built launcher honors init --no-mcp", () => {
+  const dir = projectWithoutUserPack(`{
+    "$schema": "${SCHEMA_URI}",
+    "extends": "@atlante/pack"
+  }`);
+  rmSync(join(dir, "atlante.jsonc"));
+  const executableDir = join(dir, "path");
+  mkdirSync(executableDir);
+  symlinkSync(nodeExecutable(), join(executableDir, "node"));
+
+  const result = spawnSync(LAUNCHER, ["init", dir, "--no-mcp"], {
+    cwd: dir,
+    encoding: "utf8",
+    env: { ...process.env, PATH: executableDir },
+  });
+
+  expect(result.status).toBe(0);
+  expect(existsSync(join(dir, "atlante.jsonc"))).toBe(true);
+  expect(existsSync(join(dir, "opencode.jsonc"))).toBe(false);
+  expect(existsSync(join(dir, "opencode.json"))).toBe(false);
+});
+
 test("the built launcher builds a project under Node", () => {
   const dir = project(valid);
   const executableDir = join(dir, "path");
@@ -356,10 +378,11 @@ describe("runBuild", () => {
   });
 });
 
-test("registers validate, build, init, and eval, but not resolve", () => {
+test("registers validate, build, mcp, init, and eval, but not resolve", () => {
   expect(createProgram().commands.map((command) => command.name())).toEqual([
     "validate",
     "build",
+    "mcp",
     "init",
     "eval",
   ]);
@@ -387,4 +410,12 @@ test("init no longer exposes the removed --preset option", () => {
     (command) => command.name() === "init",
   );
   expect(init?.options.map((option) => option.long)).not.toContain("--preset");
+});
+
+test("init exposes the --no-mcp opt-out", () => {
+  const init = createProgram().commands.find(
+    (command) => command.name() === "init",
+  );
+
+  expect(init?.options.map((option) => option.long)).toContain("--no-mcp");
 });

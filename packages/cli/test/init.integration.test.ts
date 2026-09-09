@@ -16,6 +16,7 @@ import type { BuildResult } from "@atlante/builder";
 import { buildProject } from "@atlante/builder";
 import { openCodeMaterializer } from "@atlante/opencode";
 import { SCHEMA_URI } from "@atlante/schema";
+import packageJson from "../package.json" with { type: "json" };
 import {
   type InitDependencies,
   runInitWithDependencies,
@@ -1389,10 +1390,17 @@ describe("runInit", () => {
     expect(readFileSync(nativeManifest, "utf8")).toBe(originalManifest);
   });
 
-  test("does not create an OpenCode configuration", async () => {
+  test("creates an OpenCode configuration and registers the MCP server", async () => {
     const dir = tempDir();
     await runInitWithDependencies(dir, {}, {});
-    expect(existsSync(join(dir, "opencode.jsonc"))).toBe(false);
+    const config = JSON.parse(
+      readFileSync(join(dir, "opencode.jsonc"), "utf8"),
+    ) as { mcp?: { atlante?: Record<string, unknown> } };
+    expect(config.mcp?.atlante).toEqual({
+      type: "local",
+      command: ["npx", "--yes", `atlante@${packageJson.version}`, "mcp"],
+      enabled: true,
+    });
     expect(existsSync(join(dir, "opencode.json"))).toBe(false);
   });
 
@@ -1413,7 +1421,7 @@ describe("runInit", () => {
     );
   });
 
-  test("preserves an existing opencode.jsonc without a registration", async () => {
+  test("preserves an existing opencode.jsonc while registering MCP", async () => {
     const dir = tempDir();
     const path = join(dir, "opencode.jsonc");
     const original = `{ "model": "anthropic/claude-sonnet-5" }`;
@@ -1421,8 +1429,12 @@ describe("runInit", () => {
     await runInitWithDependencies(dir, {}, {});
     const opencode = JSON.parse(readFileSync(path, "utf8"));
     expect(opencode.model).toBe("anthropic/claude-sonnet-5");
-    expect(opencode.plugin).toBeUndefined();
-    expect(readFileSync(path, "utf8")).toBe(original);
+    expect(opencode.mcp.atlante.command).toEqual([
+      "npx",
+      "--yes",
+      `atlante@${packageJson.version}`,
+      "mcp",
+    ]);
   });
 
   test("preserves an existing host configuration with a stale Atlante plugin", async () => {
@@ -1433,18 +1445,27 @@ describe("runInit", () => {
 
     expect(await runInitWithDependencies(dir, {}, {})).toBe(0);
 
-    expect(readFileSync(path, "utf8")).toBe(original);
+    const opencode = JSON.parse(readFileSync(path, "utf8"));
+    expect(opencode.model).toBe("anthropic/claude-sonnet-5");
+    expect(opencode.plugin).toEqual(["@atlante/opencode"]);
+    expect(opencode.mcp.atlante.type).toBe("local");
     expect(existsSync(join(dir, "opencode.jsonc"))).toBe(false);
   });
 
-  test("preserves malformed existing OpenCode configuration", async () => {
+  test("rejects malformed existing OpenCode configuration", async () => {
     const dir = tempDir();
     const path = join(dir, "opencode.jsonc");
     const original = '{ "model": "demo",';
     writeFileSync(path, original);
 
-    expect(await runInit(dir, {})).toBe(0);
+    const result = await captureErrors(() => runInit(dir, {}));
+
+    expect(result.result).toBe(1);
+    expect(result.errors.join("\n")).toContain(
+      "invalid-opencode-configuration",
+    );
     expect(readFileSync(path, "utf8")).toBe(original);
+    expect(existsSync(join(dir, "atlante.jsonc"))).toBe(false);
   });
 
   test("appends only missing .gitignore entries without touching existing content", async () => {
@@ -1636,5 +1657,187 @@ describe("runInit", () => {
     expect(result.errors.join("\n")).toContain("configuration-exists");
     expect(packManager.runs).toEqual([]);
     expect(readFileSync(join(dir, "package.json"), "utf8")).toBe(before);
+  });
+
+  describe("OpenCode MCP registration", () => {
+    test("registers the version-pinned Atlante MCP server in a new config", async () => {
+      const dir = tempDirWithoutUserPack();
+
+      expect(await runInit(dir, {})).toBe(0);
+
+      const config = JSON.parse(
+        readFileSync(join(dir, "opencode.jsonc"), "utf8"),
+      ) as {
+        mcp?: { atlante?: Record<string, unknown> };
+      };
+      expect(config.mcp?.atlante).toEqual({
+        type: "local",
+        command: ["npx", "--yes", `atlante@${packageJson.version}`, "mcp"],
+        enabled: true,
+      });
+    });
+
+    test("skips OpenCode registration with --no-mcp", async () => {
+      const dir = tempDir();
+
+      expect(await runInitWithDependencies(dir, { noMcp: true }, {})).toBe(0);
+
+      expect(existsSync(join(dir, "opencode.jsonc"))).toBe(false);
+      expect(existsSync(join(dir, "opencode.json"))).toBe(false);
+    });
+
+    test("preserves JSONC comments and unrelated host settings", async () => {
+      const dir = tempDirWithoutUserPack();
+      const path = join(dir, "opencode.jsonc");
+      const original = `{
+  // Keep this project model.
+  "model": "anthropic/claude-sonnet-5",
+}`;
+      writeFileSync(path, original);
+
+      expect(await runInit(dir, {})).toBe(0);
+
+      const updated = readFileSync(path, "utf8");
+      expect(updated).toContain("// Keep this project model.");
+      expect(updated).toContain('"model": "anthropic/claude-sonnet-5"');
+      expect(updated).toContain('"atlante"');
+    });
+
+    test("updates an existing JSON config without creating a JSONC sibling", async () => {
+      const dir = tempDir();
+      const path = join(dir, "opencode.json");
+      writeFileSync(path, '{ "model": "anthropic/claude-sonnet-5" }');
+
+      expect(await runInit(dir, {})).toBe(0);
+
+      const config = JSON.parse(readFileSync(path, "utf8")) as {
+        mcp?: { atlante?: Record<string, unknown> };
+      };
+      expect(config.mcp?.atlante).toEqual({
+        type: "local",
+        command: ["npx", "--yes", `atlante@${packageJson.version}`, "mcp"],
+        enabled: true,
+      });
+      expect(existsSync(join(dir, "opencode.jsonc"))).toBe(false);
+    });
+
+    test("prefers opencode.jsonc when both host config files exist", async () => {
+      const dir = tempDir();
+      const jsonc = join(dir, "opencode.jsonc");
+      const json = join(dir, "opencode.json");
+      writeFileSync(jsonc, '{ "model": "anthropic/claude-sonnet-5" }');
+      const originalJson = '{ "model": "google/gemini-3-pro" }';
+      writeFileSync(json, originalJson);
+
+      expect(await runInit(dir, {})).toBe(0);
+
+      expect(readFileSync(json, "utf8")).toBe(originalJson);
+      const config = JSON.parse(readFileSync(jsonc, "utf8")) as {
+        mcp?: { atlante?: Record<string, unknown> };
+      };
+      expect(config.mcp?.atlante?.type).toBe("local");
+    });
+
+    test("preserves unrelated MCP servers", async () => {
+      const dir = tempDir();
+      const path = join(dir, "opencode.jsonc");
+      writeFileSync(
+        path,
+        JSON.stringify({
+          mcp: {
+            other: {
+              type: "local",
+              command: ["bun", "run", "other-mcp"],
+              enabled: false,
+            },
+          },
+        }),
+      );
+
+      expect(await runInit(dir, {})).toBe(0);
+
+      const config = JSON.parse(readFileSync(path, "utf8")) as {
+        mcp: Record<string, unknown>;
+      };
+      expect(config.mcp.other).toEqual({
+        type: "local",
+        command: ["bun", "run", "other-mcp"],
+        enabled: false,
+      });
+      expect(config.mcp.atlante).toBeDefined();
+    });
+
+    test("is idempotent when the Atlante MCP entry is already registered", async () => {
+      const dir = tempDirWithoutUserPack();
+
+      expect(await runInit(dir, {})).toBe(0);
+      const path = join(dir, "opencode.jsonc");
+      const registered = readFileSync(path, "utf8");
+
+      expect(await runInit(dir, { force: true })).toBe(0);
+      expect(readFileSync(path, "utf8")).toBe(registered);
+    });
+
+    test("rejects an invalid host MCP structure before writing Atlante config", async () => {
+      const dir = tempDirWithoutUserPack();
+      const path = join(dir, "opencode.jsonc");
+      const original = '{ "mcp": [] }';
+      writeFileSync(path, original);
+
+      const result = await captureErrors(() => runInit(dir, {}));
+
+      expect(result.result).toBe(1);
+      expect(result.errors.join("\n")).toContain(
+        "invalid-opencode-configuration",
+      );
+      expect(readFileSync(path, "utf8")).toBe(original);
+      expect(existsSync(join(dir, "atlante.jsonc"))).toBe(false);
+    });
+
+    test("rejects a conflicting Atlante MCP entry without overwriting it", async () => {
+      const dir = tempDirWithoutUserPack();
+      const path = join(dir, "opencode.jsonc");
+      const original = JSON.stringify({
+        mcp: { atlante: { type: "remote", url: "https://example.test/mcp" } },
+      });
+      writeFileSync(path, original);
+
+      const result = await captureErrors(() => runInit(dir, {}));
+
+      expect(result.result).toBe(1);
+      expect(result.errors.join("\n")).toContain(
+        "invalid-opencode-configuration",
+      );
+      expect(readFileSync(path, "utf8")).toBe(original);
+      expect(existsSync(join(dir, "atlante.jsonc"))).toBe(false);
+    });
+
+    test("rolls back a newly registered MCP entry when the build fails", async () => {
+      const dir = tempDir();
+      const result = await captureErrors(() =>
+        runInitWithDependencies(
+          dir,
+          {},
+          {
+            buildProject: () => ({
+              projectRoot: dir,
+              diagnostics: [
+                {
+                  severity: "error",
+                  code: "injected-build-failure",
+                  message: "build failed",
+                },
+              ],
+              materializations: [],
+            }),
+          },
+        ),
+      );
+
+      expect(result.result).toBe(1);
+      expect(result.errors.join("\n")).toContain("injected-build-failure");
+      expect(existsSync(join(dir, "atlante.jsonc"))).toBe(false);
+      expect(existsSync(join(dir, "opencode.jsonc"))).toBe(false);
+    });
   });
 });

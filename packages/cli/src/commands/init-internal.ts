@@ -31,6 +31,7 @@ import {
 } from "../report.js";
 import { createStyler } from "../style.js";
 import { formatInitError } from "./init-error.js";
+import { type OpenCodeMcpPlan, prepareOpenCodeMcp } from "./opencode-mcp.js";
 import { parsePackLocator, type SelectedPack } from "./pack-locator.js";
 import {
   discoverPackPresets,
@@ -49,7 +50,11 @@ import {
   runPackageManagerDefault,
 } from "./package-manager.js";
 
-export type InitOptions = { pack?: string; force?: boolean };
+export type InitOptions = {
+  pack?: string;
+  force?: boolean;
+  noMcp?: boolean;
+};
 
 type InitFileSystem = {
   existsSync: (path: string) => boolean;
@@ -288,12 +293,18 @@ function commitInitFiles(
   flow: InitFlow,
   contents: string,
   before: { target: Snapshot; alternate: Snapshot },
+  mcp: OpenCodeMcpPlan | undefined,
   gitignore: GitignorePlan,
 ): { error?: string } {
   const { changes } = flow.state;
   try {
     changes.push({ path: flow.target, before: before.target });
     flow.fileSystem.writeFileSync(flow.target, contents);
+
+    if (mcp?.write) {
+      changes.push({ path: mcp.path, before: mcp.previous });
+      flow.fileSystem.writeFileSync(mcp.path, mcp.contents);
+    }
 
     if (gitignore.write) {
       changes.push({ path: flow.gitignore, before: gitignore.previous });
@@ -870,16 +881,24 @@ async function prepareConfiguration(
 function commitConfiguration(
   flow: InitFlow,
   contents: string,
+  options: InitOptions,
   abort: Abort,
-): number | undefined {
+): number | { mcp?: OpenCodeMcpPlan } {
   const before = {
     target: snapshot(flow.target, flow.fileSystem),
     alternate: snapshot(flow.alternate, flow.fileSystem),
   };
+  let mcp: OpenCodeMcpPlan | undefined;
+  if (!options.noMcp) {
+    const prepared = prepareOpenCodeMcp(flow.directory, flow.fileSystem);
+    if ("error" in prepared) return abort(prepared.error);
+    mcp = prepared;
+  }
   const gitignore = prepareGitignore(flow.directory, flow.fileSystem);
 
-  const committed = commitInitFiles(flow, contents, before, gitignore);
+  const committed = commitInitFiles(flow, contents, before, mcp, gitignore);
   if (committed.error) return abort(committed.error);
+  return { mcp };
 }
 
 export async function runInitWithDependencies(
@@ -914,8 +933,13 @@ export async function runInitWithDependencies(
     const prepared = await prepareConfiguration(flow, options, abort);
     if (typeof prepared === "number") return prepared;
 
-    const committed = commitConfiguration(flow, prepared.contents, abort);
-    if (committed !== undefined) return committed;
+    const committed = commitConfiguration(
+      flow,
+      prepared.contents,
+      options,
+      abort,
+    );
+    if (typeof committed === "number") return committed;
 
     const result = buildAndReport(
       flow.directory,
@@ -927,6 +951,15 @@ export async function runInitWithDependencies(
       flow.context,
     );
     if (result !== 0) return result;
+    if (options.noMcp) {
+      console.log("skipped OpenCode MCP registration (--no-mcp)");
+    } else if (committed.mcp?.registered) {
+      console.log(`registered Atlante MCP server in ${committed.mcp.path}`);
+    } else if (committed.mcp) {
+      console.log(
+        `Atlante MCP server is already registered in ${committed.mcp.path}`,
+      );
+    }
     return 0;
   } catch (cause) {
     return abort(
