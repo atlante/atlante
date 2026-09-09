@@ -13,8 +13,9 @@ Follow [Getting started](/getting-started) to initialize the project and
 [install a project-local CLI](/getting-started#use-a-project-local-cli).
 Run the commands in this guide from that project directory.
 
-The examples extend `@atlante/pack`, keeping its default agent and skills
-while adding your reviewer. You do not need to copy the preset's files.
+The example uses the first-party `@atlante/pack` templates directly without
+extending the full preset, so the build adds only the reviewer and skill shown
+here.
 
 ## Add the reviewer
 
@@ -26,7 +27,6 @@ existing maps instead.
 ```jsonc title="atlante.jsonc"
 {
   "$schema": "https://atlante.sh/schema/v0.1/schema.json",
-  "extends": "@atlante/pack",
   "values": {
     "project": "billing-api",
     "language": "TypeScript"
@@ -130,9 +130,6 @@ wrote opencode: .opencode/skills/api-review/SKILL.md
 built /Users/example/billing-api
 ```
 
-Other files may also change, including inherited content that uses the
-values you added.
-
 ## Inspect the result
 
 Open `.opencode/agents/reviewer.md`. Its prompt should contain the resolved
@@ -176,6 +173,6 @@ Watch mode rebuilds the output; restart OpenCode when you want a new session
 to load it. See [Materialization](/reference/materialization) for the generated
 file and ownership contract.
 
-To check what the reviewer produces on a defined task, continue with
-[Evaluate your harness](/guides/evaluating-a-harness). To reuse its configuration
-in other projects, follow [Author a pack](/guides/authoring-packs).
+To reuse its configuration in other projects, continue with
+[Author a pack](/guides/authoring-packs). To check what the reviewer produces
+on a defined task, follow [Evaluate your harness](/guides/evaluating-a-harness).
