@@ -45,7 +45,7 @@
   --sl-text-h4: 1.2rem;
   --sl-line-height: 1.65;
   --sl-line-height-headings: 1.1;
-  --sl-content-width: 56rem;
+  --sl-content-width: 52rem;
   --sl-sidebar-width: 16rem;
   --sl-content-pad-x: clamp(1rem, 2.5vw, 2rem);
 }
@@ -157,11 +157,11 @@ dialog,
 details,
 .pagination-links a,
 .sl-markdown-content :is(pre, table, blockquote) {
-  border-radius: 0;
+  border-radius: 4px;
 }
 .sl-markdown-content code:not(pre code) {
   border: 1px solid var(--ds-border-subtle);
-  border-radius: 0;
+  border-radius: 4px;
   background: var(--sl-color-bg-inline-code);
   color: var(--sl-color-text);
 }
@@ -169,7 +169,7 @@ details,
 .sl-markdown-content table,
 .sl-markdown-content blockquote,
 .sl-markdown-content details {
-  border-radius: 0;
+  border-radius: 4px;
 }
 .sl-markdown-content pre {
   border: 1px solid var(--atlante-bronze);
@@ -259,10 +259,10 @@ details,
   text-decoration-thickness: 2px;
 }
 .sl-markdown-content .starlight-aside {
-  border-radius: 0;
+  border-radius: 4px;
 }
 .mobile-starlight-toc .toggle {
-  border-radius: 0;
+  border-radius: 4px;
 }
 .site-title,
 .social-icons a,

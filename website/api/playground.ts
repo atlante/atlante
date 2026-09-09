@@ -4,6 +4,10 @@ import {
   parsePlaygroundRequest,
   runPlaygroundStep,
 } from "./_lib/playground.js";
+import {
+  consumeSessionBuild,
+  resolvePlaygroundSession,
+} from "./_lib/session-budget.js";
 
 const MAX_BODY_BYTES = 256 * 1024;
 
@@ -37,14 +41,21 @@ function sameOrigin(request: IncomingMessage): boolean {
   }
 }
 
+function clientAddress(request: IncomingMessage): string {
+  const forwarded = request.headers["x-forwarded-for"];
+  if (typeof forwarded === "string") return forwarded.split(",")[0].trim();
+  return request.socket.remoteAddress ?? "unknown";
+}
+
 export default async function handler(
   request: IncomingMessage,
   response: ServerResponse,
 ): Promise<void> {
-  const send = (status: number, payload: unknown): void => {
+  const send = (status: number, payload: unknown, setCookie?: string): void => {
     response.statusCode = status;
     response.setHeader("content-type", "application/json; charset=utf-8");
     response.setHeader("cache-control", "no-store");
+    if (setCookie) response.setHeader("set-cookie", setCookie);
     response.end(JSON.stringify(payload));
   };
 
@@ -75,8 +86,25 @@ export default async function handler(
     return;
   }
 
+  const session = resolvePlaygroundSession(
+    request.headers.cookie,
+    clientAddress(request),
+    request.headers["x-forwarded-proto"] === "https",
+  );
+  const budget = consumeSessionBuild(session.key, {
+    fallbackKey: session.fallbackKey,
+  });
+  if (!budget.allowed) {
+    send(
+      429,
+      { error: "playground session build limit reached" },
+      session.setCookie,
+    );
+    return;
+  }
+
   try {
-    send(200, await runPlaygroundStep(parsed));
+    send(200, await runPlaygroundStep(parsed), session.setCookie);
   } catch (error) {
     send(500, {
       error: error instanceof Error ? error.message : "playground failure",

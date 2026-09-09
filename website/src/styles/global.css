@@ -38,7 +38,6 @@ body {
   display: none !important;
 }
 
-
 .skip-link {
   position: fixed;
   inset-block-start: var(--space-2);
@@ -65,12 +64,11 @@ body {
 }
 
 :root {
-  /* Reading surfaces stay centered; the playground is intentionally wider. */
-  --container-wide: 1440px;
-  --container-hero: 1280px;
-  --container-playground: 1760px;
-  --container-divider: 1200px;
-  --container-content: 86ch;
+  /* Every major landing-page section shares one reading width. */
+  --container-wide: 1200px;
+  --container-playground: 1440px;
+  --container-divider: var(--container-wide);
+  --container-content: 70ch;
 }
 
 :root {
@@ -137,9 +135,9 @@ main section[id] {
 @media (min-width: 1200px) {
   .observatory .instrument,
   .review-close .intro,
-  .review-close .guarantees,
+  .review-close .benefits,
   .review-close .next-step {
-    max-width: min(100%, var(--container-hero));
+    max-width: min(100%, var(--container-wide));
     margin-inline: auto;
   }
 }

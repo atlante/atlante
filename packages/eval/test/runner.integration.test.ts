@@ -79,7 +79,11 @@ const evalConfigWithModel: EvalConfig = {
 };
 
 describe("runEval", () => {
-  test("runs trials per scenario and computes statistics", async () => {
+  // Full report assembly and check evaluation can approach bun's 5s default
+  // timeout when the complete suite is running concurrently.
+  test("runs trials per scenario and computes statistics", {
+    timeout: 30_000,
+  }, async () => {
     let call = 0;
     const report = await runEval({
       projectRoot,

@@ -88,35 +88,38 @@ host-native files; the host executes them.
   // workflow skills (brainstorm, plan, build, review, harness).
   "extends": "@atlante/pack",
   "values": {
-    "project": "my-app",
-    // Referenced below as {{values.apiRule}}.
-    "apiRule": "All public APIs must have JSDoc.",
+    "project": "NEXORA",
+    "apiTestCommand": "bun run test:api",
   },
   "agents": {
-    // A project-specific agent: the preset already provides the
-    // general-purpose architect, so add the roles your project needs.
-    "api-designer": {
+    "api-reviewer": {
       "$template": "@atlante/pack/agent",
-      "description": "Designs and reviews the public API surface of {{values.project}}.",
-      "identity": "You are the API designer for {{values.project}}.",
-      "mission": "Keep the public API small, consistent, and backward-compatible.",
+      "description": "Use when reviewing a public API surface for consistency, compatibility, and clear request and response contracts before changes merge.",
+      "identity": "You are the API reviewer for {{values.project}}, responsible for keeping its public surface small, coherent, and safe to evolve.",
+      "mission": "You are responsible for reviewing API changes with the smallest process that produces a clear, compatible, and verified contract.",
       "sections": [
         {
-          "responsibilities": [
-            "Design new endpoints and their request and response contracts",
-            "Review breaking changes before they merge",
+          "instructions": [
+            "Read the existing public API and its tests before proposing a change",
+            "Define request, response, and error contracts explicitly for every endpoint",
+            "Keep naming, versioning, validation, and compatibility consistent with the existing API",
+            "Run {{values.apiTestCommand}} after changing the API and report the result",
           ],
         },
         {
-          "invariants": ["{{values.apiRule}}"],
+          "invariants": [
+            "Public API changes MUST preserve backward compatibility unless a breaking change is explicitly approved",
+            "Every new endpoint MUST define request, response, and error behavior",
+            "API changes MUST include or update focused tests",
+            "The public API MUST NOT expose internal implementation details",
+          ],
         },
       ],
     },
   },
-  // Test the harness with deterministic scenarios run in a sandbox.
   "eval": {
     "host": "opencode",
-    "scenarios": "eval/scenarios/*.eval.json",
+    "scenarios": "eval/scenarios/reviews-public-api.eval.json",
   },
 }
 ```
@@ -142,10 +145,10 @@ scenario that exercises the agent above:
 {
   "$schema": "https://atlante.sh/schema/v0.1/eval-scenario.json",
   "version": "0.1",
-  "name": "designs-health-endpoint",
+  "name": "reviews-public-api",
   "task": {
     "fixture": "eval/fixtures/empty-app",
-    "agent": "api-designer",
+    "agent": "api-reviewer",
     "prompt": "Design a GET /health endpoint that returns { \"status\": \"ok\" }."
   },
   "checks": [

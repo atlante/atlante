@@ -13,17 +13,17 @@ When documents disagree, apply this order:
 
 **Category:** the configuration and build layer for your coding-agent harness.
 
-**Primary audience:** engineering teams that need explicit structure for the agents, skills, and workflows in a shared coding-agent harness. Adjacent audiences are individual engineers adopting or maintaining a harness, engineering leads defining agent roles, and maintainers packaging reusable harness content.
+**Primary audience:** engineering teams and individual engineers who need explicit structure for a shared or personal coding-agent harness. Adjacent audiences are engineering leads defining agent roles and maintainers packaging reusable harness content.
 
 **Tagline:** Give form to your harness.
 
-Approved positioning: for teams that need a coding-agent harness they can share and evolve, Atlante turns agents, skills, and workflows into one versioned system. Unlike maintaining scattered prompts and host configuration separately, Atlante gives the team an authoritative source in the repository, then materializes it through a host adapter.
+Approved positioning: for engineering teams and individual engineers who need a coding-agent harness they can share or evolve, Atlante turns agents, skills, and workflows into one versioned system. Unlike maintaining scattered prompts and host configuration separately, Atlante gives you an authoritative source in the repository, then materializes it through a host adapter.
 
 Message order:
 
 1. Category: configuration and build layer for the harness.
-2. Team outcome: one shared source inherited through the repository.
-3. System contents: agents, skills, workflows, values, and selected resources.
+2. Authoring outcome: one versioned source you can review and evolve.
+3. System contents: agents, skills, values, and eval configuration.
 4. Destination: materialized through a host adapter; OpenCode is available today.
 5. Supporting proof: composition, validation, deterministic output, artifact verification, and host-setting preservation.
 6. Boundary: Atlante defines orchestration but does not execute agents itself.
@@ -81,9 +81,10 @@ This section distills decisions into pointers; the named files are authoritative
 - Logo master: `brand/assets/final_logo.svg`. Production exports live under `brand/assets/exports/`. Every export traces to the master and preserves the complete approved composition: never redraw, trace, crop, partially recolor, glow, shadow, or gradient the mark.
 - Lockups: glyph only; horizontal and stacked glyph plus uppercase `ATLANTE`; each arrangement with optional tagline; and single-color reverse. Lockups are layouts of one identity, not alternate marks.
 - Palette primitives and roles: `--atlante-linen` is the primary light surface and reverse ink; `--atlante-jet` is the primary ink and dark surface; `--atlante-bronze` covers rules, structural details, and non-text accents on light surfaces; `--atlante-pine` is the principal accent and light-theme success; `--atlante-brown` carries warning and error emphasis. Components consume semantic tokens through `brand/atlante-design-tokens.css` instead of duplicating raw palette values.
-- Typography roles: Bodoni Moda for display and wordmark; Source Serif 4 for editorial reading; Source Sans 3 for interface text; JetBrains Mono for code, commands, paths, diagnostics, and the formal tagline. Bodoni is never used for body text, controls, navigation, tables, or diagnostics.
+- Typography roles: Bodoni Moda for the wordmark; Source Serif 4 for display headings and editorial reading; Source Sans 3 for interface text; JetBrains Mono for code, commands, paths, diagnostics, and the formal tagline. Bodoni is never used for body text, controls, tables, or diagnostics.
 - Font licensing: all four families ship under the SIL Open Font License 1.1; see `brand/fonts/README.md`. Redistributed font files retain their matching copyright notice and license text.
 - Contrast: Jet on Linen and Linen on Jet carry primary text at roughly 13.9:1; Pine passes normal-text accent use; Golden Bronze on Linen is non-text only — rules, borders, registration marks, and large decorative marks, never normal text on Linen.
 - Focus: never rely on color alone. Use a visible `3px` Jet outline on Linen surfaces and a `3px` Linen outline on Jet surfaces, with a `2px` offset.
-- Geometry: radius is always `0`, including controls, cards, dialogs, and fields. Circles stay reserved for celestial geometry and functionally circular controls; ordinary content is flat with no shadow.
+- Geometry: use a restrained `4px` radius for controls and bounded surfaces, including cards, dialogs, fields, code blocks, and panels. Circles stay reserved for celestial geometry and functionally circular controls; ordinary content remains flat with no shadow.
+- Content width: landing editorial sections cap at `1200px` with prose limited to `70ch`; the playground remains wider at `1440px`; docs prose caps at `52rem`.
 - Accessibility baseline: semantic HTML before ARIA; every control has a programmatic name; interactive targets are at least `44 x 44px`; focus stays visible and follows reading order; color never carries status alone; every shipped surface rechecks its exact combinations against WCAG 2.2 AA; surfaces are tested at mobile widths, 200% zoom, and reduced motion.
