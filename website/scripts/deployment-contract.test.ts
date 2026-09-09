@@ -59,6 +59,19 @@ describe("website deployment contract", () => {
     expect(releaseWorkflow).toContain(
       "npx vercel@59.3.0 deploy --prebuilt --prod website",
     );
+    expect(releaseWorkflow).toContain("workflow_dispatch:");
+    expect(releaseWorkflow).toContain("deploy_only:");
+    expect(releaseWorkflow).toContain("version:");
+    expect(releaseWorkflow).toContain(
+      "if: $" + "{{ github.event_name == 'push' }}",
+    );
+    expect(releaseWorkflow).toContain(
+      "if: $" +
+        "{{ always() && (needs.publish-packages.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.deploy_only)) }}",
+    );
+    expect(releaseWorkflow).toContain(
+      "DEPLOY_VERSION: $" + "{{ inputs.version }}",
+    );
     expect(releaseWorkflow).toContain(
       'pack_target="$function_root/packages/cli/node_modules/@atlante/pack"',
     );
