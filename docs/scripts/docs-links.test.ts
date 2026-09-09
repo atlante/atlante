@@ -6,20 +6,22 @@ const docsRoot = join(import.meta.dirname, "..");
 const sourceRoot = join(docsRoot, "src", "content", "docs");
 const configPath = join(docsRoot, "astro.config.mjs");
 
-function markdownFiles(directory: string): string[] {
+function contentFiles(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true })
     .flatMap((entry) => {
       const path = join(directory, entry.name);
-      if (entry.isDirectory()) return markdownFiles(path);
-      return entry.isFile() && entry.name.endsWith(".md") ? [path] : [];
+      if (entry.isDirectory()) return contentFiles(path);
+      return entry.isFile() && /\.mdx?$/.test(entry.name) ? [path] : [];
     })
     .sort();
 }
 
 function authoredRoutes(): string[] {
-  return markdownFiles(sourceRoot).map(
+  return contentFiles(sourceRoot).map(
     (sourcePath) =>
-      `/${relative(sourceRoot, sourcePath).replaceAll("\\", "/").replace(/\.md$/, "")}`,
+      `/${relative(sourceRoot, sourcePath)
+        .replaceAll("\\", "/")
+        .replace(/\.mdx?$/, "")}`,
   );
 }
 
@@ -50,13 +52,14 @@ describe("docs internal links", () => {
   it("declares every retired route as a redirect or keeps it authored", () => {
     expect(redirectRoutes).toContain("/contributing");
     expect(redirectRoutes).toContain("/guides/extensions");
+    expect(redirectRoutes).toContain("/guides/opencode");
     expect(redirectRoutes).toContain("/concepts/native-outputs");
   });
 
   it("resolves every site-absolute link to an authored page or redirect", () => {
     const broken: string[] = [];
 
-    for (const sourcePath of markdownFiles(sourceRoot)) {
+    for (const sourcePath of contentFiles(sourceRoot)) {
       const source = readFileSync(sourcePath, "utf8");
       for (const target of internalLinks(source)) {
         if (!resolvable.has(target)) {

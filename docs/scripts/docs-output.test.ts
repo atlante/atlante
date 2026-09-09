@@ -13,20 +13,20 @@ type AuthoredDocument = {
   draft: boolean;
 };
 
-function markdownFiles(directory: string): string[] {
+function contentFiles(directory: string): string[] {
   if (!existsSync(directory)) return [];
 
   return readdirSync(directory, { withFileTypes: true })
     .flatMap((entry) => {
       const path = join(directory, entry.name);
-      if (entry.isDirectory()) return markdownFiles(path);
-      return entry.isFile() && entry.name.endsWith(".md") ? [path] : [];
+      if (entry.isDirectory()) return contentFiles(path);
+      return entry.isFile() && /\.mdx?$/.test(entry.name) ? [path] : [];
     })
     .sort();
 }
 
 function authoredDocuments(): AuthoredDocument[] {
-  return markdownFiles(sourceRoot).map((sourcePath) => {
+  return contentFiles(sourceRoot).map((sourcePath) => {
     const source = readFileSync(sourcePath, "utf8");
     const frontmatter = source.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
     if (!frontmatter) {
@@ -40,7 +40,7 @@ function authoredDocuments(): AuthoredDocument[] {
     return {
       source,
       sourceRelativePath,
-      route: `/${sourceRelativePath}`,
+      route: `/${sourceRelativePath.replace(/\.mdx$/, ".md")}`,
       draft: /^draft\s*:\s*true\s*$/m.test(frontmatter[1]),
     };
   });
@@ -91,12 +91,12 @@ const runOutputTests = process.env.ATLANTE_BUILT_OUTPUT_TESTS === "1";
 describe.skipIf(!runOutputTests)("docs built output", () => {
   const documents = authoredDocuments();
 
-  it("publishes exactly the non-draft authored Markdown routes", () => {
+  it("publishes exactly the non-draft authored content routes", () => {
     const expectedRoutes = documents
       .filter((document) => !document.draft)
       .map(rawOutputRoute)
       .sort();
-    const actualRoutes = markdownFiles(outputRoot)
+    const actualRoutes = contentFiles(outputRoot)
       .filter((path) => path !== outputPath("/index.md"))
       .map((path) => `/${relative(outputRoot, path).replaceAll("\\", "/")}`)
       .sort();
@@ -157,6 +157,14 @@ describe.skipIf(!runOutputTests)("docs built output", () => {
       "/guides/extensions",
       "/guides/authoring-packs",
       join("guides", "extensions", "index.html"),
+    );
+  });
+
+  it("keeps the OpenCode guide route as a redirect", () => {
+    expectStaticRedirect(
+      "/guides/opencode",
+      "/guides/building-a-harness",
+      join("guides", "opencode", "index.html"),
     );
   });
 

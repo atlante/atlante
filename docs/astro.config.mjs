@@ -11,6 +11,7 @@ export default defineConfig({
     "/contributing":
       "https://github.com/atlante/atlante/blob/main/CONTRIBUTING.md",
     "/guides/extensions": "/guides/authoring-packs",
+    "/guides/opencode": "/guides/building-a-harness",
     "/concepts/native-outputs": "/reference/materialization",
   },
   integrations: [
@@ -78,6 +79,7 @@ export default defineConfig({
             { slug: "concepts/templates", label: "Templates" },
             { slug: "concepts/values", label: "Values" },
             { slug: "concepts/resolution", label: "Resolution" },
+            { slug: "concepts/evaluation", label: "Evaluation" },
           ],
         },
         {
@@ -85,17 +87,25 @@ export default defineConfig({
           items: [
             {
               slug: "guides/building-a-harness",
-              label: "Build a harness",
+              label: "Customize your harness",
             },
-            { slug: "guides/opencode", label: "Use OpenCode" },
-            { slug: "guides/authoring-packs", label: "Author a pack" },
+            {
+              slug: "guides/evaluating-a-harness",
+              label: "Evaluate your harness",
+            },
+            {
+              slug: "guides/authoring-packs",
+              label: "Author a pack",
+            },
           ],
         },
         {
           label: "Reference",
           items: [
             { slug: "reference/cli", label: "CLI" },
+            { slug: "reference/eval", label: "Eval" },
             { slug: "reference/schema", label: "Schema" },
+            { slug: "reference/template-syntax", label: "Template syntax" },
             { slug: "reference/materialization", label: "Materialization" },
             { slug: "reference/diagnostics", label: "Diagnostics" },
           ],

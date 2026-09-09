@@ -1,60 +1,78 @@
 ---
 title: Configuration
-description: The authored document that defines an Atlante harness.
+description: How configuration brings agents, skills, and reusable guidance into one versioned harness.
 ---
 
-What should your project keep under version control, and what should Atlante
-generate? Keep the configuration document: it is the authored, versioned source
-for the harness. It selects presets, defines values, and binds agents and skills
-to static resources. The build turns that source into host-native output;
-generated files do not replace it.
+Your `atlante.jsonc` is the entry point for the harness configuration. It
+selects the agents, skills, presets, and resources to build, while values
+provide project-specific input to reusable content stored in separate files.
 
-The source-to-output flow is:
+## Agents and skills
 
-```text
-atlante.jsonc or atlante.json
-        -> validate and resolve
-        -> build
-        -> .opencode/ + .atlante/opencode-native.json
-```
+An agent binding gives a named agent the instructions that define its role
+in the host. A skill binding provides named, reusable guidance that the host
+can make available when relevant to a task.
+For example, a reviewer agent can have a project-specific mission while a
+review skill provides reusable review guidance. Both select content through
+the same [template and instance model](/concepts/templates), but they become
+different kinds of native output.
 
-## Supported source files
-
-The project root may contain exactly one of these source files:
-
-- `atlante.jsonc`, which permits JSONC comments and trailing commas.
-- `atlante.json`, which uses strict JSON.
-
-If both files exist, Atlante reports an ambiguity and requires an explicit
-choice. The same document contract applies to either filename.
-
-## Document contract
-
-The document must declare the exact v0.1 schema URI:
+This configuration defines a reviewer for `billing-api` and selects an
+existing skill from the first-party pack:
 
 ```jsonc title="atlante.jsonc"
 {
   "$schema": "https://atlante.sh/schema/v0.1/schema.json",
-  "extends": "@atlante/pack"
+  "values": { "project": "billing-api" },
+  "agents": {
+    "reviewer": {
+      "$template": "@atlante/pack/agent",
+      "description": "Reviews {{values.project}}.",
+      "identity": "You review {{values.project}}.",
+      "mission": "Find defects before merge."
+    }
+  },
+  "skills": {
+    "code-review": "@atlante/pack/review"
+  }
 }
 ```
 
-At a high level, a document selects presets, defines values, binds agents and
-skills to resources, optionally configures `atlante eval`, and selects a host.
-The [Schema](/reference/schema) reference defines the exact fields, types, and
-constraints. [Templates](/concepts/templates) explains selector behavior,
-[Resources](/concepts/resources) explains locators, and the [CLI
-reference](/reference/cli#atlante-eval) explains eval configuration and scenario
-documents.
+The map keys, `reviewer` and `code-review`, identify the resulting agent and
+skill in the host. Their content can change without changing those names or
+the places that refer to them.
 
-The hosted [Schema](https://atlante.sh/schema/v0.1/schema.json) and the
-[generated schema file](https://github.com/atlante/atlante/blob/main/packages/schema/schema/v0.1/schema.json)
-define the machine-readable contract. Use the [Schema](/reference/schema)
-reference for the complete field and type contract, including binding details.
+## Presets as a starting point
 
-## Configuration versus a guide
+A preset is a reusable configuration document that can supply agents,
+skills, values, and other configuration fields. Selecting it through
+`extends` lets your project inherit those choices and override the parts
+that differ.
+For example, the bundled `@atlante/pack` preset supplies a starting harness
+that your local configuration can customize.
+[Resources](/concepts/resources) explains where reusable content lives, and
+[Resolution](/concepts/resolution) explains how those layers combine.
 
-This page explains what the source document means. For the practical sequence of
-adding bindings, values, and selected content, use
-[Build a harness](/guides/building-a-harness). For the shortest executable path,
-start with [Getting started](/getting-started).
+## Source and native output
+
+The configuration and selected resources form the source of the harness. Each
+build turns that source into native agent and skill files for the host.
+
+```text
+configuration + selected resources
+    -> validation and resolution
+    -> rendering
+    -> native agent and skill files
+```
+
+OpenCode discovers the generated files when it starts, while the ownership
+manifest tells later builds which files Atlante manages.
+[Evaluation](/concepts/evaluation) uses the built harness to run defined tasks
+and check their results.
+
+:::note
+See the [Schema reference](/reference/schema) for fields and source formats,
+[Customize your harness](/guides/building-a-harness) for the authoring workflow,
+and [Materialization](/reference/materialization) for native output paths and
+ownership.
+:::

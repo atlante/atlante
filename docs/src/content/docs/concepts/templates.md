@@ -1,63 +1,131 @@
 ---
 title: Templates
-description: Templates, instances, bindings, and template-owned input.
+description: How reusable input contracts, configured content, and bindings become agent and skill instructions.
 ---
 
-How do you reuse prompt structure without putting prompt-specific fields into
-the document schema? Use a template. A template owns an input contract and a
-Markdown renderer. Its resource has two required facets: `template.jsonc`, a
-JSON Schema Draft 2020-12 document, and `template.md`, the renderer. The schema
-owns the names, types, and composition slots of the input that the renderer
-receives.
+A template defines accepted input and renders it as a Markdown file for an
+agent or skill. An instance stores reusable configured input for one template,
+while a binding assigns selected content to a named agent or skill. Together,
+these roles separate reusable structure, configured content, and host-facing
+identity.
 
-An instance is different: it is reusable configured input for one template. It
-lives in `instance.jsonc` and resolves to exactly one effective template. A
-binding in `agents` or `skills` selects one of these forms:
+## From input to a Markdown file
 
-- `$template` selects a template and supplies its input in the binding.
-- `$instance` selects a configured instance.
-- A bare resource locator is shorthand for `$instance`.
+A template consists of two files: `template.jsonc` defines its input
+contract, and `template.md` renders the validated input. The input contract
+uses [JSON Schema Draft 2020-12](https://json-schema.org/draft/2020-12) to
+describe accepted fields, their types, and which fields are required.
 
-`$template` and `$instance` cannot appear together. Binding metadata is removed
-before the selected template validates its input, so the selected template owns
-all fields beyond `description`, `values`, and the selector. A missing source
-uses the applicable configured default.
+The first-party agent template requires `identity` and `mission`, which this
+reviewer binding supplies directly in a configuration excerpt:
 
 ```jsonc
 {
   "agents": {
     "reviewer": {
       "$template": "@atlante/pack/agent",
-      "description": "Reviews the implementation.",
-      "identity": "You are a careful reviewer.",
-      "mission": "Find defects before merge."
-    },
-    "architect": "@atlante/pack/architect"
-  }
-}
-```
-
-## Selector-less bindings
-
-At the top level of the document's `agents` and `skills` collections, an object
-binding may omit both selectors. Atlante then uses the collection's default
-first-party template: `@atlante/pack/agent` for an agent and
-`@atlante/pack/skill` for a skill. This default applies only to those top-level
-collections; nested resource source objects require `$template` or `$instance`.
-
-```jsonc
-{
-  "agents": {
-    "reviewer": {
-      "description": "Reviews the implementation.",
-      "identity": "You are a careful reviewer.",
+      "description": "Reviews billing-api.",
+      "identity": "You review billing-api.",
       "mission": "Find defects before merge."
     }
   }
 }
 ```
 
-This selector-less form is valid. The default template still controls the
-accepted fields and the rendered Markdown. See [Resolution](/concepts/resolution)
-for interpolation, composition, and the validation stage where the resource
-graph is checked.
+The corresponding part of the agent template's renderer inserts those
+fields beneath the headings it defines:
+
+```hbs title="template.md — excerpt"
+# Identity
+
+{{identity}}
+
+# Mission
+
+{{mission}}
+```
+
+The resulting prompt contains the supplied content in that structure,
+while `description` remains separate lookup metadata for the host:
+
+```md
+# Identity
+
+You review billing-api.
+
+# Mission
+
+Find defects before merge.
+```
+
+## Reuse configured input
+
+An instance preserves a template selection and configured input, so several
+bindings can reuse the same starting content. For example, this local reviewer
+instance selects the first-party agent template and supplies its required
+fields:
+
+```jsonc title="resources/reviewer/instance.jsonc"
+{
+  "$template": "@atlante/pack/agent",
+  "description": "Reviews the implementation.",
+  "identity": "You are a careful reviewer.",
+  "mission": "Find defects before merge."
+}
+```
+
+A binding can select that instance and customize its mission, preserving
+the identity and description supplied by the instance:
+
+```jsonc title="Configuration excerpt"
+{
+  "agents": {
+    "reviewer": {
+      "$instance": "./resources/reviewer",
+      "mission": "Find breaking API changes before merge."
+    }
+  }
+}
+```
+
+The bare locator `"reviewer": "./resources/reviewer"` selects the same
+instance without adding a local override to its content. Resolution determines
+which template renders the resulting input.
+
+## Configuration and template fields
+
+A binding combines fields owned by two schemas:
+
+- **Configuration fields** come from Atlante's document schema. `$template`,
+  `$instance`, `description`, and `values` control content selection,
+  interpolation, or host metadata; they are not passed to the renderer.
+- **Template fields** come from the selected template's schema and form the
+  input passed to its renderer. The first-party agent template defines
+  `identity`, `mission`, and `sections`, while another template can define
+  different fields and validation rules.
+
+Top-level agent and skill bindings can also omit the selector and use the
+corresponding first-party default template.
+The [binding reference](/reference/schema#binding-fields) documents the exact
+defaults, selector rules, and distinction from nested resource selections.
+
+## Template composition
+
+A template can delegate part of its input to a child template through a
+declared composition slot. For example, the first-party agent template can
+use an instructions template to render a section of the reviewer's prompt.
+The child owns that section's input and rendering, while the parent
+determines where the rendered section appears. This lets several
+templates reuse a section's structure without copying its renderer into
+each parent template.
+
+A workflow section is one example of template-defined content, rather than
+a separate top-level collection in the configuration. Composed output remains
+rendered content; it is not interpreted again as parent template source.
+
+:::note
+[Template syntax](/reference/template-syntax#composition-slots) defines slot
+declarations and rendering rules, including required references and cycle
+checks. [Author a pack](/guides/authoring-packs) covers the procedure for
+creating templates and instances.
+:::

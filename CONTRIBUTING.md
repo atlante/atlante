@@ -154,9 +154,24 @@ to Vercel, so the remote build does not need Bun or access to the repository-lev
 ## Write documentation
 
 Documentation should describe shipped behavior, not future capabilities. Use
-active voice, sentence-case headings, and one primary idea per sentence. Use
-`configuration` for the authored system, `document` for its parsed data model,
-`native output` for generated host files, `ownership manifest` for the
+active voice, sentence-case headings, and one primary idea per sentence. Each
+page type makes one promise to the reader:
+
+| Page type | Promise |
+| --- | --- |
+| Introduction | Why Atlante exists, what it does, and what it does not do |
+| Getting started | The first successful build |
+| Concepts | Mental models, without procedures |
+| Guides | Outcome-driven procedures: when you want X, do this |
+| Reference | Exhaustive tables and contracts, without narrative |
+| Troubleshooting | Symptom to recovery actions |
+
+State a constraint once, where it belongs, and link to it from other pages;
+repeating it on every page reads like damping, not emphasis. The docs
+introduction owns the does-not boundary statement.
+
+Use `configuration` for the authored system, `document` for its parsed data
+model, `native output` for generated host files, `ownership manifest` for the
 generated-file record, and `materializer` for host-specific materialization.
 
 Metaphor belongs in occasional explanatory copy. Procedures, CLI output, errors,

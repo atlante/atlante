@@ -3,8 +3,9 @@ title: Troubleshooting
 description: Diagnose configuration discovery, resource resolution, validation, and materialization problems.
 ---
 
-Start with the diagnostic code in the command output. It identifies the failure,
-the source or location, and often the next recovery action.
+Start with the diagnostic code in the command output. Then use the matching
+recovery path below. [Diagnostics](/reference/diagnostics) explains the output
+format and code meanings.
 
 ## The CLI says `config-not-found`
 
@@ -14,7 +15,7 @@ Run the command from the project root or pass the explicit configuration path:
 npx @atlante/cli@latest validate ./path/to/atlante.jsonc
 ```
 
-The supported filenames are exactly `atlante.jsonc` and `atlante.json`.
+The supported filenames are `atlante.jsonc` and `atlante.json`.
 
 ## The CLI says `ambiguous-config`
 
@@ -26,13 +27,9 @@ pass an explicit path. Atlante never chooses between both files silently.
 Check the locator and confirm that the selected target exists in its trusted
 Pack root. See [Resources](/concepts/resources) for locator rules.
 
-For a custom Pack, check both package diagnostics:
-
-- `package-not-declared` means the package is not declared by the authoring project.
-- `package-not-installed` means it is declared but cannot be found in the installation.
-
-The published CLI bundles the first-party `@atlante/pack`. A custom Pack must be
-declared and installed before the CLI can resolve it:
+The published CLI bundles the first-party `@atlante/pack`; it does not need a
+separate installation. For a custom Pack, declare and install the package before
+validating:
 
 ```sh
 npm install --save-dev @acme/review-pack
@@ -42,7 +39,7 @@ npx @atlante/cli@latest validate
 ## A locator is rejected
 
 See [Resources](/concepts/resources) for accepted locator forms and Pack-root
-restrictions. Correct the locator, then run validation again.
+restrictions. Correct the locator, then validate again.
 
 ## Template input is rejected
 
@@ -65,8 +62,8 @@ npx @atlante/cli@latest validate
 npx @atlante/cli@latest build
 ```
 
-For command behavior and output, read the [CLI](/reference/cli) and
-[Diagnostics](/reference/diagnostics) references.
+For command behavior, read the [CLI](/reference/cli). For the diagnostic
+format and code index, read [Diagnostics](/reference/diagnostics).
 
 ## Watch mode reports a failure
 
@@ -87,8 +84,8 @@ Then restart OpenCode to pick up changed native files. See
 
 ## The build reports `materialization-*`
 
-See [Materialization](/reference/materialization) for diagnostic meanings and
-the complete publication contract. Common repairs are:
+See [Materialization](/reference/materialization) for the publication contract.
+Common repairs are:
 
 - `materialization-collision`: remove or rename the unowned file, then build
   again.
@@ -106,7 +103,7 @@ the complete publication contract. Common repairs are:
 ## The build reports `unsupported-host`
 
 In v0.1 the only admitted `hosts` value is `"opencode"`. Remove the unknown
-entry and run validation again.
+entry, then validate again.
 
 ## `init` touched my OpenCode config or `.gitignore`
 

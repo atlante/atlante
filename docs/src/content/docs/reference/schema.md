@@ -9,7 +9,7 @@ Atlante v0.1 documents use this exact, immutable schema URI:
 https://atlante.sh/schema/v0.1/schema.json
 ```
 
-Add it to `atlante.jsonc` or `atlante.json`:
+The minimal valid document adds it to `atlante.jsonc` or `atlante.json`:
 
 ```jsonc
 {
@@ -22,7 +22,7 @@ JSONC, so the same document contract applies to both supported filenames.
 
 ## Supported source files
 
-The canonical project configuration is exactly one of `atlante.jsonc` or
+The project's source configuration is exactly one of `atlante.jsonc` or
 `atlante.json`. `atlante.jsonc` may contain comments; `atlante.json` must contain
 strict JSON. If both exist and no explicit path was supplied, the CLI reports
 `ambiguous-config` instead of choosing silently.
@@ -54,8 +54,8 @@ contain this reserved metadata:
 | --- | --- | --- |
 | `$template` | string | Selects a template resource |
 | `$instance` | string | Selects an instance resource |
-| `description` | non-empty string | Host lookup metadata, interpolated before validation |
-| `values` | object | Binding-local string value overrides |
+| `description` | non-empty string or `null` | Optional host lookup metadata overlay, interpolated before canonical validation; `null` removes inherited metadata |
+| `values` | object | Binding-local string value overrides; `null` removes an inherited value |
 | other fields | template-defined | Input validated by the selected template |
 
 `$template` and `$instance` cannot occur together. The legacy `template` field is
@@ -68,8 +68,10 @@ resource source objects, which require `$template` or `$instance`.
 
 ## Agent and skill maps
 
-Agent map keys remain host-agent IDs, and skill map keys remain skill IDs. Both
-binding types require a non-empty `description` after interpolation. The
+Agent map keys remain host-agent IDs, and skill map keys remain skill IDs.
+Authored bindings may omit `description` or set it to `null`; canonical agent
+and skill bindings require a non-empty `description` after composition and
+interpolation. Canonical binding values contain strings only. The
 [Materialization](/reference/materialization) reference explains how those IDs
 become native output paths.
 
@@ -77,15 +79,41 @@ The document schema leaves template-owned fields open. Resource resolution and
 template validation determine whether those fields are valid for the selected
 resource.
 
-Values are strings. The only supported system value is `{{sys.cwd.basename}}`,
-which resolves to the current working directory's basename. Arbitrary filesystem
-and environment lookups are not part of the document contract.
+See [Eval](/reference/eval) for the configuration and scenario contract.
+
+Value keys match `[A-Za-z_$][A-Za-z0-9_$-]*`, and canonical values are strings.
+The only supported system value is `{{sys.cwd.basename}}`, which resolves to the
+current working directory's basename immediately before descriptions and
+template input are rendered. Arbitrary filesystem and environment lookups are
+not part of the document contract.
+
+## Defaults and precedence
+
+- An explicit configuration path is read directly. Without one, discovery
+  accepts exactly one of `atlante.jsonc` or `atlante.json`; both files produce
+  `ambiguous-config`.
+- Missing `agents` and `skills` maps normalize to empty maps. Missing `hosts`
+  normalizes to `["opencode"]`; host targets cannot repeat.
+- Presets resolve from left to right, then the local document overlays them.
+  Objects merge recursively, arrays and scalars replace, and `null` removes an
+  inherited field.
+- Project values override inherited preset values. Binding-local values
+  override the effective global values only within that binding.
 
 ## Canonical form
 
-After resolution, the canonical document contains the schema URI, resolved
-values, agent bindings, skill bindings, and optional eval configuration. It has
-no `extends`, `$template`, `$instance`, or unresolved `null` removals.
+After resolution, the canonical document contains the schema URI, merged values,
+agent bindings, skill bindings, host targets, and optional eval configuration.
+Merged values can still contain the supported system reference until rendering.
+The canonical document has no `extends`, `$template`, `$instance`, or unresolved
+`null` removals.
+
+## Failure cases and diagnostics
+
+Raw validation rejects unknown fields, invalid container shapes, duplicate hosts,
+and conflicting selectors. Resolution then checks packs, resources, templates,
+and inherited values. Read [Diagnostics](/reference/diagnostics) for the stable
+codes and recovery actions emitted by these stages.
 
 ## Hosted and repository sources
 
@@ -110,3 +138,10 @@ The document schema version, ownership-manifest format version, template input
 schema, and package version evolve independently. The CLI rejects an
 unsupported document schema URI, and a materializer rejects an unsupported
 manifest format, instead of inferring a compatible version.
+
+## Next steps
+
+- [Configuration](/concepts/configuration) introduces the authored document.
+- [Templates](/concepts/templates) explains template and instance selectors.
+- [Resolution](/concepts/resolution) describes the validation and composition
+  stages.
