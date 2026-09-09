@@ -173,6 +173,6 @@ Watch mode rebuilds the output; restart OpenCode when you want a new session
 to load it. See [Materialization](/reference/materialization) for the generated
 file and ownership contract.
 
-To reuse its configuration in other projects, continue with
-[Author a pack](/guides/authoring-packs). To check what the reviewer produces
-on a defined task, follow [Evaluate your harness](/guides/evaluating-a-harness).
+To check what the reviewer produces on a defined task, continue with
+[Evaluate your harness](/guides/evaluating-a-harness). To reuse its configuration
+in other projects, follow [Author a pack](/guides/authoring-packs).

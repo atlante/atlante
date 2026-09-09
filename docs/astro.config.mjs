@@ -90,12 +90,12 @@ export default defineConfig({
               label: "Customize your harness",
             },
             {
-              slug: "guides/authoring-packs",
-              label: "Author a pack",
-            },
-            {
               slug: "guides/evaluating-a-harness",
               label: "Evaluate your harness",
+            },
+            {
+              slug: "guides/authoring-packs",
+              label: "Author a pack",
             },
           ],
         },

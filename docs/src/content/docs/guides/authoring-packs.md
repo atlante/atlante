@@ -291,6 +291,6 @@ behavior; [Resources](/concepts/resources) explains locator resolution.
 Before sharing a pack, validate and build a representative consumer for each
 preset or resource you expect others to select, then inspect both the command
 output and generated prompts. A build covers only its selected content and
-dependencies, so exercise other supported selections separately. To assess how
-an agent follows the generated instructions, continue with
-[Evaluate your harness](/guides/evaluating-a-harness).
+dependencies, so exercise other supported selections separately. If you have
+not evaluated the generated harness yet, run [Evaluate your harness](/guides/evaluating-a-harness)
+before sharing the pack.
