@@ -87,7 +87,11 @@ export default defineConfig({
           items: [
             {
               slug: "guides/building-a-harness",
-              label: "Build a harness",
+              label: "Customize your harness",
+            },
+            {
+              slug: "guides/evaluating-a-harness",
+              label: "Evaluate your harness",
             },
             { slug: "guides/authoring-packs", label: "Author a pack" },
           ],

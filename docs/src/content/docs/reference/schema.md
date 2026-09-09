@@ -22,7 +22,7 @@ JSONC, so the same document contract applies to both supported filenames.
 
 ## Supported source files
 
-The canonical project configuration is exactly one of `atlante.jsonc` or
+The project's source configuration is exactly one of `atlante.jsonc` or
 `atlante.json`. `atlante.jsonc` may contain comments; `atlante.json` must contain
 strict JSON. If both exist and no explicit path was supplied, the CLI reports
 `ambiguous-config` instead of choosing silently.
@@ -93,13 +93,15 @@ and environment lookups are not part of the document contract.
 - Presets resolve from left to right, then the local document overlays them.
   Objects merge recursively, arrays and scalars replace, and `null` removes an
   inherited field.
-- Local values always win over inherited values after those merge rules apply.
+- Project values override inherited preset values. Binding-local values
+  override the effective global values only within that binding.
 
 ## Canonical form
 
 After resolution, the canonical document contains the schema URI, resolved
-values, agent bindings, skill bindings, and optional eval configuration. It has
-no `extends`, `$template`, `$instance`, or unresolved `null` removals.
+values, agent bindings, skill bindings, host targets, and optional eval
+configuration. It has no `extends`, `$template`, `$instance`, or unresolved
+`null` removals.
 
 ## Failure cases and diagnostics
 

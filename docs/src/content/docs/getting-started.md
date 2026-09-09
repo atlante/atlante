@@ -1,61 +1,35 @@
 ---
 title: Getting started
-description: Build a versioned coding-agent harness with the published CLI.
+description: Initialize Atlante in your project and build your first OpenCode agents and skills.
 ---
 
-Run the CLI from the project you want to configure. The published CLI bundles
-the first-party `@atlante/pack`, so the default path does not require a
-separate pack install.
+Initialize Atlante in an existing project and build the agent and skill files
+that OpenCode will load.
 
-**By the end:** you will have a versioned `atlante.jsonc` and host-native agent
-and skill files that OpenCode can discover.
+## Before you begin
 
-## 1. Invoke or install the CLI
+You need [Node.js](https://nodejs.org/) 22 or later. Open a terminal in the
+project directory where you want to keep your harness configuration.
 
-For a one-off first build, use `npx` from your project directory:
+You can initialize and build without installing OpenCode. To use the resulting
+agents and skills, you will also need [OpenCode](https://opencode.ai/docs/).
+
+## Initialize your project
+
+Create the configuration and run the first build:
 
 ```sh
 npx @atlante/cli@latest init
 ```
 
-If the project should pin the CLI version, install it as a development
-dependency and keep using the project-local command through `npx`:
+The CLI uses the bundled `@atlante/pack` preset, so you do not need to install
+a separate pack. The preset provides an `architect` agent, the `brainstorm`,
+`plan`, `build`, and `review` skills, and a `harness` skill for working on the
+harness itself.
 
-```sh
-npm install --save-dev @atlante/cli
-npx atlante init
-```
+## Inspect the configuration and output
 
-:::note
-The CLI requires [Node.js](https://nodejs.org/) 22 or later. It bundles the
-first-party `@atlante/pack`, so the default path needs no separate pack
-install.
-:::
-
-## 2. See what `init` creates
-
-`init` scaffolds `atlante.jsonc`, runs the first build, and adds the generated
-folders to `.gitignore`:
-
-```text
-.opencode/agents/
-.opencode/skills/
-.atlante/
-```
-
-The entries exist because generated files are derived from the source, and
-rendered values may contain project-sensitive content. They are a default, not
-a rule: if your team prefers generated output under version control, remove
-the entries and commit the files. The ownership manifest detects any
-out-of-band edit, and the next build fails closed rather than overwrite one.
-[Troubleshooting](/troubleshooting) describes both directions.
-
-:::caution
-Generated native files are derived output. Edit `atlante.jsonc` and rebuild
-instead of changing `.opencode/` or `.atlante/` directly.
-:::
-
-The generated source selects the default first-party preset:
+Open `atlante.jsonc`. Its configuration selects the preset through `extends`:
 
 ```jsonc title="atlante.jsonc"
 {
@@ -64,85 +38,87 @@ The generated source selects the default first-party preset:
 }
 ```
 
-Read the file, then add `values`, `agents`, or `skills` as the harness grows.
-[Configuration](/concepts/configuration) explains the document model and
-[Schema](/reference/schema) the exact contract.
+The build creates native files alongside that source:
 
-## 3. Validate and build
+```text
+my-project/
+├── atlante.jsonc
+├── .opencode/
+│   ├── agents/
+│   │   └── architect.md
+│   └── skills/
+│       ├── brainstorm/SKILL.md
+│       ├── plan/SKILL.md
+│       ├── build/SKILL.md
+│       ├── review/SKILL.md
+│       └── harness/SKILL.md
+└── .atlante/
+    └── opencode-native.json
+```
 
-After changing `atlante.jsonc` or selected resources, validate first:
+Open `.opencode/agents/architect.md` to inspect the agent's description and
+instructions. The ownership manifest, `.atlante/opencode-native.json`, records
+the files managed by the build.
+
+Keep `atlante.jsonc` and any resources you author in version control. `init`
+adds `.opencode/agents/`, `.opencode/skills/`, and `.atlante/` to `.gitignore`
+because those files can be rebuilt from the source.
+
+:::note
+Make changes in `atlante.jsonc` or its selected resources, then rebuild. Native
+files are generated output. See [Materialization](/reference/materialization)
+for output ownership and [Troubleshooting](/troubleshooting) for versioning
+alternatives and recovery from output edits.
+:::
+
+## Open the harness in OpenCode
+
+Start OpenCode from the same project directory, or restart an existing session
+so it discovers the new files. The `architect` agent should now be available.
+
+You can also inspect the agent list from the terminal:
 
 ```sh
-npx @atlante/cli@latest validate
+opencode agent list
 ```
 
-Validation parses the document, resolves selected content, and checks values,
-template schemas, composition, and template-owned input — without writing
-anything. Failures come as structured diagnostics with stable codes and source
-locations; see [Diagnostics](/reference/diagnostics).
+Look for `architect` in the list. If it is missing, confirm that you ran the
+command from the directory containing `.opencode/agents/architect.md`.
 
-When validation passes, materialize the native outputs:
+Choose a model and configure permissions through
+[OpenCode's configuration](https://opencode.ai/docs/config/). These settings
+remain in OpenCode's own files when Atlante rebuilds the harness.
+
+You now have the default harness built from a configuration in your project.
+
+## Use a project-local CLI
+
+For ongoing work, install the CLI as a development dependency in the project
+that owns your `package.json`:
 
 ```sh
-npx @atlante/cli@latest build
+npm install --save-dev @atlante/cli
 ```
 
-Build repeats the validation, renders deterministic Markdown, and writes the
-host-native files plus the ownership manifest.
-[Materialization](/reference/materialization) documents the output contract.
+If the repository has no `package.json`, create one with `npm init -y` before
+installing. Commit the manifest and lockfile with your configuration so other
+contributors can install the same CLI version.
 
-## 4. Open the generated harness
-
-OpenCode discovers the generated agents and skills when it starts; restart it
-to pick up new or changed files. Model, mode, permission, and tool settings
-stay in OpenCode's own configuration, outside the document.
-
-## 5. Test the harness (optional)
-
-`atlante eval` runs scenarios against the built outputs in a disposable
-sandbox and grades them with deterministic checks. The checks never call a
-model, so a scenario verdict is reproducible. Add an `eval` section and one
-scenario document:
-
-```jsonc title="atlante.jsonc"
-{
-  // ...
-  "eval": {
-    "host": "opencode",
-    "scenarios": "eval/scenarios/*.eval.json*"
-  }
-}
-```
-
-```json title="eval/scenarios/hello.eval.json"
-{
-  "$schema": "https://atlante.sh/schema/v0.1/eval-scenario.json",
-  "version": "0.1",
-  "name": "hello",
-  "task": {
-    "fixture": "eval/fixtures/empty",
-    "prompt": "Create a file named hello.txt containing hello."
-  },
-  "checks": [
-    { "type": "file-contains", "path": "hello.txt", "pattern": "hello" },
-    { "type": "diff-allowlist", "allow": ["hello.txt"] }
-  ]
-}
-```
+After installing locally, use `npx atlante` rather than requesting `@latest`.
+For example, rebuild after a configuration change with:
 
 ```sh
-npx @atlante/cli@latest eval
+npx atlante build
 ```
 
-Each trial copies the fixture into a fresh sandbox, runs the prompt with the
-built agents and skills, and grades the checks. Eval reads the outputs of the
-build above; rebuild after source changes. The [Eval](/reference/eval)
-reference documents scenarios, checks, budgets, and reports.
+The guides use this project-local command. You do not need to run `init`
+again when installing the CLI into an already initialized project.
 
-## 6. Continue
+## Next steps
 
-- [Build a harness](/guides/building-a-harness) to add an agent, skill, or
-  value.
-- [CLI](/reference/cli) for command options,
-  [Materialization](/reference/materialization) for output details, and
-  [Diagnostics](/reference/diagnostics) when a build fails.
+- [Customize your harness](/guides/building-a-harness) with a project-specific
+  reviewer and reusable review guidance.
+- [Evaluate your harness](/guides/evaluating-a-harness) on a task with explicit
+  checks for the result.
+- Read [Configuration](/concepts/configuration) to understand how presets,
+  agents, skills, and values fit together.

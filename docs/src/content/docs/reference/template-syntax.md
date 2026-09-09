@@ -1,6 +1,6 @@
 ---
 title: Template syntax
-description: The rendering syntax a template.md may use and the composition slots a template.jsonc declares.
+description: Handlebars expressions, built-in helpers, and composition slots for template renderers.
 ---
 
 A template pairs an input contract, `template.jsonc`, with a renderer,
@@ -10,16 +10,16 @@ the renderer emits becomes Markdown verbatim, and `{{field}}` needs no escape
 syntax. Missing input fields render as empty text, so required input belongs
 in the schema, not in template conditionals.
 
-This page documents the syntax surface Atlante v0.1 implements. It is the
-de-facto contract for template authors; it evolves with the document contract,
-and Handlebars features outside this surface are not part of it.
+This page covers the rendering expressions and helpers used by Atlante v0.1.
+For a complete schema, renderer, and instance example, see
+[Author a pack](/guides/authoring-packs#define-a-custom-template).
 
 ## The rendering input
 
-Inside `template.md`, plain references address the validated template input —
-the binding or instance fields left after the selected template owns them:
+Inside `template.md`, expressions read validated template input. Binding
+metadata such as `description` and `values` is excluded from that input.
 
-```hbs title="template.md"
+```hbs title="template.md — excerpt"
 # Identity
 
 {{identity}}
@@ -44,9 +44,10 @@ renderer supports:
 | Construct | Use |
 | --- | --- |
 | `{{field}}`, `{{a.b}}` | Insert a validated input field |
+| `{{this}}` | Insert the current context, such as a string item inside `each` |
 | `{{#each list}}` | Iterate an array; `@index`, `@first`, `@last` address the position |
 | `{{#if x}}` / `{{#unless x}}` | Branch on a present, truthy field |
-| `{{/if}}` with `{{else}}` | Alternative branch |
+| `{{else}}` | Introduce an alternative branch before the closing `{{/if}}` or `{{/unless}}` |
 | `(subexpression)` | Pass a computed value, as in `{{> blocks (input)}}` |
 | `{{#*inline "name"}}` | Define a local partial for structural recursion |
 | `{{~ ... ~}}` | Whitespace control around directives |
@@ -70,7 +71,7 @@ the marker `{ "template": "<locator>" }`. Each declared slot becomes a partial
 named `slot/<path>` in the renderer, and invoking it renders the referenced
 child template:
 
-```jsonc title="template.jsonc"
+```jsonc title="template.jsonc — composition excerpt"
 {
   "properties": {
     "sections": {
@@ -85,7 +86,7 @@ child template:
 }
 ```
 
-```hbs title="template.md"
+```hbs title="template.md — composition excerpt"
 {{#each sections}}
 {{#if instructions}}
 

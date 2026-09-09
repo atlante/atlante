@@ -1,12 +1,12 @@
 ---
 title: Diagnostics
-description: Parse Atlante errors and warnings by severity, code, location, and recovery action.
+description: Diagnostic fields, terminal format, common codes, and source locations for Atlante errors and warnings.
 ---
 
-Diagnostics are the stable error contract emitted by validation, build, watch,
-and materialization commands. Use this page when a person or a CI tool needs to
-parse command output; use [Troubleshooting](/troubleshooting) when you need a
-recovery path.
+Diagnostics describe errors and warnings from initialization, validation,
+builds, evaluation, and materialization. This reference defines their fields
+and terminal format. [Troubleshooting](/troubleshooting) organizes recovery
+procedures by symptom.
 
 Each diagnostic has a severity, stable code, and message. It may also carry a
 stable source identity, a JSON Pointer, a one-based source location, a resource
@@ -19,14 +19,17 @@ expected: a string accepted by the selected template
 next: update the field or select a compatible template
 ```
 
-The terminal lines have a fixed order:
+The terminal formatter emits these lines in order, omitting optional fields
+when they are unavailable:
 
-1. Severity and stable code.
-2. Failure statement.
-3. `at:` source, location, and JSON Pointer when available.
-4. `expected:` required contract, when available.
-5. `next:` one recovery action, when available.
-6. `cause:` normalized low-level cause, last when available.
+1. Severity, stable code, and failure statement on one line.
+2. `at:` source, location, and JSON Pointer.
+3. `expected:` required contract.
+4. `next:` recovery action.
+5. `cause:` normalized low-level cause.
+
+CLI diagnostics are written to stderr. Color can be disabled with
+`NO_COLOR=1`; see [CLI output](/reference/cli#output).
 
 Diagnostics use project-relative or stable package-qualified source identities.
 They do not expose machine-specific absolute paths. CLI success lines separately
@@ -46,6 +49,10 @@ report resolved filesystem paths for the configuration and materialized outputs.
 | `expected` | Contract the authored input must satisfy |
 | `next` | Deterministic recovery action |
 | `cause` | Normalized low-level cause |
+
+Only `severity`, `code`, and `message` are required. The resource traversal
+`chain` is structured metadata; the terminal formatter does not print it as
+a separate line.
 
 ## Common codes
 
@@ -68,10 +75,11 @@ and publication failures can produce additional stable codes.
 | `watch-build-failed` | A watch-mode rebuild failed and will be retried |
 | `watch-inputs-failed` | Watch mode could not update its watched files and will retry |
 
-Validation and build diagnostics are written before the command's success line.
-An `error` diagnostic produces exit status `1` for a one-shot command. Warnings
-can follow successful publication without changing the result. Watch-mode errors
-keep the process active and are retried after changes.
+Validation and build warnings appear before a success line. Errors produce
+exit status `1` for one-shot validation and build commands, without a success
+line. Watch-mode errors keep the process active and are retried after changes.
+Evaluation uses [separate exit statuses](/reference/eval#reports-and-exit-status)
+for failed trials, validation failures, and infrastructure failures.
 
 ## JSON Pointers and locations
 
@@ -79,9 +87,9 @@ When an issue belongs to document data, `at:` may include an RFC 6901 JSON
 Pointer such as `/agents/reviewer/mission`. Use the pointer to locate the
 invalid field. A location, when present, uses one-based line and column numbers.
 
-For resource failures, the structured diagnostic can include the selected source
-and a resource-traversal chain. Fix the first actionable error, then run the same
-CLI command again. See [Troubleshooting](/troubleshooting) for recovery paths.
+For resource failures, the structured diagnostic can include the selected
+source and a resource-traversal chain. Each chain entry identifies a preset,
+instance, or template by its `kind`, `locator`, and `source`.
 
 ## Next steps
 

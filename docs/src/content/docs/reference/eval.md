@@ -3,11 +3,14 @@ title: Eval
 description: The eval configuration, scenario documents, checks, budgets, and reports for testing a harness.
 ---
 
-`atlante eval` tests a built harness. Each trial runs the
-[OpenCode](https://opencode.ai/) host headless in a disposable sandbox — a copy
-of the scenario fixture plus the materialized native agent and skill files —
-and then grades the sandbox with deterministic, zero-LLM checks. Atlante
-validates and grades; the declared host runs the scenario.
+`atlante eval` runs a built harness through
+[OpenCode](https://opencode.ai/) in disposable sandboxes. Each trial starts
+with a copy of the scenario fixture and the native agent and skill files,
+then checks the resulting files and command results against explicit assertions.
+
+This reference defines configuration, scenarios, checks, budgets, and reports.
+For a complete setup procedure, see
+[Evaluate your harness](/guides/evaluating-a-harness).
 
 Eval never builds. It reads the verified native outputs of a prior
 `atlante build`, and a rebuild is required whenever the sources change. Every
@@ -23,11 +26,14 @@ A run needs all of the following:
 | An `eval` section | `atlante.jsonc` |
 | Scenario documents | The files matched by the `scenarios` glob |
 | Verified native outputs | A prior `atlante build` |
-| An authenticated host | The OpenCode installation and its credentials |
+| OpenCode on `PATH` | The installed `opencode` executable |
+| Stored provider credentials | OpenCode's `auth.json`; shell API-key variables alone are insufficient |
+| Git on `PATH` | Used to establish the trial's baseline snapshot |
+| Setup and check executables | Tools invoked by the scenario, such as Bun for `bun test` |
 
 ## Configuration
 
-```jsonc title="atlante.jsonc"
+```jsonc title="atlante.jsonc — eval excerpt"
 {
   "eval": {
     "host": "opencode",
@@ -53,7 +59,7 @@ A run needs all of the following:
 
 | Budget field | Default | Meaning |
 | --- | --- | --- |
-| `trials` | 3 | Trials per scenario; at most 50 per run |
+| `trials` | 3 | Trials per scenario; at most 50 per scenario |
 | `timeoutMs` | 600000 | Wall-clock limit per trial; at most 3600000 |
 | `maxSessions` | 15 | Host sessions per run; the run stops when exhausted |
 | `maxTokens` | 400000 | Token spend per trial, enforced from host usage events |
@@ -113,8 +119,10 @@ A scenario is a versioned document that validates against
 
 ## Checks
 
-Checks are deterministic and zero-LLM; they grade sandbox state and never call
-a model.
+File and diff checks apply fixed rules to sandbox state. Command checks run
+the supplied program and inspect its exit status and optional output pattern.
+Atlante does not use a model-judge, but a command check's behavior depends on
+the program it invokes.
 
 | Type | Fields | Asserts |
 | --- | --- | --- |
@@ -123,7 +131,7 @@ a model.
 | `file-absent` | `path` | The file does not exist |
 | `file-unchanged` | `path` | The file matches its baseline snapshot |
 | `file-contains` | `path`, `pattern`, `regex` (default `false`) | The file contains the pattern; literal text by default, regular expression when `regex` is `true` |
-| `diff-allowlist` | `allow` | The session modified only allowlisted paths; anything else is scope creep. The scan ignores paths under the host-owned `.opencode/` directory, where the host installs runtime artifacts during a session |
+| `diff-allowlist` | `allow` | No changed paths fall outside the allowlist. The scan ignores the host-owned `.opencode/` directory |
 
 A `file-contains` regular expression compiles at validation time, so an
 invalid pattern fails before any model call. A check-level `timeoutMs` is
@@ -131,8 +139,10 @@ capped at 3600000.
 
 ## Path containment
 
-Fixture, check, and allowlist paths are sandbox-relative. Absolute paths, path
-traversal, and `.git` or `node_modules` segments are rejected at validation.
+`task.fixture` is relative to the project root, not the scenario document.
+Check paths and allowlist entries are relative to the sandbox root. Absolute
+paths, path traversal, and `.git` or `node_modules` segments are rejected at
+validation.
 
 Fixtures must not ship host-owned files. A fixture `.opencode` file that
 collides with a native output fails the trial with a rename-or-remove
@@ -140,19 +150,24 @@ diagnostic, and a fixture `opencode.jsonc` is rejected because the host would
 prefer it over the generated `opencode.json`, which always wins over a
 fixture-provided one.
 
-## Containment
+<a id="containment"></a>
 
-Containment is tool-level policy, not OS-level isolation. Forced permission
-denials close the host's web and search tools and the most destructive shell
-commands, and the trial process inherits only an allowlisted environment —
-your shell secrets stay with the host. The host's shell tool still has
-ordinary user access to the network and machine, so run only scenarios whose
-fixture content you trust.
+## Sandbox containment
+
+Containment is tool-level policy, not OS-level isolation. Host permission
+rules deny web and search tools and selected destructive shell commands.
+The host's shell tool still has ordinary user access to the network and
+machine.
+
+The host trial and command checks receive an allowlisted environment.
+Scenario setup commands run before the baseline snapshot and inherit the
+full environment of the Atlante process. Review fixture content, setup
+commands, and check commands before executing a scenario from another source.
 
 ## Reports and exit status
 
-The report is written to `<project>/.atlante/eval/<run-id>/report.json`; that
-location is gitignored. `--out <dir>` relocates it and `--keep` preserves the
+The default report path is `<project>/.atlante/eval/<run-id>/report.json`.
+`--out <dir>` relocates it and `--keep` preserves the
 trial sandboxes; see [CLI](/reference/cli#atlante-eval) for flags and progress
 output, and [Diagnostics](/reference/diagnostics) for the error envelope.
 
