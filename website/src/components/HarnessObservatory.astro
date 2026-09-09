@@ -3,310 +3,186 @@ import IdentitySymbol from "./IdentitySymbol.astro";
 
 const observations = [
   {
-    focus: "configuration" as const,
-    term: "Family",
-    title: "One harness, held together",
-    code: "atlante.jsonc",
-    detail:
-      "Agents, skills, values, and eval configuration live in one versioned configuration beside your code.",
+    focus: "star" as const,
+    title: "An agent is a star",
+    detail: "Define each role with a clear identity, mission, and instructions.",
   },
   {
-    focus: "inputs" as const,
-    term: "Stars",
-    title: "Every signal stays visible",
-    code: "named values → explicit template inputs",
-    detail:
-      "Templates receive only the named values you explicitly declare, keeping every input visible in reviews and diffs.",
+    focus: "constellation" as const,
+    title: "Stars form constellations",
+    detail: "Combine complementary roles around the work they share.",
   },
   {
-    focus: "agent" as const,
-    term: "Constellations",
-    title: "Your stars form an agent",
-    code: "agents.implementer → agents/implementer.md",
+    focus: "family" as const,
+    title: "Constellations form families",
     detail:
-      "Reusable templates for instructions, gotchas, and invariants compose into coherent agents and skills.",
+      "A family is one project's complete harness: its agents, skills, values, evals, and host configuration.",
   },
   {
-    focus: "validation" as const,
-    term: "Coordinates",
-    title: "Validate before you build",
-    code: "atlante validate",
+    focus: "projection" as const,
+    title: "Families have specific coordinates",
     detail:
-      "Atlante validates the configuration and every selected template before anything can be published.",
+      "Atlante validates its source and materializes deterministic, host-native files.",
   },
   {
-    focus: "adapter" as const,
-    term: "Projection",
-    title: "The build writes what the host reads",
-    code: "configuration → build → native files",
+    focus: "sphere" as const,
+    title: "Families form the celestial sphere",
     detail:
-      "Atlante materializes a prepared project as host-native files and an ownership manifest; OpenCode discovers them when it starts.",
-  },
-  {
-    focus: "runtime" as const,
-    term: "Bearing",
-    title: "Atlante bears the structure. The host runs it.",
-    code: "models · effort · permissions · tools · modes",
-
-    detail:
-      "Runtime settings and execution remain with the host while Atlante keeps the authored structure reproducible.",
+      "Each family stays independently authored and versioned within one coherent system.",
   },
 ];
 ---
 
-<section class="observatory major-divider" id="system" data-observatory data-focus="configuration">
+<section class="observatory major-divider" id="system">
   <div class="inner">
-    <div class="instrument">
-      <div class="stage-wrap">
-        <div class="symbol-stage" aria-hidden="true">
-          {
-            observations.map((item) => (
-              <div class="symbol-frame" data-symbol={item.focus}>
-                <IdentitySymbol kind={item.focus} />
-              </div>
-            ))
-          }
-        </div>
-      </div>
-
-      <div class="readout">
-        {
-          observations.map((item) => (
-            <article data-observation={item.focus}>
-              <div class="mobile-symbol" aria-hidden="true">
-                <IdentitySymbol kind={item.focus} />
-              </div>
-              <div>
-
-                <p class="term">{item.term}</p>
-                <h3>{item.title}</h3>
-                <code>{item.code}</code>
-                <p class="detail">{item.detail}</p>
-              </div>
-            </article>
-          ))
-        }
-      </div>
+    <header class="intro">
+      <h2>The celestial sphere of harnesses</h2>
+      <p>Follow the hierarchy from individual agents to complete, versioned harness families.</p>
+    </header>
+    <div class="readout">
+      {
+        observations.map((item) => (
+          <article data-observation={item.focus}>
+            <div class="observation-symbol" data-symbol={item.focus} aria-hidden="true">
+              <IdentitySymbol kind={item.focus} />
+            </div>
+            <div class="observation-copy">
+              <h3>{item.title}</h3>
+              <p class="detail">{item.detail}</p>
+            </div>
+          </article>
+        ))
+      }
     </div>
-
   </div>
 </section>
 
-<script>
-  import { isDocumentEnd } from "../lib/scroll";
-
-  const observatory = document.querySelector<HTMLElement>("[data-observatory]");
-  const observations = observatory?.querySelectorAll<HTMLElement>(
-    "[data-observation]",
-  );
-  const lastObservation = observations?.[observations.length - 1];
-
-  if (observatory && observations) {
-    const focus = (element: HTMLElement): void => {
-      observatory.dataset.focus = element.dataset.observation;
-    };
-
-    const focusFinalObservation = (): boolean => {
-      const atObservatoryEnd =
-        observatory.getBoundingClientRect().bottom <= window.innerHeight + 2;
-
-      if (
-        !lastObservation ||
-        (!isDocumentEnd(
-          window.scrollY,
-          window.innerHeight,
-          Math.max(
-            document.documentElement.scrollHeight,
-            document.body?.scrollHeight ?? 0,
-          ),
-        ) &&
-          !atObservatoryEnd)
-      ) {
-        return false;
-      }
-
-      focus(lastObservation);
-      return true;
-    };
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (focusFinalObservation()) return;
-        const visible = entries.find((entry) => entry.isIntersecting);
-        if (visible?.target instanceof HTMLElement) focus(visible.target);
-      },
-      { rootMargin: "-38% 0px -38% 0px" },
-    );
-
-    for (const item of observations) {
-      observer.observe(item);
-      item.addEventListener("pointerenter", () => {
-        if (!focusFinalObservation()) focus(item);
-      });
-    }
-
-    const syncFinalObservation = (): void => {
-      focusFinalObservation();
-    };
-
-    window.addEventListener("scroll", syncFinalObservation, { passive: true });
-    window.addEventListener("resize", syncFinalObservation);
-    syncFinalObservation();
-  }
-</script>
-
 <style>
-  .observatory {
-    border-block-start: 0;
-  }
-
   .inner {
     max-width: var(--container-wide);
     margin-inline: auto;
-    padding: clamp(var(--space-24), 9vw, 168px) var(--space-4);
+    padding: clamp(var(--space-16), 7vw, 120px) var(--space-4);
   }
 
-  .instrument {
-    display: grid;
-    grid-template-columns: minmax(320px, 0.8fr) minmax(0, 1.2fr);
-    gap: clamp(var(--space-12), 8vw, 180px);
-    align-items: start;
+  .intro {
+    padding-block-end: clamp(var(--space-10), 6vw, var(--space-16));
   }
 
-  .stage-wrap {
-    min-height: 100%;
-  }
-
-  .symbol-stage {
-    position: sticky;
-    inset-block-start: 13vh;
-    display: grid;
-    place-items: center;
-    min-height: min(72vh, 680px);
-    color: var(--ds-fg);
-  }
-
-  .symbol-frame {
-    grid-area: 1 / 1;
-    width: clamp(210px, 24vw, 350px);
-    opacity: 0;
-    scale: 0.84;
-    rotate: -3deg;
-    transition:
-      opacity 320ms var(--ease-standard),
-      scale 480ms var(--ease-standard),
-      rotate 480ms var(--ease-standard);
-  }
-
-  .observatory[data-focus="configuration"] [data-symbol="configuration"],
-  .observatory[data-focus="inputs"] [data-symbol="inputs"],
-  .observatory[data-focus="agent"] [data-symbol="agent"],
-  .observatory[data-focus="validation"] [data-symbol="validation"],
-  .observatory[data-focus="adapter"] [data-symbol="adapter"],
-  .observatory[data-focus="runtime"] [data-symbol="runtime"] {
-    opacity: 1;
-    scale: 1;
-    rotate: 0deg;
-  }
-
-  .readout {
-    border-block-end: 1px solid var(--ds-border-subtle);
-  }
-
-  article {
-    display: flex;
-    align-items: center;
-    min-height: 180px;
-    padding-block: var(--space-8);
-    border-block-start: 1px solid var(--ds-border-subtle);
-  }
-
-  .mobile-symbol {
-    display: none;
-  }
-
-  .term {
-    margin: 0 0 var(--space-3);
-    font-family: var(--font-ui);
-    font-size: var(--text-meta);
-    font-weight: 700;
-    letter-spacing: 0.11em;
-  }
-
-  h3 {
+  .intro h2 {
     max-width: 18ch;
-    margin: 0 0 var(--space-3);
-    font-family: var(--font-heading);
-    font-size: clamp(26px, 2.2vw, 36px);
-    font-weight: 600;
-    line-height: 1;
-  }
-
-  article code {
-    display: block;
-    margin-block-end: var(--space-3);
-    color: var(--ds-accent);
-    font-family: var(--font-mono);
-    font-size: var(--text-small);
-    overflow-wrap: anywhere;
-  }
-
-  .detail {
-    max-width: 50ch;
     margin: 0;
+    font-family: var(--font-heading);
+    font-size: clamp(44px, 6vw, 76px);
+    font-weight: 600;
+    line-height: 1.02;
+    text-wrap: balance;
+  }
+
+  .intro p {
+    max-width: 62ch;
+    margin: var(--space-4) 0 0;
     color: var(--ds-muted);
     font-family: var(--font-body);
-    font-size: var(--text-ui);
+    font-size: clamp(var(--text-ui), 1.5vw, 20px);
     line-height: 1.65;
   }
 
-
-
-  @media (max-width: 900px) {
-    .instrument {
-      grid-template-columns: 1fr;
-      gap: 0;
-    }
-
-    .stage-wrap {
-      display: none;
-    }
-
-    article {
-      display: grid;
-      grid-template-columns: 96px minmax(0, 1fr);
-      gap: var(--space-8);
-      min-height: 0;
-      padding-block: var(--space-8);
-    }
-
-    .mobile-symbol {
-      display: block;
-      width: 96px;
-      color: var(--ds-fg);
-    }
+  article {
+    position: relative;
+    display: grid;
+    grid-template-columns: 280px minmax(0, 1fr);
+    gap: clamp(var(--space-12), 7vw, 112px);
+    align-items: center;
+    min-height: 288px;
+    padding-block: var(--space-12);
+    border-block-start: 1px solid var(--ds-border-subtle);
   }
 
-  @media (max-width: 680px) {
+  article:first-child {
+    border-block-start: 0;
+  }
+
+  .observation-symbol {
+    z-index: 1;
+    width: 220px;
+    box-sizing: border-box;
+    margin-inline: auto;
+    padding: var(--space-4);
+    background: var(--ds-bg);
+    color: var(--ds-fg);
+  }
+
+  .observation-copy {
+    position: relative;
+    z-index: 1;
+  }
+
+  h3 {
+    max-width: 22ch;
+    margin: 0 0 var(--space-3);
+    font-family: var(--font-heading);
+    font-size: clamp(36px, 4vw, 54px);
+    font-weight: 600;
+    line-height: 1.04;
+  }
+
+  .detail {
+    max-width: 54ch;
+    margin: 0;
+    color: var(--ds-muted);
+    font-family: var(--font-body);
+    font-size: clamp(var(--text-ui), 1.5vw, 20px);
+    line-height: 1.65;
+  }
+  @media (max-width: 800px) {
     article {
-      display: block;
-      text-align: center;
+      grid-template-columns: 144px minmax(0, 1fr);
+      gap: var(--space-8);
+      min-height: 0;
+      padding-block: var(--space-10);
     }
 
-    .mobile-symbol {
-      width: 96px;
-      margin-inline: auto;
-      margin-block-end: var(--space-4);
+    .observation-symbol {
+      width: 120px;
+      padding: var(--space-2);
     }
 
     h3 {
+      font-size: clamp(30px, 6vw, 42px);
+    }
+  }
+
+  @media (max-width: 540px) {
+    .intro {
+      text-align: center;
+    }
+
+    .intro h2,
+    .intro p {
       margin-inline: auto;
     }
 
-    article code,
-    .detail {
-      margin-inline: auto;
+    article {
+      grid-template-columns: 1fr;
+      gap: var(--space-4);
+      padding-block: var(--space-16) var(--space-12);
       text-align: center;
+    }
+
+    .observation-symbol {
+      width: 128px;
+      padding: var(--space-1);
+    }
+
+    h3 {
+      margin: 0 auto var(--space-2);
+      font-size: clamp(27px, 8vw, 36px);
+    }
+
+    .detail {
+      max-width: 32ch;
+      margin-inline: auto;
+      font-size: var(--text-ui);
     }
 
   }

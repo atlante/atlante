@@ -1,47 +1,66 @@
 ---
+import logoGlyph from "../assets/atlante-glyph.svg?raw";
+
 type Kind =
-  | "configuration"
-  | "inputs"
-  | "agent"
-  | "validation"
-  | "adapter"
-  | "runtime";
+  | "star"
+  | "constellation"
+  | "family"
+  | "sphere"
+  | "projection";
 
 interface Props {
   kind: Kind;
 }
 
 const { kind } = Astro.props;
+
+const constellationLine = "M20 82 42 58 62 68 91 32";
+const constellationNodes = [
+  { cx: 20, cy: 82 },
+  { cx: 42, cy: 58 },
+  { cx: 62, cy: 68 },
+  { cx: 91, cy: 32 },
+];
+const familyConstellations = [
+  "translate(2 3) scale(.52)",
+  "translate(61 7) scale(.52)",
+  "translate(30 58) scale(.52)",
+];
+
+const logoPath = logoGlyph.match(/<path d="([^"]+)"/)?.[1];
+if (!logoPath) {
+  throw new Error("The Atlante glyph does not contain its expected path");
+}
+
+const logoSubpaths = logoPath.split(/(?=M )/);
+if (logoSubpaths.length < 59) {
+  throw new Error("The Atlante glyph does not contain its sphere geometry");
+}
+
+// These path ranges are the celestial-sphere details authored in the master glyph.
+const sphereBursts = logoSubpaths.slice(1, 3);
+const sphereLines = [3, 4, 6, 8, 9, 11, 12, 16].map(
+  (index) => logoSubpaths[index],
+);
+const sphereNodes = [5, 7, 10, 13, 14, 15].map(
+  (index) => logoSubpaths[index],
+);
+const sphereHorizon = [
+  ...Array.from({ length: 21 }, (_, index) => index + 17),
+  ...Array.from({ length: 14 }, (_, index) => index + 39),
+  55,
+  56,
+]
+  .filter((index) => ![32, 34, 40].includes(index))
+  .map((index) => logoSubpaths[index]);
+const sphereCoordinate = [38, 53, 54, 57, 58]
+  .map((index) => logoSubpaths[index])
+  .join(" ");
 ---
 
 <div class={`identity-symbol ${kind}`} aria-hidden="true">
   {
-    kind === "configuration" && (
-      <svg viewBox="0 0 120 120">
-        <g class="cluster cluster-a">
-          <path d="M15 31 29 23 40 34" />
-          <circle cx="15" cy="31" r="3.2" />
-          <circle cx="29" cy="23" r="3.2" />
-          <circle cx="40" cy="34" r="3.2" />
-        </g>
-        <g class="cluster cluster-b">
-          <path d="M52 55 65 43 80 54 91 43" />
-          <circle cx="52" cy="55" r="3.2" />
-          <circle cx="65" cy="43" r="3.2" />
-          <circle cx="80" cy="54" r="3.2" />
-          <circle cx="91" cy="43" r="3.2" />
-        </g>
-        <g class="cluster cluster-c">
-          <path d="M24 88 37 77 51 91" />
-          <circle cx="24" cy="88" r="3.2" />
-          <circle cx="37" cy="77" r="3.2" />
-          <circle cx="51" cy="91" r="3.2" />
-        </g>
-      </svg>
-    )
-  }
-  {
-    kind === "inputs" && (
+    kind === "star" && (
       <svg viewBox="0 0 120 120">
         <path
           class="star"
@@ -51,45 +70,61 @@ const { kind } = Astro.props;
     )
   }
   {
-    kind === "agent" && (
+    kind === "constellation" && (
       <svg viewBox="0 0 120 120">
-        <path class="line" d="M24 83 55 57 91 34" />
-        <circle class="node" cx="24" cy="83" r="4" />
-        <circle class="node" cx="55" cy="57" r="4" />
-        <circle class="node" cx="91" cy="34" r="4" />
+        <path class="line" d={constellationLine} />
+        {constellationNodes.map(({ cx, cy }) => (
+          <circle class="node" cx={cx} cy={cy} r="4" />
+        ))}
       </svg>
     )
   }
   {
-    kind === "adapter" && (
+    kind === "family" && (
+      <svg viewBox="0 0 120 120">
+        {familyConstellations.map((transform) => (
+          <g class="family-copy" transform={transform}>
+            <path class="line" d={constellationLine} />
+            {constellationNodes.map(({ cx, cy }) => (
+              <circle class="node" cx={cx} cy={cy} r="4" />
+            ))}
+          </g>
+        ))}
+      </svg>
+    )
+  }
+  {
+    kind === "sphere" && (
+      <svg viewBox="140 130 430 430">
+        <path
+          class="sphere-outline"
+          d="M210.151 199.682A205 205 0 1 1 187.121 231.84"
+        />
+        <g class="sphere-bursts">
+          {sphereBursts.map((path) => <path d={path} />)}
+        </g>
+        <g class="sphere-logo-lines">
+          {sphereLines.map((path) => <path d={path} />)}
+        </g>
+        <g class="sphere-nodes">
+          {sphereNodes.map((path) => <path d={path} />)}
+        </g>
+        <g class="sphere-horizon-dots">
+          {sphereHorizon.map((path) => <path d={path} />)}
+        </g>
+        <g class="coordinate-mark">
+          <path d={sphereCoordinate} fill-rule="evenodd" />
+        </g>
+      </svg>
+    )
+  }
+  {
+    kind === "projection" && (
       <svg viewBox="0 0 120 120">
         <path class="project" d="M24 96Q30 54 49 27" />
         <path class="project" d="M24 96Q47 51 76 30" />
         <path class="project" d="M24 96Q61 62 96 49" />
         <path class="project" d="M24 96Q65 84 101 78" />
-      </svg>
-    )
-  }
-  {
-    kind === "validation" && (
-      <svg viewBox="0 0 120 120">
-        <circle class="outline" cx="60" cy="60" r="25" />
-        <path class="line" d="M60 18v25m0 34v25M18 60h25m34 0h25" />
-      </svg>
-    )
-  }
-  {
-    kind === "runtime" && (
-      <svg viewBox="0 0 120 120">
-        <g class="constellation">
-          <path d="M29 43 46 28 64 39 83 22" />
-          <circle cx="29" cy="43" r="3.2" />
-          <circle cx="46" cy="28" r="3.2" />
-          <circle cx="64" cy="39" r="3.2" />
-          <circle cx="83" cy="22" r="3.2" />
-        </g>
-        <path class="boundary" d="M16 63h88" />
-        <path class="motion-path" d="M20 91c15-16 27 16 42 0s27 16 42 0" />
       </svg>
     )
   }
@@ -110,10 +145,8 @@ const { kind } = Astro.props;
   .outline,
   .line,
   .project,
-  .cluster path,
   .constellation path,
-  .boundary,
-  .motion-path {
+  .sphere-outline {
     fill: none;
     stroke: currentColor;
     stroke-linecap: round;
@@ -124,8 +157,25 @@ const { kind } = Astro.props;
     stroke-width: 1.5;
   }
 
+  .sphere-outline {
+    stroke-width: 5;
+  }
+
+  .sphere-logo-lines,
+  .sphere-nodes,
+  .sphere-bursts,
+  .sphere-horizon-dots,
+  .coordinate-mark {
+    fill: currentColor;
+  }
+
   .line {
     stroke-width: 1.35;
+    stroke-dasharray: 4 5;
+  }
+
+  .family .line {
+    vector-effect: non-scaling-stroke;
   }
 
   .project {
@@ -136,30 +186,96 @@ const { kind } = Astro.props;
   .node,
   .spark,
   .star,
-  .cluster circle,
   .constellation circle {
     fill: currentColor;
   }
 
-  .motion-path {
-    stroke-width: 2;
-    stroke-dasharray: 3 8;
-  }
-
   @media (prefers-reduced-motion: no-preference) {
     .project {
-      animation: project 10s linear infinite;
+      animation: project 4s linear infinite;
     }
 
-    .motion-path {
-      animation: bearing-motion 2.4s linear infinite;
-    }
-
-    .spark,
     .star {
       transform-box: fill-box;
       transform-origin: center;
-      animation: breathe 4s var(--ease-standard) infinite;
+      animation: breathe 2.8s var(--ease-standard) infinite;
+    }
+
+    .constellation .line,
+    .family .line {
+      animation: constellation-flow 3.4s linear infinite;
+    }
+
+    .constellation .node,
+    .family .node {
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: twinkle 1.9s var(--ease-standard) infinite alternate;
+    }
+
+    .constellation .node:nth-of-type(2),
+    .family .node:nth-of-type(2) {
+      animation-delay: -0.6s;
+    }
+
+    .constellation .node:nth-of-type(3),
+    .family .node:nth-of-type(3) {
+      animation-delay: -1.2s;
+    }
+
+    .family-copy:nth-child(2) .line,
+    .family-copy:nth-child(2) .node {
+      animation-delay: -0.8s;
+    }
+
+    .family-copy:nth-child(3) .line,
+    .family-copy:nth-child(3) .node {
+      animation-delay: -1.6s;
+    }
+
+    .sphere-outline,
+    .sphere-logo-lines path,
+    .sphere-nodes path,
+    .sphere-bursts path,
+    .sphere-horizon-dots {
+      transform-box: fill-box;
+      transform-origin: center;
+    }
+
+    .sphere-outline {
+      animation: sphere-turn 14s linear infinite;
+    }
+
+    .sphere-logo-lines path {
+      animation: line-pulse 2.6s var(--ease-standard) infinite alternate;
+    }
+
+    .sphere-logo-lines path:nth-child(even) {
+      animation-delay: -1.3s;
+    }
+
+    .sphere-nodes path {
+      animation: twinkle 2s var(--ease-standard) infinite alternate;
+    }
+
+    .sphere-nodes path:nth-child(2n) {
+      animation-delay: -0.7s;
+    }
+
+    .sphere-nodes path:nth-child(3n) {
+      animation-delay: -1.4s;
+    }
+
+    .sphere-bursts path {
+      animation: burst 2.4s var(--ease-standard) infinite alternate;
+    }
+
+    .sphere-bursts path:last-child {
+      animation-delay: -1.2s;
+    }
+
+    .sphere-horizon-dots {
+      animation: horizon-drift 3.2s var(--ease-standard) infinite alternate;
     }
 
     @keyframes project {
@@ -168,22 +284,74 @@ const { kind } = Astro.props;
       }
     }
 
-    @keyframes bearing-motion {
+    @keyframes constellation-flow {
       to {
-        stroke-dashoffset: -22;
+        stroke-dashoffset: -72;
+      }
+    }
+
+    @keyframes twinkle {
+      from {
+        transform: scale(0.88);
+        opacity: 0.58;
+      }
+
+      to {
+        transform: scale(1.32);
+        opacity: 1;
+      }
+    }
+
+    @keyframes line-pulse {
+      from {
+        opacity: 0.45;
+      }
+
+      to {
+        opacity: 1;
+      }
+    }
+
+    @keyframes burst {
+      from {
+        transform: scale(0.88) rotate(-4deg);
+        opacity: 0.7;
+      }
+
+      to {
+        transform: scale(1.12) rotate(4deg);
+        opacity: 1;
+      }
+    }
+
+    @keyframes horizon-drift {
+      from {
+        transform: translateX(-4px);
+        opacity: 0.55;
+      }
+
+      to {
+        transform: translateX(4px);
+        opacity: 1;
+      }
+    }
+
+    @keyframes sphere-turn {
+      to {
+        transform: rotate(360deg);
       }
     }
 
     @keyframes breathe {
+      0%,
+      100% {
+        transform: scale(0.93) rotate(-2deg);
+      }
+
       50% {
-        scale: 1.04;
+        transform: scale(1.1) rotate(2deg);
       }
     }
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .motion-path {
-      animation: none;
-    }
-  }
 </style>
