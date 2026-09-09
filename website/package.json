@@ -16,7 +16,7 @@
     "astro": "astro"
   },
   "dependencies": {
-    "atlante": "0.2.1",
+    "atlante": "0.2.2",
     "codejar": "4.3.0"
   },
   "devDependencies": {

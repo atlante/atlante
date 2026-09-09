@@ -1,6 +1,6 @@
 {
   "name": "@atlante/resources",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "type": "module",
   "description": "Atlante private local resource packs, facets, and rendering",
   "license": "MIT",
