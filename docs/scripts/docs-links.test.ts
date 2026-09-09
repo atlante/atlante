@@ -19,7 +19,9 @@ function contentFiles(directory: string): string[] {
 function authoredRoutes(): string[] {
   return contentFiles(sourceRoot).map(
     (sourcePath) =>
-      `/${relative(sourceRoot, sourcePath).replaceAll("\\", "/").replace(/\.mdx?$/, "")}`,
+      `/${relative(sourceRoot, sourcePath)
+        .replaceAll("\\", "/")
+        .replace(/\.mdx?$/, "")}`,
   );
 }
 
