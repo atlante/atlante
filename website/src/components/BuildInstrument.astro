@@ -136,22 +136,21 @@ const config = `{
             <select id="generated-file" data-file-select aria-label="Select generated file"></select>
           </div>
         </div>
-      </div>
-
-      <div class="build-controls">
-        <button type="button" class="build-button" data-build>Build</button>
-        <p class="run-hint" data-run-hint>
-          Build validates the configuration and materializes native files in an isolated sandbox.
-        </p>
+        <div class="build-controls">
+          <button type="button" class="build-button" data-build aria-label="Build" title="Build">
+            <svg class="build-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="m8 5 10 7-10 7V5Z"></path>
+            </svg>
+            <span class="build-button-label">Build</span>
+          </button>
+          <p class="run-hint" data-run-hint>
+            Build validates the configuration and materializes native files in an isolated sandbox.
+          </p>
+        </div>
       </div>
 
       <div class="terminal" aria-live="polite">
-        <div class="terminal-head">
-          <span>Build log</span>
-          <span data-exit hidden>exit 0</span>
-        </div>
-        <pre data-terminal-out>$ npx @atlante/cli@latest build
-Press Build to run the real CLI in an isolated sandbox.</pre>
+        <pre data-terminal-out>$ npx @atlante/cli@latest build</pre>
       </div>
 
     </div>
@@ -184,6 +183,7 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
     const outputView = instrument.querySelector<HTMLElement>(
       "[data-output-view]",
     );
+    const outputPane = instrument.querySelector<HTMLElement>(".output-pane");
     const outputName = instrument.querySelector<HTMLElement>(
       "[data-output-name]",
     );
@@ -198,7 +198,6 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
     );
     const runHint = instrument.querySelector<HTMLElement>("[data-run-hint]");
     const statusDot = instrument.querySelector<HTMLElement>("[data-status-dot]");
-    const exitLabel = instrument.querySelector<HTMLElement>("[data-exit]");
     const terminalOut = instrument.querySelector<HTMLElement>(
       "[data-terminal-out]",
     );
@@ -323,24 +322,17 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
       lastAttemptHash: null as string | null,
       requestSequence: 0,
       hasGoodOutput: false,
+      emptyOutputMessage: "Press Build to inspect generated native files.",
     };
 
     const showTerminal = (
       output: string,
       status: "success" | "error" | "fallback" | "idle",
-      exitCode: number | null = null,
     ): void => {
-      if (!terminalOut || !exitLabel || !statusDot) return;
-      terminalOut.textContent = `$ npx @atlante/cli@latest build\n${output}`;
-      exitLabel.hidden = status === "idle";
-      exitLabel.textContent =
-        status === "fallback"
-          ? "fallback"
-          : exitCode === null
-            ? status === "success"
-              ? "exit 0"
-              : "no exit code"
-            : `exit ${exitCode}`;
+      if (!terminalOut || !statusDot) return;
+      terminalOut.textContent = output
+        ? `$ npx @atlante/cli@latest build\n${output}`
+        : "$ npx @atlante/cli@latest build";
       statusDot.style.background =
         status === "success"
           ? "var(--ds-success)"
@@ -366,8 +358,18 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
       if (outputView) {
         outputView.innerHTML = hasOutput
           ? `<code>${highlightFile(path, content)}</code>`
-          : "<code>Press Build to inspect generated native files.</code>";
+          : `<code>${escapeHtml(state.emptyOutputMessage)}</code>`;
       }
+    };
+
+    const syncOutputSelectorHeight = (): void => {
+      if (!outputPane || !outputSelector) return;
+      outputPane.style.setProperty(
+        "--output-selector-height",
+        outputSelector.hidden
+          ? "0px"
+          : `${outputSelector.getBoundingClientRect().height}px`,
+      );
     };
 
     const renderSelector = (): void => {
@@ -383,6 +385,7 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
       }
 
       outputSelector.hidden = state.files.size === 0;
+      syncOutputSelectorHeight();
     };
 
     const render = (): void => {
@@ -394,11 +397,12 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
       state.running = busy;
       if (!buildButton) return;
       buildButton.disabled = busy;
-      buildButton.textContent = busy ? "Building…" : "Build";
+      buildButton.setAttribute("aria-busy", String(busy));
     };
 
     const showFallback = (reason: string): void => {
       if (!state.hasGoodOutput) {
+        state.emptyOutputMessage = "No generated files are available.";
         state.files.clear();
         for (const file of playgroundFallback.files) {
           if (nativeOutput(file.path)) state.files.set(file.path, file.content);
@@ -407,18 +411,18 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
         render();
       }
       showTerminal(
-        `${reason}\n${playgroundFallback.output}`,
+        reason,
         "fallback",
       );
       if (runHint) {
         runHint.textContent = state.hasGoodOutput
           ? "The live playground is unavailable. The last successful output remains visible."
-          : "The live playground is unavailable. Showing a static example.";
+          : "The live playground is unavailable. No generated files are available.";
       }
     };
 
-    const showBuildFailure = (output: string, exitCode: number | null): void => {
-      showTerminal(output, "error", exitCode);
+    const showBuildFailure = (output: string): void => {
+      showTerminal(output, "error");
       if (runHint) {
         runHint.textContent =
           "Build failed. The last successful output remains visible.";
@@ -513,7 +517,7 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
         }
 
         if (!result.ok) {
-          showBuildFailure(result.output, result.exitCode ?? null);
+          showBuildFailure(result.output);
           return;
         }
 
@@ -534,7 +538,7 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
             })[0]?.path ?? null;
         state.hasGoodOutput = true;
         render();
-        showTerminal(result.output, "success", result.exitCode ?? 0);
+        showTerminal(result.output, "success");
         if (runHint) {
           runHint.textContent =
             "Build complete. Select a generated native file to inspect it.";
@@ -564,15 +568,13 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
       renderOutput();
       renderSelector();
     });
+    window.addEventListener("resize", syncOutputSelectorHeight);
 
     editorShell?.classList.add("is-enhanced");
     if (editor) editor.style.whiteSpace = "pre";
     syncLineNumbers(initialConfig);
     render();
-    showTerminal(
-      "Press Build to run the real CLI in an isolated sandbox.",
-      "idle",
-    );
+    showTerminal("", "idle");
   }
 </script>
 
@@ -646,12 +648,16 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
   }
 
   .workspace {
+    position: relative;
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .configuration-pane {
+    display: flex;
     min-width: 0;
+    flex-direction: column;
+    position: relative;
     border-inline-end: 1px solid var(--ds-border);
   }
 
@@ -659,6 +665,8 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
     display: flex;
     min-width: 0;
     flex-direction: column;
+    position: relative;
+    border-block-end: 1px solid var(--ds-border);
   }
 
   .pane-head {
@@ -666,9 +674,9 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
     align-items: center;
     justify-content: space-between;
     gap: var(--space-4);
-    min-height: 72px;
-    padding: var(--space-3) var(--space-4);
-    border-block-end: 1px solid var(--ds-border-subtle);
+    min-height: var(--control-min);
+    padding: var(--space-2) var(--space-4);
+    border-block-end: 1px solid var(--ds-border);
   }
 
   .pane-head > div:first-child {
@@ -696,10 +704,14 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
   }
 
   .pane-actions {
+    position: absolute;
+    inset-block-end: 0;
+    inset-inline-end: 0;
+    z-index: 1;
     display: flex;
     flex-wrap: wrap;
     flex-shrink: 0;
-    gap: var(--space-2);
+    gap: 0;
   }
 
   button {
@@ -739,6 +751,24 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
   .pane-actions [data-output-copy] {
     min-width: var(--control-min);
     padding-inline: 0;
+    border: 0;
+    border-block-start: 1px solid var(--ds-border);
+    border-inline-start: 1px solid var(--ds-border);
+    border-radius: 0;
+    background: var(--ds-bg);
+    opacity: 1;
+  }
+
+  .pane-actions [data-output-copy]:disabled {
+    opacity: 0.4;
+  }
+
+  .configuration-pane .pane-actions [data-source-copy] {
+    border-block-end: 1px solid var(--ds-border);
+  }
+
+  .output-pane .pane-actions {
+    inset-block-end: var(--output-selector-height, 0px);
   }
 
   .pane-actions svg {
@@ -752,16 +782,26 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
     color: var(--ds-fg);
   }
 
+  .pane-actions [data-source-copy]:hover:not(:disabled),
+  .pane-actions [data-source-copy]:focus-visible:not(:disabled),
+  .pane-actions [data-output-copy]:hover:not(:disabled),
+  .pane-actions [data-output-copy]:focus-visible:not(:disabled) {
+    background: var(--ds-bg);
+    color: var(--ds-fg);
+  }
+
   .editor-shell {
     display: grid;
-    grid-template-columns: 3.5rem minmax(0, 1fr);
+    flex: 1 1 auto;
+    grid-template-columns: 3rem minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
     min-height: 480px;
-    border-block-end: 1px solid var(--ds-border-subtle);
+    border-block-end: 1px solid var(--ds-border);
   }
 
   .line-numbers {
-    max-height: 640px;
-    padding: var(--space-8) var(--space-3);
+    min-height: 0;
+    padding: var(--space-6) var(--space-2);
     overflow: hidden;
     background: color-mix(in oklab, var(--ds-bg) 94%, var(--ds-fg));
     color: var(--ds-muted);
@@ -777,8 +817,9 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
   }
 
   .editor-code {
+    display: flex;
     min-width: 0;
-    max-height: 640px;
+    min-height: 0;
   }
 
   .code-editor,
@@ -787,9 +828,8 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
     box-sizing: border-box;
     width: 100%;
     min-height: 480px;
-    max-height: 640px;
     margin: 0;
-    padding: var(--space-8) clamp(var(--space-4), 3vw, var(--space-12));
+    padding: var(--space-6);
     border: 0;
     background: transparent;
     color: var(--ds-fg);
@@ -800,6 +840,8 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
   }
 
   .code-editor {
+    flex: 1 1 auto;
+    min-height: 0;
     overflow: auto;
     white-space: pre;
   }
@@ -809,14 +851,14 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
     outline-offset: 2px;
   }
 
-  /* Editable regions can match :focus-visible even for pointer activation.
-     Keep the keyboard ring, but do not add an outer border while clicking. */
+  /* Suppress the ring only for pointer activation; keyboard focus remains visible. */
   .code-editor[data-pointer-focus]:focus {
     outline: none !important;
   }
 
   pre[data-output-view] {
     flex: 1;
+    max-height: 640px;
     overflow: auto;
   }
 
@@ -881,25 +923,47 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
   }
 
   .build-controls {
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-start: 50%;
+    z-index: 2;
     display: flex;
     align-items: center;
     gap: var(--space-4);
-    padding: var(--space-4);
-    border-block-start: 1px solid var(--ds-border);
+    padding: 0;
+    translate: -50% -50%;
   }
 
   .build-button {
     flex: 0 0 auto;
-    min-width: 120px;
-    border: 0;
-    background: var(--ds-fg);
-    color: var(--ds-bg);
+    width: var(--control-min);
+    min-width: var(--control-min);
+    height: var(--control-min);
+    padding: 0;
+    border: 1px solid var(--ds-border);
+    border-radius: 50%;
+    background: var(--ds-bg);
+    color: var(--ds-fg);
+  }
+
+  .build-icon {
+    width: 18px;
+    height: 18px;
+  }
+
+  .build-button-label {
+    display: none;
   }
 
   .build-button:hover:not(:disabled),
   .build-button:focus-visible:not(:disabled) {
-    background: var(--ds-button-hover);
-    color: var(--ds-bg);
+    background: var(--ds-bg);
+    color: var(--ds-fg);
+    border-color: var(--ds-fg);
+  }
+
+  .build-button:disabled {
+    opacity: 1;
   }
 
   .run-hint {
@@ -910,29 +974,26 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
     line-height: 1.55;
   }
 
+  @media (min-width: 981px) {
+    .run-hint {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+      border: 0;
+    }
+  }
+
   .terminal {
     display: flex;
     min-width: 0;
     flex-direction: column;
-    margin: var(--space-4);
-    border: 1px solid rgb(160 160 160 / 0.5);
-    border-radius: 4px;
-    background: color-mix(in oklab, var(--ds-bg) 96%, var(--ds-fg));
-  }
-
-  .terminal-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-3);
-    min-height: 44px;
-    padding-inline: var(--space-3);
-    border-block-end: 1px solid var(--ds-border-subtle);
-    color: var(--ds-muted);
-    font-family: var(--font-ui);
-    font-size: var(--text-meta);
-    font-weight: 650;
-    letter-spacing: 0.1em;
+    margin: 0;
+    border-radius: 0;
+    background: var(--ds-bg);
   }
 
   pre[data-terminal-out] {
@@ -956,13 +1017,61 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
 
     .configuration-pane {
       border-inline-end: 0;
+      border-block-end: 0;
+    }
+
+    .build-controls {
+      position: static;
+      grid-column: 1;
+      align-items: center;
+      padding: var(--space-4);
+      border-block-start: 0;
       border-block-end: 1px solid var(--ds-border);
+      translate: none;
+    }
+
+    .run-hint {
+      display: none;
+    }
+
+    .build-button {
+      width: auto;
+      min-width: 120px;
+      height: auto;
+      padding-inline: var(--space-4);
+      border-radius: 4px;
+    }
+
+    .build-button-label {
+      display: inline;
     }
 
     .editor-shell,
     .code-editor,
     pre[data-output-view] {
       min-height: 0;
+    }
+  }
+
+  @media (min-width: 981px) {
+    /* Keep both panels at one fixed height when generated files appear. */
+    .workspace {
+      height: 700px;
+      grid-template-rows: minmax(0, 1fr);
+    }
+
+    .configuration-pane,
+    .output-pane,
+    .editor-shell,
+    .code-editor,
+    pre[data-output-view] {
+      min-height: 0;
+    }
+
+    /* Keep the source content scrollable instead of letting its intrinsic
+       height determine the two-column workspace. */
+    .editor-shell {
+      contain: size;
     }
   }
 
@@ -988,7 +1097,7 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
     .pane-head {
       align-items: center;
       flex-direction: row;
-      padding-block: var(--space-4);
+      padding-block: var(--space-2);
     }
 
     .pane-head > div:first-child {
@@ -1008,16 +1117,22 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
       text-align: center;
     }
 
+    .editor-shell {
+      flex: 0 0 360px;
+      height: 360px;
+    }
+
+    .editor-code,
+    .code-editor,
+    .line-numbers {
+      max-height: none;
+    }
+
     .build-button {
       width: 100%;
     }
 
     .run-hint {
-      text-align: center;
-    }
-
-    .terminal-head {
-      justify-content: center;
       text-align: center;
     }
 
@@ -1032,11 +1147,14 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
     }
 
     .code-editor,
-    pre[data-output-view],
-    pre[data-terminal-out] {
-      padding-inline: var(--space-4);
+    pre[data-output-view] {
+      padding-inline: var(--space-6);
       font-size: clamp(11px, 0.85vw, 14px);
       text-align: start;
+    }
+
+    pre[data-terminal-out] {
+      padding-inline: var(--space-4);
     }
 
     .line-numbers {
@@ -1070,7 +1188,7 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
     pre[data-output-view] {
       min-height: 240px;
       max-height: 360px;
-      padding-block: var(--space-4);
+      padding-block: var(--space-6);
     }
 
     .output-selector {
@@ -1083,7 +1201,7 @@ Press Build to run the real CLI in an isolated sandbox.</pre>
     }
 
     .line-numbers {
-      padding-block: var(--space-4);
+      padding-block: var(--space-6);
     }
   }
 </style>

@@ -38,7 +38,6 @@ body {
   display: none !important;
 }
 
-
 .skip-link {
   position: fixed;
   inset-block-start: var(--space-2);
