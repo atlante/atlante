@@ -163,7 +163,7 @@ jobs:
           set -euo pipefail
           function_root="website/.vercel/output/functions/api/playground.func"
           pack_source="website/node_modules/@atlante/pack"
-          pack_target="$function_root/packages/cli/node_modules/@atlante/pack"
+          pack_target="$function_root/website/node_modules/@atlante/pack"
           test -d "$pack_source"
           mkdir -p "$(dirname "$pack_target")"
           cp -R "$pack_source" "$pack_target"

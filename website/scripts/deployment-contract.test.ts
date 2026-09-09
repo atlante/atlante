@@ -73,12 +73,12 @@ describe("website deployment contract", () => {
       "DEPLOY_VERSION: $" + "{{ inputs.version }}",
     );
     expect(releaseWorkflow).toContain(
-      'pack_target="$function_root/packages/cli/node_modules/@atlante/pack"',
+      'pack_target="$function_root/website/node_modules/@atlante/pack"',
     );
     expect(releaseWorkflow).toContain('mkdir -p "$(dirname "$pack_target")"');
     expect(releaseWorkflow).toContain('cp -R "$pack_source" "$pack_target"');
     expect(releaseWorkflow).not.toContain(
-      "playground.func/website/node_modules/@atlante/pack",
+      'pack_target="$function_root/packages/cli/node_modules/@atlante/pack"',
     );
     expect(releaseWorkflow).not.toContain("Copy schema files");
     expect(releaseWorkflow).not.toContain(
