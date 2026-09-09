@@ -217,6 +217,11 @@ starlight-lang-select select,
 .social-icons a {
   min-inline-size: var(--control-min);
 }
+starlight-menu-button button {
+  align-items: center;
+  justify-content: center;
+  top: calc((var(--sl-nav-height) - var(--control-min)) / 2);
+}
 :focus-visible {
   outline: 3px solid var(--sl-color-text);
   outline-offset: 2px;
