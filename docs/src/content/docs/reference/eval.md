@@ -126,16 +126,17 @@ the program it invokes.
 
 | Type | Fields | Asserts |
 | --- | --- | --- |
-| `command` | `run`, `expectExit` (default `0`), `outputMatches`, `timeoutMs` (default `120000`) | argv runs in the sandbox root, never through a shell; exit code and, optionally, an output pattern on combined stdout and stderr |
+| `command` | `run`, `expectExit` (default `0`), `outputMatches`, `timeoutMs` (default `120000`) | argv runs in the sandbox root, never through a shell; exit code and, optionally, a regular expression on combined stdout and stderr |
 | `file-exists` | `path` | The file exists |
 | `file-absent` | `path` | The file does not exist |
 | `file-unchanged` | `path` | The file matches its baseline snapshot |
 | `file-contains` | `path`, `pattern`, `regex` (default `false`) | The file contains the pattern; literal text by default, regular expression when `regex` is `true` |
 | `diff-allowlist` | `allow` | No changed paths fall outside the allowlist. The scan ignores the host-owned `.opencode/` directory |
 
-A `file-contains` regular expression compiles at validation time, so an
-invalid pattern fails before any model call. A check-level `timeoutMs` is
-capped at 3600000.
+`outputMatches` is compiled as a regular expression and matched against
+combined stdout and stderr. It and `file-contains` patterns with `regex: true`
+are checked during validation, so invalid expressions fail before any model
+call. A check-level `timeoutMs` is capped at 3600000.
 
 ## Path containment
 

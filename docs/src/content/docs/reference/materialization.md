@@ -111,7 +111,8 @@ Materialization failures carry a `materialization-` prefix:
 | `materialization-filesystem` | A filesystem operation failed |
 | `materialization-publication-failed` | Publication failed; restoration was attempted, and the diagnostic identifies any recovery failure |
 
-Each diagnostic names the affected path and provides recovery guidance.
+Each diagnostic provides recovery guidance and includes an affected path
+when one is available.
 See [`atlante init`](/reference/cli#atlante-init) for the default
 generated-output ignore entries and [Troubleshooting](/troubleshooting) for
 recovery procedures.

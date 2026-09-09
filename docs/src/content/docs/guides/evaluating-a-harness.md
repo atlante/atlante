@@ -21,7 +21,8 @@ You need:
 - A `reviewer` agent, such as the one in
   [Customize your harness](/guides/building-a-harness).
 - [OpenCode](https://opencode.ai/docs/) installed and available as `opencode`
-  in your terminal, with stored provider credentials and a configured model.
+  in your terminal, with stored provider credentials. You can select a model
+  explicitly or use the host default.
 - Git available in your terminal so Atlante can establish each trial's
   starting filesystem state.
 

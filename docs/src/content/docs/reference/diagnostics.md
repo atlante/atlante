@@ -9,7 +9,7 @@ and terminal format. [Troubleshooting](/troubleshooting) organizes recovery
 procedures by symptom.
 
 Each diagnostic has a severity, stable code, and message. It may also carry a
-stable source identity, a JSON Pointer, a one-based source location, a resource
+source reference, a JSON Pointer, a one-based source location, a resource
 reference chain, an expected contract, a recovery action, and a normalized cause:
 
 ```text
@@ -31,9 +31,10 @@ when they are unavailable:
 CLI diagnostics are written to stderr. Color can be disabled with
 `NO_COLOR=1`; see [CLI output](/reference/cli#output).
 
-Diagnostics use project-relative or stable package-qualified source identities.
-They do not expose machine-specific absolute paths. CLI success lines separately
-report resolved filesystem paths for the configuration and materialized outputs.
+Diagnostic sources may be project-relative paths, package-qualified resource
+identities, or absolute filesystem paths. Materialization diagnostics can
+include absolute paths in both `source` and the message. See
+[CLI path behavior](/reference/cli#path-behavior) for paths in success messages.
 
 ## Diagnostic fields
 
@@ -42,7 +43,7 @@ report resolved filesystem paths for the configuration and materialized outputs.
 | `severity` | `error` or `warning` |
 | `code` | Stable machine-readable diagnostic code |
 | `message` | Human-readable failure statement |
-| `source` | Project-relative or stable package-qualified source identity |
+| `source` | Source identity or filesystem path, which may be absolute |
 | `path` / `pointer` | JSON Pointer into document data, when applicable |
 | `location` | One-based `{ line, column }`, when available |
 | `chain` | Preset, instance, or template traversal that caused a resource failure |

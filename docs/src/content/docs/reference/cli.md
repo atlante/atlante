@@ -201,8 +201,12 @@ status when it is stopped.
 When a path is a directory, Atlante discovers `atlante.jsonc` or `atlante.json`.
 When a path is one of those files, Atlante reads it directly. If both files are
 present in a discovered project, the CLI reports `ambiguous-config` rather than
-choosing one silently. Validation and build success lines report resolved
-filesystem paths, even when the command received a relative path.
+choosing one silently.
+
+The `validated` and `built` lines report the resolved configuration file and
+project directory paths, respectively, even when the command received a
+relative path. Native file paths in `wrote` and `removed` lines are relative
+to the project root.
 
 ## Next steps
 
