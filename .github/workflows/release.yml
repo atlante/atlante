@@ -138,8 +138,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cp -R website/node_modules/@atlante/pack \
-            website/.vercel/output/functions/api/playground.func/website/node_modules/@atlante/pack
+          function_root="website/.vercel/output/functions/api/playground.func"
+          pack_source="website/node_modules/@atlante/pack"
+          pack_target="$function_root/packages/cli/node_modules/@atlante/pack"
+          test -d "$pack_source"
+          mkdir -p "$(dirname "$pack_target")"
+          cp -R "$pack_source" "$pack_target"
+          test -f "$pack_target/package.json"
 
       - name: Deploy website to Vercel
         shell: bash

@@ -60,6 +60,11 @@ describe("website deployment contract", () => {
       "npx vercel@59.3.0 deploy --prebuilt --prod website",
     );
     expect(releaseWorkflow).toContain(
+      'pack_target="$function_root/packages/cli/node_modules/@atlante/pack"',
+    );
+    expect(releaseWorkflow).toContain('mkdir -p "$(dirname "$pack_target")"');
+    expect(releaseWorkflow).toContain('cp -R "$pack_source" "$pack_target"');
+    expect(releaseWorkflow).not.toContain(
       "playground.func/website/node_modules/@atlante/pack",
     );
     expect(releaseWorkflow).not.toContain("Copy schema files");
