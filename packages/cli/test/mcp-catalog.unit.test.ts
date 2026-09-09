@@ -163,5 +163,13 @@ describe("bundled schemas", () => {
       status: "ok",
       uri: EVAL_SCENARIO_SCHEMA_URI,
     });
+    expect(getBundledSchema("__proto__")).toMatchObject({
+      status: "diagnostic",
+      diagnostic: { code: "schema-not-supported" },
+    });
+    expect(getBundledSchema("constructor")).toMatchObject({
+      status: "diagnostic",
+      diagnostic: { code: "schema-not-supported" },
+    });
   });
 });

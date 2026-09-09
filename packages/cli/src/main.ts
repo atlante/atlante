@@ -5,6 +5,7 @@ import { runBuildWatch } from "./commands/build-watch.js";
 import type { EvalCommandOptions } from "./commands/eval.js";
 import { runEvalCommand } from "./commands/eval.js";
 import { runInit } from "./commands/init.js";
+import { runMcp } from "./commands/mcp.js";
 import { runValidate } from "./commands/validate.js";
 
 /** Commander collector for repeatable options. */
@@ -16,6 +17,7 @@ export { runBuild } from "./commands/build.js";
 export { runBuildWatch } from "./commands/build-watch.js";
 export { runEvalCommand } from "./commands/eval.js";
 export { runInit } from "./commands/init.js";
+export { runMcp } from "./commands/mcp.js";
 export { runValidate } from "./commands/validate.js";
 export { formatDiagnostic } from "./report.js";
 
@@ -45,6 +47,13 @@ export function createProgram(): Command {
       } else {
         process.exitCode = runBuild(path);
       }
+    });
+
+  program
+    .command("mcp")
+    .description("run the read-only Atlante MCP server over stdio")
+    .action(async () => {
+      process.exitCode = await runMcp();
     });
 
   program

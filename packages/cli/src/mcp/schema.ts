@@ -40,8 +40,7 @@ export function getBundledSchema(uri: string | undefined): SchemaLookupResult {
         message: "a supported Atlante schema URI is required",
       },
     };
-  const schema = schemas[uri];
-  if (schema === undefined)
+  if (!Object.hasOwn(schemas, uri))
     return {
       status: "diagnostic",
       diagnostic: {
@@ -49,5 +48,6 @@ export function getBundledSchema(uri: string | undefined): SchemaLookupResult {
         message: `Atlante does not bundle the schema URI "${uri}"`,
       },
     };
+  const schema = schemas[uri];
   return { status: "ok", uri, schema };
 }
