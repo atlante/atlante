@@ -65,7 +65,6 @@ rendered text:     You review billing-api.
 The value reference belongs to the authored content, while `{{identity}}`
 belongs to the template's rendering syntax. The renderer receives the
 resolved identity field, not the values dictionary as an additional input.
-
 Missing value references produce diagnostics rather than unresolved prompt
 text, making a misspelled name visible during validation.
 
@@ -76,8 +75,31 @@ rules inserted into other text fields. A template can separately accept
 arrays, objects, or other input types defined by its own schema.
 
 For example, the first-party agent template accepts a `sections` array as
-structured input rather than as a named value. [Templates and instances](/concepts/templates)
-explains that input contract, while [Inheritance and resolution](/concepts/resolution)
+structured input rather than as a named value:
+
+```jsonc title="Configuration excerpt"
+{
+  "agents": {
+    "reviewer": {
+      "$template": "@atlante/pack/agent",
+      "identity": "You are a careful reviewer.",
+      "mission": "Find defects before merge.",
+      "sections": [
+        {
+          "responsibilities": [
+            "Read the relevant source and tests.",
+            "Report findings with supporting evidence."
+          ]
+        }
+      ]
+    }
+  }
+}
+```
+
+Here, `sections` is passed to the template as an array. It is not declared
+under `values` or referenced through `{{values.*}}`. [Templates](/concepts/templates)
+explains structured template input, while [Resolution](/concepts/resolution)
 describes removing an inherited value with `null`.
 
 ## The working directory value
@@ -95,6 +117,10 @@ project name when the directory is an appropriate source for that value:
 ```
 
 The working directory then becomes an input to the rendered content, so
-changing its basename can change the resulting prompt. The [Schema reference](/reference/schema#agent-and-skill-maps)
-defines the supported value namespace, and [Template syntax](/reference/template-syntax#the-rendering-input)
+changing its basename can change the resulting prompt.
+
+:::note
+The [Schema reference](/reference/schema#agent-and-skill-maps) defines the
+supported value namespace, and [Template syntax](/reference/template-syntax#the-rendering-input)
 describes the input a renderer receives.
+:::

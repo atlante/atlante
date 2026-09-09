@@ -15,6 +15,7 @@ easy to review, and tested against the work it is meant to guide. Reading the
 instructions explains their intent, but their effect becomes clear only when
 an agent uses them. Even a small change to that context can alter how the
 agent writes code.
+
 Atlante keeps configuration, builds, and evaluation together in the
 repository. The [OpenCode](https://opencode.ai/) host adapter materializes
 reusable context as native files, while evaluation checks the resulting

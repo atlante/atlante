@@ -261,6 +261,11 @@ details,
 .sl-markdown-content .starlight-aside {
   border-radius: 4px;
 }
+.pagination-links .link-title {
+  font-family: "Source Serif 4", Georgia, serif;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+}
 .mobile-starlight-toc .toggle {
   border-radius: 4px;
 }

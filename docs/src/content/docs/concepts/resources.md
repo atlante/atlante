@@ -1,11 +1,12 @@
 ---
-title: Packs and resources
+title: Resources
 description: How packs organize reusable configuration, templates, and instances for a harness.
 ---
 
-A resource supplies a template, configured input, or both for use in your
-harness. A pack groups resources and reusable configuration so you can
-maintain related content together or use it across projects.
+A pack collects reusable content for one or more projects. It can contain
+presets and resources. A preset defines a reusable harness configuration,
+including agents and skills. A resource contains a template, configured input
+for a template, or both.
 
 The relationship between a pack and its contents is:
 
@@ -17,39 +18,36 @@ pack
     └── instances: configured input
 ```
 
-A preset can select several agents and skills, while a resource supplies
-content for an individual selection or a composed template. Selecting one
-resource does not select every agent, skill, or preset in its pack.
+Selecting a resource does not include the rest of its pack. Atlante follows
+that resource's references but leaves unrelated presets and resources
+unselected.
 
-## Packs and packages
-
-A pack is the Atlante content; a package is one way to distribute that
-content through a package manager. A local pack can instead live inside
-your repository, keeping a project-specific preset and its resources together.
-
-A package pack identifies its content through a readable `package.json`
-declaring numeric `atlante.format: 1`. Custom package packs are available to
+A pack can live in your repository or be distributed through a package
+manager. A local pack keeps project-specific presets and resources together.
+A pack distributed as a package identifies its content through a readable
+`package.json` declaring numeric `atlante.format: 1` and is available to
 resolution through the authoring project's declared, installed dependencies.
 
 The published CLI bundles the first-party `@atlante/pack`, so its default
 harness needs no separate pack installation. That bundled content is a
 starting point; a configuration can select other presets and resources.
-
 [Author a pack](/guides/authoring-packs) describes local and package layouts,
-including the files that make a resource a template or instance.
+including the files that define templates and instances.
 
 ## The first-party pack
 
-The default `@atlante/pack` preset provides one `architect` agent and five
-skills. The `brainstorm`, `plan`, `build`, and `review` skills cover the main
-delivery phases. The `harness` skill provides separate guidance for
-initializing, configuring, validating, and improving the harness itself.
+`@atlante/pack` includes:
 
-The architect selects the phase skills that fit a task while preserving their
-order. These skills provide guidance to the host; they do not schedule or
-enforce a workflow. The pack also exports reusable agent, skill, workflow, and
-section templates for project-specific configurations.
+- An `architect` agent that selects the phase skills relevant to a task while
+  preserving their order.
+- Four phase skills: `brainstorm`, `plan`, `build`, and `review`.
+- A `harness` skill for initializing, configuring, validating, and improving
+  the harness itself.
+- Reusable agent, skill, workflow, and section templates for project-specific
+  configurations.
 
+These skills provide guidance to the host; they do not schedule or enforce a
+workflow.
 The [pack README](https://github.com/atlante/atlante/tree/main/packages/pack)
 lists its public locators and describes the default workflow in detail.
 
@@ -60,8 +58,9 @@ a relative path or a package name. Relative paths begin with `./` or `../`
 and resolve from the file containing the locator, not necessarily the
 project root.
 
-This configuration excerpt selects two reviewer instances from different
-locations, giving each its own agent ID:
+For example, the following configuration gives two reviewer instances their
+own agent IDs. `./resources/reviewer` resolves from the configuration file,
+while `@acme/review-pack/reviewer` selects `reviewer` from an installed pack:
 
 ```jsonc
 {
@@ -72,24 +71,22 @@ locations, giving each its own agent ID:
 }
 ```
 
-The local locator selects a resource relative to this document; the package
-locator selects `reviewer` inside an installed pack. A package locator can
-also name the package alone, such as `@acme/review-pack`, to select its root.
-
+A package locator can also name the package alone, such as
+`@acme/review-pack`, to select its root.
 Template and instance locators identify resource directories rather than
 individual files such as `template.md` or `instance.jsonc`.
-[Templates and instances](/concepts/templates) explains how a binding selects
+[Templates](/concepts/templates) explains how a binding selects
 the content available at that location.
 
-## Selected content only
-
-Atlante reads the content you select and the resources that content refers
-to, including nested template dependencies. An unused sibling resource is
-outside that selection, so a malformed unused resource does not invalidate
-the reviewer you selected.
-
-Each pack has a root that contains its presets, resources, and referenced
-files, including the resolved targets of symlinks. Locators stay within that
-root after path resolution; absolute paths and URLs are not resource locators.
-The [locator contract](https://github.com/atlante/atlante/blob/main/SPECIFICATION.md#5-packs-and-resolution)
+Each pack has a root containing its presets and resources. Referenced files,
+including resolved symlink targets, must remain inside that root. Absolute
+paths and URLs are not resource locators. The
+[locator contract](https://github.com/atlante/atlante/blob/main/SPECIFICATION.md#5-packs-and-resolution)
 defines the complete path grammar and containment rules.
+
+:::caution
+Atlante loads only the selected resource and its dependencies, including
+nested templates. It does not validate unrelated resources in the same pack,
+so a successful build does not establish that every resource in the pack is
+valid.
+:::

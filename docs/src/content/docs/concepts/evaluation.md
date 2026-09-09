@@ -4,14 +4,10 @@ description: How scenarios, repeated trials, and explicit checks help assess cha
 ---
 
 Validation checks whether a configuration and its selected content form
-valid input for the build. Evaluation observes what the built harness
-produces on defined tasks, then assesses those results against expectations
-you specify.
-
-Both matter when instructions change: a valid configuration can produce
-results that fall short of the task's requirements. Evaluation makes those
-expectations concrete enough to check across repeated runs and harness
-revisions.
+valid build input, while Evaluation observes what the built harness produces
+on defined tasks. This distinction matters because a valid configuration can
+still produce results that miss the task's requirements. Evaluation makes
+those expectations explicit across repeated runs and harness revisions.
 
 ## Scenarios, fixtures, trials, and checks
 
@@ -28,7 +24,6 @@ For example, a fixture might contain a `billing-api` route with missing
 request validation that the reviewer should identify. The task asks the
 reviewer to record its findings in `review.md`, rather than change the
 implementation.
-
 Checks can require that report to contain an expected finding and restrict
 changed files to the report alone. Those checks define the evidence that
 counts as success for this particular scenario, rather than grading whether
@@ -58,11 +53,9 @@ configuration revision.
 File checks apply fixed rules to the resulting files; command checks use
 exit statuses and optional output patterns. The checks grade that evidence
 without asking a model to judge whether the task succeeded.
-
 The agent may still take different actions or produce different results
 when the same scenario runs again. Repeated trials expose that variation
 while keeping the task and its expectations consistent across executions.
-
 A trial passes when every check passes, so a required condition cannot be
 offset by success on another check. A passing trial supports the
 expectations expressed in those checks, for the task and conditions it
@@ -74,13 +67,14 @@ A comparison is more informative when scenarios, fixtures, checks, model
 settings, and budgets stay consistent across harness revisions. Changing
 those inputs alongside the instructions makes the cause of a result
 difference harder to identify.
-
 Reports provide trial outcomes and check evidence that you can inspect
 across runs, rather than relying on a single successful example. An unmet
 expectation, a timeout, and an infrastructure failure provide different
 evidence about the harness and its evaluation conditions.
 
+:::note
 The [Eval reference](/reference/eval) defines scenario fields, check types,
 budgets, reports, and sandbox containment. [Getting started](/getting-started)
-shows the setup procedure, and the [Introduction](/introduction#where-atlante-stops)
+shows the setup procedure, and the [Introduction](/introduction#how-atlante-works)
 explains Atlante's execution boundary.
+:::

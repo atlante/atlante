@@ -66,7 +66,7 @@ supply the prompt content accepted by the selected template.
 The two values keep the project name and language in one place. Atlante
 substitutes them into the description and identity before rendering the
 prompt. See [Values](/concepts/values) for binding-local overrides and
-[Templates and instances](/concepts/templates) for other ways to select content.
+[Templates](/concepts/templates) for other ways to select content.
 
 ## Add reusable review guidance
 

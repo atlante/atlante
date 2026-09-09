@@ -128,7 +128,7 @@ You are a senior TypeScript reviewer on billing-api.
 
 You now have a local pack consumed through a preset. Changes to shared review
 instructions belong in the instance; project-specific values remain in the
-root configuration. [Inheritance and resolution](/concepts/resolution) explains
+root configuration. [Resolution](/concepts/resolution) explains
 how those layers combine.
 
 ## Define a custom template
@@ -260,7 +260,7 @@ harness and applies the review preset after it:
 
 Rebuild that consumer after changing its preset selection. The
 [CLI reference](/reference/cli) covers named preset selection and installation
-behavior; [Packs and resources](/concepts/resources) explains locator resolution.
+behavior; [Resources](/concepts/resources) explains locator resolution.
 
 ## Check the content you share
 

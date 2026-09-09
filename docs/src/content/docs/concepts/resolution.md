@@ -1,12 +1,12 @@
 ---
-title: Inheritance and resolution
+title: Resolution
 description: How presets, local overrides, and selected resources become the effective configuration of a harness.
 ---
 
 Inheritance lets a configuration reuse existing choices and override only
-the parts that differ for a project. Resolution follows those inherited
-choices and selected resources to determine the effective configuration
-that a build will render.
+the parts that differ for a project, while resolution follows those inherited
+choices and selected resources to determine the effective configuration that
+a build will render.
 
 ## Preset order and local choices
 
@@ -104,39 +104,29 @@ it does not add migration checks to the inherited list. Removing a value
 also removes it as a possible input, so remaining references to that name
 need another value in scope.
 
-## Inheritance and value scope
+## From inheritance to native output
 
-Preset precedence determines the global configuration and the fields of
-each binding after its inherited layers have combined. Binding-local values
-then provide a separate scope for interpreting references within that
-binding, overriding matching global keys.
+Preset precedence determines the global configuration and each binding's
+inherited fields. [Binding-local values](/concepts/values) then override
+matching global values only within that binding, so changing the project name
+for one reviewer leaves other agents and skills unchanged.
 
-[Values](/concepts/values) shows why a project-name override for one reviewer
-leaves other agents and skills unchanged.
+Resolution follows selected resources, combines instance content with binding
+overrides, interpolates values, and validates the result against each binding's
+effective template. This produces the canonical document: effective bindings
+without inheritance instructions or unresolved source selectors. Template
+composition then renders that input as Markdown, as described in
+[Templates](/concepts/templates).
 
-## From selected content to native output
+`atlante validate` checks this resolved input without rendering files.
+`atlante build` performs the same checks, then renders and
+[materializes native output](/reference/materialization). The same inputs,
+including [working directory values](/concepts/values#the-working-directory-value),
+produce the same output. [Evaluation](/concepts/evaluation) assesses the built
+harness on defined tasks.
 
-Resolution also follows resource selections, combines instance content with
-binding overrides, and determines the effective template for each binding.
-Value interpolation and template-input validation establish the content
-that the selected renderers will receive.
-
-The resolved configuration is called the canonical document: it contains
-effective bindings rather than inheritance instructions or unresolved
-source selectors. [Templates and instances](/concepts/templates) explains how
-template composition then turns validated input into Markdown.
-
-`atlante validate` checks source structure, resolves selected content, and
-validates effective input without rendering or materializing native files.
-`atlante build` includes those checks, renders the content, and materializes
-native output through the selected host adapter.
-
-The same inputs produce the same resolved content, including any working
-directory value described in [Values](/concepts/values#the-working-directory-value).
-[Materialization](/reference/materialization) describes the generated files,
-while [Evaluation](/concepts/evaluation) explains how a built harness is
-assessed on tasks.
-
-The [Schema reference](/reference/schema#defaults-and-precedence) defines
-the exact precedence rules, and [Diagnostics](/reference/diagnostics)
-documents failures encountered during validation and resolution.
+:::note
+For exact precedence and failures, see the
+[Schema reference](/reference/schema#defaults-and-precedence) and
+[Diagnostics](/reference/diagnostics).
+:::
