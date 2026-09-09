@@ -3,16 +3,13 @@ title: Evaluate your harness
 description: Test a reviewer on a known defect, inspect the check results, and repeat the scenario after changing its instructions.
 ---
 
-Test your harness on a task with a known expected result. In this guide, a
-reviewer examines a small invoice function and writes its findings to a file.
-You will check that it identifies a defect without changing the implementation.
+Using a deliberately flawed invoice function, this guide runs a reviewer
+through a repeatable scenario, checks that its report identifies the defect
+without changing the implementation, and compares the results across multiple
+trials. [Evaluation](/concepts/evaluation) explains how fixed checks assess
+variable agent results.
 
-The scenario gives you a repeatable task and fixed checks. The model's actions
-can still vary between runs, which is why a useful evaluation includes more
-than one trial. See [Evaluation](/concepts/evaluation) for the distinction
-between deterministic grading and variable agent results.
-
-## Before you begin
+## Prerequisites
 
 You need:
 
@@ -29,8 +26,8 @@ You need:
 Run commands from the root of the project containing `atlante.jsonc`.
 
 :::caution
-Evaluation launches OpenCode and can incur model usage costs. The checks
-grade the results without a model-judge; running the task still uses a model.
+Evaluation launches OpenCode, so trials can incur model usage costs even though
+the checks grade their results without another model acting as judge.
 Review the [sandbox containment boundary](/reference/eval#sandbox-containment)
 before running fixtures or instructions from other sources.
 :::
@@ -41,9 +38,16 @@ A fixture supplies the files the reviewer will see at the start of each
 trial. Keep it small enough that a failed check is straightforward to
 investigate.
 
-Create `eval/fixtures/invoice-review/invoice.js` with this function:
+Create the fixture directory and file:
 
-```js title="eval/fixtures/invoice-review/invoice.js"
+```sh
+mkdir -p eval/fixtures
+touch eval/fixtures/invoice.js
+```
+
+Open `eval/fixtures/invoice.js` and add this function:
+
+```js title="eval/fixtures/invoice.js"
 export function invoiceTotal(items) {
   return items.reduce((total, item) => total + item.price, 0);
 }
@@ -54,23 +58,29 @@ This implementation ignores quantity: two units priced at 10 produce a total
 of 10 instead of 20. Leave the defect in place; it is the condition you want
 the reviewer to identify.
 
-Your evaluation files will have this layout after the next step:
+## Describe the task and its checks
+
+Create the scenario directory and file:
+
+```sh
+mkdir -p eval/scenarios
+touch eval/scenarios/invoice-review.eval.json
+```
+
+The evaluation files now have this layout:
 
 ```text
 my-project/
 ├── atlante.jsonc
 └── eval/
     ├── fixtures/
-    │   └── invoice-review/
-    │       └── invoice.js
+    │   └── invoice.js
     └── scenarios/
         └── invoice-review.eval.json
 ```
 
-## Describe the task and its checks
-
-Create a scenario that selects `reviewer`, asks for a report, and defines
-what counts as a passing result:
+Open `eval/scenarios/invoice-review.eval.json` and define the task and its
+passing conditions:
 
 ```json title="eval/scenarios/invoice-review.eval.json"
 {
@@ -78,7 +88,7 @@ what counts as a passing result:
   "version": "0.1",
   "name": "invoice-review",
   "task": {
-    "fixture": "eval/fixtures/invoice-review",
+    "fixture": "eval/fixtures",
     "agent": "reviewer",
     "prompt": "Review invoice.js. Each item has a unit price and a quantity, and invoiceTotal should sum price multiplied by quantity for all items. Write your findings to review.md, naming the affected function and fields. Do not change implementation files."
   },
@@ -101,19 +111,22 @@ what counts as a passing result:
 }
 ```
 
-`task.fixture` is relative to the project root. Check paths such as
-`review.md` refer to files inside the trial's sandbox, where the fixture
-contents become the starting project files.
+The scenario applies these paths and checks as follows:
 
-The first two checks require a report that names the function and the field
-involved in the defect. The last check rejects changes outside `review.md`,
-including an attempted fix to `invoice.js`.
+- **Fixture:** `task.fixture` resolves from the project root. Atlante copies the
+  contents of `eval/fixtures` into the trial's sandbox, where `invoice.js`
+  appears at the sandbox root.
+- **Required report content:** Check paths resolve from the sandbox root. The
+  two `file-contains` checks therefore require the generated `review.md` to
+  mention both `invoiceTotal` and `quantity`.
+- **Allowed changes:** The `diff-allowlist` check permits only `review.md` to
+  change. The trial fails if the reviewer edits `invoice.js` or creates another
+  file.
 
-These checks establish a narrow baseline: the report mentions the expected
-details and the implementation remains untouched. Read the report too;
-matching those words alone does not prove that its explanation is correct.
-For larger fixtures, add checks for other concrete requirements rather than
-trying to grade every aspect of a review with one text pattern.
+Passing all three checks means the report contains the expected terms and the
+implementation remains unchanged. It does not prove that the report explains
+the defect correctly, so inspect the report itself and add more concrete checks
+as the expected outcomes grow.
 
 ## Select the scenarios
 
@@ -144,25 +157,25 @@ the next trial only after you rebuild it.
 
 ## Run one trial
 
-Start with one trial to check the setup and inspect the result:
+Start with one trial to verify the setup and inspect the result:
 
 ```sh
 npx atlante eval --trials 1 --keep
 ```
 
-`--trials 1` runs each selected scenario once; it does not cap that trial's
-token use. Configure appropriate time and usage limits through the
-[budget settings](/reference/eval) before running larger tasks. `--keep`
-retains trial sandboxes for inspection.
+`--keep` retains the trial sandbox for inspection. The trial count applies to
+each selected scenario and does not limit token use; configure appropriate time
+and usage limits through the [budget settings](/reference/eval) before running
+larger tasks.
 
-Atlante copies the fixture into a fresh sandbox, makes the built harness
-available there, and asks OpenCode to run the task. It then grades the
-resulting files against the scenario's checks.
+Atlante creates a fresh sandbox from the fixture, adds the built harness, asks
+OpenCode to run the task, and grades the resulting files against the scenario's
+checks.
 
 ## Inspect the result
 
-Use the report and retained sandbox paths reported by the command to inspect
-the trial. Check three pieces of evidence:
+Open the report and retained sandbox paths printed by the command, then inspect
+three pieces of evidence:
 
 1. **The check results.** Confirm that `review.md` contains the expected
    function and field names, and that only the allowed report changed.
@@ -175,21 +188,35 @@ For example, a useful finding would explain that an item with `price: 10`
 and `quantity: 2` contributes 10 when it should contribute 20. Your reviewer
 may phrase the finding differently.
 
-A failed text check means the report did not contain its required pattern.
-A failed allowlist check means something outside the report changed. A host
-startup failure or timeout needs a different response from an incorrect
-review; inspect the recorded failure before changing the instructions.
+The failure determines what to inspect next:
+
+- **Failed `file-contains` check:** The report is missing a required pattern.
+  Read `review.md` to see whether the reviewer missed the defect or described
+  it in different terms.
+- **Failed `diff-allowlist` check:** A file other than `review.md` changed.
+  Inspect the sandbox diff to identify what the reviewer edited or created.
+- **Host startup failure or timeout:** The trial did not complete normally, so
+  the result does not show that the review instructions are wrong. Inspect the
+  recorded error, host setup, and applicable budgets before changing the
+  harness.
 
 The [Eval reference](/reference/eval#reports-and-exit-status) describes the
 report format and exit statuses.
 
-## Repeat after changing the harness
+## Compare a harness change
 
-Use a failure to identify a specific instruction worth testing. If the
-reviewer edits the implementation, for example, strengthen the reviewer's
-instructions about reporting defects without fixing them.
+After the setup trial succeeds, establish a baseline with three trials:
 
-Edit the source binding or instance, rebuild, and repeat the same scenario:
+```sh
+npx atlante eval --trials 3 --keep
+```
+
+Use the baseline results to identify a specific instruction worth testing. If
+the reviewer edits the implementation, for example, strengthen its instructions
+about reporting defects without fixing them.
+
+Edit the source binding or instance, rebuild, and repeat the same number of
+trials:
 
 ```sh
 npx atlante validate
@@ -197,15 +224,10 @@ npx atlante build
 npx atlante eval --trials 3 --keep
 ```
 
-Compare the reports from before and after the change. Keep the fixture,
-task, checks, model, and per-trial budget the same so the instruction change
-is the variable you are investigating. Use the same trial count for a
-like-for-like comparison; the initial single trial is a setup check.
-
-Look at failed checks and the reports behind them, not only whether one
-trial passed. Repeated trials help expose variation, while each check still
-supports only the expectation it actually measures.
-
-As your harness grows, add scenarios for other tasks you rely on it to
-perform. Keep the starting files and expected outcomes explicit so a change
-in results can lead to a specific investigation.
+Compare the before-and-after reports under the same fixture, task, checks,
+model, per-trial budget, and trial count so the instruction change is the only
+variable. Review failures and reports across the full run rather than relying
+on a single pass, because repeated trials reveal variation and each check
+supports only the expectation it measures. As the harness grows, add scenarios
+for other important tasks, keeping their starting files and expected outcomes
+explicit enough to trace a changed result to a specific cause.

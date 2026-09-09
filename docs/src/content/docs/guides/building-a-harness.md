@@ -3,14 +3,11 @@ title: Customize your harness
 description: Add a project-specific reviewer and a reusable review skill to your OpenCode harness.
 ---
 
-Add a code reviewer to your project's harness, define its review criteria,
-and build the files OpenCode will load.
+Using a TypeScript project named `billing-api` as its example, this guide adds
+a project-specific reviewer and reusable API-review skill, then builds the
+native files OpenCode will load.
 
-This guide uses a TypeScript project named `billing-api`. You will give its
-reviewer project-specific instructions and add a skill for checking API
-changes. Use your own project name and review criteria when adapting the example.
-
-## Before you begin
+## Prerequisites
 
 Follow [Getting started](/getting-started) to initialize the project and
 [install a project-local CLI](/getting-started#use-a-project-local-cli).
@@ -70,8 +67,8 @@ prompt. See [Values](/concepts/values) for binding-local overrides and
 
 ## Add reusable review guidance
 
-The reviewer has a role, but API changes also need a repeatable review
-procedure. Put that procedure in a skill so other agents can use it too.
+The reviewer defines the role, while a reusable skill gives that reviewer and
+other agents a consistent procedure for checking API changes.
 
 Add `api-review` to the top-level `skills` map in `atlante.jsonc`. Create the
 map if it does not exist. This excerpt shows only the new binding; keep the

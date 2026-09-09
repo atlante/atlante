@@ -3,27 +3,29 @@ title: Author a pack
 description: Move review guidance into a local pack, customize its template, and reuse it from another project.
 ---
 
-Move a reviewer's configuration into a pack so you can maintain it separately
-from project settings and reuse it in other projects.
+This guide moves a reviewer's configuration out of project settings and into a
+reusable local pack built on an existing template, then covers the optional
+steps of adding a custom renderer and packaging it for other projects.
 
-You will first build a local pack using an existing template. You can then
-give it a custom renderer or package it for another project. Neither step
-is required to use the local pack.
+## Prerequisites
 
-## Before you begin
-
-Start with an initialized project and a
-[project-local CLI](/getting-started#use-a-project-local-cli). The example
-uses the same `billing-api` reviewer as
-[Customize your harness](/guides/building-a-harness), but includes the files
-needed to follow this guide independently.
-
-Run commands from your project root unless a step names a different directory.
+Run this guide from the root of an initialized project with a
+[project-local CLI](/getting-started#use-a-project-local-cli); it uses the
+`billing-api` reviewer from
+[Customize your harness](/guides/building-a-harness), but includes every file
+needed to follow it independently and notes when a command runs elsewhere.
 
 ## Create a reusable reviewer instance
 
-Create `packs/review/reviewer/instance.jsonc`. This file keeps the reviewer's
-template selection and input together:
+Create the resource directory and instance file:
+
+```sh
+mkdir -p packs/review/reviewer
+touch packs/review/reviewer/instance.jsonc
+```
+
+Open `packs/review/reviewer/instance.jsonc` and add the reviewer's template
+selection and input:
 
 ```jsonc title="packs/review/reviewer/instance.jsonc"
 {
@@ -48,18 +50,25 @@ template selection and input together:
 }
 ```
 
-The instance uses the first-party agent template. You do not need to author
-a renderer to share these instructions. Project-specific values will come
-from the configuration that selects the pack.
+The instance reuses the first-party agent renderer, so the pack only needs to
+store the reviewer's input. The preset in the next step supplies default
+values for `project` and `language`, which a consuming project can override.
 
-If you are extracting an existing reviewer, move its input into this file
-instead of using the sample wording. Include any skills that its instructions
-refer to in the pack's preset as well.
+When moving an existing reviewer into the pack, replace the sample fields with
+the input from its current binding. Add every skill referenced by those
+instructions to the pack's preset so consuming projects receive all required
+guidance.
 
 ## Add a preset
 
-Create `packs/review/atlante.jsonc` to give the pack a preset that selects
-the instance:
+Create the preset file:
+
+```sh
+touch packs/review/atlante.jsonc
+```
+
+Open `packs/review/atlante.jsonc` and add a preset that selects the reviewer
+instance:
 
 ```jsonc title="packs/review/atlante.jsonc"
 {
@@ -75,8 +84,7 @@ the instance:
 ```
 
 The `./reviewer` locator selects `reviewer/instance.jsonc` relative to this
-preset. The preset also supplies default values, which a consuming project
-can override.
+file, which also supplies default values that a consuming project can override.
 
 Your local pack now has three levels:
 
@@ -137,7 +145,14 @@ Keep the existing template when its structure fits your guidance. Define
 your own when consumers need a different input shape or Markdown layout.
 
 For example, a review-specific template can accept a `focus` field and a list
-of `checks`. Create the following two files beside `instance.jsonc`:
+of `checks`. Create the two template files beside `instance.jsonc`:
+
+```sh
+touch packs/review/reviewer/template.jsonc
+touch packs/review/reviewer/template.md
+```
+
+Open `packs/review/reviewer/template.jsonc` and define the accepted input:
 
 ```jsonc title="packs/review/reviewer/template.jsonc"
 {
@@ -155,6 +170,9 @@ of `checks`. Create the following two files beside `instance.jsonc`:
   "additionalProperties": false
 }
 ```
+
+Open `packs/review/reviewer/template.md` and define how that input becomes
+Markdown:
 
 ```hbs title="packs/review/reviewer/template.md"
 # Review focus
@@ -185,8 +203,15 @@ to the template in the same resource directory:
 ```
 
 The preset still selects `./reviewer`, so the consuming project needs no
-changes. Run `npx atlante validate` and `npx atlante build` again from the
-project root. The prompt should now contain:
+changes. From the project root, validate the updated pack and rebuild the
+native files:
+
+```sh
+npx atlante validate
+npx atlante build
+```
+
+The generated reviewer prompt should now contain:
 
 ```md title="Generated reviewer — prompt excerpt"
 # Review focus
@@ -200,10 +225,9 @@ Review API compatibility in billing-api.
 - Report findings without changing implementation files.
 ```
 
-The schema checks the template's input; the renderer determines how that
-input appears in the prompt. The instance's `description` remains host
-metadata, separate from the renderer input. See
-[Template syntax](/reference/template-syntax) for helpers and composition slots.
+The instance's `description` remains host metadata rather than renderer input.
+[Template syntax](/reference/template-syntax) documents the available helpers
+and composition slots.
 
 ## Reuse the pack from another project
 
@@ -264,10 +288,9 @@ behavior; [Resources](/concepts/resources) explains locator resolution.
 
 ## Check the content you share
 
-Validate and build a representative consumer for each preset or resource you
-intend others to use. A build checks selected content and its dependencies,
-not every unused resource in the pack.
-
-Inspect the generated prompts as well as the command results. To test what
-an agent does with those instructions, follow
+Before sharing a pack, validate and build a representative consumer for each
+preset or resource you expect others to select, then inspect both the command
+output and generated prompts. A build covers only its selected content and
+dependencies, so exercise other supported selections separately. To assess how
+an agent follows the generated instructions, continue with
 [Evaluate your harness](/guides/evaluating-a-harness).
