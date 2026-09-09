@@ -3,7 +3,7 @@ title: CLI
 description: Command reference for init, validate, build, and eval.
 ---
 
-The `@atlante/cli` package provides the `atlante` command and requires
+The `atlante` package provides the `atlante` command and requires
 [Node.js](https://nodejs.org/) 22 or later. It includes the first-party
 `@atlante/pack`, so the default preset needs no separate pack installation.
 
@@ -14,9 +14,8 @@ npx atlante --help
 npx atlante --version
 ```
 
-For a one-off invocation, replace `npx atlante` with
-`npx @atlante/cli@latest`. This requests the latest release rather than the
-version installed in your project.
+For a one-off invocation, use `npx atlante@latest`. This requests the latest
+release rather than the version installed in your project.
 
 ## Output
 

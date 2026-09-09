@@ -12,7 +12,7 @@ prompt content.
 Initialize a project with the first-party pack:
 
 ```bash
-npx @atlante/cli@latest init
+npx atlante@latest init
 ```
 
 The CLI selects the default preset from `@atlante/pack` and writes

@@ -48,16 +48,16 @@ const require = createRequire(import.meta.url);
 /** The published CLI resolves @atlante/pack from its own installation, so
  * any working directory works as a project sandbox. */
 function cliEntry(): string {
-  const manifest: string = require.resolve("@atlante/cli/package.json");
+  const manifest: string = require.resolve("atlante/package.json");
   const entry = join(dirname(manifest), "dist", "bin", "atlante.js");
   if (!existsSync(entry)) {
     throw new Error(
-      "the @atlante/cli bundle is missing; run `bun run build` at the repository root first",
+      "the atlante bundle is missing; run `bun run build` at the repository root first",
     );
   }
   // Literal deep resolve so serverless bundlers trace the CLI bundle into
   // the deployed function next to the package manifest.
-  require.resolve("@atlante/cli/dist/bin/atlante.js");
+  require.resolve("atlante/dist/bin/atlante.js");
   return entry;
 }
 

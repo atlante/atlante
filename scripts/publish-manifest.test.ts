@@ -12,7 +12,7 @@ test("staging rewrites the published pack dependency", async () => {
   try {
     const manifestPath = join(directory, "package.json");
     const manifest = {
-      name: "@atlante/cli",
+      name: "atlante",
       version: "0.1.21",
       bin: { atlante: "./dist/bin/atlante.js" },
       dependencies: { "@atlante/pack": "workspace:*" },
@@ -46,7 +46,7 @@ test("staging rejects a workspace dependency on an unpublished package", async (
   try {
     const manifestPath = join(directory, "package.json");
     const manifest = {
-      name: "@atlante/cli",
+      name: "atlante",
       version: "0.1.21",
       dependencies: {
         "@atlante/opencode": "workspace:*",

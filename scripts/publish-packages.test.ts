@@ -8,7 +8,7 @@ test("staged CLI publishing rewrites the pack workspace dependency", async () =>
   const directory = mkdtempSync(join(tmpdir(), "atlante-publish-manifest-"));
   const path = join(directory, "package.json");
   const original = `{
-  "name": "@atlante/cli",
+   "name": "atlante",
   "dependencies": {
     "@atlante/pack": "workspace:*"
   },
@@ -39,7 +39,7 @@ test("staged publishing rejects unpublished workspace runtime dependencies", asy
   const directory = mkdtempSync(join(tmpdir(), "atlante-publish-manifest-"));
   const path = join(directory, "package.json");
   const original =
-    '{"name":"@atlante/cli","dependencies":{"@atlante/schema":"workspace:*","@atlante/pack":"workspace:*"}}\n';
+    '{"name":"atlante","dependencies":{"@atlante/schema":"workspace:*","@atlante/pack":"workspace:*"}}\n';
   writeFileSync(path, original);
 
   try {
@@ -61,7 +61,7 @@ test("staged publishing restores the source manifest when publishing fails", asy
   const directory = mkdtempSync(join(tmpdir(), "atlante-publish-manifest-"));
   const path = join(directory, "package.json");
   const original =
-    '{"name":"@atlante/cli","dependencies":{"@atlante/pack":"workspace:*"}}\n';
+    '{"name":"atlante","dependencies":{"@atlante/pack":"workspace:*"}}\n';
   writeFileSync(path, original);
 
   try {

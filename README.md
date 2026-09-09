@@ -27,11 +27,11 @@ harness, so it can be developed like code.
 Run the CLI from the project you want to configure:
 
 ```bash
-npx @atlante/cli@latest init            # scaffold atlante.jsonc and build the first outputs
-npx @atlante/cli@latest validate        # check the configuration without building
-npx @atlante/cli@latest build           # materialize the native outputs
-npx @atlante/cli@latest build --watch   # rebuild while you edit
-npx @atlante/cli@latest eval            # optional: run eval scenarios in a sandbox
+npx atlante@latest init            # scaffold atlante.jsonc and build the first outputs
+npx atlante@latest validate        # check the configuration without building
+npx atlante@latest build           # materialize the native outputs
+npx atlante@latest build --watch   # rebuild while you edit
+npx atlante@latest eval            # optional: run eval scenarios in a sandbox
 ```
 
 > [!NOTE]
@@ -45,7 +45,7 @@ the generated folders to `.gitignore`. To use the bare `atlante` command,
 install the CLI first:
 
 ```bash
-npm install --global @atlante/cli
+npm install --global atlante
 atlante init
 ```
 
@@ -172,7 +172,7 @@ trial counts only when every check passes.
 
 Atlante publishes two packages to npm:
 
-- [`@atlante/cli`](https://www.npmjs.com/package/@atlante/cli) — the `init`,
+- [`atlante`](https://www.npmjs.com/package/atlante) — the `init`,
   `validate`, `build`, and `eval` commands.
 - [`@atlante/pack`](https://www.npmjs.com/package/@atlante/pack) — the
   first-party presets, the `agent` and `skill` templates, and their

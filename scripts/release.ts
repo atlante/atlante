@@ -27,7 +27,7 @@ const PACKAGES = [
 // the local workspace install links the workspace package so dev exercises
 // the current source bundle.
 const DEPENDENTS = [
-  { manifest: "website/package.json", dependency: "@atlante/cli" },
+  { manifest: "website/package.json", dependency: "atlante" },
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -178,10 +178,10 @@ async function validateVersion(v: ReturnType<typeof parseVersion>) {
   }
 }
 
-// bun 1.3.x treats manifest-version drift as a no-op and may leave bun.lock
-// untouched (oven-sh/bun#28411, #28935; v0.1.21 shipped a stale lock this
-// way). Detection alone strands the release, so the stale entries are synced
-// in place — the same invariant scripts/package-graph.test.ts enforces — and
+// bun 1.3.x treats manifest drift as a no-op and may leave bun.lock untouched
+// (oven-sh/bun#28411, #28935; v0.1.21 shipped a stale lock this way). Detection
+// alone strands the release, so stale names, versions, and pins are synced in
+// place — the same invariant scripts/package-graph.test.ts enforces — and
 // anything that cannot be repaired fails before any commit or tag exists.
 function validateLock() {
   console.log("\nValidating bun.lock against the bumped manifests...");

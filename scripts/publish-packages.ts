@@ -8,6 +8,10 @@ const ROOT = join(import.meta.dir, "..");
 // The static pack must be published before the CLI that depends on it. The
 // CLI bundle includes the internal OpenCode materializer.
 const PACKAGES = ["pack", "cli"] as const;
+const PACKAGE_NAMES: Record<(typeof PACKAGES)[number], string> = {
+  pack: "@atlante/pack",
+  cli: "atlante",
+};
 
 function parseArgs() {
   let version: string | undefined;
@@ -53,7 +57,7 @@ async function preflightArtifacts(): Promise<string[]> {
 
   for (const pkg of PACKAGES) {
     const dir = join(ROOT, "packages", pkg);
-    const name = `@atlante/${pkg}`;
+    const name = PACKAGE_NAMES[pkg];
 
     for (const rel of REQUIRED_FILES[pkg]) {
       if (!existsSync(join(dir, rel))) missing.push(`${name}: missing ${rel}`);
@@ -126,11 +130,23 @@ async function publishPackageContents(
   console.log(`Published ${name}@${version}`);
 }
 
-async function publishPackage(pkg: string, version: string, otp?: string) {
+async function publishPackage(
+  pkg: (typeof PACKAGES)[number],
+  version: string,
+  otp?: string,
+) {
   const dir = join(ROOT, "packages", pkg);
   const manifestPath = join(dir, "package.json");
 
-  const name = `@atlante/${pkg}`;
+  const name = PACKAGE_NAMES[pkg];
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as {
+    name?: unknown;
+  };
+  if (manifest.name !== name) {
+    throw new Error(
+      `${manifestPath} must declare package name ${name}, got ${String(manifest.name)}`,
+    );
+  }
 
   if (await isVersionPublished(name, version)) {
     console.log(`Skipping ${name}@${version} (already published)`);
@@ -156,7 +172,7 @@ async function main() {
   }
 
   for (const pkg of PACKAGES) {
-    console.log(`\n--- @atlante/${pkg} ---`);
+    console.log(`\n--- ${PACKAGE_NAMES[pkg]} ---`);
     await publishPackage(pkg, version, otp);
   }
 }

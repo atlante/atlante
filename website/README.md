@@ -36,7 +36,7 @@ is ignored and is included in `dist/` by the complete website build. The deploye
 ## Playground
 
 The build instrument on the landing page runs the published
-`@atlante/cli` for real. `website/api/playground.ts` is a stateless
+`atlante` package for real. `website/api/playground.ts` is a stateless
 Vercel function: each request writes the visitor's files into
 an isolated temp directory, executes one CLI command, and returns the
 actual output and generated file tree. A process-local session counter limits
@@ -47,7 +47,7 @@ the same endpoint in-process through a dev-only Vite middleware, so the
 playground works locally; `astro preview` stays static and shows a
 friendly offline message instead.
 
-Production installs the exact `@atlante/cli` version pinned in
+Production installs the exact `atlante` version pinned in
 `website/package.json` from npm; `scripts/release.ts` advances the pin
 to the released version at every release. Locally the workspace install
 links the workspace package instead, so run `bun install` and
@@ -65,7 +65,7 @@ runtime.
 The site deploys from the release workflow as prebuilt Vercel artifacts:
 
 1. The workflow installs the website dependencies in isolation with
-   `npm install --prefix website`, which resolves the exact `@atlante/cli`
+   `npm install --prefix website`, which resolves the exact `atlante`
    version pinned in `website/package.json` from npm. The website build
    needs files outside `website` — the authoritative brand assets and
    schema live at `../brand` and `../packages/schema` — so the build runs

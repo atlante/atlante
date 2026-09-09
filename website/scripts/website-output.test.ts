@@ -30,7 +30,7 @@ describe.skipIf(process.env.ATLANTE_BUILT_OUTPUT_TESTS !== "1")(
         "https://github.com/atlante/atlante/releases",
         "https://github.com/atlante/atlante/issues",
         "https://github.com/atlante/atlante/blob/main/SPECIFICATION.md",
-        "https://www.npmjs.com/package/@atlante/cli",
+        "https://www.npmjs.com/package/atlante",
         "https://github.com/atlante/atlante/blob/main/CONTRIBUTING.md",
       ]) {
         expect(html).toContain(href);

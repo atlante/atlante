@@ -89,7 +89,7 @@ jobs:
           # The published CLI declares @atlante/pack as a registry dependency,
           # so the website's npm install resolves both; pack's propagation can
           # lag behind the CLI's, so wait for each before installing.
-          for package in @atlante/cli @atlante/pack; do
+          for package in atlante @atlante/pack; do
             available=0
             for attempt in $(seq 1 30); do
               if npm view "$package@$VERSION" version >/dev/null 2>&1; then

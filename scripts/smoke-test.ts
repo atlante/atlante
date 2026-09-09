@@ -21,7 +21,7 @@ function assert(condition: boolean, message: string) {
 const sandbox = await mkdtemp(join(tmpdir(), "atlante-smoke-"));
 const project = join(sandbox, "project");
 const globalRoot = join(sandbox, "global");
-const installedCli = join(globalRoot, "node_modules", "@atlante", "cli");
+const installedCli = join(globalRoot, "node_modules", "atlante");
 const installedPack = join(globalRoot, "node_modules", "@atlante", "pack");
 const CLI = join(installedCli, "dist", "bin", "atlante.js");
 

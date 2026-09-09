@@ -252,7 +252,7 @@ inside your project. Run these commands from that new `pack-consumer` directory:
 
 ```sh
 npm init -y
-npm install --save-dev @atlante/cli ../packs/review
+npm install --save-dev atlante ../packs/review
 npx atlante init --pack @acme/review-pack
 npx atlante validate
 npx atlante build

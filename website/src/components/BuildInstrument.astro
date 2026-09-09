@@ -150,7 +150,7 @@ const config = `{
       </div>
 
       <div class="terminal" aria-live="polite">
-        <pre data-terminal-out>$ npx @atlante/cli@latest build</pre>
+        <pre data-terminal-out>$ npx atlante@latest build</pre>
       </div>
 
     </div>
@@ -331,8 +331,8 @@ const config = `{
     ): void => {
       if (!terminalOut || !statusDot) return;
       terminalOut.textContent = output
-        ? `$ npx @atlante/cli@latest build\n${output}`
-        : "$ npx @atlante/cli@latest build";
+        ? `$ npx atlante@latest build\n${output}`
+        : "$ npx atlante@latest build";
       statusDot.style.background =
         status === "success"
           ? "var(--ds-success)"
