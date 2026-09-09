@@ -38,6 +38,21 @@ starting point; a configuration can select other presets and resources.
 [Author a pack](/guides/authoring-packs) describes local and package layouts,
 including the files that make a resource a template or instance.
 
+## The first-party pack
+
+The default `@atlante/pack` preset provides one `architect` agent and five
+skills. The `brainstorm`, `plan`, `build`, and `review` skills cover the main
+delivery phases. The `harness` skill provides separate guidance for
+initializing, configuring, validating, and improving the harness itself.
+
+The architect selects the phase skills that fit a task while preserving their
+order. These skills provide guidance to the host; they do not schedule or
+enforce a workflow. The pack also exports reusable agent, skill, workflow, and
+section templates for project-specific configurations.
+
+The [pack README](https://github.com/atlante/atlante/tree/main/packages/pack)
+lists its public locators and describes the default workflow in detail.
+
 ## Locators connect configuration to content
 
 A locator identifies the preset or resource a configuration selects, using

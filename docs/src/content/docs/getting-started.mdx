@@ -1,0 +1,201 @@
+---
+title: Getting started
+description: Initialize Atlante in your project and build your first OpenCode agents and skills.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+## Prerequisites
+
+You need [Node.js](https://nodejs.org/) 22 or later. Open a terminal in the
+project directory where you want to keep your harness configuration.
+
+<Aside>
+You can initialize and build without installing OpenCode. To use the resulting
+agents and skills, you will also need [OpenCode](https://opencode.ai/docs/).
+</Aside>
+
+## Initialize your project
+
+Create the configuration and run the first build:
+
+<Tabs syncKey="package-manager">
+  <TabItem label="npm">
+
+```sh
+npx @atlante/cli@latest init
+```
+
+  </TabItem>
+  <TabItem label="pnpm">
+
+```sh
+pnpm dlx @atlante/cli@latest init
+```
+
+  </TabItem>
+  <TabItem label="bun">
+
+```sh
+bunx @atlante/cli@latest init
+```
+
+  </TabItem>
+</Tabs>
+
+<Aside title="The first-party pack">
+The CLI bundles the `@atlante/pack` preset, so the first build needs no separate
+pack installation. It provides the `architect` agent; the `brainstorm`, `plan`,
+`build`, and `review` skills; and the `harness` skill for maintaining the
+harness itself. Explore the [first-party pack](/concepts/resources#the-first-party-pack)
+to understand these defaults and the reusable content it includes.
+</Aside>
+
+## Inspect the configuration and output
+
+Open `atlante.jsonc`. Its configuration selects the preset through `extends`:
+
+```jsonc title="atlante.jsonc"
+{
+  "$schema": "https://atlante.sh/schema/v0.1/schema.json",
+
+  // Extend the first-party package preset. You can override any value or agent
+  // below; your local configuration takes precedence over the inherited one.
+  "extends": "@atlante/pack",
+}
+```
+
+The build creates native files alongside that source:
+
+```text
+my-project/
+├── atlante.jsonc
+├── .opencode/
+│   ├── agents/
+│   │   └── architect.md
+│   └── skills/
+│       ├── brainstorm/SKILL.md
+│       ├── plan/SKILL.md
+│       ├── build/SKILL.md
+│       ├── review/SKILL.md
+│       └── harness/SKILL.md
+└── .atlante/
+    └── opencode-native.json
+```
+
+The files have different roles:
+
+- `atlante.jsonc` is the source configuration. Keep it and any resources you
+  author in version control.
+- `.opencode/agents/architect.md` and the skill files are native output. Open
+  the agent file to inspect what the build produced, but make changes in the
+  source configuration or its resources.
+- `.atlante/opencode-native.json` is the ownership manifest. It tells later
+  builds which native files Atlante may update or remove without claiming
+  unrelated OpenCode files.
+
+`init` adds `.opencode/agents/`, `.opencode/skills/`, and `.atlante/` to
+`.gitignore`. These directories hold generated native files and Atlante state;
+the authored configuration remains the versioned source.
+
+See [Materialization](/reference/materialization) for output ownership and
+[Troubleshooting](/troubleshooting) when generated output must be versioned or
+recovered after an edit.
+
+## Open the harness in OpenCode
+
+Start OpenCode from the project root, where `init` created `.opencode/`, or
+restart an existing session so it discovers the new files. The `architect`
+agent should now be available.
+
+You can also inspect the agent list from the terminal:
+
+```sh
+opencode agent list
+```
+
+Look for `architect` in the list. If it is missing, confirm that
+the project root contains `.opencode/agents/architect.md`, then restart OpenCode.
+Choose a model and configure permissions through
+[OpenCode's configuration](https://opencode.ai/docs/config/). These settings
+remain in OpenCode's own files when Atlante rebuilds the harness.
+
+You now have the default harness built from a configuration in your project.
+
+## Use a project-local CLI
+
+For ongoing work, install the CLI as a development dependency in the project
+that owns your `package.json`:
+
+<Tabs syncKey="package-manager">
+  <TabItem label="npm">
+
+```sh
+npm install --save-dev @atlante/cli
+```
+
+  </TabItem>
+  <TabItem label="pnpm">
+
+```sh
+pnpm add --save-dev @atlante/cli
+```
+
+  </TabItem>
+  <TabItem label="bun">
+
+```sh
+bun add --dev @atlante/cli
+```
+
+  </TabItem>
+</Tabs>
+
+If the repository has no `package.json`, create one with your package manager
+before installing. Commit the manifest and lockfile with your configuration so
+other contributors can install the same CLI version.
+
+After installing locally, run the project-local CLI rather than requesting
+`@latest`. For example, rebuild after a configuration change with:
+
+<Tabs syncKey="package-manager">
+  <TabItem label="npm">
+
+```sh
+npx atlante build
+```
+
+  </TabItem>
+  <TabItem label="pnpm">
+
+```sh
+pnpm exec atlante build
+```
+
+  </TabItem>
+  <TabItem label="bun">
+
+```sh
+bunx atlante build
+```
+
+  </TabItem>
+</Tabs>
+
+Installing the CLI does not require another initialization. For normal changes,
+edit the configuration and run `build`.
+
+<Aside type="caution" title="Reinitializing an existing project">
+`atlante init --force` is available when you intentionally want a fresh starter
+configuration. It overwrites the existing `atlante.jsonc` and removes an
+alternate `atlante.json`, so do not use it as a routine rebuild command.
+</Aside>
+
+## Next steps
+
+- [Customize your harness](/guides/building-a-harness) with a project-specific
+  reviewer and reusable review guidance.
+- [Evaluate your harness](/guides/evaluating-a-harness) on a task with explicit
+  checks for the result.
+- Read [Configuration](/concepts/configuration) to understand how presets,
+  agents, skills, and values fit together.
