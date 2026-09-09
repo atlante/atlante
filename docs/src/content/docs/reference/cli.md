@@ -1,6 +1,6 @@
 ---
 title: CLI
-description: Command reference for init, validate, build, and eval.
+description: Command reference for init, validate, build, MCP, and eval.
 ---
 
 The `atlante` package provides the `atlante` command and requires
@@ -33,16 +33,40 @@ npx atlante init [path]
 npx atlante init [path] --pack <pack-locator>
 npx atlante init [path] --pack <pack>/<preset>
 npx atlante init [path] --force
+npx atlante init [path] --no-mcp
 ```
 
 - `path` is a project directory and defaults to the current directory.
 - `--pack <locator>` selects a package pack instead of the bundled default `@atlante/pack`. An optional subpath names a preset, such as `@acme/review-pack/strict`. Local filesystem paths are not accepted by this option.
 - `--force` overwrites an existing `atlante.jsonc` and removes the alternate `atlante.json`.
+- `--no-mcp` skips registration of the local Atlante MCP server in the OpenCode configuration.
 
 `init` validates the selected preset before writing the configuration. It ensures
 `.gitignore` contains `.opencode/agents/`, `.opencode/skills/`, and
-`.atlante/` without reordering existing content, then runs a build. Existing
-OpenCode configuration is preserved.
+`.atlante/` without reordering existing content, then runs a build. By default,
+it also registers the version-pinned local MCP server in the target directory's
+OpenCode configuration. It prefers `opencode.jsonc`, updates `opencode.json`
+when that is the only existing file, and creates `opencode.jsonc` when neither
+file exists. Unrelated settings and JSONC comments remain in place. A
+conflicting `mcp.atlante` entry fails closed instead of being replaced. Use
+`--no-mcp` when the host configuration must remain unchanged.
+
+The registered entry has this shape, with `<version>` taken from the CLI package:
+
+```json
+{
+  "mcp": {
+    "atlante": {
+      "type": "local",
+      "command": ["npx", "--yes", "atlante@<version>", "mcp"],
+      "enabled": true
+    }
+  }
+}
+```
+
+Registration follows the directory passed to `init`; installing the CLI
+globally does not add a separate user-level OpenCode configuration.
 
 ### Pack installation
 
@@ -86,6 +110,55 @@ Use `--pack` only with packages you trust. Custom pack installation can run
 package-manager install scripts before Atlante validates the installed pack or
 selects a preset.
 :::
+
+## `atlante mcp`
+
+Start the read-only Atlante context server over newline-delimited JSON-RPC on
+standard input and output:
+
+```sh
+npx atlante mcp
+```
+
+The server uses its current working directory as the active project. It does
+not accept a project path. OpenCode starts it from the registered target
+directory.
+
+The server is offline and read-only. It does not write project files, install
+packages, build or materialize native output, execute agents or commands, call
+an LLM, or fetch remote content. Standard output contains protocol responses;
+operational diagnostics use standard error.
+
+### Tools
+
+`tools/list` advertises six tools. Every `tools/call` result includes the
+`atlante-mcp/v1` contract version, the tool name, a status, and either data or
+structured diagnostics.
+
+| Tool | Inputs | Result |
+| --- | --- | --- |
+| `inspect_project` | none | Authored, effective, and resolved configuration; provenance; capabilities; and native artifact freshness. |
+| `list_resources` | Optional `limit` from 1 to 100 | Successfully resolved templates, instances, and bindings. |
+| `validate` | none | Authoritative validation status without rendering or materialization. |
+| `search_docs` | `query`; optional `limit` from 1 to 20 | Deterministically ranked matches from the bundled documentation catalog. |
+| `read_doc` | `document_id`; optional `section_id` and `max_bytes` up to 65536 | A known documentation or specification document or section. |
+| `get_schema` | Exact versioned schema `uri` | A bundled Atlante document or eval-scenario JSON Schema. |
+
+Documentation search and reads use the catalog bundled with the CLI. The
+catalog contains the documentation pages and `SPECIFICATION.md`; it has a
+deterministic source hash and does not contact the documentation site. Schema
+lookup accepts only the exact supported versioned URIs and reports
+`schema-not-supported` for other URIs.
+
+The bundled schema URIs are:
+
+- `https://atlante.sh/schema/v0.1/schema.json` for the configuration document;
+- `https://atlante.sh/schema/v0.1/eval-scenario.json` for eval scenarios.
+
+Project paths in normal results are relative to the active project. Diagnostics
+redact machine-specific absolute paths. Unknown tools and malformed JSON-RPC
+requests use standard JSON-RPC errors; invalid tool arguments and unavailable
+project capabilities use structured tool diagnostics.
 
 ## `atlante validate`
 

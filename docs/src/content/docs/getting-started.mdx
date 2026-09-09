@@ -47,6 +47,12 @@ harness itself. Explore the [first-party pack](/concepts/resources#the-first-par
 to understand these defaults and the reusable content it includes.
 </Aside>
 
+By default, `init` also registers the read-only Atlante MCP server in the
+OpenCode configuration for this project. It prefers `opencode.jsonc`, updates
+`opencode.json` when that is the only existing file, and creates
+`opencode.jsonc` when neither file exists. Use
+`npx atlante@latest init --no-mcp` when you want to skip that registration.
+
 ## Inspect the configuration and output
 
 Open `atlante.jsonc`. Its configuration selects the preset through `extends`:
@@ -61,11 +67,13 @@ Open `atlante.jsonc`. Its configuration selects the preset through `extends`:
 }
 ```
 
-The build creates native files alongside that source:
+After `init` completes its first build, the project contains source
+configuration, host configuration, generated native output, and Atlante state:
 
 ```text
 my-project/
 ├── atlante.jsonc
+├── opencode.jsonc
 ├── .opencode/
 │   ├── agents/
 │   │   └── architect.md
@@ -83,6 +91,9 @@ The files have different roles:
 
 - `atlante.jsonc` is the source configuration. Keep it and any resources you
   author in version control.
+- `opencode.jsonc` is the host configuration created by `init` when no OpenCode
+  configuration exists. When `opencode.json` already exists, `init` updates that
+  file instead. The `mcp.atlante` entry is managed there alongside host settings.
 - `.opencode/agents/architect.md` and the skill files are native output. Open
   the agent file to inspect what the build produced, but make changes in the
   source configuration or its resources.
@@ -92,7 +103,8 @@ The files have different roles:
 
 `init` adds `.opencode/agents/`, `.opencode/skills/`, and `.atlante/` to
 `.gitignore`. These directories hold generated native files and Atlante state;
-the authored configuration remains the versioned source.
+the authored configuration remains the versioned source. The OpenCode
+configuration is host configuration rather than generated native output.
 
 See [Materialization](/reference/materialization) for output ownership and
 [Troubleshooting](/troubleshooting) when generated output must be versioned or

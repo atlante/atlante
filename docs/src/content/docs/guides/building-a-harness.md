@@ -17,6 +17,40 @@ The example uses the first-party `@atlante/pack` templates directly without
 extending the full preset, so the build adds only the reviewer and skill shown
 here.
 
+## Configure the OpenCode context server
+
+`atlante init` registers a version-pinned local Atlante MCP server in the
+OpenCode configuration for the directory it initializes. It prefers
+`opencode.jsonc`, updates `opencode.json` when that is the only existing file,
+and creates `opencode.jsonc` when neither file exists.
+
+The registration invokes the CLI over stdio:
+
+```json
+{
+  "type": "local",
+  "command": ["npx", "--yes", "atlante@<version>", "mcp"],
+  "enabled": true
+}
+```
+
+The server uses that directory as its active project. Its tools inspect and
+validate the project, list resolved resources, search and read bundled
+documentation, and return supported schemas. The server does not write files,
+build native output, execute agents, install packages, or fetch remote content.
+
+Registration follows the `init` target rather than the CLI installation mode.
+Installing `atlante` globally does not create a separate user-level
+registration. Use `--no-mcp` when you want initialization without changing
+OpenCode configuration:
+
+```sh
+npx atlante init --no-mcp
+```
+
+The [CLI reference](/reference/cli#atlante-mcp) lists the six tools and their
+inputs and result boundaries.
+
 ## Add the reviewer
 
 Open `atlante.jsonc`. If it still contains only the generated preset

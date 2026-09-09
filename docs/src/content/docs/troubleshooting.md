@@ -107,8 +107,11 @@ entry, then validate again.
 
 ## `init` touched my OpenCode config or `.gitignore`
 
-`init` leaves the OpenCode configuration untouched. It only appends the
-generated-output entries to `.gitignore` when they are missing.
+By default, `init` registers the local Atlante MCP server in the target
+directory's `opencode.jsonc` or `opencode.json`. Use `--no-mcp` to leave the
+OpenCode configuration unchanged. Existing settings and JSONC comments remain
+in place, while initialization appends only the missing generated-output
+entries to `.gitignore`.
 
 The generated-output ignore policy appends `.opencode/agents/`,
 `.opencode/skills/`, and `.atlante/` to `.gitignore` when missing. Because a
