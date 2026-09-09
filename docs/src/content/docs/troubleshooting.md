@@ -12,7 +12,7 @@ format and code meanings.
 Run the command from the project root or pass the explicit configuration path:
 
 ```sh
-npx @atlante/cli@latest validate ./path/to/atlante.jsonc
+npx atlante@latest validate ./path/to/atlante.jsonc
 ```
 
 The supported filenames are `atlante.jsonc` and `atlante.json`.
@@ -33,7 +33,7 @@ validating:
 
 ```sh
 npm install --save-dev @acme/review-pack
-npx @atlante/cli@latest validate
+npx atlante@latest validate
 ```
 
 ## A locator is rejected
@@ -58,8 +58,8 @@ for interpolation and system-value rules.
 Fix the first actionable `error` diagnostic, then run validation and build again:
 
 ```sh
-npx @atlante/cli@latest validate
-npx @atlante/cli@latest build
+npx atlante@latest validate
+npx atlante@latest build
 ```
 
 For command behavior, read the [CLI](/reference/cli). For the diagnostic
@@ -75,8 +75,8 @@ Fix the reported source error; the watcher retries on a later change. See the
 Run a successful build first:
 
 ```sh
-npx @atlante/cli@latest validate
-npx @atlante/cli@latest build
+npx atlante@latest validate
+npx atlante@latest build
 ```
 
 Then restart OpenCode to pick up changed native files. See
@@ -119,6 +119,6 @@ outputs under version control.
 
 ## The output is stale after an edit
 
-Run `npx @atlante/cli@latest build` after changing `atlante.jsonc`, local resources, or
-selected Pack content. Use `npx @atlante/cli@latest build --watch` during active editing
+Run `npx atlante@latest build` after changing `atlante.jsonc`, local resources, or
+selected Pack content. Use `npx atlante@latest build --watch` during active editing
 when you want selected changes rebuilt automatically.

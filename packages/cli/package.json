@@ -1,5 +1,5 @@
 {
-  "name": "@atlante/cli",
+  "name": "atlante",
   "version": "0.1.23",
   "type": "module",
   "description": "Atlante command-line interface for structured, versionable AI agent prompts",

@@ -1,4 +1,4 @@
-# `@atlante/cli`
+# `atlante`
 
 Command-line interface for [Atlante](https://github.com/atlante/atlante): the
 configuration layer for your coding-agent harness. Requires
@@ -9,13 +9,13 @@ configuration layer for your coding-agent harness. Requires
 Run the CLI directly from npm in the project you want to configure:
 
 ```bash
-npx @atlante/cli@latest init
+npx atlante@latest init
 ```
 
 For a global `atlante` command:
 
 ```bash
-npm install --global @atlante/cli
+npm install --global atlante
 atlante init
 ```
 

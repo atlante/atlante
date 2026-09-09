@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 interface Lockfile {
   workspaces?: Record<
     string,
-    { version?: string; dependencies?: Record<string, string> }
+    { name?: string; version?: string; dependencies?: Record<string, string> }
   >;
 }
 
@@ -40,10 +40,9 @@ function defaultRoot(): string {
 
 /**
  * Compare bun.lock against the manifests on disk and return one
- * human-readable description per stale entry: workspace versions that
- * drifted from their packages/<name>/package.json and exact pins that
- * drifted from the manifest declaring them. An empty result means the
- * lock is in sync.
+ * human-readable description per stale entry: the root workspace name,
+ * workspace versions, or exact pins that drifted from their manifests. An
+ * empty result means the lock is in sync.
  */
 export function lockSyncIssues(
   { packages, pins = [] }: LockSyncInput,
@@ -51,6 +50,16 @@ export function lockSyncIssues(
 ): string[] {
   const lock = readLockfile(root);
   const issues: string[] = [];
+
+  const rootManifestPath = join(root, "package.json");
+  if (existsSync(rootManifestPath)) {
+    const declared = readJson(rootManifestPath).name;
+    const locked = lock.workspaces?.[""]?.name;
+    if (locked !== declared)
+      issues.push(
+        `root workspace has name ${locked ?? "<missing>"} in bun.lock but package.json declares ${declared ?? "<missing>"}`,
+      );
+  }
 
   for (const name of packages) {
     const workspace = `packages/${name}`;
@@ -97,7 +106,7 @@ function stanzaStart(lines: string[], workspace: string): number {
 
 /**
  * Overwrite the value of the entry addressed by keys — ["version"] for a
- * stanza's direct child, ["dependencies", "@atlante/cli"] for a pin —
+ * stanza's direct child, ["dependencies", "atlante"] for a pin —
  * preserving the line's formatting. Returns false when the stanza or any
  * key along the path is absent; the caller's post-patch lockSyncIssues()
  * run reports such residue so the release can fail loudly.
@@ -140,8 +149,9 @@ function setStanzaValue(
 }
 
 /**
- * Rewrite the workspace versions and exact pins recorded in bun.lock so
- * they match the manifests on disk. bun 1.3.x treats manifest-version drift
+ * Rewrite the root workspace name, workspace versions, and exact pins recorded
+ * in bun.lock so they match the manifests on disk. bun 1.3.x treats
+ * manifest-version drift
  * as a no-op and may leave the lock untouched (oven-sh/bun#28411, #28935),
  * so the release flow syncs the lock directly after `bun install` instead
  * of trusting the install to do it. Only lines inside the affected
@@ -159,6 +169,16 @@ export function syncLockToManifests(
   const lockPath = join(root, "bun.lock");
   const lines = readFileSync(lockPath, "utf8").split("\n");
   let synced = 0;
+
+  const rootManifestPath = join(root, "package.json");
+  if (existsSync(rootManifestPath)) {
+    const rootName = readJson(rootManifestPath).name;
+    if (
+      typeof rootName === "string" &&
+      setStanzaValue(lines, "", ["name"], rootName)
+    )
+      synced++;
+  }
 
   for (const name of packages) {
     const declared = readJson(

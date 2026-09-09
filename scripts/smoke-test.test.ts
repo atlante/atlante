@@ -9,6 +9,8 @@ test("smoke test exercises the installed static pack and global-style CLI", () =
   const smoke = readFileSync(join(ROOT, "scripts", "smoke-test.ts"), "utf8");
 
   expect(smoke).toContain("@atlante/pack");
+  expect(smoke).toContain('join(globalRoot, "node_modules", "atlante")');
+  expect(smoke).not.toContain('node_modules", "@atlante", "cli"');
   expect(smoke).toContain("node_modules");
   expect(smoke).toContain('Bun.file(join(project, "opencode.jsonc")).exists()');
   expect(smoke).toContain("opencode-native.json");

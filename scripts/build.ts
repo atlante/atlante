@@ -58,15 +58,13 @@ if (!cliResult.success) throw new Error(cliResult.logs.join("\n"));
 // Contract check: the shipped launcher must run under node.
 const bundle = await readFile(join(cli, "dist", "bin", "atlante.js"), "utf8");
 if (!bundle.startsWith("#!/usr/bin/env node"))
-  throw new Error(
-    "@atlante/cli: bundle shebang is not node; check bin/atlante.ts",
-  );
-// Contract check: fully self-contained. The Vercel lambda ships only
-// node_modules/@atlante/** (vercel.json includeFiles), so the only allowed
-// externals are Node builtins and ajv's runtime modules, which ajv's
-// generated validator code requires dynamically when schemas use the
-// matching keywords; the Atlante schema does not, so ajv itself does not
-// ship in the lambda.
+  throw new Error("atlante: bundle shebang is not node; check bin/atlante.ts");
+// Contract check: fully self-contained. The deployed website resolves the
+// unscoped CLI from node_modules/atlante/** and its runtime pack dependency
+// from node_modules/@atlante/**. The only allowed bundle externals are Node
+// builtins and ajv's runtime modules, which ajv's generated validator code
+// requires dynamically when schemas use the matching keywords; the Atlante
+// schema does not, so ajv itself does not ship in the lambda.
 const builtinModules = new Set(cliRequire("node:module").builtinModules);
 const externalImports = new Set(
   [
@@ -86,7 +84,7 @@ const externalImports = new Set(
 );
 if (externalImports.size > 0) {
   throw new Error(
-    `@atlante/cli: bundle is not self-contained, external imports remain: ${[
+    `atlante: bundle is not self-contained, external imports remain: ${[
       ...externalImports,
     ].join(", ")}`,
   );

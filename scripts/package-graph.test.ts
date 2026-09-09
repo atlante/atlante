@@ -48,8 +48,10 @@ test("removes old workspace entries, manifests, imports, scripts, and lock entri
 
   const rootManifest = readJson(join(ROOT, "package.json"));
   expect(rootManifest.workspaces).toEqual(["packages/*", "website", "docs"]);
+  expect(rootManifest.name).toBe("@atlante/repo");
 
   const lockfile = readFileSync(join(ROOT, "bun.lock"), "utf8");
+  expect(lockfile).toContain('"name": "@atlante/repo"');
   for (const name of LEGACY_PACKAGES) {
     expect(lockfile).not.toContain(`@atlante/${name}`);
     expect(lockfile).not.toContain(`packages/${name}`);
@@ -108,9 +110,42 @@ test("keeps bun.lock synchronized with the workspace manifests", () => {
   expect(
     lockSyncIssues({
       packages: PACKAGES,
-      pins: [{ manifest: "website/package.json", dependency: "@atlante/cli" }],
+      pins: [{ manifest: "website/package.json", dependency: "atlante" }],
     }),
   ).toEqual([]);
+});
+
+test("repairs a stale root workspace name", () => {
+  const root = mkdtempSync(join(tmpdir(), "package-graph-root-"));
+  try {
+    writeFileSync(
+      join(root, "package.json"),
+      JSON.stringify({ name: "@atlante/repo", private: true }),
+    );
+    writeFileSync(
+      join(root, "bun.lock"),
+      `{
+  "workspaces": {
+    "": {
+      "name": "atlante",
+    },
+  },
+}`,
+    );
+
+    expect(lockSyncIssues({ packages: [] }, root)).toEqual([
+      "root workspace has name atlante in bun.lock but package.json declares @atlante/repo",
+    ]);
+    expect(syncLockToManifests({ packages: [] }, root)).toEqual({
+      synced: 1,
+      remaining: [],
+    });
+    expect(readFileSync(join(root, "bun.lock"), "utf8")).toContain(
+      '"name": "@atlante/repo"',
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 function writeLockFixture(root: string, lock: string) {
@@ -118,14 +153,14 @@ function writeLockFixture(root: string, lock: string) {
   mkdirSync(join(root, "packages", "cli"), { recursive: true });
   writeFileSync(
     join(root, "packages", "cli", "package.json"),
-    JSON.stringify({ name: "@atlante/cli", version: "0.2.0" }),
+    JSON.stringify({ name: "atlante", version: "0.2.0" }),
   );
   mkdirSync(join(root, "website"), { recursive: true });
   writeFileSync(
     join(root, "website", "package.json"),
     JSON.stringify({
       name: "website",
-      dependencies: { "@atlante/cli": "0.2.0" },
+      dependencies: { atlante: "0.2.0" },
     }),
   );
 }
@@ -135,7 +170,7 @@ function fixtureIssues(root: string, lock: string) {
   return lockSyncIssues(
     {
       packages: ["cli"],
-      pins: [{ manifest: "website/package.json", dependency: "@atlante/cli" }],
+      pins: [{ manifest: "website/package.json", dependency: "atlante" }],
     },
     root,
   );
@@ -150,13 +185,13 @@ test("reports stale workspace versions and pins", () => {
         `{
   "workspaces": {
     "packages/cli": { "version": "0.1.0", },
-    "website": { "dependencies": { "@atlante/cli": "0.1.0", }, },
+    "website": { "dependencies": { "atlante": "0.1.0", }, },
   },
 }`,
       ),
     ).toEqual([
       "packages/cli has version 0.1.0 in bun.lock but packages/cli/package.json declares 0.2.0",
-      "website pins @atlante/cli to 0.1.0 in bun.lock but website/package.json declares 0.2.0",
+      "website pins atlante to 0.1.0 in bun.lock but website/package.json declares 0.2.0",
     ]);
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -171,7 +206,7 @@ test("reports missing workspace entries and accepts JSONC trailing commas", () =
         root,
         `{
   "workspaces": {
-    "website": { "dependencies": { "@atlante/cli": "0.2.0" } },
+    "website": { "dependencies": { "atlante": "0.2.0" } },
   },
 }`,
       ),
@@ -192,7 +227,7 @@ test("accepts a synchronized lock", () => {
         `{
   "workspaces": {
     "packages/cli": { "version": "0.2.0" },
-    "website": { "dependencies": { "@atlante/cli": "0.2.0" } },
+    "website": { "dependencies": { "atlante": "0.2.0" } },
   },
 }`,
       ),
@@ -203,7 +238,7 @@ test("accepts a synchronized lock", () => {
 });
 
 const SYNC_PINS = [
-  { manifest: "website/package.json", dependency: "@atlante/cli" },
+  { manifest: "website/package.json", dependency: "atlante" },
 ] as const;
 
 test("syncs stale entries in a bun-shaped lock, leaving all other bytes alone", () => {
@@ -215,11 +250,11 @@ test("syncs stale entries in a bun-shaped lock, leaving all other bytes alone", 
   "lockfileVersion": 1,
   "workspaces": {
     "": {
-      "name": "atlante",
+      "name": "@atlante/repo",
       "version": "0.1.0",
     },
     "packages/cli": {
-      "name": "@atlante/cli",
+      "name": "atlante",
       "version": "0.1.0",
       "bin": { "atlante": "./dist/bin/atlante.js" },
       "dependencies": {
@@ -234,13 +269,13 @@ test("syncs stale entries in a bun-shaped lock, leaving all other bytes alone", 
       "name": "website",
       "version": "0.1.0",
       "dependencies": {
-        "@atlante/cli": "0.1.0",
+        "atlante": "0.1.0",
         "astro": "^5.0.0",
       },
     },
   },
   "packages": {
-    "@atlante/cli": ["@atlante/cli@workspace:packages/cli", "", {}, "sha"],
+    "atlante": ["atlante@workspace:packages/cli", "", {}, "sha"],
     "some-pkg": ["some-pkg@0.1.0", "", {}, "sha"],
   },
 }`,
@@ -260,11 +295,11 @@ test("syncs stale entries in a bun-shaped lock, leaving all other bytes alone", 
   "lockfileVersion": 1,
   "workspaces": {
     "": {
-      "name": "atlante",
+      "name": "@atlante/repo",
       "version": "0.1.0",
     },
     "packages/cli": {
-      "name": "@atlante/cli",
+      "name": "atlante",
       "version": "0.2.0",
       "bin": { "atlante": "./dist/bin/atlante.js" },
       "dependencies": {
@@ -279,13 +314,13 @@ test("syncs stale entries in a bun-shaped lock, leaving all other bytes alone", 
       "name": "website",
       "version": "0.1.0",
       "dependencies": {
-        "@atlante/cli": "0.2.0",
+        "atlante": "0.2.0",
         "astro": "^5.0.0",
       },
     },
   },
   "packages": {
-    "@atlante/cli": ["@atlante/cli@workspace:packages/cli", "", {}, "sha"],
+    "atlante": ["atlante@workspace:packages/cli", "", {}, "sha"],
     "some-pkg": ["some-pkg@0.1.0", "", {}, "sha"],
   },
 }`);
@@ -302,7 +337,7 @@ test("leaves an in-sync lock byte-identical", () => {
       `{
   "workspaces": {
     "packages/cli": { "version": "0.2.0" },
-    "website": { "dependencies": { "@atlante/cli": "0.2.0" } },
+    "website": { "dependencies": { "atlante": "0.2.0" } },
   },
 }`,
     );
@@ -327,10 +362,10 @@ test("reports entries it cannot repair and leaves them stale", () => {
       root,
       `{
   "workspaces": {
-    "packages/cli": { "name": "@atlante/cli" },
+    "packages/cli": { "name": "atlante" },
     "website": {
       "dependencies": {
-        "@atlante/cli": "0.1.0",
+        "atlante": "0.1.0",
       },
     },
   },
@@ -400,6 +435,12 @@ test("keeps the first-party pack as a CLI runtime dependency in source", () => {
   const cli = readJson(join(ROOT, "packages", "cli", "package.json"));
   const dependencies = cli.dependencies as Record<string, unknown>;
   expect(dependencies["@atlante/pack"]).toBe("workspace:*");
+});
+
+test("uses the unscoped canonical CLI package name", () => {
+  const cli = readJson(join(ROOT, "packages", "cli", "package.json"));
+  expect(cli.name).toBe("atlante");
+  expect(cli.bin).toEqual({ atlante: "./dist/bin/atlante.js" });
 });
 
 test("orders public packages pack before CLI", () => {
