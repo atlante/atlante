@@ -1,19 +1,16 @@
 ---
 const benefits = [
   {
-    signal: "security review",
     title: "Keep review rules consistent",
     detail:
       "Define a no-secrets policy once, reuse it across review agents, and validate every binding before you build.",
   },
   {
-    signal: "team-wide pack",
     title: "Give every project the same starting point",
     detail:
       "Package your team's agents, skills, values, and policies once, then initialize new repositories from the reviewed pack.",
   },
   {
-    signal: "versioned eval",
     title: "Catch breakage before sharing",
     detail:
       "Run a scenario through OpenCode in a sandbox, grade deterministic checks, and catch regressions before sharing.",
@@ -21,18 +18,17 @@ const benefits = [
 ];
 ---
 
-<section class="review-close major-divider" id="benefits">
+<section class="review-close" id="benefits">
   <div class="inner">
     <header class="intro">
-      <h2>Use it for real work</h2>
-
+      <h2>Harnesses in practice</h2>
+      <p>Apply one versioned harness across reviews, projects, and evaluations.</p>
     </header>
 
     <div class="benefits">
       {
         benefits.map((item) => (
           <article>
-            <code>{item.signal}</code>
             <h3>{item.title}</h3>
             <p>{item.detail}</p>
           </article>
@@ -43,7 +39,6 @@ const benefits = [
     <div class="next-step">
       <span class="next-star" aria-hidden="true"></span>
       <div class="next-copy">
-        <p class="next-label">Next step</p>
         <p class="statement">Build your harness</p>
         <p class="literal">
           Follow the getting started guide, or explore the source on GitHub.
@@ -58,10 +53,6 @@ const benefits = [
 </section>
 
 <style>
-  .review-close {
-    border-block-start: 0;
-  }
-
    .inner {
     max-width: var(--container-wide);
     margin-inline: auto;
@@ -85,12 +76,18 @@ const benefits = [
     text-wrap: balance;
   }
 
-
-
+  .intro p {
+    max-width: 58ch;
+    margin: var(--space-4) 0 0;
+    color: var(--ds-muted);
+    font-family: var(--font-body);
+    font-size: clamp(18px, 1.35vw, 22px);
+    line-height: 1.65;
+  }
   .benefits {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    border-block: 1px solid var(--ds-border);
+    border-block-end: 1px solid var(--ds-border);
   }
 
   article {
@@ -103,17 +100,9 @@ const benefits = [
     border-inline-end: 0;
   }
 
-  article code {
-    display: block;
-    min-height: 3em;
-    color: var(--ds-accent);
-    font-family: var(--font-mono);
-    font-size: var(--text-small);
-  }
-
   h3 {
     max-width: 14ch;
-    margin: var(--space-12) 0 var(--space-4);
+    margin: 0 0 var(--space-4);
     font-family: var(--font-heading);
     font-size: clamp(26px, 2.2vw, 36px);
 
@@ -134,14 +123,6 @@ const benefits = [
     position: relative;
     padding-block: clamp(var(--space-24), 10vw, 176px) var(--space-8);
     overflow: hidden;
-  }
-
-  .next-label {
-    margin: 0 0 var(--space-6);
-    font-family: var(--font-ui);
-    font-size: var(--text-meta);
-    font-weight: 700;
-    letter-spacing: 0.11em;
   }
 
   .statement {
@@ -269,7 +250,8 @@ const benefits = [
       text-align: center;
     }
 
-    .intro h2 {
+    .intro h2,
+    .intro p {
       margin-inline: auto;
     }
 
@@ -292,21 +274,15 @@ const benefits = [
       text-align: center;
     }
 
-    .benefits article code,
     .benefits article h3,
     .benefits article p {
       margin-inline: auto;
-    }
-
-    article h3 {
-      margin-block-start: var(--space-8);
     }
 
     .next-step {
       text-align: center;
     }
 
-    .next-label,
     .statement,
     .literal {
       margin-inline: auto;

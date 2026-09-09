@@ -34,16 +34,17 @@ Never open with schema validation, artifact hashing, mythology, or a future regi
 
 ## Naming and Vocabulary
 
-As analogy, Atlante bears the celestial sphere. The celestial sphere represents the broader ecosystem of independently authored harness families. A Family is one complete harness containing related constellations, skills, workflows, values, and supporting configuration. Metaphors explain the product; they never replace its technical vocabulary and never enter schema fields, package names, types, or code identifiers.
+As analogy, an agent is a star, related agents form a constellation, and one or more constellations form a Family. Coordinates represent host-native locations, and `atlante build` projects a family into those coordinates through a host adapter. Every independently authored family and its constellations form the celestial sphere that Atlante bears. These groupings are explanatory only: metaphors never replace technical vocabulary or enter schema fields, package names, types, or code identifiers.
 
 | Metaphor | Meaning | Allowed use |
 | --- | --- | --- |
 | Atlante bearing the sphere | Atlante carries the harness structure | Brand story, identity rationale, major narrative moments |
-| Celestial sphere | The broader ecosystem of independently authored harness families | Architecture overview and visual system |
-| Star | A named input, instruction, constraint, value, or policy | Explanatory diagrams and occasional editorial copy |
-| Constellation | One configured agent | Light explanatory copy and diagrams |
-| Family | One complete harness containing related constellations, skills, workflows, values, and supporting configuration | Architecture overview and occasional editorial copy |
-| Projection | Materialization through a host adapter | Architecture explanation paired with the literal term `adapter` |
+| Star | One configured agent | Explanatory diagrams and occasional editorial copy |
+| Constellation | A related set of configured agents | Light explanatory copy and diagrams; not a schema-level grouping |
+| Family | One complete harness containing one or more constellations, skills, workflows, values, and supporting configuration | Architecture overview and occasional editorial copy |
+| Coordinates | Host-native locations where a built family takes form | Architecture explanation paired with literal native output paths |
+| Projection | Materialization with `atlante build` through a host adapter | Architecture explanation paired with the literal term `host adapter` |
+| Celestial sphere | The broader ecosystem containing every independently authored harness family | Architecture overview and visual system |
 | Bearing | Support, load, responsibility, materialization | Brand narrative and graphic devices |
 | Almanac | A possible future registry for independently authored harness families | Reserved; it is not shipped and has no current behavior |
 
@@ -52,7 +53,7 @@ outputs remain generated outputs. Never rename Atlante to Atlas or Atlantis.
 
 Technical vocabulary keeps its required meanings: `configuration` is the primary prose term for the authored system and `config` appears only in compact CLI, argument, or code contexts; `document` names the parsed or validated configuration entity in technical documentation; `preset` names a preconfigured root document used directly or through `extends`; `native output` names generated host files under `.opencode/` and the ownership manifest under `.atlante/opencode-native.json`; `host adapter` is the public phrase for host-specific materialization.
 
-`Family` names one complete harness containing related constellations, skills, workflows, values, and supporting configuration. It is explanatory brand vocabulary only and does not name a schema field, package, type, or code identifier. `PackItem` remains a retired early discussion term.
+`Family` names one complete harness containing one or more constellations, skills, workflows, values, and supporting configuration. It is explanatory brand vocabulary only and does not name a schema field, package, type, or code identifier. `PackItem` remains a retired early discussion term.
 
 Retired implementation names: `atlante/starter`, `atlante/<resource>`, `@atlante/templates`, `@atlante/presets`, and `resolve` terminology. The current implementation uses `@atlante/pack`, `$template`, `$instance`, and `build`.
 

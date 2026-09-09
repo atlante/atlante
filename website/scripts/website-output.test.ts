@@ -9,12 +9,11 @@ function read(relativePath: string): string {
 }
 
 const observatoryKeys = [
-  "configuration",
-  "inputs",
-  "agent",
-  "validation",
-  "adapter",
-  "runtime",
+  "star",
+  "constellation",
+  "family",
+  "projection",
+  "sphere",
 ] as const;
 
 describe.skipIf(process.env.ATLANTE_BUILT_OUTPUT_TESTS !== "1")(
@@ -35,9 +34,15 @@ describe.skipIf(process.env.ATLANTE_BUILT_OUTPUT_TESTS !== "1")(
       ]) {
         expect(html).toContain(href);
       }
+      let previousSymbol = -1;
+      let previousObservation = -1;
       for (const key of observatoryKeys) {
-        expect(html).toContain(`data-symbol="${key}"`);
-        expect(html).toContain(`data-observation="${key}"`);
+        const symbol = html.indexOf(`data-symbol="${key}"`);
+        const observation = html.indexOf(`data-observation="${key}"`);
+        expect(symbol).toBeGreaterThan(previousSymbol);
+        expect(observation).toBeGreaterThan(previousObservation);
+        previousSymbol = symbol;
+        previousObservation = observation;
       }
     });
 

@@ -1,4 +1,4 @@
-<section class="contract-band major-divider" aria-label="Product contract">
+<section class="contract-band" aria-label="Product contract">
   <div class="inner">
     <div class="contract-grid">
       <article>
@@ -90,12 +90,18 @@
     article {
       padding-block: var(--space-8);
       padding-inline: var(--space-4);
+      text-align: center;
     }
 
     article + article {
       margin-block-start: 0;
       border-block-start: 1px solid var(--ds-border-subtle);
       border-inline-start: 0;
+    }
+
+    ul {
+      padding-inline-start: 0;
+      list-style-position: inside;
     }
   }
 </style>
