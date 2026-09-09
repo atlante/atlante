@@ -13,15 +13,6 @@ harness, so it can be developed like code.
 > [OpenCode](https://opencode.ai/) is the only supported host today. Read the
 > [documentation](https://docs.atlante.sh) for concepts, guides, and reference.
 
-## Scope
-
-| Atlante does | Atlante doesn't |
-| --- | --- |
-| Validates and composes a versioned JSONC source for agents and skills | Executes agents or skills, or performs LLM inference |
-| Renders deterministic prompt and skill content | Runs your project code |
-| Materializes host-native files, guarded by an ownership manifest | Owns host settings — models, permissions, and tools remain with OpenCode |
-| Tests the harness with `atlante eval`, delegated to the host in a sandbox | Manages runtime workflow state, checkpoints, or scheduling |
-
 ## Quick start
 
 Run the CLI from the project you want to configure:
@@ -184,15 +175,14 @@ To publish your own reusable content, read
 ## Documentation
 
 - [Getting started](https://docs.atlante.sh/getting-started)
-- Concepts: [Configuration](https://docs.atlante.sh/concepts/configuration), [Templates](https://docs.atlante.sh/concepts/templates), [Values](https://docs.atlante.sh/concepts/values), [Resources](https://docs.atlante.sh/concepts/resources)
-- Guides: [Build a harness](https://docs.atlante.sh/guides/building-a-harness), [Author a pack](https://docs.atlante.sh/guides/authoring-packs)
+- Concepts: [Configuration](https://docs.atlante.sh/concepts/configuration), [Resolution](https://docs.atlante.sh/concepts/resolution), [Templates](https://docs.atlante.sh/concepts/templates), [Values](https://docs.atlante.sh/concepts/values), [Resources](https://docs.atlante.sh/concepts/resources), [Evaluation](https://docs.atlante.sh/concepts/evaluation)
+- Guides: [Build a harness](https://docs.atlante.sh/guides/building-a-harness), [Evaluate your harness](https://docs.atlante.sh/guides/evaluating-a-harness), [Author a pack](https://docs.atlante.sh/guides/authoring-packs)
 - Reference: [CLI](https://docs.atlante.sh/reference/cli), [Eval](https://docs.atlante.sh/reference/eval), [Template syntax](https://docs.atlante.sh/reference/template-syntax), [Schema](https://docs.atlante.sh/reference/schema), [Materialization](https://docs.atlante.sh/reference/materialization), [Diagnostics](https://docs.atlante.sh/reference/diagnostics)
 - [Troubleshooting](https://docs.atlante.sh/troubleshooting)
 
 ## Status
 
-The current alpha `v0.1` follows the [`SPECIFICATION.md`](SPECIFICATION.md) as
-the normative technical contract.
+[`SPECIFICATION.md`](SPECIFICATION.md) defines the normative `v0.1` contract.
 
 ## License
 
