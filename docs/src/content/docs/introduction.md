@@ -1,63 +1,68 @@
 ---
 title: Introduction
-description: A structured, versioned source for your coding agents and skills, with native OpenCode builds and scenario-based evaluation.
+description: A structured, versioned source for coding agents and skills, with native OpenCode builds and scenario-based evaluation.
 ---
 
-Atlante is the configuration and build layer for your coding-agent harness.
-It gives your agents and skills a structured, versioned source, with
-scenario-based evaluation to test the resulting harness.
-
+Atlante is the configuration and build layer for a coding-agent harness. It
+keeps agents and skills in a structured, versioned source and tests the
+resulting harness through repeatable scenarios.
 A coding agent’s results depend on
-[more than the model you choose](https://blog.langchain.com/improving-deep-agents-with-harness-engineering/).
-The instructions around it shape how it approaches tasks, applies project
-rules, and checks its work. Changing those instructions changes the system
-you rely on to write code.
+[more than the selected model](https://blog.langchain.com/improving-deep-agents-with-harness-engineering/).
+The context supplied to the model shapes how it interprets tasks, follows
+project rules, and checks its work. Whether written by a person or generated
+by an agent, that context deserves the same care as code. It should be clear,
+easy to review, and tested against the work it is meant to guide. Reading the
+instructions explains their intent, but their effect becomes clear only when
+an agent uses them. Even a small change to that context can alter how the
+agent writes code.
+Atlante keeps configuration, builds, and evaluation together in the
+repository. The [OpenCode](https://opencode.ai/) host adapter materializes
+reusable context as native files, while evaluation checks the resulting
+harness against explicit expectations.
 
-Whether you write that guidance yourself or ask an agent to generate it, it
-deserves the same discipline as your code. It needs clear structure,
-reviewable changes, and tests that help you assess the effect of each
-revision. Reading a prompt diff tells you what changed, but not whether the
-agent will produce better results.
+## How Atlante works
 
-Atlante brings configuration, builds, and evaluation into one toolchain you
-can use from your repository. You compose reusable guidance, build native
-OpenCode files, and use [`atlante eval`](/reference/eval) to assess the
-harness against defined scenarios. OpenCode runs those scenarios, and
-deterministic checks grade the results against expectations you specify.
+A project’s `atlante.jsonc` brings together the
+[configuration](/concepts/configuration) and [resources](/concepts/resources)
+that define its agents and skills. It can extend a
+[preset](/concepts/configuration#presets-as-a-starting-point), compose content
+through [templates](/concepts/templates), and supply project-specific
+[values](/concepts/values). Together, the configuration and selected resources
+are the source of the harness, which can evolve alongside the code it guides.
+Atlante validates that source before writing any files, then a successful
+build produces reproducible [native output](/reference/materialization) for
+OpenCode (currently the only supported host). The host discovers the generated
+agents and skills when it starts, and [`atlante eval`](/reference/eval) uses
+them to run defined scenarios in disposable sandboxes.
 
-## One source for your harness
+<figure class="atlante-flow" data-atlante-flow aria-labelledby="atlante-flow-caption">
+  <figcaption id="atlante-flow-caption">From source to use and evaluation</figcaption>
+  <div class="atlante-flow-diagram">
+    <div class="atlante-flow-node">
+      <span>Source</span>
+      <strong>Configuration and resources</strong>
+    </div>
+    <span class="atlante-flow-arrow" aria-hidden="true"></span>
+    <div class="atlante-flow-node">
+      <span>Build</span>
+      <strong>Validate and materialize</strong>
+    </div>
+    <span class="atlante-flow-arrow" aria-hidden="true"></span>
+    <div class="atlante-flow-node">
+      <span>Native output</span>
+      <strong>Generated agents and skills</strong>
+    </div>
+    <span class="atlante-flow-arrow" aria-hidden="true"></span>
+    <div class="atlante-flow-node">
+      <span>Use / evaluate</span>
+      <strong>OpenCode / <code>atlante eval</code></strong>
+    </div>
+  </div>
+</figure>
 
-Your `atlante.jsonc` brings together the configuration and resources that
-define your project’s agents and skills. You can build on a preset, compose
-content through templates, and supply project-specific values.
+Atlante prepares this structure but does not run it: model calls, permissions,
+tools, modes, and project execution remain with the host and configured model.
+Workflows describe a process for the model to follow, but Atlante does not
+schedule them, track their progress, or manage runtime checkpoints.
 
-The configuration and its resources remain the source you review, while
-generated host files are derived output. You can inspect changes, compare
-revisions, and evolve the harness alongside the code it guides.
-
-## Build and test the harness
-
-Atlante validates your configuration, composes the selected content, and
-generates native agent and skill files through a host adapter.
-[OpenCode](https://opencode.ai/) is currently the only supported host and
-discovers those files when it starts.
-
-Validation checks the configuration before a build writes anything, while
-deterministic rendering makes the native output reproducible from its inputs.
-
-You can also test the built harness with [`atlante eval`](/reference/eval),
-which launches OpenCode to run scenarios in disposable sandboxes. Atlante
-then grades the results with deterministic checks, so you can assess changes
-against explicit expectations.
-
-## Where Atlante stops
-
-Atlante defines instructions for agents; the host and model remain
-responsible for carrying them out. Model calls, permissions, and tool use
-belong to OpenCode, not to Atlante’s configuration and build layer.
-
-Workflows describe a process for the model to follow; Atlante does not track
-their progress or schedule their execution.
-
-Follow [Getting started](/getting-started) to create your first configuration
-and build its native OpenCode files.
+Follow [Getting started](/getting-started) to create your first configuration.
