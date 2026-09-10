@@ -118,8 +118,20 @@ describe("prepareHostIntegration", () => {
       const nestedConfig = join(nestedDirectory, filename);
       const rootConfig = join(projectRoot, "opencode.json");
       mkdirSync(nestedDirectory, { recursive: true });
-      writeFileSync(nestedConfig, '{ "model": "nested-model" }');
-      writeFileSync(rootConfig, '{ "model": "root-model" }');
+      writeFileSync(
+        nestedConfig,
+        JSON.stringify({
+          model: "nested-model",
+          agent: { nested: { description: "Nested agent" } },
+        }),
+      );
+      writeFileSync(
+        rootConfig,
+        JSON.stringify({
+          small_model: "root-small-model",
+          agent: { root: { description: "Root agent" } },
+        }),
+      );
       try {
         const runner = createOpenCodeRunner({
           projectRoot,
@@ -135,6 +147,9 @@ describe("prepareHostIntegration", () => {
           readFileSync(join(project, ".opencode", filename), "utf8"),
         );
         expect(written.model).toBe("nested-model");
+        expect(written.small_model).toBe("root-small-model");
+        expect(written.agent.nested.description).toBe("Nested agent");
+        expect(written.agent.root.description).toBe("Root agent");
         expect(existsSync(join(project, "opencode.json"))).toBe(false);
       } finally {
         rmSync(nestedConfig, { force: true });
@@ -142,6 +157,40 @@ describe("prepareHostIntegration", () => {
       }
     },
   );
+
+  test("does not inherit project MCP servers into the eval sandbox", () => {
+    const nestedDirectory = join(projectRoot, ".opencode");
+    const config = join(nestedDirectory, "opencode.jsonc");
+    mkdirSync(nestedDirectory, { recursive: true });
+    writeFileSync(
+      config,
+      JSON.stringify({
+        mcp: {
+          projectTool: {
+            type: "local",
+            command: ["node", "-e", "process.exit(0)"],
+          },
+        },
+      }),
+    );
+    try {
+      const runner = createOpenCodeRunner({
+        projectRoot,
+        authPath: authFile,
+      });
+      const project = tempDir("eval-sandbox-no-mcp-");
+      runner.prepareHostIntegration(
+        sandboxFor(project, tempDir("eval-state-no-mcp-")),
+        {},
+      );
+      const written = JSON.parse(
+        readFileSync(join(project, ".opencode", "opencode.jsonc"), "utf8"),
+      );
+      expect(written.mcp).toBeUndefined();
+    } finally {
+      rmSync(config, { force: true });
+    }
+  });
 
   test("serializes a __proto__ agent id as an own agent entry", () => {
     const config = join(projectRoot, "opencode.json");

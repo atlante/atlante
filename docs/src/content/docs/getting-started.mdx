@@ -72,11 +72,15 @@ Open `atlante.jsonc`. Its configuration selects the preset through `extends`:
 After `init` completes its first build, the project contains source
 configuration, host configuration, generated native output, and Atlante state:
 
+The selected host configuration is either `.opencode/opencode.jsonc`,
+`.opencode/opencode.json`, `opencode.jsonc`, or `opencode.json`, depending on
+which file already exists.
+
 ```text
 my-project/
 ├── atlante.jsonc
-├── opencode.jsonc                 # selected host config; may be .opencode/opencode.json[c] or opencode.json
 ├── .opencode/
+│   ├── opencode.jsonc             # selected host config when nested (or .json)
 │   ├── agents/
 │   │   └── architect.md
 │   └── skills/
@@ -85,6 +89,7 @@ my-project/
 │       ├── build/SKILL.md
 │       ├── review/SKILL.md
 │       └── harness/SKILL.md
+├── opencode.jsonc                 # selected host config when root-level (or .json)
 └── .atlante/
     └── opencode-native.json
 ```

@@ -101,6 +101,45 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function setOwnValue(
+  target: Record<string, unknown>,
+  key: string,
+  value: unknown,
+): void {
+  Object.defineProperty(target, key, {
+    configurable: true,
+    enumerable: true,
+    value,
+    writable: true,
+  });
+}
+
+/**
+ * Mirrors OpenCode's project-config merge: objects merge recursively, while
+ * arrays and scalar values from the higher-precedence layer replace the lower
+ * layer. Own-property writes keep config keys such as `__proto__` inert.
+ */
+function mergeConfigLayers(
+  base: Record<string, unknown>,
+  override: Record<string, unknown>,
+): Record<string, unknown> {
+  const merged: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(base)) {
+    setOwnValue(merged, key, value);
+  }
+  for (const [key, value] of Object.entries(override)) {
+    const existing = Object.hasOwn(merged, key) ? merged[key] : undefined;
+    setOwnValue(
+      merged,
+      key,
+      isObject(existing) && isObject(value)
+        ? mergeConfigLayers(existing, value)
+        : value,
+    );
+  }
+  return merged;
+}
+
 type PermissionMap = Record<string, unknown>;
 
 /**
@@ -174,34 +213,40 @@ type HostConfig = Readonly<{
 }>;
 
 function readHostConfig(projectRoot: string): HostConfig {
-  const path =
-    openCodeConfigPaths(projectRoot).find(existsSync) ??
-    join(projectRoot, "opencode.json");
-  if (!existsSync(path)) return { path, value: {} };
-  const filename = relative(projectRoot, path).replaceAll("\\", "/");
-  let text: string;
-  try {
-    text = readFileSync(path, "utf8");
-  } catch (cause) {
-    throw new Error(
-      `could not read ${filename}: ${cause instanceof Error ? cause.message : String(cause)}`,
-    );
+  const paths = openCodeConfigPaths(projectRoot).filter(existsSync);
+  const path = paths[0] ?? join(projectRoot, "opencode.json");
+  let value: Record<string, unknown> = {};
+
+  // OpenCode merges every project config layer from low to high precedence;
+  // the highest existing path remains the sandbox's write target.
+  for (const configPath of paths.slice().reverse()) {
+    const filename = relative(projectRoot, configPath).replaceAll("\\", "/");
+    let text: string;
+    try {
+      text = readFileSync(configPath, "utf8");
+    } catch (cause) {
+      throw new Error(
+        `could not read ${filename}: ${cause instanceof Error ? cause.message : String(cause)}`,
+      );
+    }
+    // The existing configuration contract treats JSONC as the serialized
+    // format with strict JSON as a subset (`atlante init` parses both
+    // filenames with comments and trailing commas allowed), so `eval` must
+    // accept the same documents.
+    const parsed = parseJsonc(text, {
+      allowTrailingComma: true,
+      disallowComments: false,
+    });
+    if (parsed.errors.length > 0) {
+      throw new Error(`host configuration ${filename} is malformed`);
+    }
+    if (!isObject(parsed.value)) {
+      throw new Error(`host configuration ${filename} must contain an object`);
+    }
+    value = mergeConfigLayers(value, parsed.value);
   }
-  // The existing configuration contract treats JSONC as the serialized
-  // format with strict JSON as a subset (`atlante init` parses both
-  // filenames with comments and trailing commas allowed), so `eval` must
-  // accept the same documents.
-  const parsed = parseJsonc(text, {
-    allowTrailingComma: true,
-    disallowComments: false,
-  });
-  if (parsed.errors.length > 0) {
-    throw new Error(`host configuration ${filename} is malformed`);
-  }
-  if (!isObject(parsed.value)) {
-    throw new Error(`host configuration ${filename} must contain an object`);
-  }
-  return { path, value: parsed.value };
+
+  return { path, value };
 }
 
 /**
@@ -225,6 +270,9 @@ export function createOpenCodeRunner(
       const nativeAgentIds = readNativeAgentIds(projectRoot);
       const hostConfig = readHostConfig(projectRoot);
       const config = hostConfig.value;
+      // Eval runs disposable fixtures and must never launch project-configured
+      // MCP commands from the developer's repository or environment.
+      delete config.mcp;
       config.$schema = "https://opencode.ai/config.json";
 
       // A fixture-provided config at any supported precedence path would
