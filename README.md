@@ -20,6 +20,9 @@ Run the CLI from the project you want to configure:
 ```bash
 npx atlante@latest init            # scaffold atlante.jsonc and build the first outputs
 npx atlante@latest init --no-mcp   # scaffold without registering the MCP server
+npx atlante@latest pack install @acme/review-pack
+npx atlante@latest pack list       # inspect direct pack dependencies
+npx atlante@latest pack uninstall @acme/review-pack
 npx atlante@latest validate        # check the configuration without building
 npx atlante@latest build           # materialize the native outputs
 npx atlante@latest build --watch   # rebuild while you edit
@@ -45,6 +48,13 @@ install the CLI first:
 npm install --global atlante
 atlante init
 ```
+
+Use `atlante pack install`, `atlante pack uninstall`, and `atlante pack list` to
+manage third-party pack dependencies independently of initialization. Pack
+installation uses the project's package manager, validates the installed pack,
+and rolls back dependency changes when validation fails. These commands do not
+change the configuration or generated outputs; the bundled `@atlante/pack` does
+not need to be installed as a project dependency.
 
 After a build, OpenCode discovers the generated agents and skills when it
 starts; restart it to pick up new or changed files.
@@ -175,7 +185,7 @@ trial counts only when every check passes.
 
 Atlante publishes two packages to npm:
 
-- [`atlante`](https://www.npmjs.com/package/atlante) — the `init`,
+- [`atlante`](https://www.npmjs.com/package/atlante) — the `init`, `pack`,
   `validate`, `build`, `mcp`, and `eval` commands.
 - [`@atlante/pack`](https://www.npmjs.com/package/@atlante/pack) — the
   first-party presets, the `agent` and `skill` templates, and their

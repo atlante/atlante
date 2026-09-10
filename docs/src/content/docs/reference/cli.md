@@ -1,6 +1,6 @@
 ---
 title: CLI
-description: Command reference for init, validate, build, MCP, and eval.
+description: Command reference for init, pack management, validate, build, MCP, and eval.
 ---
 
 The `atlante` package provides the `atlante` command and requires
@@ -96,6 +96,43 @@ Use `--pack` only with packages you trust. Custom pack installation can run
 package-manager install scripts before Atlante validates the installed pack or
 selects a preset.
 :::
+
+## `atlante pack`
+
+Manage third-party pack dependencies without changing the project configuration
+or generated native outputs.
+
+```sh
+npx atlante pack install <package> [path]
+npx atlante pack uninstall <package> [path]
+npx atlante pack list [path]
+```
+
+- `path` is a project directory and defaults to the current directory.
+- `<package>` is a package name such as `@acme/review-pack`; preset paths are
+  not accepted by these commands.
+- The package manager comes from the manifest's `packageManager` field when it
+  names npm, pnpm, Yarn, or Bun. Otherwise, Atlante uses the nearest recognized
+  lockfile and falls back to npm. Commands run from the supplied project path,
+  including when that path is a workspace member.
+- `pack install` adds an undeclared package to `devDependencies`, updates the
+  lockfile, and validates the installed package name, strict semver version, and
+  numeric `atlante.format: 1` metadata. A failed package-manager run or pack
+  validation restores the manifest and lockfile and reconciles the installation.
+- The bundled `@atlante/pack` is supplied by the CLI and is not installed as a
+  project dependency by this command.
+- `pack uninstall` removes a direct dependency through the detected package
+  manager. It checks `dependencies`, `optionalDependencies`, and
+  `devDependencies`, and stops before mutation when the package is referenced
+  by `extends`, `$template`, or `$instance` in `atlante.jsonc` or `atlante.json`.
+- `pack list` reads direct dependency declarations and their installed package
+  manifests. Each row reports the declared range, installed version, Atlante
+  pack validity, and whether the package is referenced by the current
+  configuration. It does not run a package manager.
+
+The commands leave `atlante.jsonc`, `atlante.json`, `.gitignore`, and generated
+native files untouched. Package-manager install scripts remain under the
+package manager's control.
 
 ## `atlante mcp`
 

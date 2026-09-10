@@ -378,13 +378,25 @@ describe("runBuild", () => {
   });
 });
 
-test("registers validate, build, mcp, init, and eval, but not resolve", () => {
+test("registers validate, build, mcp, init, pack, and eval, but not resolve", () => {
   expect(createProgram().commands.map((command) => command.name())).toEqual([
     "validate",
     "build",
     "mcp",
     "init",
+    "pack",
     "eval",
+  ]);
+});
+
+test("registers the pack lifecycle subcommands", () => {
+  const pack = createProgram().commands.find(
+    (command) => command.name() === "pack",
+  );
+  expect(pack?.commands.map((command) => command.name())).toEqual([
+    "install",
+    "uninstall",
+    "list",
   ]);
 });
 
