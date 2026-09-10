@@ -55,6 +55,22 @@ const cliResult = await Bun.build({
   outdir: join(cli, "dist", "bin"),
 });
 if (!cliResult.success) throw new Error(cliResult.logs.join("\n"));
+const catalogPath = join(cli, "dist", "mcp", "catalog.json");
+const catalogBuild = Bun.spawn(
+  [
+    process.execPath,
+    join(cli, "src", "mcp", "catalog-build.ts"),
+    "--root",
+    ROOT,
+    "--output",
+    catalogPath,
+  ],
+  { stderr: "inherit", stdout: "inherit" },
+);
+if ((await catalogBuild.exited) !== 0)
+  throw new Error("atlante: documentation catalog generation failed");
+if (!existsSync(catalogPath))
+  throw new Error("atlante: documentation catalog is missing from the bundle");
 // Contract check: the shipped launcher must run under node.
 const bundle = await readFile(join(cli, "dist", "bin", "atlante.js"), "utf8");
 if (!bundle.startsWith("#!/usr/bin/env node"))

@@ -6,6 +6,11 @@
     "fallow": {
       "type": "local",
       "command": ["npx", "-y", "-p", "fallow", "fallow-mcp"]
+    },
+    "atlante": {
+      "type": "local",
+      "command": ["bun", "run", "cli", "mcp"],
+      "enabled": true
     }
   },
 

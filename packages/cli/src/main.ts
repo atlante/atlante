@@ -5,6 +5,7 @@ import { runBuildWatch } from "./commands/build-watch.js";
 import type { EvalCommandOptions } from "./commands/eval.js";
 import { runEvalCommand } from "./commands/eval.js";
 import { runInit } from "./commands/init.js";
+import { runMcp } from "./commands/mcp.js";
 import {
   runPackInstall,
   runPackList,
@@ -21,6 +22,7 @@ export { runBuild } from "./commands/build.js";
 export { runBuildWatch } from "./commands/build-watch.js";
 export { runEvalCommand } from "./commands/eval.js";
 export { runInit } from "./commands/init.js";
+export { runMcp } from "./commands/mcp.js";
 export {
   runPackInstall,
   runPackList,
@@ -58,6 +60,13 @@ export function createProgram(): Command {
     });
 
   program
+    .command("mcp")
+    .description("run the read-only Atlante MCP server over stdio")
+    .action(async () => {
+      process.exitCode = await runMcp();
+    });
+
+  program
     .command("init")
     .argument("[path]", "project directory", process.cwd())
     .option(
@@ -65,10 +74,18 @@ export function createProgram(): Command {
       "pack locator to install and extend; use <pack>/<preset> to select a preset explicitly",
     )
     .option("--force", "overwrite an existing Atlante config")
+    .option("--no-mcp", "skip OpenCode MCP server registration")
     .description("scaffold an Atlante configuration")
     .action(
-      async (path: string, options: { pack?: string; force?: boolean }) => {
-        process.exitCode = await runInit(path, options);
+      async (
+        path: string,
+        options: { pack?: string; force?: boolean; mcp?: boolean },
+      ) => {
+        process.exitCode = await runInit(path, {
+          pack: options.pack,
+          force: options.force,
+          noMcp: options.mcp === false,
+        });
       },
     );
 

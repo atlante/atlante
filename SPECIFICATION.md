@@ -37,7 +37,9 @@ Version 0.1 defines:
   project;
 - build-time materialization of the prepared project into host-native files
   through injected host materializers;
-- an OpenCode materializer profile for the first supported host; and
+- an OpenCode materializer profile for the first supported host;
+- a read-only, versioned MCP context interface for project inspection and
+  contract lookup (section 13); and
 - an optional eval contract that validates an `eval` configuration section and
   versioned scenario documents, delegates scenario execution to the declared
   host runner in a disposable sandbox, and grades deterministic zero-LLM
@@ -708,9 +710,11 @@ failure code (`invalid-input`, `invalid-id`, `invalid-manifest`,
 one deterministic recovery action.
 
 `atlante init` MUST NOT register a runtime integration for the materializer.
-Init MUST also enforce the ignore-by-default git policy: `.gitignore` MUST
-gain `.opencode/agents/`, `.opencode/skills/`, and `.atlante/` when missing,
-and existing `.gitignore` content MUST NOT be reordered.
+The read-only MCP context registration described in section 13 is separate from
+materialization and MUST NOT change the native output contract. Init MUST also
+enforce the ignore-by-default git policy: `.gitignore` MUST gain
+`.opencode/agents/`, `.opencode/skills/`, and `.atlante/` when missing, and
+existing `.gitignore` content MUST NOT be reordered.
 
 ### Examples
 
@@ -831,7 +835,106 @@ Declarative scenarios and deterministic checks turn the harness into testable
 output while execution stays host-owned behind a narrow runner seam: Atlante
 validates and grades, the declared host runs.
 
-## 13. Acceptance Criteria
+## 13. MCP Context Interface
+
+### Goal
+
+Define a versioned, read-only context surface without expanding Atlante into a
+runtime execution or host-materialization service.
+
+### Contract
+
+The CLI MUST expose `atlante mcp`. When started, it MUST use newline-delimited
+JSON-RPC over standard input and output, use the current working directory as
+the active project, and reserve standard output for protocol responses.
+Operational diagnostics MAY be written to standard error. The MCP contract
+identifier is `atlante-mcp/v1` and is independent of the package version.
+
+The server MUST provide these read-only tools:
+
+- `inspect_project` reports authored, effective, and resolved configuration,
+  provenance, capabilities, and verified native artifact freshness;
+- `list_resources` reports only resources resolved by the active project;
+- `validate` runs authoritative validation without rendering or materializing;
+- `search_docs` searches the deterministic bundled documentation catalog;
+- `read_doc` reads a known documentation or specification document or section;
+  and
+- `get_schema` returns a bundled schema for an exact supported versioned URI.
+
+MCP tools MUST NOT write project files, alter source configuration, install
+packages, build or materialize native output, execute agents or commands, call
+an LLM, or fetch remote content. The server MUST resolve project context through
+the existing builder, resource, validator, schema, and materialization readers;
+it MUST NOT duplicate their document or resource semantics.
+
+Documentation catalog entries MUST be generated deterministically from the
+repository documentation sources and `SPECIFICATION.md`. Catalog search and
+schema lookup MUST remain offline. Unknown documents, sections, schema URIs,
+unavailable catalogs, and unavailable project capabilities MUST produce
+structured diagnostics rather than fabricated success.
+
+Tool results MUST identify the `atlante-mcp/v1` contract, tool, status, and
+either data or diagnostics. Normal project paths MUST be project-relative, and
+machine-specific absolute paths MUST NOT appear in normal results. Implementations
+MUST bound message and response sizes and reject unknown or malformed tool
+arguments.
+
+By default, `atlante init` MUST register the server in the OpenCode
+configuration for its target directory. With `--no-mcp`, init MUST skip this
+host-file mutation. When registration is enabled, init MUST examine existing
+OpenCode configuration files in this order:
+
+```text
+.opencode/opencode.jsonc
+.opencode/opencode.json
+opencode.jsonc
+opencode.json
+```
+
+The first existing file MUST be the registration target. Init MUST parse every
+existing candidate before writing, and MUST fail closed on malformed candidates
+or a conflicting `mcp.atlante` entry in any candidate. When no candidate exists,
+init MUST create root `opencode.jsonc`. The managed `mcp.atlante` entry MUST be
+a local server whose command is `npx --yes atlante@<package-version> mcp` and
+MUST be enabled. Registration MUST preserve unrelated settings and comments, be
+idempotent, and participate in init's rollback transaction.
+
+### Examples
+
+An OpenCode configuration can delegate context discovery to the installed CLI:
+
+```json
+{
+  "mcp": {
+    "atlante": {
+      "type": "local",
+      "command": ["npx", "--yes", "atlante@0.2.0", "mcp"],
+      "enabled": true
+    }
+  }
+}
+```
+
+An agent can call `search_docs` for a topic, pass the returned document and
+section identifier to `read_doc`, and use `get_schema` for exact field shape.
+Those operations read the local catalog and schema bundle without changing the
+project.
+
+### Edge cases
+
+An invalid OpenCode configuration or conflicting `mcp.atlante` entry MUST stop
+initialization before the new Atlante configuration is committed. A failed
+later initialization stage MUST restore the previous host configuration. A
+missing or invalid catalog or schema bundle MUST be reported as unavailable;
+the server MUST NOT fetch a replacement.
+
+### Rationale
+
+A narrow context interface lets a host inspect the same verified project model
+without making Atlante an execution runtime or coupling host settings to
+materialized prompt files.
+
+## 14. Acceptance Criteria
 
 ### Goal
 
@@ -859,9 +962,12 @@ A conforming implementation MUST be able to:
 11. preserve the previous valid generated set whenever validation or
     materialization fails;
 12. validate `eval` configuration and scenario documents, including check
-    patterns, before any host run; and
+     patterns, before any host run;
 13. run eval scenarios in a host-delegated sandbox under budget enforcement
-    and grade deterministic zero-LLM checks into a local run report.
+    and grade deterministic zero-LLM checks into a local run report; and
+14. expose the read-only `atlante-mcp/v1` context interface with bounded,
+    offline inspection, validation, resource, documentation, and schema tools,
+    and register it from `atlante init` without changing materialization.
 
 ### Examples
 

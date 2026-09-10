@@ -7,8 +7,9 @@ import {
   writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { readOpenCodeNative } from "@atlante/opencode";
+import { openCodeConfigPaths } from "@atlante/opencode/config";
 import { parseJsonc } from "@atlante/validator";
 import type {
   HostRunner,
@@ -100,6 +101,45 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function setOwnValue(
+  target: Record<string, unknown>,
+  key: string,
+  value: unknown,
+): void {
+  Object.defineProperty(target, key, {
+    configurable: true,
+    enumerable: true,
+    value,
+    writable: true,
+  });
+}
+
+/**
+ * Mirrors OpenCode's project-config merge: objects merge recursively, while
+ * arrays and scalar values from the higher-precedence layer replace the lower
+ * layer. Own-property writes keep config keys such as `__proto__` inert.
+ */
+function mergeConfigLayers(
+  base: Record<string, unknown>,
+  override: Record<string, unknown>,
+): Record<string, unknown> {
+  const merged: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(base)) {
+    setOwnValue(merged, key, value);
+  }
+  for (const [key, value] of Object.entries(override)) {
+    const existing = Object.hasOwn(merged, key) ? merged[key] : undefined;
+    setOwnValue(
+      merged,
+      key,
+      isObject(existing) && isObject(value)
+        ? mergeConfigLayers(existing, value)
+        : value,
+    );
+  }
+  return merged;
+}
+
 type PermissionMap = Record<string, unknown>;
 
 /**
@@ -167,13 +207,23 @@ export function mergePermissionBaseline(existing: unknown): PermissionMap {
   };
 }
 
-function readHostConfig(projectRoot: string): Record<string, unknown> {
-  for (const filename of ["opencode.jsonc", "opencode.json"]) {
-    const path = join(projectRoot, filename);
-    if (!existsSync(path)) continue;
+type HostConfig = Readonly<{
+  path: string;
+  value: Record<string, unknown>;
+}>;
+
+function readHostConfig(projectRoot: string): HostConfig {
+  const paths = openCodeConfigPaths(projectRoot).filter(existsSync);
+  const path = paths[0] ?? join(projectRoot, "opencode.json");
+  let value: Record<string, unknown> = {};
+
+  // OpenCode merges every project config layer from low to high precedence;
+  // the highest existing path remains the sandbox's write target.
+  for (const configPath of paths.slice().reverse()) {
+    const filename = relative(projectRoot, configPath).replaceAll("\\", "/");
     let text: string;
     try {
-      text = readFileSync(path, "utf8");
+      text = readFileSync(configPath, "utf8");
     } catch (cause) {
       throw new Error(
         `could not read ${filename}: ${cause instanceof Error ? cause.message : String(cause)}`,
@@ -193,9 +243,10 @@ function readHostConfig(projectRoot: string): Record<string, unknown> {
     if (!isObject(parsed.value)) {
       throw new Error(`host configuration ${filename} must contain an object`);
     }
-    return parsed.value;
+    value = mergeConfigLayers(value, parsed.value);
   }
-  return {};
+
+  return { path, value };
 }
 
 /**
@@ -217,14 +268,23 @@ export function createOpenCodeRunner(
     prepareHostIntegration(sandbox, context) {
       // Verify the source publication before authoring any sandbox host state.
       const nativeAgentIds = readNativeAgentIds(projectRoot);
-      const config = readHostConfig(projectRoot);
+      const hostConfig = readHostConfig(projectRoot);
+      const config = hostConfig.value;
+      // Eval runs disposable fixtures and must never launch project-configured
+      // MCP commands from the developer's repository or environment.
+      delete config.mcp;
       config.$schema = "https://opencode.ai/config.json";
 
-      // OpenCode prefers a root opencode.jsonc over opencode.json, so a
-      // fixture-provided jsonc would silently bypass host integration.
-      if (existsSync(join(sandbox.root, "opencode.jsonc"))) {
+      // The generated file may replace a fixture file at its exact target,
+      // but every other supported config path would remain visible to
+      // OpenCode and could reintroduce project or fixture MCP settings.
+      const target = join(sandbox.root, relative(projectRoot, hostConfig.path));
+      const fixtureConfig = openCodeConfigPaths(sandbox.root)
+        .filter((path) => path !== target)
+        .find(existsSync);
+      if (fixtureConfig) {
         throw new Error(
-          "the fixture provides opencode.jsonc, which OpenCode would prefer over the generated opencode.json; remove it from the fixture",
+          `the fixture provides ${relative(sandbox.root, fixtureConfig).replaceAll("\\", "/")}, which OpenCode would prefer over the generated host configuration; remove it from the fixture`,
         );
       }
 
@@ -266,13 +326,10 @@ export function createOpenCodeRunner(
       config.permission = mergePermissionBaseline(config.permission);
 
       mkdirSync(sandbox.root, { recursive: true });
-      // Host integration is authoritative: this generated opencode.json
-      // intentionally replaces a fixture-provided one (a fixture jsonc is
-      // rejected above because OpenCode would prefer it over this file).
-      writeFileSync(
-        join(sandbox.root, "opencode.json"),
-        `${JSON.stringify(config, null, 2)}\n`,
-      );
+      // Host integration is authoritative: this generated config intentionally
+      // replaces the selected project config in the sandbox.
+      mkdirSync(dirname(target), { recursive: true });
+      writeFileSync(target, `${JSON.stringify(config, null, 2)}\n`);
     },
 
     async runTrial(input: RunTrialInput): Promise<TrialRun> {

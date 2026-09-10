@@ -47,6 +47,14 @@ harness itself. Explore the [first-party pack](/concepts/resources#the-first-par
 to understand these defaults and the reusable content it includes.
 </Aside>
 
+By default, `init` also registers the read-only Atlante MCP server in the
+OpenCode configuration for this project. It selects the first existing file in
+this order: `.opencode/opencode.jsonc`, `.opencode/opencode.json`,
+`opencode.jsonc`, and `opencode.json`; when none exists, it creates root
+`opencode.jsonc`. Use `npx atlante@latest init --no-mcp` when you want to skip
+that registration. See the [MCP reference](/reference/mcp) for the server
+contract.
+
 ## Inspect the configuration and output
 
 Open `atlante.jsonc`. Its configuration selects the preset through `extends`:
@@ -61,12 +69,18 @@ Open `atlante.jsonc`. Its configuration selects the preset through `extends`:
 }
 ```
 
-The build creates native files alongside that source:
+After `init` completes its first build, the project contains source
+configuration, host configuration, generated native output, and Atlante state:
+
+The selected host configuration is either `.opencode/opencode.jsonc`,
+`.opencode/opencode.json`, `opencode.jsonc`, or `opencode.json`, depending on
+which file already exists.
 
 ```text
 my-project/
 ├── atlante.jsonc
 ├── .opencode/
+│   ├── opencode.jsonc             # selected host config when nested (or .json)
 │   ├── agents/
 │   │   └── architect.md
 │   └── skills/
@@ -75,6 +89,7 @@ my-project/
 │       ├── build/SKILL.md
 │       ├── review/SKILL.md
 │       └── harness/SKILL.md
+├── opencode.jsonc                 # selected host config when root-level (or .json)
 └── .atlante/
     └── opencode-native.json
 ```
@@ -83,6 +98,10 @@ The files have different roles:
 
 - `atlante.jsonc` is the source configuration. Keep it and any resources you
   author in version control.
+- `opencode.jsonc` is the default host configuration created by `init` when no
+  OpenCode configuration exists. If an OpenCode configuration already exists,
+  `init` updates the first file in its precedence order; the `mcp.atlante` entry
+  is managed there alongside host settings.
 - `.opencode/agents/architect.md` and the skill files are native output. Open
   the agent file to inspect what the build produced, but make changes in the
   source configuration or its resources.
@@ -92,7 +111,8 @@ The files have different roles:
 
 `init` adds `.opencode/agents/`, `.opencode/skills/`, and `.atlante/` to
 `.gitignore`. These directories hold generated native files and Atlante state;
-the authored configuration remains the versioned source.
+the authored configuration remains the versioned source. The OpenCode
+configuration is host configuration rather than generated native output.
 
 See [Materialization](/reference/materialization) for output ownership and
 [Troubleshooting](/troubleshooting) when generated output must be versioned or

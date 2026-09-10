@@ -1,6 +1,6 @@
 ---
 title: CLI
-description: Command reference for init, pack management, validate, build, and eval.
+description: Command reference for init, pack management, validate, build, MCP, and eval.
 ---
 
 The `atlante` package provides the `atlante` command and requires
@@ -33,16 +33,26 @@ npx atlante init [path]
 npx atlante init [path] --pack <pack-locator>
 npx atlante init [path] --pack <pack>/<preset>
 npx atlante init [path] --force
+npx atlante init [path] --no-mcp
 ```
 
 - `path` is a project directory and defaults to the current directory.
 - `--pack <locator>` selects a package pack instead of the bundled default `@atlante/pack`. An optional subpath names a preset, such as `@acme/review-pack/strict`. Local filesystem paths are not accepted by this option.
 - `--force` overwrites an existing `atlante.jsonc` and removes the alternate `atlante.json`.
+- `--no-mcp` skips registration of the local Atlante MCP server in the OpenCode configuration.
 
 `init` validates the selected preset before writing the configuration. It ensures
 `.gitignore` contains `.opencode/agents/`, `.opencode/skills/`, and
-`.atlante/` without reordering existing content, then runs a build. Existing
-OpenCode configuration is preserved.
+`.atlante/` without reordering existing content, then runs a build. By default,
+it also registers the version-pinned local MCP server in the target directory's
+OpenCode configuration. It selects the first existing file in this order:
+`.opencode/opencode.jsonc`, `.opencode/opencode.json`, `opencode.jsonc`, and
+`opencode.json`. When none exists, it creates root `opencode.jsonc`. All existing
+candidates are parsed before initialization continues; unrelated settings and
+JSONC comments remain in place. A conflicting `mcp.atlante` entry fails closed
+instead of being replaced. Use `--no-mcp` when the host configuration must
+remain unchanged. See [MCP](/reference/mcp#opencode-registration) for the
+managed entry and server contract.
 
 ### Pack installation
 
@@ -123,6 +133,19 @@ npx atlante pack list [path]
 The commands leave `atlante.jsonc`, `atlante.json`, `.gitignore`, and generated
 native files untouched. Package-manager install scripts remain under the
 package manager's control.
+
+## `atlante mcp`
+
+Start the read-only Atlante context server:
+
+```sh
+npx atlante mcp
+```
+
+The server uses its current working directory as the active project and does not
+accept a project path. OpenCode starts it from the registered target directory.
+Transport, versioning, limits, tool inputs, result envelopes, and diagnostics are
+defined in the [MCP reference](/reference/mcp).
 
 ## `atlante validate`
 

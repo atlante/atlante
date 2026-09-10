@@ -111,6 +111,87 @@ describe("prepareHostIntegration", () => {
     expect(existsSync(join(state, "data", "opencode", "auth.json"))).toBe(true);
   });
 
+  test.each(["opencode.jsonc", "opencode.json"] as const)(
+    "uses the nested project OpenCode configuration (%s) as the sandbox target",
+    (filename) => {
+      const nestedDirectory = join(projectRoot, ".opencode");
+      const nestedConfig = join(nestedDirectory, filename);
+      const rootConfig = join(projectRoot, "opencode.json");
+      mkdirSync(nestedDirectory, { recursive: true });
+      writeFileSync(
+        nestedConfig,
+        JSON.stringify({
+          model: "nested-model",
+          agent: { nested: { description: "Nested agent" } },
+        }),
+      );
+      writeFileSync(
+        rootConfig,
+        JSON.stringify({
+          small_model: "root-small-model",
+          agent: { root: { description: "Root agent" } },
+        }),
+      );
+      try {
+        const runner = createOpenCodeRunner({
+          projectRoot,
+          authPath: authFile,
+        });
+        const project = tempDir(`eval-sandbox-nested-${filename}-`);
+        runner.prepareHostIntegration(
+          sandboxFor(project, tempDir(`eval-state-nested-${filename}-`)),
+          {},
+        );
+
+        const written = JSON.parse(
+          readFileSync(join(project, ".opencode", filename), "utf8"),
+        );
+        expect(written.model).toBe("nested-model");
+        expect(written.small_model).toBe("root-small-model");
+        expect(written.agent.nested.description).toBe("Nested agent");
+        expect(written.agent.root.description).toBe("Root agent");
+        expect(existsSync(join(project, "opencode.json"))).toBe(false);
+      } finally {
+        rmSync(nestedConfig, { force: true });
+        rmSync(rootConfig, { force: true });
+      }
+    },
+  );
+
+  test("does not inherit project MCP servers into the eval sandbox", () => {
+    const nestedDirectory = join(projectRoot, ".opencode");
+    const config = join(nestedDirectory, "opencode.jsonc");
+    mkdirSync(nestedDirectory, { recursive: true });
+    writeFileSync(
+      config,
+      JSON.stringify({
+        mcp: {
+          projectTool: {
+            type: "local",
+            command: ["node", "-e", "process.exit(0)"],
+          },
+        },
+      }),
+    );
+    try {
+      const runner = createOpenCodeRunner({
+        projectRoot,
+        authPath: authFile,
+      });
+      const project = tempDir("eval-sandbox-no-mcp-");
+      runner.prepareHostIntegration(
+        sandboxFor(project, tempDir("eval-state-no-mcp-")),
+        {},
+      );
+      const written = JSON.parse(
+        readFileSync(join(project, ".opencode", "opencode.jsonc"), "utf8"),
+      );
+      expect(written.mcp).toBeUndefined();
+    } finally {
+      rmSync(config, { force: true });
+    }
+  });
+
   test("serializes a __proto__ agent id as an own agent entry", () => {
     const config = join(projectRoot, "opencode.json");
     writeFileSync(config, JSON.stringify({}));
@@ -172,6 +253,68 @@ describe("prepareHostIntegration", () => {
       ).toThrow(/opencode\.jsonc/);
     } finally {
       rmSync(config, { force: true });
+    }
+  });
+
+  test.each(["opencode.jsonc", "opencode.json"] as const)(
+    "rejects a fixture-provided nested .opencode/%s",
+    (filename) => {
+      const config = join(projectRoot, "opencode.json");
+      writeFileSync(config, JSON.stringify({}));
+      try {
+        const runner = createOpenCodeRunner({
+          projectRoot,
+          authPath: authFile,
+        });
+        const project = tempDir(`eval-sandbox-nested-config-${filename}-`);
+        const nestedDirectory = join(project, ".opencode");
+        mkdirSync(nestedDirectory, { recursive: true });
+        writeFileSync(join(nestedDirectory, filename), "{}\n");
+        expect(() =>
+          runner.prepareHostIntegration(
+            sandboxFor(
+              project,
+              tempDir(`eval-state-nested-config-${filename}-`),
+            ),
+            {},
+          ),
+        ).toThrow(new RegExp(`fixture provides .*\\.opencode/${filename}`));
+      } finally {
+        rmSync(config, { force: true });
+      }
+    },
+  );
+
+  test("rejects a lower-precedence fixture config when the project target is nested", () => {
+    const nestedDirectory = join(projectRoot, ".opencode");
+    const nestedConfig = join(nestedDirectory, "opencode.jsonc");
+    mkdirSync(nestedDirectory, { recursive: true });
+    writeFileSync(nestedConfig, '{ "model": "nested-model" }');
+    try {
+      const runner = createOpenCodeRunner({
+        projectRoot,
+        authPath: authFile,
+      });
+      const project = tempDir("eval-sandbox-shadowing-root-config-");
+      writeFileSync(
+        join(project, "opencode.json"),
+        JSON.stringify({
+          mcp: {
+            fixtureTool: {
+              type: "local",
+              command: ["node", "-e", "process.exit(0)"],
+            },
+          },
+        }),
+      );
+      expect(() =>
+        runner.prepareHostIntegration(
+          sandboxFor(project, tempDir("eval-state-shadowing-root-config-")),
+          {},
+        ),
+      ).toThrow(/opencode\.json/);
+    } finally {
+      rmSync(nestedConfig, { force: true });
     }
   });
 

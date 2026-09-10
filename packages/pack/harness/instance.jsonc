@@ -2,7 +2,7 @@
   "$template": "@atlante/pack/skill",
   "description": "Use when initializing, configuring, validating, building, troubleshooting, or improving an Atlante harness.",
   "title": "Harness",
-  "overview": "Operate an Atlante harness with evidence: initialize and configure it from repository facts, run harness-related delivery alongside the active workflow phases, and route observed friction into a separately approved improvement cycle. This is a stewardship capability, not a workflow phase. Using this skill effectively requires web access: Atlante concepts, document structure, and configuration semantics are supplied on demand through the references below rather than restated here.",
+  "overview": "Operate an Atlante harness with evidence: initialize and configure it from repository facts, run harness-related delivery alongside the active workflow phases, and route observed friction into a separately approved improvement cycle. This is a stewardship capability, not a workflow phase. Using this skill effectively requires web access or an available read-only Atlante MCP server: Atlante concepts, document structure, and configuration semantics are supplied on demand through verified references or MCP context rather than restated here.",
   "sections": [
     {
       "responsibilities": [
@@ -11,7 +11,7 @@
         "Recognizing recurring workflow friction and proposing a separately approved harness-improvement cycle — **Permanent policy**",
         "Initializing Atlante and creating or updating `atlante.jsonc` from repository evidence — **Provisional mechanics**",
         "Running validation and build or materialization commands and interpreting common diagnostics — **Provisional mechanics**",
-        "Integrating and troubleshooting the OpenCode adapter from repository evidence — **Provisional mechanics**"
+        "Integrating and troubleshooting the OpenCode adapter and its read-only Atlante MCP context from repository evidence — **Provisional mechanics**"
       ]
     },
     {
@@ -19,11 +19,12 @@
         "Before recommending commands, keys, locators, or resources, verify them against the installed Atlante version and capabilities, the current source configuration, and installed packs; distinguish verified recommendations from unverified suggestions, and report plainly anything that cannot be established.",
         "Treat the CLI as the universal cold-start bootstrap path: bootstrap guidance starts from the CLI, since an Atlante-materialized skill becomes available only after the harness and host expose it.",
         "Inspect repository structure, conventions, existing resources, project instructions, and desired workflows before recommending configuration; explain suitable choices and help the developer define the initialization or configuration task to approve.",
+        "When the read-only Atlante MCP server is available, prefer its verified project-context tools for current local facts: inspect the project, list resolved resources, validate, search and read bundled documentation, and retrieve exact supported schemas; keep the CLI as the bootstrap and mutation path.",
         "Validate, build, and materialize through capabilities verified from the project, reporting diagnostics truthfully.",
         "Preserve the phase boundaries and workflow invariants already in force, and record material harness friction without expanding the current task.",
         "Turn observed workflow friction into an evidence-based suggestion that names the expected benefit and the affected configuration or resources.",
         "Run an accepted harness improvement as its own workflow cycle using the normal adaptive brainstorm, plan, build, review, approval, and validation policy; an improvement stays a suggestion until its own cycle is approved.",
-        "Keep permanent policy authoritative and command-level mechanics provisional: mechanics are the first content shed when verified deterministic tools (such as a future Atlante MCP server) provide the same operations, and exact tool schemas, effects, and diagnostics belong in tool descriptions rather than in this skill."
+        "Keep permanent policy authoritative and command-level mechanics provisional: mechanics are the first content shed when verified deterministic tools such as Atlante's read-only MCP context server provide the same operations, and exact tool schemas, effects, and diagnostics belong in tool descriptions and the MCP reference rather than in this skill."
       ]
     },
     {
@@ -55,6 +56,11 @@
           "name": "JSON Schema",
           "location": "https://atlante.sh/schema/v0.1/schema.json",
           "readWhen": "Authoring or validating atlante.jsonc."
+        },
+        {
+          "name": "MCP reference",
+          "location": "https://docs.atlante.sh/reference/mcp",
+          "readWhen": "Using or troubleshooting the read-only Atlante MCP context server."
         }
       ]
     }

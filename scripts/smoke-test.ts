@@ -20,6 +20,7 @@ function assert(condition: boolean, message: string) {
 
 const sandbox = await mkdtemp(join(tmpdir(), "atlante-smoke-"));
 const project = join(sandbox, "project");
+const noMcpProject = join(sandbox, "no-mcp-project");
 const globalRoot = join(sandbox, "global");
 const installedCli = join(globalRoot, "node_modules", "atlante");
 const installedPack = join(globalRoot, "node_modules", "@atlante", "pack");
@@ -59,8 +60,44 @@ try {
     "init did not use the installed @atlante/pack preset",
   );
   assert(
-    !(await Bun.file(join(project, "opencode.jsonc")).exists()),
-    "init modified the OpenCode configuration",
+    await Bun.file(join(project, "opencode.jsonc")).exists(),
+    "init did not create the OpenCode configuration",
+  );
+  const openCodeConfig = (await Bun.file(
+    join(project, "opencode.jsonc"),
+  ).json()) as {
+    mcp?: {
+      atlante?: { type?: string; command?: unknown; enabled?: boolean };
+    };
+  };
+  assert(
+    openCodeConfig.mcp?.atlante?.type === "local",
+    "init did not register a local Atlante MCP server",
+  );
+  assert(
+    JSON.stringify(openCodeConfig.mcp?.atlante?.command) ===
+      JSON.stringify(["npx", "--yes", `atlante@${pkg.version}`, "mcp"]),
+    "init did not register the version-pinned Atlante MCP command",
+  );
+  assert(
+    openCodeConfig.mcp?.atlante?.enabled === true,
+    "init did not enable the Atlante MCP server",
+  );
+
+  // The explicit opt-out must leave an existing host configuration untouched
+  // and must not create a sibling configuration file.
+  await mkdir(noMcpProject, { recursive: true });
+  const existingHostConfig = '{ "model": "demo" }\n';
+  await writeFile(join(noMcpProject, "opencode.json"), existingHostConfig);
+  await Bun.$`node ${CLI} init ${noMcpProject} --no-mcp`.cwd(noMcpProject);
+  assert(
+    (await Bun.file(join(noMcpProject, "opencode.json")).text()) ===
+      existingHostConfig,
+    "--no-mcp modified the existing OpenCode configuration",
+  );
+  assert(
+    !(await Bun.file(join(noMcpProject, "opencode.jsonc")).exists()),
+    "--no-mcp created an OpenCode JSONC configuration",
   );
 
   await Bun.$`node ${CLI} validate ${project}`.cwd(project);

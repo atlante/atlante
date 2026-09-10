@@ -18,6 +18,7 @@ const verifiedResources = [
   "https://docs.atlante.sh/getting-started",
   "https://github.com/atlante/atlante/blob/main/SPECIFICATION.md",
   "https://atlante.sh/schema/v0.1/schema.json",
+  "https://docs.atlante.sh/reference/mcp",
 ];
 
 const policyAreas = [
@@ -89,6 +90,24 @@ describe("harness skill instance", () => {
     expect(instructions).toContain("provisional");
     expect(instructions.toLowerCase()).toContain("mcp");
     expect(instructions).toContain("tool descriptions");
+  });
+
+  test("uses the read-only MCP server for verified context after CLI bootstrap", () => {
+    const skill = resolvePackSkill(locator);
+    const instructions = skill.listText("instructions");
+    const everything = skill.everythingText();
+
+    expect(instructions).toContain("read-only Atlante MCP server");
+    for (const tool of [
+      "inspect the project",
+      "list resolved resources",
+      "validate",
+      "search and read bundled documentation",
+      "retrieve exact supported schemas",
+    ])
+      expect(instructions).toContain(tool);
+    expect(instructions).toContain("CLI as the bootstrap and mutation path");
+    expect(everything).toContain("MCP reference rather than in this skill");
   });
 
   test("routes concept and structure orientation through the overview and Specification reference", () => {
