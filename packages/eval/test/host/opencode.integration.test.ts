@@ -111,6 +111,38 @@ describe("prepareHostIntegration", () => {
     expect(existsSync(join(state, "data", "opencode", "auth.json"))).toBe(true);
   });
 
+  test.each(["opencode.jsonc", "opencode.json"] as const)(
+    "uses the nested project OpenCode configuration (%s) as the sandbox target",
+    (filename) => {
+      const nestedDirectory = join(projectRoot, ".opencode");
+      const nestedConfig = join(nestedDirectory, filename);
+      const rootConfig = join(projectRoot, "opencode.json");
+      mkdirSync(nestedDirectory, { recursive: true });
+      writeFileSync(nestedConfig, '{ "model": "nested-model" }');
+      writeFileSync(rootConfig, '{ "model": "root-model" }');
+      try {
+        const runner = createOpenCodeRunner({
+          projectRoot,
+          authPath: authFile,
+        });
+        const project = tempDir(`eval-sandbox-nested-${filename}-`);
+        runner.prepareHostIntegration(
+          sandboxFor(project, tempDir(`eval-state-nested-${filename}-`)),
+          {},
+        );
+
+        const written = JSON.parse(
+          readFileSync(join(project, ".opencode", filename), "utf8"),
+        );
+        expect(written.model).toBe("nested-model");
+        expect(existsSync(join(project, "opencode.json"))).toBe(false);
+      } finally {
+        rmSync(nestedConfig, { force: true });
+        rmSync(rootConfig, { force: true });
+      }
+    },
+  );
+
   test("serializes a __proto__ agent id as an own agent entry", () => {
     const config = join(projectRoot, "opencode.json");
     writeFileSync(config, JSON.stringify({}));
@@ -174,6 +206,35 @@ describe("prepareHostIntegration", () => {
       rmSync(config, { force: true });
     }
   });
+
+  test.each(["opencode.jsonc", "opencode.json"] as const)(
+    "rejects a fixture-provided nested .opencode/%s",
+    (filename) => {
+      const config = join(projectRoot, "opencode.json");
+      writeFileSync(config, JSON.stringify({}));
+      try {
+        const runner = createOpenCodeRunner({
+          projectRoot,
+          authPath: authFile,
+        });
+        const project = tempDir(`eval-sandbox-nested-config-${filename}-`);
+        const nestedDirectory = join(project, ".opencode");
+        mkdirSync(nestedDirectory, { recursive: true });
+        writeFileSync(join(nestedDirectory, filename), "{}\n");
+        expect(() =>
+          runner.prepareHostIntegration(
+            sandboxFor(
+              project,
+              tempDir(`eval-state-nested-config-${filename}-`),
+            ),
+            {},
+          ),
+        ).toThrow(new RegExp(`fixture provides .*\\.opencode/${filename}`));
+      } finally {
+        rmSync(config, { force: true });
+      }
+    },
+  );
 
   test("fails closed when host auth is missing", () => {
     // Own config: this test must not depend on config left behind by an

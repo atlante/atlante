@@ -30,6 +30,7 @@
     "LICENSE"
   ],
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./config": "./src/config.ts"
   }
 }

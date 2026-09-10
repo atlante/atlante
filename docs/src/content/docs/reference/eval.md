@@ -155,10 +155,14 @@ Check paths and allowlist entries are relative to the sandbox root. Absolute
 paths, path traversal, and `.git` or `node_modules` segments are rejected at
 validation.
 
-Fixtures cannot contain `.git`, `node_modules`, symlinks, or `opencode.jsonc`.
-A fixture file that collides with a verified native output fails the trial with
-a rename-or-remove diagnostic. Other noncolliding `.opencode` files are copied,
-and the generated `opencode.json` replaces a fixture-provided file of that name.
+Fixtures cannot contain `.git`, `node_modules`, symlinks, or an OpenCode
+configuration that would shadow host integration: `.opencode/opencode.jsonc`,
+`.opencode/opencode.json`, or root `opencode.jsonc`. The host runner uses the
+same configuration precedence as OpenCode and writes the generated host config
+at the selected project-relative path in the sandbox. A fixture file that
+collides with a verified native output fails the trial with a rename-or-remove
+diagnostic. Other noncolliding `.opencode` files are copied, and a generated
+root `opencode.json` replaces a fixture-provided file of that name.
 
 <a id="containment"></a>
 

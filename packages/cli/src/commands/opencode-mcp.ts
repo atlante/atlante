@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { openCodeConfigPaths } from "@atlante/opencode/config";
 import {
   applyEdits,
   modify,
@@ -196,17 +197,11 @@ function snapshot(
   return { exists: true, contents: fileSystem.readFileSync(path, "utf8") };
 }
 
-/** OpenCode gives `.opencode` configuration precedence over direct project configuration. */
 function existingOpenCodeConfigPaths(
   directory: string,
   fileSystem: OpenCodeMcpFileSystem,
 ): string[] {
-  return [
-    join(directory, ".opencode", "opencode.jsonc"),
-    join(directory, ".opencode", "opencode.json"),
-    join(directory, "opencode.jsonc"),
-    join(directory, "opencode.json"),
-  ].filter((path) => fileSystem.existsSync(path));
+  return openCodeConfigPaths(directory).filter(fileSystem.existsSync);
 }
 
 function parseErrorSummary(

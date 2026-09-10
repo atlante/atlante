@@ -7,8 +7,9 @@ import {
   writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { readOpenCodeNative } from "@atlante/opencode";
+import { openCodeConfigPaths } from "@atlante/opencode/config";
 import { parseJsonc } from "@atlante/validator";
 import type {
   HostRunner,
@@ -167,35 +168,40 @@ export function mergePermissionBaseline(existing: unknown): PermissionMap {
   };
 }
 
-function readHostConfig(projectRoot: string): Record<string, unknown> {
-  for (const filename of ["opencode.jsonc", "opencode.json"]) {
-    const path = join(projectRoot, filename);
-    if (!existsSync(path)) continue;
-    let text: string;
-    try {
-      text = readFileSync(path, "utf8");
-    } catch (cause) {
-      throw new Error(
-        `could not read ${filename}: ${cause instanceof Error ? cause.message : String(cause)}`,
-      );
-    }
-    // The existing configuration contract treats JSONC as the serialized
-    // format with strict JSON as a subset (`atlante init` parses both
-    // filenames with comments and trailing commas allowed), so `eval` must
-    // accept the same documents.
-    const parsed = parseJsonc(text, {
-      allowTrailingComma: true,
-      disallowComments: false,
-    });
-    if (parsed.errors.length > 0) {
-      throw new Error(`host configuration ${filename} is malformed`);
-    }
-    if (!isObject(parsed.value)) {
-      throw new Error(`host configuration ${filename} must contain an object`);
-    }
-    return parsed.value;
+type HostConfig = Readonly<{
+  path: string;
+  value: Record<string, unknown>;
+}>;
+
+function readHostConfig(projectRoot: string): HostConfig {
+  const path =
+    openCodeConfigPaths(projectRoot).find(existsSync) ??
+    join(projectRoot, "opencode.json");
+  if (!existsSync(path)) return { path, value: {} };
+  const filename = relative(projectRoot, path).replaceAll("\\", "/");
+  let text: string;
+  try {
+    text = readFileSync(path, "utf8");
+  } catch (cause) {
+    throw new Error(
+      `could not read ${filename}: ${cause instanceof Error ? cause.message : String(cause)}`,
+    );
   }
-  return {};
+  // The existing configuration contract treats JSONC as the serialized
+  // format with strict JSON as a subset (`atlante init` parses both
+  // filenames with comments and trailing commas allowed), so `eval` must
+  // accept the same documents.
+  const parsed = parseJsonc(text, {
+    allowTrailingComma: true,
+    disallowComments: false,
+  });
+  if (parsed.errors.length > 0) {
+    throw new Error(`host configuration ${filename} is malformed`);
+  }
+  if (!isObject(parsed.value)) {
+    throw new Error(`host configuration ${filename} must contain an object`);
+  }
+  return { path, value: parsed.value };
 }
 
 /**
@@ -217,14 +223,18 @@ export function createOpenCodeRunner(
     prepareHostIntegration(sandbox, context) {
       // Verify the source publication before authoring any sandbox host state.
       const nativeAgentIds = readNativeAgentIds(projectRoot);
-      const config = readHostConfig(projectRoot);
+      const hostConfig = readHostConfig(projectRoot);
+      const config = hostConfig.value;
       config.$schema = "https://opencode.ai/config.json";
 
-      // OpenCode prefers a root opencode.jsonc over opencode.json, so a
-      // fixture-provided jsonc would silently bypass host integration.
-      if (existsSync(join(sandbox.root, "opencode.jsonc"))) {
+      // A fixture-provided config at any supported precedence path would
+      // silently bypass the generated host integration.
+      const fixtureConfig = openCodeConfigPaths(sandbox.root)
+        .slice(0, -1)
+        .find(existsSync);
+      if (fixtureConfig) {
         throw new Error(
-          "the fixture provides opencode.jsonc, which OpenCode would prefer over the generated opencode.json; remove it from the fixture",
+          `the fixture provides ${relative(sandbox.root, fixtureConfig).replaceAll("\\", "/")}, which OpenCode would prefer over the generated host configuration; remove it from the fixture`,
         );
       }
 
@@ -266,13 +276,11 @@ export function createOpenCodeRunner(
       config.permission = mergePermissionBaseline(config.permission);
 
       mkdirSync(sandbox.root, { recursive: true });
-      // Host integration is authoritative: this generated opencode.json
-      // intentionally replaces a fixture-provided one (a fixture jsonc is
-      // rejected above because OpenCode would prefer it over this file).
-      writeFileSync(
-        join(sandbox.root, "opencode.json"),
-        `${JSON.stringify(config, null, 2)}\n`,
-      );
+      // Host integration is authoritative: this generated config intentionally
+      // replaces the selected project config in the sandbox.
+      const target = join(sandbox.root, relative(projectRoot, hostConfig.path));
+      mkdirSync(dirname(target), { recursive: true });
+      writeFileSync(target, `${JSON.stringify(config, null, 2)}\n`);
     },
 
     async runTrial(input: RunTrialInput): Promise<TrialRun> {
