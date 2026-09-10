@@ -196,16 +196,17 @@ function snapshot(
   return { exists: true, contents: fileSystem.readFileSync(path, "utf8") };
 }
 
-/** OpenCode prefers JSONC when both project configuration files are present. */
-function resolveOpenCodeConfigPath(
+/** OpenCode gives `.opencode` configuration precedence over direct project configuration. */
+function existingOpenCodeConfigPaths(
   directory: string,
   fileSystem: OpenCodeMcpFileSystem,
-): string {
-  const jsonc = join(directory, "opencode.jsonc");
-  if (fileSystem.existsSync(jsonc)) return jsonc;
-  const json = join(directory, "opencode.json");
-  if (fileSystem.existsSync(json)) return json;
-  return jsonc;
+): string[] {
+  return [
+    join(directory, ".opencode", "opencode.jsonc"),
+    join(directory, ".opencode", "opencode.json"),
+    join(directory, "opencode.jsonc"),
+    join(directory, "opencode.json"),
+  ].filter((path) => fileSystem.existsSync(path));
 }
 
 function parseErrorSummary(
@@ -329,18 +330,43 @@ export function prepareOpenCodeMcp(
   directory: string,
   fileSystem: OpenCodeMcpFileSystem,
 ): OpenCodeMcpPlan | { error: string } {
-  const path = resolveOpenCodeConfigPath(directory, fileSystem);
-  const previous = snapshot(path, fileSystem);
-  const text = previous.exists ? (previous.contents ?? "") : newConfiguration();
-  const parsedResult = parseConfiguration(path, text);
-  if ("error" in parsedResult) return parsedResult;
-  const parsed = parsedResult.value;
-
-  const mcp = parsed.mcp as Record<string, unknown> | undefined;
-  if (mcp?.[ATLANTE_MCP_SERVER_ID] !== undefined) {
-    return { path, previous, contents: text, write: false, registered: false };
+  const configurations: {
+    path: string;
+    previous: OpenCodeMcpSnapshot;
+    contents: string;
+    value: Record<string, unknown>;
+  }[] = [];
+  for (const path of existingOpenCodeConfigPaths(directory, fileSystem)) {
+    const previous = snapshot(path, fileSystem);
+    const contents = previous.contents ?? "";
+    const parsedResult = parseConfiguration(path, contents);
+    if ("error" in parsedResult) return parsedResult;
+    configurations.push({
+      path,
+      previous,
+      contents,
+      value: parsedResult.value,
+    });
   }
 
+  const target = configurations[0];
+  if (
+    target &&
+    isObject(target.value.mcp) &&
+    target.value.mcp[ATLANTE_MCP_SERVER_ID] !== undefined
+  ) {
+    return {
+      path: target.path,
+      previous: target.previous,
+      contents: target.contents,
+      write: false,
+      registered: false,
+    };
+  }
+
+  const path = target?.path ?? join(directory, "opencode.jsonc");
+  const previous = target?.previous ?? { exists: false };
+  const text = target?.contents ?? newConfiguration();
   const edits = modify(
     text,
     ["mcp", ATLANTE_MCP_SERVER_ID],
