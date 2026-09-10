@@ -21,8 +21,7 @@ export default defineConfig({
       description:
         "Reference documentation for Atlante configuration, validation, builds, host materialization, and native outputs.",
       logo: {
-        light: "./src/assets/atlante-horizontal.svg",
-        dark: "./src/assets/atlante-horizontal-reverse.svg",
+        src: "./src/assets/atlante-horizontal.svg",
         alt: "Atlante",
         replacesTitle: true,
       },

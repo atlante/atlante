@@ -1,6 +1,5 @@
 ---
-import logoLight from "../assets/atlante-horizontal.svg";
-import logoDark from "../assets/atlante-horizontal-reverse.svg";
+import BrandLogo from "../components/BrandLogo.astro";
 import "../styles/atlante-tokens.css";
 
 const title = "This star is off the map | Atlante documentation";
@@ -32,14 +31,7 @@ const description = "The page you requested was not found.";
     <header class="navbar" data-atlante-navbar>
       <div class="navbar-inner">
         <a class="brand" href="/introduction" aria-label="Atlante documentation">
-          <img class="logo logo-light" src={logoLight.src} alt="" width="1200" height="420" />
-          <img
-            class="logo logo-dark"
-            src={logoDark.src}
-            alt=""
-            width="1200"
-            height="420"
-          />
+          <BrandLogo />
         </a>
       </div>
     </header>
@@ -100,24 +92,6 @@ const description = "The page you requested was not found.";
     min-block-size: var(--control-min);
     align-items: center;
     width: 160px;
-  }
-
-  .logo {
-    display: block;
-    width: 100%;
-    height: auto;
-  }
-
-  .logo-dark {
-    display: none;
-  }
-
-  :global([data-theme="dark"]) .logo-light {
-    display: none;
-  }
-
-  :global([data-theme="dark"]) .logo-dark {
-    display: block;
   }
 
   .section-label {

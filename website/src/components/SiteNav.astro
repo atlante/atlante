@@ -1,19 +1,10 @@
 ---
-
+import BrandLogo from "./BrandLogo.astro";
 ---
 
 <nav class="site-nav" aria-label="Primary">
   <a class="wordmark" href="#main" aria-label="Atlante">
-    <img
-      class="lockup-light"
-      src="/brand/horizontal/atlante-horizontal.svg"
-      alt=""
-    />
-    <img
-      class="lockup-dark"
-      src="/brand/horizontal/atlante-horizontal-reverse.svg"
-      alt=""
-    />
+    <BrandLogo variant="horizontal" />
   </a>
   <div class="nav-actions">
     <a class="nav-link desktop-only" href="https://docs.atlante.sh">Docs</a>
@@ -81,17 +72,7 @@
     align-items: center;
     min-height: var(--control-min);
     text-decoration: none;
-  }
-
-  .wordmark img {
-    display: block;
-    width: 160px;
-    height: auto;
-  }
-
-  :global(html:not([data-theme="dark"])) .wordmark .lockup-dark,
-  :global(html[data-theme="dark"]) .wordmark .lockup-light {
-    display: none;
+    --brand-logo-width: 160px;
   }
 
   .nav-actions {

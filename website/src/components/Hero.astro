@@ -1,7 +1,5 @@
 ---
-import { Image } from "astro:assets";
-import glyphLight from "../assets/atlante-glyph.svg";
-import glyphDark from "../assets/atlante-glyph-reverse.svg";
+import BrandLogo from "./BrandLogo.astro";
 ---
 
 
@@ -41,24 +39,7 @@ import glyphDark from "../assets/atlante-glyph-reverse.svg";
     </div>
   </div>
   <div class="visual">
-    <Image
-      class="glyph lockup-light"
-      src={glyphLight}
-      alt="The Atlante celestial sphere mark"
-      width={683}
-      height={1024}
-      loading="eager"
-      fetchpriority="high"
-    />
-    <Image
-      class="glyph lockup-dark"
-      src={glyphDark}
-      alt="The Atlante celestial sphere mark"
-      width={683}
-      height={1024}
-      loading="eager"
-      fetchpriority="high"
-    />
+    <BrandLogo variant="glyph" label="The Atlante celestial sphere mark" />
   </div>
 
 
@@ -129,12 +110,7 @@ import glyphDark from "../assets/atlante-glyph-reverse.svg";
   .visual {
     display: grid;
     place-items: center;
-  }
-
-  .glyph {
-    grid-area: 1 / 1;
-    width: clamp(260px, 28vw, 400px);
-    height: auto;
+    --brand-logo-width: clamp(260px, 28vw, 400px);
   }
 
   .actions {
@@ -260,6 +236,10 @@ import glyphDark from "../assets/atlante-glyph-reverse.svg";
   }
 
   @media (max-width: 680px) {
+    .visual {
+      display: none;
+    }
+
     .copy {
       text-align: center;
     }

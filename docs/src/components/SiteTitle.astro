@@ -1,27 +1,11 @@
 ---
-import logoLight from "../assets/atlante-horizontal.svg";
-import logoDark from "../assets/atlante-horizontal-reverse.svg";
+import BrandLogo from "./BrandLogo.astro";
 
 const { siteTitle, siteTitleHref } = Astro.locals.starlightRoute;
 ---
 
 <a href={siteTitleHref} class="site-title" aria-label={siteTitle} transition:persist="site-title">
-  <img
-    class="logo logo-light"
-    src={logoLight.src}
-    alt=""
-    width={1200}
-    height={420}
-    loading="eager"
-  />
-  <img
-    class="logo logo-dark"
-    src={logoDark.src}
-    alt=""
-    width={1200}
-    height={420}
-    loading="eager"
-  />
+  <BrandLogo />
 </a>
 
 <style>
@@ -36,22 +20,5 @@ const { siteTitle, siteTitleHref } = Astro.locals.starlightRoute;
       text-decoration: none;
       white-space: nowrap;
     }
-
-    .logo {
-      display: block;
-      width: 160px;
-      height: auto;
-      max-width: 100%;
-      object-fit: contain;
-      object-position: 0 50%;
-    }
-
-    .logo-dark {
-      display: none;
-    }
-
-    :global([data-theme="dark"]) .logo-light {
-      display: none;
-    }
-
-    :global([data-theme="dark"]) .logo-dark {
+  }
+</style>
