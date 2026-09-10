@@ -31,13 +31,16 @@ cpSync(
   join(publicDir, "og.png"),
 );
 
-// The hero and footer marks import the glyph exports through astro:assets,
-// so the approved artwork is mirrored into src/assets on every sync.
+// Theme-adaptive logos inline approved artwork through Astro, so the source
+// exports they use are mirrored into src/assets on every sync.
 const srcAssetsDir = join(websiteRoot, "src", "assets");
 rmSync(srcAssetsDir, { recursive: true, force: true });
 mkdirSync(srcAssetsDir, { recursive: true });
-for (const file of ["atlante-glyph.svg", "atlante-glyph-reverse.svg"]) {
-  cpSync(join(exportsDir, "glyph", file), join(srcAssetsDir, file));
+for (const [set, file] of [
+  ["glyph", "atlante-glyph.svg"],
+  ["horizontal", "atlante-horizontal.svg"],
+] as const) {
+  cpSync(join(exportsDir, set, file), join(srcAssetsDir, file));
 }
 
 // Copy the four approved families so each typographic role stays available.

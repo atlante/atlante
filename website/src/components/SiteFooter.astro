@@ -1,4 +1,6 @@
 ---
+import BrandLogo from "./BrandLogo.astro";
+
 const github = "https://github.com/atlante/atlante";
 
 const groups = [
@@ -40,22 +42,7 @@ const groups = [
   <div class="inner">
     <div class="footer-main">
       <div class="mark">
-        <img
-          class="lockup lockup-light"
-          src="/brand/horizontal/atlante-horizontal.svg"
-          alt=""
-          width="1200"
-          height="420"
-          loading="lazy"
-        />
-        <img
-          class="lockup lockup-dark"
-          src="/brand/horizontal/atlante-horizontal-reverse.svg"
-          alt=""
-          width="1200"
-          height="420"
-          loading="lazy"
-        />
+        <BrandLogo variant="horizontal" />
       </div>
 
       <nav aria-label="Footer">
@@ -138,12 +125,7 @@ const groups = [
     align-items: flex-start;
     align-self: start;
     gap: var(--space-3);
-  }
-
-  .lockup {
-    display: block;
-    width: min(220px, 100%);
-    height: auto;
+    --brand-logo-width: min(220px, 100%);
   }
 
   .link-groups {
@@ -211,14 +193,6 @@ const groups = [
 
   .planet:hover {
     border-color: var(--ds-fg);
-  }
-
-  :global(html:not([data-theme="dark"])) .lockup-dark {
-    display: none !important;
-  }
-
-  :global(html[data-theme="dark"]) .lockup-light {
-    display: none !important;
   }
 
   @media (prefers-reduced-motion: no-preference) {

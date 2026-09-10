@@ -79,14 +79,6 @@ body {
   color-scheme: dark;
 }
 
-html:not([data-theme="dark"]) .lockup-dark {
-  display: none;
-}
-
-[data-theme="dark"] .lockup-light {
-  display: none;
-}
-
 ::selection {
   background: var(--atlante-pine);
   color: var(--atlante-linen);
