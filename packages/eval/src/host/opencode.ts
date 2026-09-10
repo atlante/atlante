@@ -275,10 +275,12 @@ export function createOpenCodeRunner(
       delete config.mcp;
       config.$schema = "https://opencode.ai/config.json";
 
-      // A fixture-provided config at any supported precedence path would
-      // silently bypass the generated host integration.
+      // The generated file may replace a fixture file at its exact target,
+      // but every other supported config path would remain visible to
+      // OpenCode and could reintroduce project or fixture MCP settings.
+      const target = join(sandbox.root, relative(projectRoot, hostConfig.path));
       const fixtureConfig = openCodeConfigPaths(sandbox.root)
-        .slice(0, -1)
+        .filter((path) => path !== target)
         .find(existsSync);
       if (fixtureConfig) {
         throw new Error(
@@ -326,7 +328,6 @@ export function createOpenCodeRunner(
       mkdirSync(sandbox.root, { recursive: true });
       // Host integration is authoritative: this generated config intentionally
       // replaces the selected project config in the sandbox.
-      const target = join(sandbox.root, relative(projectRoot, hostConfig.path));
       mkdirSync(dirname(target), { recursive: true });
       writeFileSync(target, `${JSON.stringify(config, null, 2)}\n`);
     },

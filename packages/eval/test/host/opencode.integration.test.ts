@@ -285,6 +285,39 @@ describe("prepareHostIntegration", () => {
     },
   );
 
+  test("rejects a lower-precedence fixture config when the project target is nested", () => {
+    const nestedDirectory = join(projectRoot, ".opencode");
+    const nestedConfig = join(nestedDirectory, "opencode.jsonc");
+    mkdirSync(nestedDirectory, { recursive: true });
+    writeFileSync(nestedConfig, '{ "model": "nested-model" }');
+    try {
+      const runner = createOpenCodeRunner({
+        projectRoot,
+        authPath: authFile,
+      });
+      const project = tempDir("eval-sandbox-shadowing-root-config-");
+      writeFileSync(
+        join(project, "opencode.json"),
+        JSON.stringify({
+          mcp: {
+            fixtureTool: {
+              type: "local",
+              command: ["node", "-e", "process.exit(0)"],
+            },
+          },
+        }),
+      );
+      expect(() =>
+        runner.prepareHostIntegration(
+          sandboxFor(project, tempDir("eval-state-shadowing-root-config-")),
+          {},
+        ),
+      ).toThrow(/opencode\.json/);
+    } finally {
+      rmSync(nestedConfig, { force: true });
+    }
+  });
+
   test("fails closed when host auth is missing", () => {
     // Own config: this test must not depend on config left behind by an
     // earlier test in the file.
