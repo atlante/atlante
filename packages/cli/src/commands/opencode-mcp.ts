@@ -39,6 +39,155 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function isStringArray(value: unknown): value is string[] {
+  return (
+    Array.isArray(value) && value.every((item) => typeof item === "string")
+  );
+}
+
+function isStringMap(value: unknown): boolean {
+  return (
+    isObject(value) &&
+    Object.values(value).every((item) => typeof item === "string")
+  );
+}
+
+function onlyAllowedKeys(
+  value: Record<string, unknown>,
+  allowed: readonly string[],
+): boolean {
+  const allowedSet = new Set(allowed);
+  return Object.keys(value).every((key) => allowedSet.has(key));
+}
+
+function optionalStringFields(
+  value: Record<string, unknown>,
+  fields: readonly string[],
+): boolean {
+  return fields.every(
+    (field) => value[field] === undefined || typeof value[field] === "string",
+  );
+}
+
+function positiveSafeInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
+}
+
+function isOAuthConfig(value: unknown): boolean {
+  if (value === false) return true;
+  if (!isObject(value)) return false;
+  if (
+    !onlyAllowedKeys(value, [
+      "clientId",
+      "clientSecret",
+      "scope",
+      "callbackPort",
+      "redirectUri",
+    ])
+  )
+    return false;
+  if (
+    !optionalStringFields(value, [
+      "clientId",
+      "clientSecret",
+      "scope",
+      "redirectUri",
+    ])
+  )
+    return false;
+  return (
+    value.callbackPort === undefined ||
+    (positiveSafeInteger(value.callbackPort) && value.callbackPort <= 65535)
+  );
+}
+
+function commonMcpEntryError(
+  value: Record<string, unknown>,
+): string | undefined {
+  if (value.enabled !== undefined && typeof value.enabled !== "boolean")
+    return 'the "enabled" field must be a boolean';
+  if (value.timeout !== undefined && !positiveSafeInteger(value.timeout))
+    return 'the "timeout" field must be a positive safe integer';
+  return undefined;
+}
+
+function localMcpEntryError(
+  value: Record<string, unknown>,
+): string | undefined {
+  const commonError = commonMcpEntryError(value);
+  if (commonError !== undefined) return commonError;
+  if (!isStringArray(value.command))
+    return 'a local server requires a string "command" array';
+  if (value.cwd !== undefined && typeof value.cwd !== "string")
+    return 'the "cwd" field must be a string';
+  if (value.environment !== undefined && !isStringMap(value.environment))
+    return 'the "environment" field must be an object of strings';
+  return undefined;
+}
+
+function remoteMcpEntryError(
+  value: Record<string, unknown>,
+): string | undefined {
+  const commonError = commonMcpEntryError(value);
+  if (commonError !== undefined) return commonError;
+  if (typeof value.url !== "string")
+    return 'a remote server requires a string "url"';
+  if (value.headers !== undefined && !isStringMap(value.headers))
+    return 'the "headers" field must be an object of strings';
+  if (value.oauth !== undefined && !isOAuthConfig(value.oauth))
+    return 'the "oauth" field has an invalid shape';
+  return undefined;
+}
+
+function isEnabledOnlyMcpEntry(value: Record<string, unknown>): boolean {
+  return Object.keys(value).length === 1 && Object.hasOwn(value, "enabled");
+}
+
+function enabledOnlyMcpEntryError(
+  value: Record<string, unknown>,
+): string | undefined {
+  return typeof value.enabled === "boolean"
+    ? undefined
+    : 'the "enabled" field must be a boolean';
+}
+
+function mcpObjectEntryError(
+  value: Record<string, unknown>,
+): string | undefined {
+  if (value.type !== "local" && value.type !== "remote")
+    return 'the "type" field must be "local" or "remote"';
+
+  const allowedKeys =
+    value.type === "local"
+      ? ["type", "command", "cwd", "environment", "enabled", "timeout"]
+      : ["type", "url", "enabled", "headers", "oauth", "timeout"];
+  const unknownKey = Object.keys(value).find(
+    (key) => !allowedKeys.includes(key),
+  );
+  if (unknownKey !== undefined)
+    return `the "${unknownKey}" field is not valid for a ${value.type} server`;
+
+  return value.type === "local"
+    ? localMcpEntryError(value)
+    : remoteMcpEntryError(value);
+}
+
+function mcpEntryError(value: unknown): string | undefined {
+  if (!isObject(value)) return "the server entry must be an object";
+  if (isEnabledOnlyMcpEntry(value)) return enabledOnlyMcpEntryError(value);
+  return mcpObjectEntryError(value);
+}
+
+function firstInvalidMcpEntry(
+  mcp: Record<string, unknown> | undefined,
+): { id: string; cause: string } | undefined {
+  for (const [id, value] of Object.entries(mcp ?? {})) {
+    const cause = mcpEntryError(value);
+    if (cause !== undefined) return { id, cause };
+  }
+  return undefined;
+}
+
 function snapshot(
   path: string,
   fileSystem: OpenCodeMcpFileSystem,
@@ -140,6 +289,15 @@ function parseConfiguration(
   }
 
   const mcp = parsed.mcp as Record<string, unknown> | undefined;
+  const invalidEntry = firstInvalidMcpEntry(mcp);
+  if (invalidEntry) {
+    return invalidConfiguration(
+      path,
+      `the "mcp.${invalidEntry.id}" entry is invalid: ${invalidEntry.cause}`,
+      '"mcp" must be an object whose server entries are objects',
+    );
+  }
+
   const existing = mcp?.[ATLANTE_MCP_SERVER_ID];
   if (existing !== undefined && !isRegisteredMcp(existing)) {
     return invalidConfiguration(

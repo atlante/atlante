@@ -21,6 +21,7 @@ import {
   type InitDependencies,
   runInitWithDependencies,
 } from "../src/commands/init-internal.js";
+import { prepareOpenCodeMcp } from "../src/commands/opencode-mcp.js";
 import type { PackageManagerRunner } from "../src/commands/package-manager.js";
 import { firstPartyProjectContext } from "../src/first-party-pack.js";
 import { runInit, runValidate } from "../src/main.js";
@@ -1750,6 +1751,13 @@ describe("runInit", () => {
               command: ["bun", "run", "other-mcp"],
               enabled: false,
             },
+            remote: {
+              type: "remote",
+              url: "https://example.test/mcp",
+              headers: { Authorization: "Bearer token" },
+              oauth: false,
+              timeout: 5000,
+            },
           },
         }),
       );
@@ -1763,6 +1771,13 @@ describe("runInit", () => {
         type: "local",
         command: ["bun", "run", "other-mcp"],
         enabled: false,
+      });
+      expect(config.mcp.remote).toEqual({
+        type: "remote",
+        url: "https://example.test/mcp",
+        headers: { Authorization: "Bearer token" },
+        oauth: false,
+        timeout: 5000,
       });
       expect(config.mcp.atlante).toBeDefined();
     });
@@ -1792,6 +1807,61 @@ describe("runInit", () => {
       );
       expect(readFileSync(path, "utf8")).toBe(original);
       expect(existsSync(join(dir, "atlante.jsonc"))).toBe(false);
+    });
+
+    test("rejects invalid unrelated MCP server entries during registration planning", () => {
+      for (const invalidEntry of [
+        null,
+        [],
+        "not-an-object",
+        42,
+        {},
+        { type: "unknown" },
+        { type: "local", command: "not-an-array" },
+        { type: "remote", url: 42 },
+        { type: "local", command: ["bun"], extra: true },
+        { type: "local", command: ["bun"], url: "https://example.test" },
+        { type: "local", command: ["bun"], timeout: 1.5 },
+        {
+          type: "local",
+          command: ["bun"],
+          timeout: Number.MAX_SAFE_INTEGER + 1,
+        },
+        { type: "remote", url: "https://example.test", extra: true },
+        {
+          type: "remote",
+          url: "https://example.test",
+          oauth: { clientId: 42 },
+        },
+        { enabled: false, extra: true },
+      ]) {
+        const dir = tempDirWithoutUserPack();
+        const path = join(dir, "opencode.jsonc");
+        const original = JSON.stringify({ mcp: { other: invalidEntry } });
+        writeFileSync(path, original);
+
+        const result = prepareOpenCodeMcp(dir, {
+          existsSync,
+          readFileSync,
+        });
+
+        expect("error" in result).toBe(true);
+        expect(readFileSync(path, "utf8")).toBe(original);
+      }
+    });
+
+    test("preserves a valid disabled built-in MCP entry", async () => {
+      const dir = tempDir();
+      const path = join(dir, "opencode.jsonc");
+      writeFileSync(path, '{ "mcp": { "built-in": { "enabled": false } } }');
+
+      expect(await runInit(dir, {})).toBe(0);
+
+      const config = JSON.parse(readFileSync(path, "utf8")) as {
+        mcp: Record<string, unknown>;
+      };
+      expect(config.mcp["built-in"]).toEqual({ enabled: false });
+      expect(config.mcp.atlante).toBeDefined();
     });
 
     test("rejects a conflicting Atlante MCP entry without overwriting it", async () => {

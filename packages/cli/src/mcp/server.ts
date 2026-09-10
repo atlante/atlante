@@ -60,6 +60,12 @@ type JsonRpcResponse = Readonly<{
 
 type RecordValue = Record<string, unknown>;
 
+const textEncoder = new TextEncoder();
+
+function fitsResponseLimit(serialized: string): boolean {
+  return textEncoder.encode(serialized).byteLength + 1 <= MCP_MAX_MESSAGE_BYTES;
+}
+
 function isRecord(value: unknown): value is RecordValue {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -287,6 +293,17 @@ function toolResult(envelope: McpToolEnvelope): Record<string, unknown> {
   };
 }
 
+function oversizedToolResult(tool: McpToolName): Record<string, unknown> {
+  return toolResult(
+    toolEnvelope(tool, "unavailable", undefined, [
+      diagnostic(
+        "response-too-large",
+        `the ${tool} response exceeds the ${MCP_MAX_MESSAGE_BYTES}-byte limit`,
+      ),
+    ]),
+  );
+}
+
 function selectedProtocolVersion(value: unknown): McpProtocolVersion {
   if (value === undefined) return MCP_DEFAULT_PROTOCOL_VERSION;
   if (
@@ -351,8 +368,38 @@ class McpServer {
     this.version = options.version ?? packageJson.version;
   }
 
-  private writeResponse(response: JsonRpcResponse): void {
-    this.stdout.write(`${JSON.stringify(response)}\n`);
+  private writeResponse(
+    response: JsonRpcResponse,
+    oversizedFallback?: JsonRpcResponse,
+  ): void {
+    const serialized = JSON.stringify(response);
+    if (fitsResponseLimit(serialized)) {
+      this.stdout.write(`${serialized}\n`);
+      return;
+    }
+
+    const fallback =
+      oversizedFallback ??
+      ({
+        jsonrpc: "2.0",
+        id: response.id,
+        error: rpcError(-32000, "MCP response exceeds the maximum size"),
+      } satisfies JsonRpcResponse);
+    const serializedFallback = JSON.stringify(fallback);
+    if (fitsResponseLimit(serializedFallback)) {
+      this.stdout.write(`${serializedFallback}\n`);
+      return;
+    }
+
+    // Request IDs are not independently bounded, so use null if even the
+    // ordinary fallback cannot fit within the response budget.
+    this.stdout.write(
+      `${JSON.stringify({
+        jsonrpc: "2.0",
+        id: null,
+        error: rpcError(-32000, "MCP response exceeds the maximum size"),
+      })}\n`,
+    );
   }
 
   private writeError(id: RequestId, error: JsonRpcError): void {
@@ -365,9 +412,18 @@ class McpServer {
     );
   }
 
-  private result(request: JsonRpcRequest, result: unknown): void {
+  private result(
+    request: JsonRpcRequest,
+    result: unknown,
+    oversizedFallback?: unknown,
+  ): void {
     if (hasId(request))
-      this.writeResponse({ jsonrpc: "2.0", id: request.id, result });
+      this.writeResponse(
+        { jsonrpc: "2.0", id: request.id, result },
+        oversizedFallback === undefined
+          ? undefined
+          : { jsonrpc: "2.0", id: request.id, result: oversizedFallback },
+      );
   }
 
   private initialize(request: JsonRpcRequest): void {
@@ -421,10 +477,12 @@ class McpServer {
         );
       return;
     }
-    const argumentsValue = params.arguments ?? {};
+    const oversizedFallback = oversizedToolResult(params.name);
+    const argumentsValue =
+      params.arguments === undefined ? {} : params.arguments;
     const validated = validateArguments(params.name, argumentsValue);
     if (!validated.ok) {
-      this.result(request, toolResult(validated.result));
+      this.result(request, toolResult(validated.result), oversizedFallback);
       return;
     }
 
@@ -437,7 +495,7 @@ class McpServer {
         diagnosticsFromUnknown(cause),
       ]);
     }
-    this.result(request, toolResult(envelope));
+    this.result(request, toolResult(envelope), oversizedFallback);
   }
 
   private handleRequest(request: JsonRpcRequest): void {
@@ -487,7 +545,7 @@ class McpServer {
   /** Handles one newline-delimited input message; false asks the reader to stop. */
   async handleLine(line: string): Promise<boolean> {
     if (line.length === 0) return this.continueReading;
-    if (new TextEncoder().encode(line).byteLength > MCP_MAX_MESSAGE_BYTES) {
+    if (textEncoder.encode(line).byteLength > MCP_MAX_MESSAGE_BYTES) {
       this.writeError(
         null,
         rpcError(-32600, "MCP message exceeds the maximum size"),

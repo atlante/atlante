@@ -290,4 +290,127 @@ describe("MCP stdio protocol", () => {
     });
     expect(errors).toEqual(["atlante mcp: fixture operation failed\n"]);
   });
+
+  test("bounds oversized tool responses with a structured diagnostic", async () => {
+    const { server, output, errors } = harness({
+      inspectProject: () =>
+        envelope("inspect_project", {
+          payload: "x".repeat(MCP_MAX_MESSAGE_BYTES),
+        }),
+    });
+
+    await server.handleLine(
+      JSON.stringify({
+        jsonrpc: "2.0",
+        id: 11,
+        method: "tools/call",
+        params: { name: "inspect_project", arguments: {} },
+      }),
+    );
+
+    expect(
+      new TextEncoder().encode(output[0] ?? "").byteLength,
+    ).toBeLessThanOrEqual(MCP_MAX_MESSAGE_BYTES);
+    expect(response(output)).toMatchObject({
+      id: 11,
+      result: {
+        isError: true,
+        structuredContent: {
+          tool: "inspect_project",
+          status: "unavailable",
+          diagnostics: [{ code: "response-too-large" }],
+        },
+      },
+    });
+    expect(errors).toEqual([]);
+  });
+
+  test("bounds oversized validation diagnostics with a structured diagnostic", async () => {
+    const { server, output } = harness();
+    const oversizedKey = "x".repeat(MCP_MAX_MESSAGE_BYTES - 2048);
+    const request = JSON.stringify({
+      jsonrpc: "2.0",
+      id: 13,
+      method: "tools/call",
+      params: { name: "validate", arguments: { [oversizedKey]: true } },
+    });
+
+    expect(new TextEncoder().encode(request).byteLength).toBeLessThanOrEqual(
+      MCP_MAX_MESSAGE_BYTES,
+    );
+    await server.handleLine(request);
+
+    expect(
+      new TextEncoder().encode(output[0] ?? "").byteLength,
+    ).toBeLessThanOrEqual(MCP_MAX_MESSAGE_BYTES);
+    expect(response(output)).toMatchObject({
+      id: 13,
+      result: {
+        isError: true,
+        structuredContent: {
+          tool: "validate",
+          status: "unavailable",
+          diagnostics: [{ code: "response-too-large" }],
+        },
+      },
+    });
+  });
+
+  test("uses a null id when an oversized response cannot retain the request id", async () => {
+    const { server, output } = harness();
+    let requestId = "x".repeat(MCP_MAX_MESSAGE_BYTES);
+    let request = JSON.stringify({
+      jsonrpc: "2.0",
+      id: requestId,
+      method: "tools/list",
+    });
+    while (
+      new TextEncoder().encode(request).byteLength > MCP_MAX_MESSAGE_BYTES
+    ) {
+      requestId = requestId.slice(0, -1);
+      request = JSON.stringify({
+        jsonrpc: "2.0",
+        id: requestId,
+        method: "tools/list",
+      });
+    }
+
+    expect(new TextEncoder().encode(request).byteLength).toBeLessThanOrEqual(
+      MCP_MAX_MESSAGE_BYTES,
+    );
+    await server.handleLine(request);
+
+    expect(
+      new TextEncoder().encode(output[0] ?? "").byteLength,
+    ).toBeLessThanOrEqual(MCP_MAX_MESSAGE_BYTES);
+    expect(response(output)).toMatchObject({
+      id: null,
+      error: { code: -32000 },
+    });
+  });
+
+  test("rejects null tool arguments instead of treating them as an empty object", async () => {
+    const { server, output } = harness();
+
+    await server.handleLine(
+      JSON.stringify({
+        jsonrpc: "2.0",
+        id: 12,
+        method: "tools/call",
+        params: { name: "validate", arguments: null },
+      }),
+    );
+
+    expect(response(output)).toMatchObject({
+      id: 12,
+      result: {
+        isError: true,
+        structuredContent: {
+          tool: "validate",
+          status: "invalid",
+          diagnostics: [{ code: "invalid-arguments" }],
+        },
+      },
+    });
+  });
 });
