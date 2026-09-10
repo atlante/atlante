@@ -7,6 +7,7 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -40,7 +41,10 @@ afterEach(() => {
 });
 
 function fixture(): string {
-  const directory = mkdtempSync(join(tmpdir(), "atlante-mcp-"));
+  // Realpath the temp directory so fixture paths match the server's resolved
+  // project root on every platform; macOS aliases tmpdir through a symlink,
+  // which would otherwise make redaction results platform-dependent.
+  const directory = realpathSync(mkdtempSync(join(tmpdir(), "atlante-mcp-")));
   created.push(directory);
   writeFileSync(
     join(directory, "atlante.jsonc"),
@@ -231,25 +235,25 @@ test("serves the six read-only tools from the active workspace", () => {
             authored: {
               values: {
                 absolute: "<absolute-path>",
-                active: "<absolute-path>",
+                active: "./active-file-sentinel",
               },
               agents: {
                 reviewer: {
                   description: "Reviews changes from [<absolute-path>].",
-                  identity: "You review changes in <absolute-path>",
+                  identity: "You review changes in ./nested-file-sentinel.",
                 },
               },
             },
             effective: {
               values: {
                 absolute: "<absolute-path>",
-                active: "<absolute-path>",
+                active: "./active-file-sentinel",
               },
             },
             resolved: {
               values: {
                 absolute: "<absolute-path>",
-                active: "<absolute-path>",
+                active: "./active-file-sentinel",
               },
             },
             provenance: expect.arrayContaining([
@@ -346,8 +350,8 @@ test("serves the six read-only tools from the active workspace", () => {
   expect(stdout).not.toContain(directory);
   expect(stdout).not.toContain("/outside/atlante-mcp-absolute-sentinel");
   expect(stdout).not.toContain("/outside/atlante-mcp-nested-sentinel");
-  expect(stdout).not.toContain("/active-file-sentinel");
-  expect(stdout).not.toContain("/nested-file-sentinel");
+  expect(stdout).not.toContain(`${directory}/active-file-sentinel`);
+  expect(stdout).not.toContain(`${directory}/nested-file-sentinel`);
   expect(stderr).toBe("");
   expect(readdirSync(directory, { recursive: true }).sort()).toEqual(
     beforeEntries,
