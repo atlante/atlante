@@ -139,6 +139,7 @@ const sphereCoordinate = [38, 53, 54, 57, 58]
   }
 
   .identity-symbol {
+    background: transparent;
     color: var(--atlante-jet);
   }
 
@@ -195,7 +196,7 @@ const sphereCoordinate = [38, 53, 54, 57, 58]
   }
 
   :global(html[data-theme="dark"]) .identity-symbol {
-    filter: brightness(0) invert(1);
+    color: var(--atlante-linen);
   }
 
   @media (prefers-reduced-motion: no-preference) {
