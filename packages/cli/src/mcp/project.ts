@@ -31,6 +31,8 @@ import {
 import {
   diagnostic,
   type GetSchemaInput,
+  type InspectIncludeSection,
+  type InspectProjectInput,
   type McpDiagnostic,
   type McpToolEnvelope,
   type ReadDocInput,
@@ -86,10 +88,10 @@ export type InspectProjectData = Readonly<{
     path: string | null;
     schema_uri: string | null;
     version: string | null;
-    authored: unknown;
-    effective: unknown;
-    resolved: unknown;
-    provenance: readonly Readonly<{
+    authored?: unknown;
+    effective?: unknown;
+    resolved?: unknown;
+    provenance?: readonly Readonly<{
       pointer: string;
       origin: McpOrigin;
     }>[];
@@ -123,7 +125,9 @@ export type SearchDocsData = Readonly<{
 }>;
 
 export type McpOperations = Readonly<{
-  inspectProject: () => McpToolEnvelope<InspectProjectData>;
+  inspectProject: (
+    input: InspectProjectInput,
+  ) => McpToolEnvelope<InspectProjectData>;
   listResources: (
     input: Readonly<{ limit?: number }>,
   ) => McpToolEnvelope<ListResourcesData> | McpToolEnvelope;
@@ -406,8 +410,58 @@ function provenanceOf(
     .map(([pointer, origin]) => ({ pointer, origin: originOf(origin) }));
 }
 
+function inspectConfiguration(
+  projectRoot: string,
+  loaded: LoadedProject,
+  configCandidates: readonly string[],
+  include: ReadonlySet<InspectIncludeSection>,
+): InspectProjectData["configuration"] {
+  const configPath = loaded.configPath ?? configCandidates[0];
+  const authored = loaded.resources?.raw ?? authoredConfig(configPath);
+  const schemaUri = schemaUriOf(authored) ?? schemaUriOf(loaded.document);
+  const wants = (section: InspectIncludeSection): boolean =>
+    include.has(section);
+  return {
+    exists: configCandidates.length > 0,
+    path: configPath ? projectPath(projectRoot, configPath) : null,
+    schema_uri: schemaUri,
+    version: schemaVersionOf(schemaUri),
+    ...(wants("authored")
+      ? { authored: publicValue(projectRoot, authored ?? null) }
+      : {}),
+    ...(wants("effective")
+      ? {
+          effective: publicValue(
+            projectRoot,
+            loaded.resources?.effectiveRaw ?? null,
+          ),
+        }
+      : {}),
+    ...(wants("resolved")
+      ? { resolved: publicValue(projectRoot, loaded.document ?? null) }
+      : {}),
+    ...(wants("provenance")
+      ? { provenance: provenanceOf(loaded.resources) }
+      : {}),
+  };
+}
+
+function inspectArtifacts(
+  artifacts: McpArtifact,
+  include: ReadonlySet<InspectIncludeSection>,
+): McpArtifact {
+  if (include.has("artifact-files")) return artifacts;
+  return {
+    status: artifacts.status,
+    manifest_path: artifacts.manifest_path,
+    file_count: artifacts.file_count,
+    ...(artifacts.diagnostic ? { diagnostic: artifacts.diagnostic } : {}),
+  };
+}
+
 function inspectProject(
   root: string,
+  input: InspectProjectInput,
   context?: ProjectContext,
 ): McpToolEnvelope<InspectProjectData> {
   const loadedProject = activeProject(root, context);
@@ -417,31 +471,22 @@ function inspectProject(
     ]);
 
   const { loaded, configCandidates, root: projectRoot } = loadedProject;
-  const configPath = loaded.configPath ?? configCandidates[0];
-  const authored = loaded.resources?.raw ?? authoredConfig(configPath);
-  const schemaUri = schemaUriOf(authored) ?? schemaUriOf(loaded.document);
   const artifacts = artifactEvidence(projectRoot);
   const documentation = loadDocumentationCatalog(projectRoot);
   const schema = getBundledSchema(SCHEMA_URI);
   const diagnostics = diagnosticsFor(projectRoot, loaded.diagnostics);
+  const include = new Set<InspectIncludeSection>(input.include ?? []);
   const data: InspectProjectData = {
     project_root: ".",
-    configuration: {
-      exists: configCandidates.length > 0,
-      path: configPath ? projectPath(projectRoot, configPath) : null,
-      schema_uri: schemaUri,
-      version: schemaVersionOf(schemaUri),
-      authored: publicValue(projectRoot, authored ?? null),
-      effective: publicValue(
-        projectRoot,
-        loaded.resources?.effectiveRaw ?? null,
-      ),
-      resolved: publicValue(projectRoot, loaded.document ?? null),
-      provenance: provenanceOf(loaded.resources),
-    },
+    configuration: inspectConfiguration(
+      projectRoot,
+      loaded,
+      configCandidates,
+      include,
+    ),
     diagnostics,
     capabilities: capabilitiesOf(loaded, documentation, schema, artifacts),
-    artifacts,
+    artifacts: inspectArtifacts(artifacts, include),
   };
   return toolEnvelope(
     "inspect_project",
@@ -602,7 +647,7 @@ export function createMcpOperations(
 ): McpOperations {
   const projectRoot = resolve(root);
   return {
-    inspectProject: () => inspectProject(projectRoot, context),
+    inspectProject: (input) => inspectProject(projectRoot, input, context),
     listResources: (input) => listResources(projectRoot, input, context),
     validate: () => validate(projectRoot, context),
     searchDocs: (input) => searchDocs(projectRoot, input),

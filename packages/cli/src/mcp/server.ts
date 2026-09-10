@@ -3,8 +3,10 @@ import packageJson from "../../package.json" with { type: "json" };
 import {
   diagnostic,
   type GetSchemaInput,
+  type InspectProjectInput,
   type ListResourcesInput,
   MCP_DEFAULT_PROTOCOL_VERSION,
+  MCP_INSPECT_INCLUDE_SECTIONS,
   MCP_MAX_IDENTIFIER_LENGTH,
   MCP_MAX_MESSAGE_BYTES,
   MCP_MAX_QUERY_LENGTH,
@@ -163,6 +165,28 @@ function validateNoArguments(
   return unknown ? invalidArgumentResult(unknown) : validArguments(value);
 }
 
+function validateInspectProject(value: RecordValue): ArgumentValidation {
+  const unknown = unknownArgumentResult("inspect_project", value, ["include"]);
+  if (unknown) return invalidArgumentResult(unknown);
+  if (value.include !== undefined) {
+    const include = value.include;
+    const known =
+      Array.isArray(include) &&
+      include.length <= MCP_INSPECT_INCLUDE_SECTIONS.length &&
+      include.every((item) =>
+        (MCP_INSPECT_INCLUDE_SECTIONS as readonly unknown[]).includes(item),
+      );
+    if (!known)
+      return invalidArgumentResult(
+        invalidArguments(
+          "inspect_project",
+          `include must be an array drawn from: ${MCP_INSPECT_INCLUDE_SECTIONS.join(", ")}`,
+        ),
+      );
+  }
+  return validArguments(value);
+}
+
 function validateListResources(value: RecordValue): ArgumentValidation {
   const unknown = unknownArgumentResult("list_resources", value, ["limit"]);
   if (unknown) return invalidArgumentResult(unknown);
@@ -260,6 +284,7 @@ function validateArguments(
 
   switch (tool) {
     case "inspect_project":
+      return validateInspectProject(value);
     case "validate":
       return validateNoArguments(tool, value);
     case "list_resources":
@@ -337,7 +362,7 @@ function operationFor(
 ): McpToolEnvelope {
   switch (tool) {
     case "inspect_project":
-      return operations.inspectProject();
+      return operations.inspectProject(input as InspectProjectInput);
     case "list_resources":
       return operations.listResources(input as ListResourcesInput);
     case "validate":

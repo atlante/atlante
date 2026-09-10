@@ -852,8 +852,9 @@ identifier is `atlante-mcp/v1` and is independent of the package version.
 
 The server MUST provide these read-only tools:
 
-- `inspect_project` reports authored, effective, and resolved configuration,
-  provenance, capabilities, and verified native artifact freshness;
+- `inspect_project` reports capabilities, diagnostics, and verified native
+  artifact freshness, and reports authored, effective, and resolved
+  configuration and provenance on request;
 - `list_resources` reports only resources resolved by the active project;
 - `validate` runs authoritative validation without rendering or materializing;
 - `search_docs` searches the deterministic bundled documentation catalog;

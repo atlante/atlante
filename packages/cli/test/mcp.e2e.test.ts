@@ -123,6 +123,23 @@ function runServer(directory: string): {
     },
     {
       jsonrpc: "2.0",
+      id: 11,
+      method: "tools/call",
+      params: {
+        name: "inspect_project",
+        arguments: {
+          include: [
+            "authored",
+            "effective",
+            "resolved",
+            "provenance",
+            "artifact-files",
+          ],
+        },
+      },
+    },
+    {
+      jsonrpc: "2.0",
       id: 4,
       method: "tools/call",
       params: { name: "list_resources", arguments: {} },
@@ -200,7 +217,7 @@ test("serves the six read-only tools from the active workspace", () => {
   const { responses, stdout, stderr } = runServer(directory);
   const byId = new Map(responses.map((response) => [response.id, response]));
 
-  expect(responses).toHaveLength(10);
+  expect(responses).toHaveLength(11);
   expect(byId.get(1)).toMatchObject({
     result: {
       protocolVersion: "2024-11-05",
@@ -222,7 +239,31 @@ test("serves the six read-only tools from the active workspace", () => {
     "get_schema",
   ]);
 
-  expect(byId.get(3)).toMatchObject({
+  const defaultInspect = byId.get(3)?.result?.structuredContent as
+    | {
+        data?: {
+          configuration?: Record<string, unknown>;
+          artifacts?: Record<string, unknown>;
+        };
+      }
+    | undefined;
+  if (!defaultInspect?.data?.configuration)
+    throw new Error("expected the default inspect_project response");
+  expect(defaultInspect.data.configuration).toMatchObject({
+    path: "atlante.jsonc",
+    schema_uri: SCHEMA_URI,
+  });
+  for (const section of [
+    "authored",
+    "effective",
+    "resolved",
+    "provenance",
+  ] as const) {
+    expect(defaultInspect.data.configuration).not.toHaveProperty(section);
+  }
+  expect(defaultInspect.data.artifacts).not.toHaveProperty("files");
+
+  expect(byId.get(11)).toMatchObject({
     result: {
       structuredContent: {
         tool: "inspect_project",
@@ -271,6 +312,9 @@ test("serves the six read-only tools from the active workspace", () => {
       },
     },
   });
+  expect(JSON.stringify(byId.get(11)).length).toBeGreaterThan(
+    JSON.stringify(byId.get(3)).length,
+  );
   expect(byId.get(4)).toMatchObject({
     result: {
       structuredContent: {

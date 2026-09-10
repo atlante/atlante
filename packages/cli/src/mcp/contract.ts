@@ -10,6 +10,13 @@ export const MCP_MAX_MESSAGE_BYTES = 256 * 1024;
 export const MCP_MAX_QUERY_LENGTH = 256;
 export const MCP_MAX_IDENTIFIER_LENGTH = 256;
 export const MCP_MAX_RESOURCE_RESULTS = 100;
+export const MCP_INSPECT_INCLUDE_SECTIONS = [
+  "authored",
+  "effective",
+  "resolved",
+  "provenance",
+  "artifact-files",
+] as const;
 
 export type McpProtocolVersion =
   (typeof MCP_SUPPORTED_PROTOCOL_VERSIONS)[number];
@@ -21,6 +28,13 @@ export type McpToolName =
   | "search_docs"
   | "read_doc"
   | "get_schema";
+
+export type InspectIncludeSection =
+  (typeof MCP_INSPECT_INCLUDE_SECTIONS)[number];
+
+export type InspectProjectInput = Readonly<{
+  include?: readonly InspectIncludeSection[];
+}>;
 
 export type McpToolStatus =
   | "ok"
@@ -74,7 +88,13 @@ export const MCP_TOOL_DEFINITIONS: readonly McpToolDefinition[] = [
       "Inspect the active Atlante project configuration, resolved resources, diagnostics, capabilities, and generated artifact freshness without writing files.",
     inputSchema: {
       type: "object",
-      properties: {},
+      properties: {
+        include: {
+          type: "array",
+          items: { type: "string", enum: MCP_INSPECT_INCLUDE_SECTIONS },
+          maxItems: MCP_INSPECT_INCLUDE_SECTIONS.length,
+        },
+      },
       additionalProperties: false,
     },
   },
