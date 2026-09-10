@@ -19,6 +19,7 @@ import {
   packageManagerCommand,
   packageManagerInstallArgs,
   packageManagerLockfiles,
+  packageManagerRemoveArgs,
   resolveDependencyRoot,
 } from "../src/commands/package-manager.js";
 
@@ -178,6 +179,25 @@ describe("package manager commands", () => {
     for (const manager of ["npm", "pnpm", "yarn", "bun"] as const) {
       expect(packageManagerInstallArgs(manager)).toEqual(["install"]);
     }
+  });
+
+  test("removes the pack with manager-specific commands", () => {
+    expect(packageManagerRemoveArgs("npm", "@acme/pack")).toEqual([
+      "uninstall",
+      "@acme/pack",
+    ]);
+    expect(packageManagerRemoveArgs("pnpm", "@acme/pack")).toEqual([
+      "remove",
+      "@acme/pack",
+    ]);
+    expect(packageManagerRemoveArgs("yarn", "@acme/pack")).toEqual([
+      "remove",
+      "@acme/pack",
+    ]);
+    expect(packageManagerRemoveArgs("bun", "@acme/pack")).toEqual([
+      "remove",
+      "@acme/pack",
+    ]);
   });
 
   test("snapshots every lockfile the manager may read or create", () => {

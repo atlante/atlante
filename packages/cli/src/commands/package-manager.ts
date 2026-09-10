@@ -92,6 +92,23 @@ export function packageManagerAddArgs(
   }
 }
 
+/** Command that removes one direct package dependency. */
+export function packageManagerRemoveArgs(
+  manager: PackageManager,
+  packageName: string,
+): string[] {
+  switch (manager) {
+    case "npm":
+      return ["uninstall", packageName];
+    case "pnpm":
+      return ["remove", packageName];
+    case "yarn":
+      return ["remove", packageName];
+    case "bun":
+      return ["remove", packageName];
+  }
+}
+
 /** Command that reconciles installed packages with the project manifest. */
 export function packageManagerInstallArgs(manager: PackageManager): string[] {
   switch (manager) {

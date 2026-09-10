@@ -5,6 +5,11 @@ import { runBuildWatch } from "./commands/build-watch.js";
 import type { EvalCommandOptions } from "./commands/eval.js";
 import { runEvalCommand } from "./commands/eval.js";
 import { runInit } from "./commands/init.js";
+import {
+  runPackInstall,
+  runPackList,
+  runPackUninstall,
+} from "./commands/pack.js";
 import { runValidate } from "./commands/validate.js";
 
 /** Commander collector for repeatable options. */
@@ -16,6 +21,11 @@ export { runBuild } from "./commands/build.js";
 export { runBuildWatch } from "./commands/build-watch.js";
 export { runEvalCommand } from "./commands/eval.js";
 export { runInit } from "./commands/init.js";
+export {
+  runPackInstall,
+  runPackList,
+  runPackUninstall,
+} from "./commands/pack.js";
 export { runValidate } from "./commands/validate.js";
 export { formatDiagnostic } from "./report.js";
 
@@ -61,6 +71,36 @@ export function createProgram(): Command {
         process.exitCode = await runInit(path, options);
       },
     );
+
+  const pack = program
+    .command("pack")
+    .description("manage Atlante pack dependencies");
+
+  pack
+    .command("install")
+    .argument("<package>", "pack package name")
+    .argument("[path]", "project directory", process.cwd())
+    .description("install and validate an Atlante pack")
+    .action(async (packageName: string, path: string) => {
+      process.exitCode = await runPackInstall(path, packageName);
+    });
+
+  pack
+    .command("uninstall")
+    .argument("<package>", "pack package name")
+    .argument("[path]", "project directory", process.cwd())
+    .description("uninstall an unused Atlante pack")
+    .action(async (packageName: string, path: string) => {
+      process.exitCode = await runPackUninstall(path, packageName);
+    });
+
+  pack
+    .command("list")
+    .argument("[path]", "project directory", process.cwd())
+    .description("list direct Atlante pack dependencies")
+    .action(async (path: string) => {
+      process.exitCode = await runPackList(path);
+    });
 
   program
     .command("eval")
