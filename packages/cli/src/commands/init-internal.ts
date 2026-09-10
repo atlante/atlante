@@ -1,10 +1,3 @@
-import {
-  existsSync,
-  readFileSync,
-  realpathSync,
-  unlinkSync,
-  writeFileSync,
-} from "node:fs";
 import { join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import {
@@ -14,23 +7,28 @@ import {
   type ProjectContext,
 } from "@atlante/builder";
 import { openCodeMaterializer } from "@atlante/opencode";
-import {
-  createPackageResourcePack,
-  isPackageDeclared,
-} from "@atlante/resources";
 import { SCHEMA_URI } from "@atlante/schema";
 import { hasErrors, validateDocumentText } from "@atlante/validator";
 import {
   FIRST_PARTY_PACKAGE,
   resolveFirstPartyPack,
 } from "../first-party-pack.js";
-import {
-  printDiagnostic,
-  printDiagnostics,
-  reportBuildResult,
-} from "../report.js";
+import { printDiagnostics, reportBuildResult } from "../report.js";
 import { createStyler } from "../style.js";
 import { formatInitError } from "./init-error.js";
+import {
+  abortWithRestore,
+  type DependencyMutationState,
+  defaultPackFileSystem,
+  ensurePackInstalled as ensurePackDependencyInstalled,
+  locateInstalledPack as locateInstalledPackDependency,
+  type PackFileSystem,
+  reconcileDependencies,
+  reportRollbackFailures,
+  rollback,
+  type Snapshot,
+  snapshot,
+} from "./pack-dependencies.js";
 import { parsePackLocator, type SelectedPack } from "./pack-locator.js";
 import {
   discoverPackPresets,
@@ -38,26 +36,13 @@ import {
   selectPackPreset,
 } from "./pack-presets.js";
 import {
-  detectPackageManager,
-  type PackageManager,
   type PackageManagerRunner,
-  packageManagerAddArgs,
-  packageManagerCommand,
-  packageManagerInstallArgs,
-  packageManagerLockfiles,
-  resolveDependencyRoot,
   runPackageManagerDefault,
 } from "./package-manager.js";
 
 export type InitOptions = { pack?: string; force?: boolean };
 
-type InitFileSystem = {
-  existsSync: (path: string) => boolean;
-  readFileSync: (path: string, encoding: "utf8") => string;
-  writeFileSync: (path: string, contents: string) => void;
-  unlinkSync: (path: string) => void;
-  realpathSync: (path: string) => string;
-};
+type InitFileSystem = PackFileSystem;
 
 type BuildFunction = (target: string, context: ProjectContext) => BuildResult;
 
@@ -74,13 +59,7 @@ export type InitDependencies = Partial<InitFileSystem> & {
   prompt?: (query: string) => Promise<string>;
 };
 
-const defaultFileSystem: InitFileSystem = {
-  existsSync,
-  readFileSync: (path, encoding) => readFileSync(path, encoding),
-  writeFileSync: (path, contents) => writeFileSync(path, contents),
-  unlinkSync,
-  realpathSync,
-};
+const defaultFileSystem: InitFileSystem = defaultPackFileSystem;
 
 const defaultIsInteractive = (): boolean => Boolean(process.stdin.isTTY);
 
@@ -95,8 +74,6 @@ async function defaultPrompt(query: string): Promise<string> {
     readline.close();
   }
 }
-
-type Snapshot = { exists: boolean; contents?: string };
 
 /** The ignore policy init enforces for generated native outputs and state. */
 const GITIGNORE_ENTRIES: readonly string[] = [
@@ -126,15 +103,6 @@ function bareConfig(preset: string, firstParty = true): string {
 `;
 }
 
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function snapshot(path: string, fileSystem: InitFileSystem): Snapshot {
-  if (!fileSystem.existsSync(path)) return { exists: false };
-  return { exists: true, contents: fileSystem.readFileSync(path, "utf8") };
-}
-
 /**
  * Prepares the ignore-policy edit: `.gitignore` at the project root ends up
  * with exactly the generated-output entries. Existing content is never
@@ -159,129 +127,11 @@ function prepareGitignore(
   return { previous, contents: `${base}${missing.join("\n")}\n`, write: true };
 }
 
-function restore(
-  path: string,
-  before: Snapshot,
-  fileSystem: InitFileSystem,
-): string | undefined {
-  try {
-    if (before.exists) {
-      fileSystem.writeFileSync(path, before.contents ?? "");
-    } else if (fileSystem.existsSync(path)) {
-      fileSystem.unlinkSync(path);
-    }
-  } catch (cause) {
-    return `${path}: ${String(cause)}`;
-  }
-  return undefined;
-}
-
-type Change = { path: string; before: Snapshot };
-
-function rollback(
-  changes: readonly Change[],
-  fileSystem: InitFileSystem,
-): string[] {
-  const errors: string[] = [];
-  for (const change of changes) {
-    const error = restore(change.path, change.before, fileSystem);
-    if (error) errors.push(error);
-  }
-  return errors;
-}
-
 function mutationErrorMessage(message: string, cause: unknown): string {
   return formatInitError("initialization-failed", message, {
     next: "fix the reported error and run `atlante init` again",
     cause: String(cause),
   });
-}
-
-/**
- * The plain package manager install that reconciles node_modules with the
- * restored package.json and lockfile after a rollback. Defined only when a
- * dependency mutation ran.
- */
-type DependencyReconciler = Readonly<{
-  manager: PackageManager;
-  command: string;
-  directory: string;
-}>;
-
-/**
- * Dependency-mutation state shared across the init flow: every file the
- * package manager may have touched is snapshotted here alongside the
- * configuration files, so one rollback restores the whole pre-init state.
- */
-type DependencyMutationState = {
-  changes: Change[];
-  reconciler?: DependencyReconciler;
-};
-
-function reconcileDependencies(
-  state: DependencyMutationState,
-  runPackageManager: PackageManagerRunner,
-): string[] {
-  const reconciler = state.reconciler;
-  if (!reconciler) return [];
-  const run = runPackageManager(
-    reconciler.manager,
-    packageManagerInstallArgs(reconciler.manager),
-    reconciler.directory,
-  );
-  if (run.ok) return [];
-  return [
-    `\`${reconciler.command}\` failed; node_modules may not match the restored package.json and lockfile`,
-  ];
-}
-
-function reportRollbackFailures(
-  rollbackErrors: readonly string[],
-  reconcileErrors: readonly string[],
-  state: DependencyMutationState,
-): void {
-  if (rollbackErrors.length > 0) {
-    printDiagnostic({
-      severity: "error",
-      code: "rollback-failed",
-      message: "could not restore initialization files",
-      next: "restore the listed files manually before retrying `atlante init`",
-      cause: rollbackErrors.join(", "),
-    });
-  }
-  for (const error of reconcileErrors) {
-    printDiagnostic({
-      severity: "error",
-      code: "rollback-failed",
-      message:
-        "could not reconcile dependencies after rolling back initialization",
-      ...(state.reconciler
-        ? {
-            next: `run \`${state.reconciler.command}\` in the project root, then fix the reported error and run \`atlante init\` again`,
-          }
-        : {}),
-      cause: error,
-    });
-  }
-}
-
-/**
- * Restores every snapshotted file (configuration, package.json, lockfile) and
- * re-runs the detected package manager install
- * when a dependency mutation happened. Failure diagnostics are printed after
- * the filesystem is restored.
- */
-function abortWithRestore(
-  state: DependencyMutationState,
-  fileSystem: InitFileSystem,
-  runPackageManager: PackageManagerRunner,
-  mainError?: string,
-): number {
-  const rollbackErrors = rollback(state.changes, fileSystem);
-  const reconcileErrors = reconcileDependencies(state, runPackageManager);
-  if (mainError) console.error(mainError);
-  reportRollbackFailures(rollbackErrors, reconcileErrors, state);
-  return 1;
 }
 
 function commitInitFiles(
@@ -384,198 +234,6 @@ function buildAndReport(
   return 0;
 }
 
-type ProjectManifestEntry = Readonly<{
-  path: string;
-  manifest: Record<string, unknown>;
-}>;
-
-function projectManifestEntry(
-  directory: string,
-  fileSystem: InitFileSystem,
-): ProjectManifestEntry | { error: string } {
-  const path = join(directory, "package.json");
-  if (!fileSystem.existsSync(path)) {
-    return {
-      error: formatInitError(
-        "pack-manifest-required",
-        "selecting a pack requires a package.json manifest in the project",
-        {
-          source: path,
-          expected: "a package.json manifest declaring project dependencies",
-          next: "create a package.json with your package manager's init command and run `atlante init` again",
-        },
-      ),
-    };
-  }
-  let manifest: unknown;
-  try {
-    manifest = JSON.parse(fileSystem.readFileSync(path, "utf8"));
-  } catch (cause) {
-    return {
-      error: formatInitError(
-        "invalid-pack-manifest",
-        "package.json is not valid JSON",
-        {
-          source: path,
-          next: "fix package.json and run `atlante init` again",
-          cause: cause instanceof Error ? cause.message : String(cause),
-        },
-      ),
-    };
-  }
-  if (!isObject(manifest)) {
-    return {
-      error: formatInitError(
-        "invalid-pack-manifest",
-        "package.json is not valid JSON",
-        {
-          source: path,
-          next: "fix package.json and run `atlante init` again",
-          cause: "the document is not a JSON object",
-        },
-      ),
-    };
-  }
-  return { path, manifest };
-}
-
-function nodeModulesEntry(directory: string, packageName: string): string {
-  return join(directory, "node_modules", ...packageName.split("/"));
-}
-
-function exitStatus(status: number | null): string {
-  return status === null ? "without a status" : `with exit code ${status}`;
-}
-
-/**
- * Snapshots package.json and every lockfile the detected package manager may
- * read or create, before any package manager command runs. Run from a
- * workspace member, a package manager mutates the member manifest but writes
- * the shared lockfile at the dependency root, so both locations are covered.
- */
-function snapshotDependencyFiles(
-  state: DependencyMutationState,
-  manifestPath: string,
-  manager: PackageManager,
-  directory: string,
-  dependencyRoot: string,
-  fileSystem: InitFileSystem,
-): void {
-  state.changes.push({
-    path: manifestPath,
-    before: snapshot(manifestPath, fileSystem),
-  });
-  const lockfileDirectories =
-    dependencyRoot === directory ? [directory] : [directory, dependencyRoot];
-  for (const lockfileDirectory of lockfileDirectories) {
-    for (const lockfile of packageManagerLockfiles(
-      manager,
-      lockfileDirectory,
-    )) {
-      state.changes.push({
-        path: lockfile,
-        before: snapshot(lockfile, fileSystem),
-      });
-    }
-  }
-}
-
-function packInstallFailure(
-  command: string,
-  status: number | null,
-  packageName: string,
-  spawnError?: string,
-): { error: string } {
-  return {
-    error: formatInitError(
-      "pack-installation-failed",
-      `could not install ${packageName}`,
-      {
-        next: "fix the package manager error and run `atlante init` again",
-        cause: spawnError
-          ? `\`${command}\` failed: ${spawnError}`
-          : `\`${command}\` failed ${exitStatus(status)}`,
-      },
-    ),
-  };
-}
-
-/**
- * Builds the missing-entry diagnostic. Without a hoisting dependency root the
- * generic install hint applies; with one, the install already succeeded in the
- * workspace root's node_modules, so the manual install command cannot fix it
- * and the guidance points at the root instead.
- */
-function packMissingEntryFailure(
-  entry: string,
-  installCommand: string,
-  command: string,
-  packageName: string,
-  hoistedRoot: string | undefined,
-): { error: string } {
-  return {
-    error: formatInitError(
-      "pack-not-installed",
-      `${packageName} is not installed after \`${command}\``,
-      {
-        expected: `${entry} to exist after the package manager run`,
-        ...(hoistedRoot === undefined
-          ? {
-              next: `run \`${installCommand}\` manually and run \`atlante init\` again`,
-            }
-          : {
-              cause: `the install resolved at the workspace root ${hoistedRoot} (hoisted above the project's own node_modules)`,
-              next: `run \`atlante init\` at the workspace root ${hoistedRoot}, or install ${packageName} into this project directly, then run \`atlante init\` again`,
-            }),
-      },
-    ),
-  };
-}
-
-/**
- * Runs one package manager step (add or reconcile install) and verifies the
- * pack is present in the project's node_modules afterwards.
- */
-function runPackageManagerStep(
-  manager: PackageManager,
-  args: readonly string[],
-  directory: string,
-  pack: SelectedPack,
-  entry: string,
-  installCommand: string,
-  hoistedRoot: string | undefined,
-  runPackageManager: PackageManagerRunner,
-  fileSystem: InitFileSystem,
-): { error?: string } {
-  const command = packageManagerCommand(manager, args);
-  console.log(`installing ${pack.packageName} with ${manager}`);
-  const run = runPackageManager(manager, [...args], directory);
-  if (!run.ok)
-    return packInstallFailure(command, run.status, pack.packageName, run.error);
-  if (!fileSystem.existsSync(entry)) {
-    return packMissingEntryFailure(
-      entry,
-      installCommand,
-      command,
-      pack.packageName,
-      hoistedRoot,
-    );
-  }
-  return {};
-}
-
-/**
- * Reads corepack's `packageManager` field from the manifest, e.g.
- * `"pnpm@9.1.2"`, so explicit project configuration wins over lockfile
- * inference.
- */
-function packageManagerHint(
-  manifest: Record<string, unknown>,
-): string | undefined {
-  const value = manifest.packageManager;
-  return typeof value === "string" ? value : undefined;
-}
-
 /**
  * Ensures the selected third-party pack is declared and installed. The
  * transaction is rooted where init runs: the project manifest is read and
@@ -599,66 +257,13 @@ function ensurePackInstalled(
   fileSystem: InitFileSystem,
   runPackageManager: PackageManagerRunner,
 ): { root: string; entry: string } | { error: string } {
-  const dependencyRoot = resolveDependencyRoot(
-    directory,
-    fileSystem.existsSync,
-  );
-  const manifestEntry = projectManifestEntry(directory, fileSystem);
-  if ("error" in manifestEntry) return manifestEntry;
-
-  const manager = detectPackageManager(
-    dependencyRoot,
-    fileSystem.existsSync,
-    packageManagerHint(manifestEntry.manifest),
-  );
-  snapshotDependencyFiles(
-    state,
-    manifestEntry.path,
-    manager,
-    directory,
-    dependencyRoot,
-    fileSystem,
-  );
-
-  // The pack must resolve exactly like @atlante/resources resolves a project
-  // dependency: from the project root's own node_modules. Installs hoisted
-  // above it (npm/bun workspace roots) are not resolvable from here, so the
-  // check rejects them.
-  const entry = nodeModulesEntry(directory, pack.packageName);
-  const declared = isPackageDeclared(manifestEntry.manifest, pack.packageName);
-  if (declared && fileSystem.existsSync(entry))
-    return { root: dependencyRoot, entry };
-
-  const installCommand = packageManagerCommand(
-    manager,
-    packageManagerInstallArgs(manager),
-  );
-  const args = declared
-    ? packageManagerInstallArgs(manager)
-    : packageManagerAddArgs(manager, pack.packageName);
-
-  // When the dependency root sits above the project, a workspace-scoped
-  // install hoists the pack out of the project's own node_modules; the
-  // missing-entry diagnostic then names the root instead of the install.
-  const hoistedRoot = dependencyRoot === directory ? undefined : dependencyRoot;
-  const step = runPackageManagerStep(
-    manager,
-    args,
+  return ensurePackDependencyInstalled(
     directory,
     pack,
-    entry,
-    installCommand,
-    hoistedRoot,
-    runPackageManager,
+    state,
     fileSystem,
+    runPackageManager,
   );
-  if (step.error) return { error: step.error };
-  // Only the add path mutates a manifest and it succeeded, so only it records
-  // the post-rollback reconciliation of node_modules.
-  if (!declared) {
-    state.reconciler = { manager, command: installCommand, directory };
-  }
-  return { root: dependencyRoot, entry };
 }
 
 /**
@@ -670,51 +275,7 @@ function locateInstalledPack(
   pack: SelectedPack,
   fileSystem: InitFileSystem,
 ): { root: string } | { error: string } {
-  if (!fileSystem.existsSync(entry)) {
-    return {
-      error: formatInitError(
-        "pack-not-installed",
-        `${pack.packageName} is declared but not installed`,
-        {
-          expected: `${entry} to exist`,
-          next: "run your package manager's install command and run `atlante init` again",
-        },
-      ),
-    };
-  }
-  let root: string;
-  try {
-    root = fileSystem.realpathSync(entry);
-  } catch (cause) {
-    return {
-      error: formatInitError(
-        "pack-not-installed",
-        `could not resolve the installed ${pack.packageName}`,
-        {
-          expected: `${entry} to be a readable package directory`,
-          next: "run your package manager's install command and run `atlante init` again",
-          cause: String(cause),
-        },
-      ),
-    };
-  }
-  try {
-    createPackageResourcePack(root, pack.packageName);
-  } catch (cause) {
-    return {
-      error: formatInitError(
-        "invalid-pack",
-        `the installed ${pack.packageName} is not a valid Atlante pack`,
-        {
-          expected:
-            "a pack manifest declaring its own name and numeric atlante.format 1",
-          next: "fix the installed pack and run `atlante init` again",
-          cause: cause instanceof Error ? cause.message : String(cause),
-        },
-      ),
-    };
-  }
-  return { root };
+  return locateInstalledPackDependency(entry, pack, fileSystem);
 }
 
 /** Resolves the bundled first-party pack root used for preset discovery. */
