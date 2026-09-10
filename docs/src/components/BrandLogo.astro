@@ -1,0 +1,24 @@
+---
+import logoSource from "../assets/atlante-horizontal.svg?raw";
+
+const markup = logoSource.replace(/\s*<rect\b[^>]*\/>/, "");
+---
+
+<span class="brand-logo" aria-hidden="true" set:html={markup}></span>
+
+<style>
+  .brand-logo {
+    display: block;
+    width: 100%;
+  }
+
+  .brand-logo :global(svg) {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  :global(html[data-theme="dark"]) .brand-logo {
+    filter: brightness(0) invert(1);
+  }
+</style>

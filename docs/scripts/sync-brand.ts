@@ -33,16 +33,12 @@ for (const family of families) {
 
 rmSync(assetsDir, { recursive: true, force: true });
 mkdirSync(assetsDir, { recursive: true });
-for (const file of [
-  "atlante-horizontal.svg",
-  "atlante-horizontal-reverse.svg",
-]) {
-  const logo = readFileSync(join(exportsDir, "horizontal", file), "utf8");
-  writeFileSync(
-    join(assetsDir, file),
-    logo.replaceAll('url("../../../fonts/', 'url("/fonts/'),
-  );
-}
+const logoFile = "atlante-horizontal.svg";
+const logo = readFileSync(join(exportsDir, "horizontal", logoFile), "utf8");
+writeFileSync(
+  join(assetsDir, logoFile),
+  logo.replaceAll('url("../../../fonts/', 'url("/fonts/'),
+);
 
 const source = readFileSync(
   join(repoRoot, "brand", "atlante-design-tokens.css"),
