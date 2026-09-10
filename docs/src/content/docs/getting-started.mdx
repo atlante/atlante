@@ -48,10 +48,12 @@ to understand these defaults and the reusable content it includes.
 </Aside>
 
 By default, `init` also registers the read-only Atlante MCP server in the
-OpenCode configuration for this project. It prefers `opencode.jsonc`, updates
-`opencode.json` when that is the only existing file, and creates
-`opencode.jsonc` when neither file exists. Use
-`npx atlante@latest init --no-mcp` when you want to skip that registration.
+OpenCode configuration for this project. It selects the first existing file in
+this order: `.opencode/opencode.jsonc`, `.opencode/opencode.json`,
+`opencode.jsonc`, and `opencode.json`; when none exists, it creates root
+`opencode.jsonc`. Use `npx atlante@latest init --no-mcp` when you want to skip
+that registration. See the [MCP reference](/reference/mcp) for the server
+contract.
 
 ## Inspect the configuration and output
 
@@ -73,7 +75,7 @@ configuration, host configuration, generated native output, and Atlante state:
 ```text
 my-project/
 ├── atlante.jsonc
-├── opencode.jsonc
+├── opencode.jsonc                 # selected host config; may be .opencode/opencode.json[c] or opencode.json
 ├── .opencode/
 │   ├── agents/
 │   │   └── architect.md
@@ -91,9 +93,10 @@ The files have different roles:
 
 - `atlante.jsonc` is the source configuration. Keep it and any resources you
   author in version control.
-- `opencode.jsonc` is the host configuration created by `init` when no OpenCode
-  configuration exists. When `opencode.json` already exists, `init` updates that
-  file instead. The `mcp.atlante` entry is managed there alongside host settings.
+- `opencode.jsonc` is the default host configuration created by `init` when no
+  OpenCode configuration exists. If an OpenCode configuration already exists,
+  `init` updates the first file in its precedence order; the `mcp.atlante` entry
+  is managed there alongside host settings.
 - `.opencode/agents/architect.md` and the skill files are native output. Open
   the agent file to inspect what the build produced, but make changes in the
   source configuration or its resources.

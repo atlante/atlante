@@ -881,13 +881,23 @@ arguments.
 
 By default, `atlante init` MUST register the server in the OpenCode
 configuration for its target directory. With `--no-mcp`, init MUST skip this
-host-file mutation. When registration is enabled, `opencode.jsonc` MUST be
-preferred over `opencode.json`; when neither exists, init MUST create
-`opencode.jsonc`. The managed `mcp.atlante` entry MUST be a local server whose
-command is `npx --yes atlante@<package-version> mcp` and MUST be enabled.
-Registration MUST preserve unrelated settings and comments, be idempotent, and
-fail closed on a conflicting managed entry. Registration MUST participate in
-init's rollback transaction.
+host-file mutation. When registration is enabled, init MUST examine existing
+OpenCode configuration files in this order:
+
+```text
+.opencode/opencode.jsonc
+.opencode/opencode.json
+opencode.jsonc
+opencode.json
+```
+
+The first existing file MUST be the registration target. Init MUST parse every
+existing candidate before writing, and MUST fail closed on malformed candidates
+or a conflicting `mcp.atlante` entry in any candidate. When no candidate exists,
+init MUST create root `opencode.jsonc`. The managed `mcp.atlante` entry MUST be
+a local server whose command is `npx --yes atlante@<package-version> mcp` and
+MUST be enabled. Registration MUST preserve unrelated settings and comments, be
+idempotent, and participate in init's rollback transaction.
 
 ### Examples
 
@@ -952,7 +962,7 @@ A conforming implementation MUST be able to:
 11. preserve the previous valid generated set whenever validation or
     materialization fails;
 12. validate `eval` configuration and scenario documents, including check
-    patterns, before any host run; and
+     patterns, before any host run;
 13. run eval scenarios in a host-delegated sandbox under budget enforcement
     and grade deterministic zero-LLM checks into a local run report; and
 14. expose the read-only `atlante-mcp/v1` context interface with bounded,

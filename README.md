@@ -35,10 +35,11 @@ npx atlante@latest eval            # optional: run eval scenarios in a sandbox
 pack is installed or selected. Pass `--pack <locator>` to start from a
 different pack instead. It also materializes the first native outputs and adds
 the generated folders to `.gitignore`. By default, it also registers the
-version-pinned, read-only Atlante MCP server in the target directory's
-`opencode.jsonc` or `opencode.json`. Pass `--no-mcp` to leave OpenCode
-configuration unchanged. To use the bare `atlante` command, install the CLI
-first:
+version-pinned, read-only Atlante MCP server in the first existing OpenCode
+configuration under `.opencode/` or the project root; when none exists, it
+creates root `opencode.jsonc`. Pass `--no-mcp` to
+leave OpenCode configuration unchanged. To use the bare `atlante` command,
+install the CLI first:
 
 ```bash
 npm install --global atlante
@@ -51,7 +52,7 @@ starts; restart it to pick up new or changed files.
 The MCP server reads the active project from its working directory and exposes
 project inspection, validation, resource listing, offline documentation, and
 versioned schema lookup. It does not modify files, build native outputs, run
-agents, or make network requests. See the [CLI reference](https://docs.atlante.sh/reference/cli#atlante-mcp)
+agents, or make network requests. See the [MCP reference](https://docs.atlante.sh/reference/mcp)
 for the tool contract.
 
 ## How it works
@@ -188,7 +189,7 @@ To publish your own reusable content, read
 - [Getting started](https://docs.atlante.sh/getting-started)
 - Concepts: [Configuration](https://docs.atlante.sh/concepts/configuration), [Resolution](https://docs.atlante.sh/concepts/resolution), [Templates](https://docs.atlante.sh/concepts/templates), [Values](https://docs.atlante.sh/concepts/values), [Resources](https://docs.atlante.sh/concepts/resources), [Evaluation](https://docs.atlante.sh/concepts/evaluation)
 - Guides: [Build a harness](https://docs.atlante.sh/guides/building-a-harness), [Evaluate your harness](https://docs.atlante.sh/guides/evaluating-a-harness), [Author a pack](https://docs.atlante.sh/guides/authoring-packs)
-- Reference: [CLI](https://docs.atlante.sh/reference/cli), [Eval](https://docs.atlante.sh/reference/eval), [Template syntax](https://docs.atlante.sh/reference/template-syntax), [Schema](https://docs.atlante.sh/reference/schema), [Materialization](https://docs.atlante.sh/reference/materialization), [Diagnostics](https://docs.atlante.sh/reference/diagnostics)
+- Reference: [MCP](https://docs.atlante.sh/reference/mcp), [CLI](https://docs.atlante.sh/reference/cli), [Eval](https://docs.atlante.sh/reference/eval), [Template syntax](https://docs.atlante.sh/reference/template-syntax), [Schema](https://docs.atlante.sh/reference/schema), [Materialization](https://docs.atlante.sh/reference/materialization), [Diagnostics](https://docs.atlante.sh/reference/diagnostics)
 - [Troubleshooting](https://docs.atlante.sh/troubleshooting)
 
 ## Status

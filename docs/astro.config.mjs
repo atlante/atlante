@@ -102,6 +102,7 @@ export default defineConfig({
         {
           label: "Reference",
           items: [
+            { slug: "reference/mcp", label: "MCP" },
             { slug: "reference/cli", label: "CLI" },
             { slug: "reference/eval", label: "Eval" },
             { slug: "reference/schema", label: "Schema" },

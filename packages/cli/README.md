@@ -38,10 +38,11 @@ atlante init
 (`atlante.jsonc` or `atlante.json`) or a project directory.
 
 `init` adds the generated folders to `.gitignore`, registers `mcp.atlante` in
-the target directory's `opencode.jsonc` or `opencode.json`, and performs a
-build. Use `--no-mcp` to leave OpenCode configuration untouched. Generated
-outputs may embed rendered values, so they stay local: `init` ignores them in
-git.
+the first existing OpenCode configuration under `.opencode/` or the project
+root, and performs a build. When no OpenCode configuration exists, it creates
+root `opencode.jsonc`. Use `--no-mcp` to leave OpenCode configuration
+untouched. Generated outputs may embed rendered values, so they stay local:
+`init` ignores them in git.
 
 The MCP server is read-only and offline. Its tools inspect the active project,
 validate it, list resolved resources, search and read the bundled documentation,
@@ -60,4 +61,5 @@ and the lockfile.
 ## Documentation
 
 Command flags, exit codes, diagnostics, and configuration details live in the
-[CLI reference](https://docs.atlante.sh/reference/cli).
+[CLI reference](https://docs.atlante.sh/reference/cli). The MCP tools and
+transport contract live in the [MCP reference](https://docs.atlante.sh/reference/mcp).
