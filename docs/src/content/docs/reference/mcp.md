@@ -66,25 +66,6 @@ Registration preserves unrelated settings and JSONC comments, is idempotent,
 and participates in `init`'s rollback transaction. See the [CLI reference](/reference/cli#atlante-init)
 for initialization and package-installation behavior.
 
-## JSON-RPC methods
-
-The server handles these methods:
-
-| Method | Result |
-| --- | --- |
-| `initialize` | Negotiated protocol version, tool capability, and server information. |
-| `notifications/initialized` | Notification with no response. |
-| `tools/list` | The six Atlante tool definitions and input schemas. |
-| `tools/call` | The selected tool result. |
-| `ping` | Empty successful response. |
-| `shutdown` | Empty successful response, then stops reading requests. |
-| `exit` | Stops reading requests without a response. |
-| `notifications/cancelled` | Notification with no response. |
-
-Unknown methods, unknown tools, malformed JSON-RPC requests, and invalid
-JSON-RPC parameters use standard JSON-RPC errors. Tool argument errors use the
-structured envelope described below.
-
 ## Tool result envelope
 
 The JSON-RPC `result` for every `tools/call` response has this shape. The
@@ -128,6 +109,10 @@ Diagnostics provide a stable code and message and may include a source, project
 relative path, JSON pointer, source location, expected shape, recovery action,
 or cause. Normal project paths are project-relative; machine-specific absolute
 paths are redacted.
+
+Unknown methods and tools, malformed JSON-RPC requests, and invalid JSON-RPC
+parameters use standard JSON-RPC errors instead of this envelope. Tool argument
+errors use the envelope with the `invalid` status.
 
 ## Tools
 
