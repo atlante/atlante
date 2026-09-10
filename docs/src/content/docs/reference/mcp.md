@@ -137,7 +137,8 @@ with hashes. Unknown values return the `invalid` status with an
 
 ### `list_resources`
 
-List only resources successfully resolved by the active project.
+List the templates, instances, and bindings successfully resolved by the
+active project.
 
 | Input | Type | Range | Default |
 | --- | --- | --- | --- |
