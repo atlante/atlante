@@ -413,4 +413,80 @@ describe("MCP stdio protocol", () => {
       },
     });
   });
+
+  test("validates inspect_project arguments and forwards include sections", async () => {
+    const calls: Array<Record<string, unknown>> = [];
+    const { server, output } = harness({
+      inspectProject: (input) => {
+        calls.push({ ...input });
+        return envelope("inspect_project", { include: input.include ?? null });
+      },
+    });
+
+    const call = (id: number, args: Record<string, unknown>) =>
+      server.handleLine(
+        JSON.stringify({
+          jsonrpc: "2.0",
+          id,
+          method: "tools/call",
+          params: { name: "inspect_project", arguments: args },
+        }),
+      );
+
+    await call(20, { include: [], unexpected: true });
+    expect(response(output)).toMatchObject({
+      id: 20,
+      result: {
+        isError: true,
+        structuredContent: {
+          tool: "inspect_project",
+          status: "invalid",
+          diagnostics: [{ code: "invalid-arguments" }],
+        },
+      },
+    });
+
+    await call(21, { include: "resolved" });
+    expect(response(output)).toMatchObject({
+      id: 21,
+      result: { isError: true, structuredContent: { status: "invalid" } },
+    });
+
+    await call(22, { include: ["resolved", "bogus"] });
+    expect(response(output)).toMatchObject({
+      id: 22,
+      result: { isError: true, structuredContent: { status: "invalid" } },
+    });
+
+    await call(23, { include: ["resolved", "artifact-files"] });
+    expect(response(output)).toMatchObject({
+      id: 23,
+      result: {
+        isError: false,
+        structuredContent: {
+          tool: "inspect_project",
+          status: "ok",
+          data: { include: ["resolved", "artifact-files"] },
+        },
+      },
+    });
+    expect(calls.at(-1)).toEqual({ include: ["resolved", "artifact-files"] });
+
+    await call(24, {});
+    expect(response(output)).toMatchObject({
+      id: 24,
+      result: { isError: false, structuredContent: { status: "ok" } },
+    });
+    expect(calls.at(-1)).toEqual({});
+
+    await call(25, { include: [] });
+    expect(response(output)).toMatchObject({
+      id: 25,
+      result: {
+        isError: false,
+        structuredContent: { status: "ok", data: { include: [] } },
+      },
+    });
+    expect(calls.at(-1)).toEqual({ include: [] });
+  });
 });

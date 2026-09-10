@@ -120,16 +120,25 @@ errors use the envelope with the `invalid` status.
 
 Inspect the active project without writing files.
 
-**Input:** no arguments.
+| Input | Type | Range | Default |
+| --- | --- | --- | --- |
+| `include` | string[] | `authored`, `effective`, `resolved`, `provenance`, `artifact-files` | `[]` |
 
-The result reports the authored, effective, and resolved configuration;
-configuration provenance; validation, resource, documentation, schema, and
+The result reports configuration metadata (`exists`, `path`, `schema_uri`,
+`version`); validation, resource, documentation, schema, and
 generated-artifact capabilities; diagnostics; and the freshness of
-`.atlante/opencode-native.json`.
+`.atlante/opencode-native.json` (`status`, `file_count`).
+
+Each `include` value adds one section to the result. `authored`, `effective`,
+and `resolved` add the corresponding configuration views, `provenance` adds
+the per-pointer origin map, and `artifact-files` adds the generated-file list
+with hashes. Unknown values return the `invalid` status with an
+`invalid-arguments` diagnostic.
 
 ### `list_resources`
 
-List only resources successfully resolved by the active project.
+List the templates, instances, and bindings successfully resolved by the
+active project.
 
 | Input | Type | Range | Default |
 | --- | --- | --- | --- |
