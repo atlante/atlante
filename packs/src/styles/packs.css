@@ -625,12 +625,6 @@
     font-size: 1rem;
   }
 
-  .readme p,
-  .readme li {
-    text-align: justify;
-    text-wrap: pretty;
-  }
-
   .readme p + p,
   .readme ul + p,
   .readme p + ul,
@@ -644,8 +638,18 @@
     padding-inline-start: 1.25em;
   }
 
+  .readme p,
+  .readme li {
+    text-align: justify;
+    text-wrap: pretty;
+    overflow-wrap: anywhere;
+  }
+
   .readme table {
+    display: block;
+    max-width: 100%;
     border-collapse: collapse;
+    overflow-x: auto;
     font-size: var(--text-small);
   }
 
@@ -654,6 +658,7 @@
     padding: var(--space-2) var(--space-3);
     border: var(--line);
     text-align: start;
+    overflow-wrap: anywhere;
   }
 
   .readme pre {
