@@ -303,6 +303,11 @@
       padding-inline var(--duration-utility) var(--ease-standard);
   }
 
+  /* The footer's separator closes the list; the last row must not double it. */
+  .pack-list .pack-row:last-child {
+    border-block-end: 0;
+  }
+
   .pack-row:hover {
     background: var(--surface-soft);
     padding-inline: var(--space-3);
