@@ -60,6 +60,12 @@ describe.skipIf(process.env.ATLANTE_BUILT_OUTPUT_TESTS !== "1")(
       expect(html).toContain('aria-label="Switch theme"');
     });
 
+    it("inlines all stylesheets to avoid render-blocking requests", () => {
+      const html = read("dist/index.html");
+      expect(html).not.toContain('<link rel="stylesheet"');
+      expect(html).toContain("<style>");
+    });
+
     it("keeps the built schemas byte-equivalent to the authorities", () => {
       for (const name of ["schema.json", "eval-scenario.json"]) {
         expect(

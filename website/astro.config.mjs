@@ -33,7 +33,9 @@ function playgroundDevApi() {
 export default defineConfig({
   site: "https://atlante.sh",
   trailingSlash: "never",
-  build: { format: "file" },
+  // Inline all CSS: the stylesheets are tiny, and every render-blocking
+  // request adds a full roundtrip before first paint.
+  build: { format: "file", inlineStylesheets: "always" },
   image: { service: passthroughImageService() },
   vite: {
     plugins: [playgroundDevApi()],

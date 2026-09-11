@@ -28,6 +28,12 @@ describe.skipIf(process.env.ATLANTE_BUILT_OUTPUT_TESTS !== "1")(
       expect(html).toContain('id="pack-sort"');
     });
 
+    it("inlines all stylesheets to avoid render-blocking requests", () => {
+      const html = read("dist/index.html");
+      expect(html).not.toContain('<link rel="stylesheet"');
+      expect(html).toContain("<style>");
+    });
+
     it("renders the pack detail page with installation and inspection", () => {
       const html = read("dist/@atlante/pack.html");
       expect(html).toContain("npx atlante@latest init --pack @atlante/pack");
