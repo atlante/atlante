@@ -640,9 +640,10 @@
   .readme pre {
     margin-block: var(--space-4);
     padding: var(--space-4);
-    background: var(--ds-code-bg);
-    color: var(--ds-code-fg);
-    border: var(--line);
+    /* Code blocks share the try-it-now command skin. */
+    background: color-mix(in oklab, var(--ds-bg) 96%, var(--ds-fg));
+    color: var(--ds-fg);
+    border: 1px solid rgb(160 160 160 / 0.5);
     border-radius: 4px;
     overflow-x: auto;
     font-size: var(--text-small);
