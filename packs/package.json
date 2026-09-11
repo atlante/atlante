@@ -13,7 +13,6 @@
     "preview": "astro preview",
     "sync:brand": "bun scripts/sync-brand.ts",
     "sync:packs": "bun scripts/sync-packs.ts",
-    "fake:packs": "bun scripts/fake-packs.ts",
     "astro": "astro"
   },
   "devDependencies": {

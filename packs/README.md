@@ -14,7 +14,6 @@ the network fetch fails and is never edited by hand.
 bun run --cwd packs dev    # dev server on port 4323
 bun run --cwd packs build  # sync brand assets, sync the registry, build Astro
 bun run --cwd packs check  # build, then run the workspace test suite
-bun run --cwd packs fake:packs # append ten local fixture packs to the snapshot
 ```
 
 The catalog lives at the subdomain root: `/` lists the packs and
@@ -28,7 +27,6 @@ packs.atlante.sh. The legacy `/packs` path redirects to `/`.
 - `src/data/registry-manifest.json` — the curated pack manifest (authored).
 - `src/data/registry-snapshot.json` — the generated registry snapshot.
 - `scripts/sync-packs.ts` — the registry synchronization step.
-- `scripts/fake-packs.ts` — local-only fixture packs for exercising the catalog; `sync:packs` restores the real snapshot.
 - `scripts/sync-brand.ts` — brand asset synchronization; see `scripts/sync-brand-assets.ts` in the repository root.
 
 ## Adding a pack to the catalog
