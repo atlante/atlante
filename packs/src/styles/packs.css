@@ -487,7 +487,6 @@
 
   .install-panel {
     padding-block: var(--space-8);
-    border-block-end: var(--line);
   }
 
   .install-panel-header {
@@ -855,21 +854,6 @@
 
   .metadata-item code {
     font-size: var(--text-meta);
-  }
-
-  .trust-note {
-    max-width: 52ch;
-    margin-block-start: var(--space-4);
-    padding-inline-start: var(--space-4);
-    color: var(--ds-muted);
-    border-inline-start: 3px solid var(--ds-warning);
-    font-size: var(--text-small);
-  }
-
-  .trust-note strong {
-    display: block;
-    margin-block-end: var(--space-1);
-    color: var(--ds-fg);
   }
 
   .sidebar-sync {

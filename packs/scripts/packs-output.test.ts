@@ -33,7 +33,6 @@ describe.skipIf(process.env.ATLANTE_BUILT_OUTPUT_TESTS !== "1")(
       expect(html).toContain("npx atlante@latest init --pack @atlante/pack");
       expect(html).toContain("npm install --save-dev @atlante/pack");
       expect(html).toContain("atlante.format: 1");
-      expect(html).toContain("Read before installing");
       expect(html).toContain("data-file-select");
       expect(html).toContain("data-file-view");
       expect(html).toContain("atlante.jsonc");
