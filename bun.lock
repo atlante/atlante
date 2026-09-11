@@ -101,6 +101,13 @@
         "jsonc-parser": "^3.3.1",
       },
     },
+    "packs": {
+      "name": "@atlante/packs",
+      "version": "0.1.0",
+      "devDependencies": {
+        "astro": "^5.0.0",
+      },
+    },
     "website": {
       "name": "@atlante/website",
       "version": "0.1.0",
@@ -145,6 +152,8 @@
     "@atlante/opencode": ["@atlante/opencode@workspace:packages/opencode"],
 
     "@atlante/pack": ["@atlante/pack@workspace:packages/pack"],
+
+    "@atlante/packs": ["@atlante/packs@workspace:packs"],
 
     "@atlante/resources": ["@atlante/resources@workspace:packages/resources"],
 

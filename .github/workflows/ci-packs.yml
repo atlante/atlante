@@ -1,0 +1,33 @@
+name: ci-packs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packs/**"
+      - "brand/**"
+      - "package.json"
+      - "bun.lock"
+      - ".bun-version"
+      - ".github/workflows/ci-packs.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-packs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  packs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: ".bun-version"
+      - run: bun install --frozen-lockfile
+
+      # Builds the pack explorer (syncing brand assets and the registry
+      # snapshot from npm) and runs the packs workspace's internal test suite.
+      - run: bun run packs:check

@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.astro/
+public/brand/
+public/fonts/
+public/og.png
+src/styles/atlante-tokens.css
+src/assets/
+.vercel
