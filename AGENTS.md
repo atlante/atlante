@@ -49,7 +49,7 @@ bun run test:e2e                # full command-path tests (CLI spawns, real bun 
 bun run type:check              # type-check all packages
 bun run lint:check              # lint + format check
 bun run build                   # build publishable CLI + internal adapter artifacts (pack is static)
-bun run quick:check             # type:check + lint:check + test:unit (PR gate, fast inner loop)
+bun run quick:check             # type:check + lint:check + test:unit (fast inner loop)
 bun run core:check              # toolchain lane: build + type + lint + all tests + both smokes
 bun run docs:check              # docs lane: site build + docs test suite
 bun run website:check           # website lane: site build + website test suite
