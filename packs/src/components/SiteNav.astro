@@ -1,0 +1,168 @@
+---
+import BrandLogo from "./BrandLogo.astro";
+
+interface Props {
+  current?: "packs";
+}
+
+const { current } = Astro.props;
+---
+
+<header class="site-header">
+  <div class="shell header-inner">
+    <a class="brand-link" href="/packs" aria-label="Atlante pack explorer">
+      <span class="brand-holder">
+        <BrandLogo variant="horizontal" />
+      </span>
+    </a>
+    <nav class="primary-nav" aria-label="Primary">
+      <a class="nav-link" href="/packs" aria-current={current === "packs" ? "page" : undefined}>Packs</a>
+      <a class="nav-link" href="https://docs.atlante.sh">Docs</a>
+      <a class="nav-link" href="https://github.com/atlante/atlante">GitHub</a>
+    </nav>
+    <div class="header-actions">
+      <button
+        class="icon-button"
+        type="button"
+        data-theme-toggle
+        aria-label="Switch theme"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle
+            cx="12"
+            cy="12"
+            r="8"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"></circle>
+          <path
+            d="M12 4a8 8 0 0 1 0 16Z"
+            fill="currentColor"></path>
+          <ellipse
+            cx="12"
+            cy="12"
+            rx="11"
+            ry="3.6"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1"
+            transform="rotate(-18 12 12)"></ellipse>
+        </svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<style>
+  .site-header {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 20;
+    min-height: 72px;
+    background: color-mix(in oklab, var(--ds-bg) 94%, transparent);
+    border-block-end: var(--line);
+    backdrop-filter: blur(14px);
+  }
+
+  .header-inner {
+    min-height: 72px;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: var(--space-8);
+  }
+
+  .brand-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--control-min);
+    text-decoration: none;
+  }
+
+  .brand-holder {
+    display: block;
+    width: 132px;
+    --brand-logo-width: 132px;
+  }
+
+  .primary-nav {
+    justify-self: center;
+    display: flex;
+    align-items: center;
+    gap: var(--space-8);
+  }
+
+  .nav-link {
+    min-height: var(--control-min);
+    display: inline-flex;
+    align-items: center;
+    border-block-end: 2px solid transparent;
+    font-size: var(--text-small);
+    font-weight: 650;
+    letter-spacing: 0.035em;
+    text-decoration: none;
+  }
+
+  .nav-link:hover,
+  .nav-link[aria-current="page"] {
+    border-color: var(--ds-border);
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .icon-button {
+    width: var(--control-min);
+    height: var(--control-min);
+    display: inline-grid;
+    place-items: center;
+    padding: 0;
+    color: var(--ds-fg);
+    background: transparent;
+    border: var(--line);
+    border-radius: 50%;
+  }
+
+  .icon-button:hover {
+    background: var(--surface-raised);
+    border-color: var(--ds-border);
+  }
+
+  .icon-button svg {
+    width: 19px;
+    height: 19px;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .icon-button,
+    .nav-link {
+      transition:
+        color var(--duration-utility) var(--ease-standard),
+        background-color var(--duration-utility) var(--ease-standard),
+        border-color var(--duration-utility) var(--ease-standard);
+    }
+  }
+
+  @media (max-width: 760px) {
+    .site-header,
+    .header-inner {
+      min-height: 64px;
+    }
+
+    .header-inner {
+      grid-template-columns: 1fr auto;
+    }
+
+    .primary-nav {
+      display: none;
+    }
+
+    .brand-holder {
+      width: 116px;
+      --brand-logo-width: 116px;
+    }
+  }
+</style>

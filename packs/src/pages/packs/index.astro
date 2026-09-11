@@ -1,13 +1,243 @@
 ---
+import "../../styles/packs.css";
 import BaseLayout from "../../layouts/BaseLayout.astro";
+import SiteNav from "../../components/SiteNav.astro";
+import SiteFooter from "../../components/SiteFooter.astro";
+import { formatCount, formatSyncTime } from "../../data/format";
+import snapshot from "../../data/registry-snapshot.json";
+
+const packs = snapshot.packs;
 ---
 
 <BaseLayout
   title="Pack explorer | Atlante"
-  description="Discover and inspect Atlante packs published as npm packages."
+  description="Find reusable Atlante presets, templates, and harness configurations. Inspect every pack before adding it to your project."
   canonicalPath="/packs"
 >
+  <SiteNav current="packs" />
+
   <main id="main">
-    <h1>Pack explorer</h1>
+    <section class="shell catalog-hero" aria-labelledby="catalog-title">
+      <div class="hero-copy">
+        <span class="eyebrow">Atlante ecosystem</span>
+        <h1 id="catalog-title">Pack explorer</h1>
+        <p>
+          Find reusable presets, templates, and harness configurations.
+          Inspect every pack before adding it to your project.
+        </p>
+      </div>
+      <div class="catalog-mark" aria-hidden="true">
+        <svg viewBox="0 0 240 240" fill="none">
+          <circle cx="120" cy="120" r="88" stroke="currentColor"></circle>
+          <ellipse cx="120" cy="120" rx="88" ry="32" stroke="currentColor"></ellipse>
+          <ellipse cx="120" cy="120" rx="32" ry="88" stroke="currentColor"></ellipse>
+          <path d="M48 70h144M48 170h144" stroke="currentColor"></path>
+          <path
+            d="m69 149 33-52 31 27 37-57M69 149l51 24 50-106"
+            stroke="currentColor"
+            stroke-width="1.5"></path>
+          <g fill="currentColor">
+            <circle cx="69" cy="149" r="3.5"></circle>
+            <circle cx="102" cy="97" r="3.5"></circle>
+            <circle cx="133" cy="124" r="3.5"></circle>
+            <circle cx="120" cy="173" r="3.5"></circle>
+            <circle cx="170" cy="67" r="3.5"></circle>
+          </g>
+        </svg>
+      </div>
+    </section>
+
+    <section class="shell catalog-controls" aria-label="Pack filters">
+      <div class="controls-row">
+        <div class="search-wrap">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle
+              cx="10.5"
+              cy="10.5"
+              r="6.5"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"></circle>
+            <path
+              d="m15.5 15.5 4.5 4.5"
+              stroke="currentColor"
+              stroke-width="1.6"></path>
+          </svg>
+          <label class="sr-only" for="pack-search">Search packs</label>
+          <input
+            class="search-input"
+            id="pack-search"
+            type="search"
+            placeholder="Search by package, description, preset, or tag"
+            autocomplete="off"
+          />
+        </div>
+        <label class="sort-control" for="pack-sort">
+          <span class="section-label">Sort by</span>
+          <select class="sort-select" id="pack-sort">
+            <option value="downloads">npm downloads</option>
+            <option value="stars">GitHub stars</option>
+            <option value="updated">Recently updated</option>
+            <option value="name">Package name</option>
+          </select>
+        </label>
+      </div>
+      <div class="catalog-status" aria-live="polite">
+        <span><strong id="result-count">{packs.length} {packs.length === 1 ? "pack" : "packs"}</strong> in the curated index</span>
+        <span>Raw metrics · synchronized {formatSyncTime(snapshot.syncedAt)}</span>
+      </div>
+    </section>
+
+    <section class="shell" aria-labelledby="pack-list-title">
+      <h2 class="sr-only" id="pack-list-title">Available packs</h2>
+      <div class="pack-table-header" aria-hidden="true">
+        <span class="column-label">No.</span>
+        <span class="column-label">Pack</span>
+        <span class="column-label">Presets</span>
+        <span class="column-label">Downloads</span>
+        <span class="column-label">Stars</span>
+        <span></span>
+      </div>
+      <ol class="pack-list" id="pack-list">
+        {packs.map((pack, index) => (
+          <li
+            class="pack-row"
+            data-pack-row
+            data-name={pack.name}
+            data-description={pack.description}
+            data-tags={pack.tags.join(" ")}
+            data-presets={pack.presets.map((preset) => preset.locator).join(" ")}
+            data-downloads={pack.metrics.downloads ?? -1}
+            data-stars={pack.metrics.stars ?? -1}
+            data-updated={pack.metrics.publishedAt ?? ""}
+            data-position={index + 1}
+          >
+            <span class="pack-rank">{String(index + 1).padStart(2, "0")}</span>
+            <div>
+              <div class="pack-name-line">
+                <a
+                  class="pack-link"
+                  href={`/packs/${pack.name}`}
+                >{pack.name}</a>
+                <span class={`badge ${pack.official ? "official" : "community"}`}>
+                  {pack.official ? "Official" : "Community"}
+                </span>
+              </div>
+              <p class="pack-description">{pack.description}</p>
+              <div class="pack-tags">
+                {pack.tags.map((tag) => (
+                  <span class="tag">{tag}</span>
+                ))}
+              </div>
+              <div class="pack-mobile-metrics" aria-label="Pack metrics">
+                <span><strong>{pack.presets.length}</strong> presets</span>
+                <span><strong>{formatCount(pack.metrics.downloads)}</strong> downloads</span>
+                <span><strong>{formatCount(pack.metrics.stars)}</strong> stars</span>
+              </div>
+            </div>
+            <div class="metric">
+              <span class="metric-value">{pack.presets.length}</span>
+              <span class="metric-label-mobile"> presets</span>
+            </div>
+            <div class="metric">
+              <span class="metric-value">{formatCount(pack.metrics.downloads)}</span>
+              <span class="metric-label-mobile"> downloads</span>
+            </div>
+            <div class="metric">
+              <span class="metric-value">{formatCount(pack.metrics.stars)}</span>
+              <span class="metric-label-mobile"> stars</span>
+            </div>
+            <span class="row-arrow" aria-hidden="true">→</span>
+          </li>
+        ))}
+      </ol>
+      <div class="empty-state" id="empty-state" hidden>
+        <h2>No packs found</h2>
+        <p>Try a package name, preset, or broader tag.</p>
+      </div>
+    </section>
+
+    <aside class="shell catalog-note" aria-label="Catalog note">
+      <span class="section-label">About the index</span>
+      <p>
+        This is a curated directory, not a registry. Pack metadata is
+        synchronized from npm and public GitHub data, then published as a
+        static snapshot. Raw metrics are shown without a composite score.
+      </p>
+    </aside>
   </main>
+
+  <SiteFooter syncedAt={snapshot.syncedAt} />
+
+  <script>
+    const packList = document.querySelector<HTMLOListElement>("#pack-list");
+    const searchInput = document.querySelector<HTMLInputElement>("#pack-search");
+    const sortSelect = document.querySelector<HTMLSelectElement>("#pack-sort");
+    const resultCount = document.querySelector<HTMLElement>("#result-count");
+    const emptyState = document.querySelector<HTMLElement>("#empty-state");
+
+    if (packList && searchInput && sortSelect && resultCount && emptyState) {
+      const rows = [...packList.querySelectorAll<HTMLElement>("[data-pack-row]")];
+      const state = { search: "", sort: "downloads" };
+
+      const searchableText = (element: HTMLElement): string =>
+        [
+          element.dataset.name ?? "",
+          element.dataset.description ?? "",
+          element.dataset.tags ?? "",
+          element.dataset.presets ?? "",
+        ]
+          .join(" ")
+          .toLowerCase();
+
+      const metrics = (row: HTMLElement): Record<string, string> => ({
+        downloads: row.dataset.downloads ?? "-1",
+        stars: row.dataset.stars ?? "-1",
+        updated: row.dataset.updated ?? "",
+        name: row.dataset.name ?? "",
+      });
+
+      const render = (): void => {
+        const query = state.search.trim().toLowerCase();
+        const visible = rows.filter((row) =>
+          searchableText(row).includes(query),
+        );
+
+        visible.sort((a, b) => {
+          const left = metrics(a);
+          const right = metrics(b);
+          if (state.sort === "name") {
+            return left.name.localeCompare(right.name);
+          }
+          if (state.sort === "updated") {
+            return right.updated.localeCompare(left.updated);
+          }
+          return Number(right[state.sort]) - Number(left[state.sort]);
+        });
+
+        for (const row of rows) {
+          const position = visible.indexOf(row);
+          row.hidden = position === -1;
+          if (position !== -1) {
+            row.style.order = String(position);
+            const rank = row.querySelector<HTMLElement>(".pack-rank");
+            if (rank) rank.textContent = String(position + 1).padStart(2, "0");
+          }
+        }
+
+        resultCount.textContent = `${visible.length} ${visible.length === 1 ? "pack" : "packs"}`;
+        emptyState.hidden = visible.length !== 0;
+      };
+
+      searchInput.addEventListener("input", () => {
+        state.search = searchInput.value;
+        render();
+      });
+
+      sortSelect.addEventListener("change", () => {
+        state.sort = sortSelect.value;
+        render();
+      });
+    }
+  </script>
 </BaseLayout>

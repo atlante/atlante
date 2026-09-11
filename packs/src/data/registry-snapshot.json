@@ -1,21 +1,14 @@
 {
-  "syncedAt": "2026-09-11T08:41:22.295Z",
+  "syncedAt": "2026-09-11T08:45:01.180Z",
   "packs": [
     {
       "name": "@atlante/pack",
       "official": true,
-      "tags": [
-        "agents",
-        "skills",
-        "workflow"
-      ],
+      "tags": ["agents", "skills", "workflow"],
       "description": "Atlante's first-party static resource pack",
       "version": "0.3.0",
       "license": "MIT",
-      "maintainers": [
-        "jeeiii",
-        "cedoor"
-      ],
+      "maintainers": ["jeeiii", "cedoor"],
       "repository": {
         "url": "git+https://github.com/atlante/atlante.git",
         "slug": "atlante/atlante"

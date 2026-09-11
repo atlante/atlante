@@ -1,0 +1,134 @@
+---
+import BrandLogo from "./BrandLogo.astro";
+import { formatSyncTime } from "../data/format";
+
+interface Props {
+  syncedAt: string;
+}
+
+const { syncedAt } = Astro.props;
+
+const github = "https://github.com/atlante/atlante";
+
+const groups = [
+  {
+    label: "Explore",
+    links: [
+      { label: "Packs", href: "/packs" },
+      { label: "Author a pack", href: "https://docs.atlante.sh/guides/authoring-packs" },
+      { label: "Resources", href: "https://docs.atlante.sh/concepts/resources" },
+    ],
+  },
+  {
+    label: "Project",
+    links: [
+      { label: "GitHub", href: github },
+      { label: "Releases", href: `${github}/releases` },
+      { label: "Issues", href: `${github}/issues` },
+    ],
+  },
+  {
+    label: "Reference",
+    links: [
+      { label: "Documentation", href: "https://docs.atlante.sh" },
+      { label: "Specification", href: `${github}/blob/main/SPECIFICATION.md` },
+      { label: "npm", href: "https://www.npmjs.com/package/atlante" },
+    ],
+  },
+];
+---
+
+<footer class="site-footer">
+  <div class="shell footer-inner">
+    <div class="footer-brand">
+      <a class="brand-link" href="/packs" aria-label="Atlante pack explorer">
+        <span class="brand-holder">
+          <BrandLogo variant="horizontal" />
+        </span>
+      </a>
+      <p>Define, test, evolve, and share your harness as code.</p>
+    </div>
+    {groups.map((group) => (
+      <nav class="footer-group" aria-label={group.label}>
+        <h2>{group.label}</h2>
+        <ul>
+          {group.links.map((link) => (
+            <li><a href={link.href}>{link.label}</a></li>
+          ))}
+        </ul>
+      </nav>
+    ))}
+  </div>
+  <p class="sync-line">
+    Pack data synchronized {formatSyncTime(syncedAt)}
+  </p>
+</footer>
+
+<style>
+  .site-footer {
+    border-block-start: 1px solid var(--ds-border);
+  }
+
+  .footer-inner {
+    display: grid;
+    grid-template-columns: minmax(220px, 1.5fr) repeat(3, 1fr);
+    gap: var(--space-12);
+    padding-block: var(--space-16);
+  }
+
+  .footer-brand p {
+    max-width: 34ch;
+    margin-block-start: var(--space-4);
+    color: var(--ds-muted);
+    font-family: var(--font-body);
+  }
+
+  .brand-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--control-min);
+    text-decoration: none;
+  }
+
+  .brand-holder {
+    display: block;
+    width: 132px;
+    --brand-logo-width: 132px;
+  }
+
+  .footer-group h2 {
+    margin-block-end: var(--space-4);
+    color: var(--ds-muted);
+    font: 600 var(--text-meta) / 1.4 var(--font-mono);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .footer-group ul {
+    display: grid;
+    gap: var(--space-2);
+    list-style: none;
+    padding: 0;
+    font-size: var(--text-small);
+  }
+
+  .sync-line {
+    padding-block: var(--space-4);
+    color: var(--ds-muted);
+    border-block-start: var(--line);
+    font: var(--text-meta) / 1.4 var(--font-mono);
+    text-align: center;
+  }
+
+  @media (max-width: 760px) {
+    .footer-inner {
+      grid-template-columns: 1fr;
+      gap: var(--space-8);
+    }
+
+    .footer-brand {
+      padding-block-end: var(--space-6);
+      border-block-end: var(--line);
+    }
+  }
+</style>
