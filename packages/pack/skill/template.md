@@ -1,9 +1,9 @@
-# {{title}}
+{{#if title}}# {{title}}
 
-## Overview
+{{/if}}{{#if overview}}## Overview
 
 {{overview}}
-{{#each sections}}
+{{/if}}{{#each sections}}
 {{#if markdown}}
 
 {{> slot/sections/markdown markdown}}

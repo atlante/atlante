@@ -70,7 +70,22 @@ and publication failures can produce additional stable codes.
 | `package-not-declared` | A package locator lacks an admitted declaration: project references use `dependencies`, `optionalDependencies`, or `devDependencies`; pack-to-pack references use runtime dependencies |
 | `package-not-installed` | A declared package cannot be found in the installation |
 | `invalid-json` | A configuration or scenario document is malformed JSON or JSONC |
-| `malformed-jsonc` | A selected resource JSONC file is malformed |
+| `markdown-parse-failed` | The Markdown source could not be parsed |
+| `invalid-frontmatter` | Markdown frontmatter is malformed YAML or not a YAML mapping |
+| `invalid-frontmatter-value` | A mapped frontmatter value is not a string |
+| `unknown-frontmatter-key` | Frontmatter contains a key without an explicit importer mapping |
+| `missing-metadata` | Required agent or skill frontmatter is absent or empty |
+| `unsupported-markdown` | Markdown uses HTML, footnotes, or an unsupported node |
+| `unresolved-reference` | A Markdown link or image reference has no definition |
+| `invalid-import-name` | The generated ID is empty or longer than 64 characters |
+| `import-target-exists` | The import output directory exists but is not an Atlante local pack |
+| `import-binding-exists` | The generated ID already exists in the target pack as a resource or binding; pass `--name` |
+| `import-validation-failed` | The first-party input schema could not be loaded |
+| `input-not-found` | The Markdown input file does not exist |
+| `input-unreadable` | The Markdown input file could not be read |
+| `import-write-failed` | The generated local pack could not be published |
+| `invalid-prompt-input` | Imported AST or metadata fails a loaded template input schema |
+| `malformed-jsonc` | A selected resource or local-pack preset JSONC file is malformed |
 | `invalid-resolved-input` | Resolved document or template-owned input is invalid |
 | `conflicting-selectors` | A source uses `$template` and `$instance` together |
 | `build-failed` | The CLI caught an unexpected exception from the build operation; ordinary failures retain their specific code |

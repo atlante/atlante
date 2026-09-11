@@ -35,4 +35,7 @@ export type {
   JsoncParseResult,
 } from "./jsonc.js";
 export { locationAtPointer, parseJsonc, positionOf } from "./jsonc.js";
-export { validateResolvedDocument } from "./templates.js";
+export {
+  validateResolvedDocument,
+  validateTemplateFacetInput,
+} from "./templates.js";

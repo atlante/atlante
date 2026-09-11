@@ -283,6 +283,16 @@ function schemaContextForIssue(
     );
 }
 
+function compileInputSchema(
+  schema: Record<string, unknown>,
+): ReturnType<Ajv2020["compile"]> | undefined {
+  try {
+    return new Ajv2020({ allErrors: true, strict: false }).compile(schema);
+  } catch {
+    return undefined;
+  }
+}
+
 function validateInputSchema(
   schema: Record<string, unknown>,
   templateId: string,
@@ -292,11 +302,8 @@ function validateInputSchema(
   subject: "agent" | "skill",
   contexts: readonly ResolvedSchemaContext[] = [],
 ): Diagnostic[] {
-  const ajv = new Ajv2020({ allErrors: true, strict: false });
-  let validate: ReturnType<typeof ajv.compile>;
-  try {
-    validate = ajv.compile(schema);
-  } catch {
+  const validate = compileInputSchema(schema);
+  if (!validate) {
     // A structurally invalid inputSchema (SPECIFICATION.md, Validation) must be
     // rejected as a diagnostic, not surfaced as Ajv's uncaught compile error.
     return [
@@ -321,6 +328,37 @@ function validateInputSchema(
       ),
     );
   return inputDiagnostics;
+}
+
+/**
+ * Validates one input value against a template facet's input schema and
+ * returns one diagnostic per violation. Shared facility for tools that
+ * enforce a facet contract outside a resolved document, such as the Markdown
+ * importer; resolved-document validation composes richer binding context
+ * around the same compile step.
+ */
+export function validateTemplateFacetInput(
+  templateId: string,
+  schema: Record<string, unknown>,
+  input: unknown,
+): Diagnostic[] {
+  const validate = compileInputSchema(schema);
+  if (!validate) {
+    return [
+      error(
+        "invalid-input-schema",
+        `template "${templateId}": inputSchema is invalid; expected a valid JSON Schema Draft 2020-12 object`,
+      ),
+    ];
+  }
+  if (validate(input)) return [];
+  return (validate.errors ?? []).map((issue) =>
+    error(
+      "invalid-prompt-input",
+      `template "${templateId}": ${issue.instancePath || "<root>"} ${issue.message ?? "is invalid"}${issueMessageSuffix(issue)}`,
+      { path: `${issue.instancePath}${issuePathSuffix(issue)}` },
+    ),
+  );
 }
 
 function expandResolvedTemplateSchema(
@@ -388,21 +426,16 @@ function schemaCompilationDiagnostic(
   template: ResolvedTemplate,
   inputPath: readonly string[],
 ): Diagnostic | undefined {
-  const ajv = new Ajv2020({ allErrors: true, strict: false });
-  try {
-    ajv.compile(template.facet.inputSchema);
-    return undefined;
-  } catch {
-    return error(
-      "invalid-input-schema",
-      `template "${template.key}": inputSchema is invalid; expected a valid JSON Schema Draft 2020-12 object`,
-      {
-        path: `/${inputPath.map(escapeJsonPointerSegment).join("/")}`,
-        source: String(template.origin.path),
-        location: template.locations?.[""],
-      },
-    );
-  }
+  if (compileInputSchema(template.facet.inputSchema)) return undefined;
+  return error(
+    "invalid-input-schema",
+    `template "${template.key}": inputSchema is invalid; expected a valid JSON Schema Draft 2020-12 object`,
+    {
+      path: `/${inputPath.map(escapeJsonPointerSegment).join("/")}`,
+      source: String(template.origin.path),
+      location: template.locations?.[""],
+    },
+  );
 }
 
 function validTemplateMarker(value: unknown): value is string {

@@ -5,6 +5,7 @@ import {
   formatDiagnostic,
   hasErrors,
   sortDiagnostics,
+  validateTemplateFacetInput,
   warning,
 } from "../src/index.js";
 
@@ -107,6 +108,39 @@ describe("diagnostics", () => {
       plain,
       sourceOnly,
       authored,
+    ]);
+  });
+
+  test("validates a template input through the shared AJV facility", () => {
+    const schema = {
+      type: "object",
+      properties: { title: { type: "string", minLength: 1 } },
+      required: ["title"],
+      additionalProperties: false,
+    };
+
+    expect(
+      validateTemplateFacetInput("example", schema, { title: "Title" }),
+    ).toEqual([]);
+    expect(
+      validateTemplateFacetInput("example", schema, { title: "", extra: true }),
+    ).toEqual([
+      expect.objectContaining({
+        code: "invalid-prompt-input",
+        path: "/extra",
+      }),
+      expect.objectContaining({
+        code: "invalid-prompt-input",
+        path: "/title",
+      }),
+    ]);
+    expect(
+      validateTemplateFacetInput("broken", { type: "not-a-schema" }, {}),
+    ).toEqual([
+      expect.objectContaining({
+        code: "invalid-input-schema",
+        message: expect.stringContaining('template "broken"'),
+      }),
     ]);
   });
 });

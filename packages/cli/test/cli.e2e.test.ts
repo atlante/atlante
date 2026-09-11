@@ -245,7 +245,7 @@ test("CLI resolves first-party package resource facets", async () => {
     "skills": {
       "plan": { "$instance": "@atlante/pack/plan", "description": "Plan" },
       "review": { "$instance": "@atlante/pack/review", "description": "Review" },
-      "skill": { "$template": "@atlante/pack/skill", "description": "Skill", "title": "Skill", "overview": "Overview", "sections": [{ "markdown": [{ "p": ["Body"] }] }] }
+      "skill": { "$template": "@atlante/pack/skill", "description": "Skill", "title": "Skill", "overview": "Overview", "sections": [{ "markdown": [{ "type": "paragraph", "children": [{ "type": "text", "value": "Body" }] }] }] }
     }
   }`);
 
@@ -378,12 +378,13 @@ describe("runBuild", () => {
   });
 });
 
-test("registers validate, build, mcp, init, pack, and eval, but not resolve", () => {
+test("registers validate, build, mcp, init, import, pack, and eval, but not resolve", () => {
   expect(createProgram().commands.map((command) => command.name())).toEqual([
     "validate",
     "build",
     "mcp",
     "init",
+    "import",
     "pack",
     "eval",
   ]);

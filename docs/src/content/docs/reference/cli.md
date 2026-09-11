@@ -1,6 +1,6 @@
 ---
 title: CLI
-description: Command reference for init, pack management, validate, build, MCP, and eval.
+description: Command reference for init, Markdown import, pack management, validate, build, MCP, and eval.
 ---
 
 The `atlante` package provides the `atlante` command and requires
@@ -96,6 +96,64 @@ Use `--pack` only with packages you trust. Custom pack installation can run
 package-manager install scripts before Atlante validates the installed pack or
 selects a preset.
 :::
+
+## `atlante import`
+
+Convert an existing Markdown agent or skill into a project-local source pack.
+
+```sh
+npx atlante import <input> --kind agent --out <dir>
+npx atlante import <input> --kind skill --out <dir>
+npx atlante import <input> --kind skill --out <dir> --name <id>
+```
+
+- `<input>` is the Markdown source file. YAML frontmatter supplies template input
+  and binding metadata, while the frontmatter itself does not render as body content.
+- `--kind <kind>` is required and accepts `agent` or `skill`. The command does
+  not infer a host kind or synthesize missing metadata.
+- `--out <dir>` is required and names the local pack directory. When the
+  directory does not exist, the command creates a new pack. When it exists and
+  is an Atlante local pack (contains `package.json` and `atlante.jsonc`), the
+  command adds the imported resource to it: the instance lands in its own
+  subdirectory and the binding is appended to the preset, leaving the existing
+  `package.json` untouched. The preset is re-serialized deterministically, so
+  comments in a hand-edited `atlante.jsonc` are dropped by a merge. Any other
+  existing directory is never overwritten.
+- `--name <id>` overrides the generated pack, resource, and binding ID.
+  Without it, the ID comes from the frontmatter `name` key or the sanitized
+  input filename stem. The final extension is removed before sanitization. IDs
+  contain lowercase ASCII letters, digits, and hyphens, with a maximum length
+  of 64 characters after sanitization. An ID that already exists in the target
+  pack is refused; pass `--name` to import under a different ID.
+
+Frontmatter requires only `description`, which becomes binding lookup
+metadata — the field hosts consume directly. The optional template input maps
+when present: `title` and `overview` for skills, `identity` and `mission` for
+agents, each rendering only when provided; a skill without `title` derives it
+from `name`. A `name` key sets the generated ID, taking precedence over the
+filename stem but not over `--name`. Other frontmatter keys produce warnings
+when the importer does not map them explicitly.
+
+The importer accepts the CommonMark and GFM profile described in
+[Templates](/concepts/templates#canonical-markdown-input), including nested
+blocks, inline formatting, links, images, code, tables, task items, and
+strikethrough. HTML, footnotes, unknown nodes, unresolved references, invalid
+metadata, and schema failures produce diagnostics without a partial pack.
+
+The output is source configuration, not generated native output:
+
+```text
+<dir>/
+├── atlante.jsonc
+├── package.json
+└── <id>/
+    └── instance.jsonc
+```
+
+`package.json` records the bundled `@atlante/pack` version. Add the generated
+preset to `extends`, then run `atlante validate` and `atlante build` from the
+consuming project's root. A successful import exits with status `0`; failures
+exit with status `1`.
 
 ## `atlante pack`
 
@@ -255,7 +313,7 @@ warnings and diagnostics written to that stream.
 ## Exit status
 
 - `0` means the command completed without errors. In watch mode, interruption also produces exit status `0`.
-- `1` means `init`, `validate`, or `build` failed for a one-shot command.
+- `1` means `init`, `import`, `validate`, or `build` failed for a one-shot command.
 
 Eval has its own exit statuses; see [Eval](/reference/eval#reports-and-exit-status).
 
