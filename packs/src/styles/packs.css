@@ -609,6 +609,7 @@
   .readme p,
   .readme li {
     max-width: 70ch;
+    text-align: justify;
     text-wrap: pretty;
   }
 
