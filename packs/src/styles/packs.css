@@ -740,80 +740,122 @@
     font-size: var(--text-small);
   }
 
-  .file-browser {
-    display: grid;
-    grid-template-columns: 220px minmax(0, 1fr);
-    min-height: 430px;
-    border: var(--line);
-    border-radius: 4px;
-    overflow: hidden;
-  }
-
-  .file-tree {
-    padding: var(--space-3);
-    background: var(--surface-soft);
-    border-inline-end: var(--line);
-  }
-
-  .file-tree ul {
-    list-style: none;
-    padding: 0;
-  }
-
-  .file-button {
-    width: 100%;
-    min-height: 38px;
+  /* The pack file inspector mirrors the landing site's playground pane:
+     head with the selected path and copy action, a highlighted code view,
+     and a file selector strip. */
+  .file-inspector {
     display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    padding-inline: var(--space-2);
-    color: var(--ds-muted);
-    background: transparent;
-    border: 0;
-    border-radius: 3px;
-    font: var(--text-meta) / 1.3 var(--font-mono);
-    text-align: start;
-  }
-
-  .file-button:hover,
-  .file-button[aria-pressed="true"] {
-    color: var(--ds-fg);
-    background: var(--surface-raised);
-  }
-
-  .file-button.nested {
-    padding-inline-start: var(--space-6);
-  }
-
-  .file-button.deeper {
-    padding-inline-start: var(--space-8);
-  }
-
-  .file-preview {
     min-width: 0;
-    background: var(--ds-code-bg);
+    flex-direction: column;
+    border: 1px solid var(--ds-border);
+    border-radius: 4px;
+    background: var(--ds-bg);
   }
 
-  .file-preview-header {
-    min-height: 48px;
+  .file-head {
+    position: relative;
     display: flex;
     align-items: center;
-    padding-inline: var(--space-4);
-    color: var(--ds-code-muted);
-    border-block-end: 1px solid
-      color-mix(in oklab, var(--ds-code-fg) 18%, transparent);
-    font: var(--text-meta) / 1 var(--font-mono);
+    justify-content: space-between;
+    gap: var(--space-4);
+    min-height: var(--control-min);
+    padding: var(--space-2) var(--space-4);
+    border-block-end: 1px solid var(--ds-border);
   }
 
-  .file-preview pre {
-    max-height: 460px;
+  .file-head-title {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .file-head-title span {
+    color: var(--ds-muted);
+    font-family: var(--font-ui);
+    font-size: var(--text-meta);
+    font-weight: 650;
+    letter-spacing: 0.09em;
+  }
+
+  .file-head-title strong {
+    overflow: hidden;
+    font-family: var(--font-mono);
+    font-size: var(--text-small);
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  pre.file-view {
     margin-block: 0;
-    padding: var(--space-4);
-    color: var(--ds-code-fg);
-    font-size: 12px;
-    line-height: 1.7;
+    min-height: 280px;
+    max-height: 640px;
+    padding: var(--space-6);
     overflow: auto;
+    color: var(--ds-fg);
+    font-family: var(--font-mono);
+    font-size: clamp(11px, 0.85vw, 14px);
+    line-height: 1.8;
     tab-size: 2;
+  }
+
+  pre.file-view code {
+    display: block;
+    width: max-content;
+    min-width: 100%;
+  }
+
+  .file-view .token-key {
+    color: var(--ds-warning);
+    font-weight: 650;
+  }
+
+  .file-view .token-string {
+    color: var(--ds-accent);
+  }
+
+  .file-view .token-literal {
+    color: var(--ds-warning);
+  }
+
+  .file-view .token-md-heading {
+    color: var(--ds-accent);
+    font-weight: 650;
+  }
+
+  .file-view .token-md-item {
+    color: var(--ds-muted);
+  }
+
+  .file-selector {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border-block-start: 1px solid var(--ds-border);
+  }
+
+  .file-selector label {
+    flex-shrink: 0;
+    color: var(--ds-muted);
+    font-family: var(--font-ui);
+    font-size: var(--text-meta);
+    font-weight: 650;
+    letter-spacing: 0.1em;
+  }
+
+  .file-selector select {
+    min-width: 0;
+    flex: 1;
+    min-height: var(--control-min);
+    padding: 0 var(--space-3);
+    border: 1px solid var(--ds-border);
+    border-radius: 4px;
+    background: var(--ds-bg);
+    color: var(--ds-fg);
+    font-family: var(--font-mono);
+    font-size: var(--text-small);
   }
 
   .detail-sidebar {
@@ -936,7 +978,6 @@
     .toast,
     .command-tab,
     .copy-button,
-    .file-button,
     .skip-link {
       transition:
         color var(--duration-utility) var(--ease-standard),
@@ -1087,27 +1128,15 @@
       position: static;
     }
 
-    .file-browser {
-      grid-template-columns: minmax(0, 1fr);
+    pre.file-view {
+      min-height: 240px;
+      max-height: 420px;
+      padding: var(--space-4);
     }
 
-    .file-tree {
-      border-inline-end: 0;
-      border-block-end: var(--line);
-    }
-
-    .file-tree ul {
-      display: flex;
-      gap: var(--space-1);
-      overflow-x: auto;
-    }
-
-    .file-button,
-    .file-button.nested,
-    .file-button.deeper {
-      width: auto;
-      padding-inline: var(--space-3);
-      white-space: nowrap;
+    .file-selector {
+      align-items: stretch;
+      flex-direction: column;
     }
 
     .preset-item {

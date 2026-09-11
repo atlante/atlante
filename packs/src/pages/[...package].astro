@@ -6,6 +6,7 @@ import SiteFooter from "../components/SiteFooter.astro";
 import type { RegistryFile } from "../data/registry";
 import { formatCount, formatDate, formatSyncTime } from "../data/format";
 import { encodeJsonForScript } from "../data/json";
+import { highlightFile } from "../lib/highlight";
 import snapshot from "../data/registry-snapshot.json";
 
 export function getStaticPaths() {
@@ -29,12 +30,6 @@ const selectedFile = files.find((file) => file.path !== "README.md") ?? files[0]
 const filesPayload = encodeJsonForScript(
   files.map((file) => ({ path: file.path, content: file.content })),
 );
-
-const indentClass = (path: string): string => {
-  const depth = path.split("/").length - 1;
-  if (depth === 0) return "";
-  return depth === 1 ? "nested" : "deeper";
-};
 
 const bindingSummary = (binding: { agents: number; skills: number }): string => {
   const parts: string[] = [];
@@ -184,32 +179,32 @@ const bindingSummary = (binding: { agents: number; skills: number }): string => 
             </ul>
           </section>
 
-          <section class="file-section" aria-labelledby="files-title">
+          <section class="file-section" aria-label="Pack contents">
             <span class="section-label">Pack contents</span>
-            <h2 id="files-title">Directory</h2>
-            <div class="file-browser">
-              <nav class="file-tree" aria-label="Pack files">
-                <ul>
-                  {files.map((file, index) => (
-                    <li>
-                      <button
-                        class:list={[
-                          "file-button",
-                          indentClass(file.path),
-                        ]}
-                        type="button"
-                        data-file={file.path}
-                        aria-pressed={file.path === selectedFile?.path}
-                      >
-                        {file.path}
-                      </button>
-                    </li>
+            <div class="file-inspector">
+              <div class="file-head">
+                <div class="file-head-title">
+                  <span>File</span>
+                  <strong data-file-name>{selectedFile?.path}</strong>
+                </div>
+              </div>
+              <pre
+                class="file-view"
+                tabindex="0"
+                data-file-view
+              ><code set:html={selectedFile?.content === null || selectedFile === undefined ? "Preview not available: this file is too large." : highlightFile(selectedFile.path, selectedFile.content)} /></pre>
+              <div class="file-selector">
+                <label for="pack-file">Files</label>
+                <select id="pack-file" data-file-select aria-label="Select a pack file">
+                  {files.map((file) => (
+                    <option
+                      value={file.path}
+                      selected={file.path === selectedFile?.path}
+                    >
+                      {file.path}
+                    </option>
                   ))}
-                </ul>
-              </nav>
-              <div class="file-preview">
-                <div class="file-preview-header">{selectedFile?.path}</div>
-                <pre tabindex="0"><code>{selectedFile?.content ?? "Preview not available: this file is too large."}</code></pre>
+                </select>
               </div>
             </div>
           </section>

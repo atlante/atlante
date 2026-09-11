@@ -1,3 +1,7 @@
+import { highlightFile } from "./highlight";
+
+type PackFile = { path: string; content: string | null };
+
 export function installPanel(): void {
   const commandText = document.querySelector<HTMLElement>("#command-text");
   const toast = document.querySelector<HTMLElement>("#toast");
@@ -17,6 +21,8 @@ export function installPanel(): void {
       toast.hidden = true;
     }, 1800);
   };
+
+  bindCopyTextButtons();
 
   // Installation commands.
   if (commandText) {
@@ -53,40 +59,43 @@ export function installPanel(): void {
     }
   });
 
-  // Package file browser.
+  // Pack contents: a playground-style file selector over the embedded files.
   if (payloadScript?.textContent) {
-    let files: Array<{ path: string; content: string | null }>;
+    let files: PackFile[];
     try {
-      files = JSON.parse(payloadScript.textContent) as typeof files;
+      files = JSON.parse(payloadScript.textContent) as PackFile[];
     } catch {
       return;
     }
-    const byPath = new Map(files.map((file) => [file.path, file]));
-    const previewHeader = document.querySelector<HTMLElement>(
-      ".file-preview-header",
+    const byPath = new Map(
+      files.map((file) => [file.path, file.content] as const),
     );
-    const previewCode = document.querySelector<HTMLElement>(
-      ".file-preview pre code",
+    const fileSelect =
+      document.querySelector<HTMLSelectElement>("[data-file-select]");
+    const fileName = document.querySelector<HTMLElement>("[data-file-name]");
+    const fileView = document.querySelector<HTMLElement>(
+      "pre[data-file-view] code",
     );
-    const buttons = [
-      ...document.querySelectorAll<HTMLButtonElement>("[data-file]"),
-    ];
-    for (const button of buttons) {
-      button.addEventListener("click", () => {
-        const path = button.dataset.file ?? "";
-        for (const candidate of buttons) {
-          candidate.setAttribute("aria-pressed", String(candidate === button));
-        }
-        const file = byPath.get(path);
-        if (previewHeader) previewHeader.textContent = path;
-        if (previewCode) {
-          previewCode.textContent =
-            file === undefined
-              ? "File not available."
-              : (file.content ??
-                "Preview not available: this file is too large.");
-        }
-      });
-    }
+
+    const emptyPreview = "Preview not available: this file is too large.";
+
+    const render = (): void => {
+      const path = fileSelect?.value ?? "";
+      const content = byPath.get(path);
+      if (fileName) fileName.textContent = path;
+      if (fileView) {
+        fileView.innerHTML =
+          content === undefined
+            ? "File not available."
+            : content === null
+              ? emptyPreview
+              : highlightFile(path, content);
+      }
+    };
+
+    fileSelect?.addEventListener("change", () => {
+      render();
+    });
+    render();
   }
 }
