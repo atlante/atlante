@@ -1,10 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import {
-  formatCount,
-  formatDate,
-  formatShortSyncTime,
-  formatSyncTime,
-} from "./format";
+import { formatCount, formatDate, formatSyncTime } from "./format";
 
 describe("formatCount", () => {
   it("formats large counts in k", () => {
@@ -32,14 +27,6 @@ describe("formatSyncTime", () => {
   it("labels the synchronization time with UTC", () => {
     expect(formatSyncTime("2026-09-10T14:32:00.000Z")).toBe(
       "Sep 10, 2026 at 14:32 UTC",
-    );
-  });
-});
-
-describe("formatShortSyncTime", () => {
-  it("writes the numeric date first", () => {
-    expect(formatShortSyncTime("2026-09-10T14:32:00.000Z")).toBe(
-      "10/09/26 at 14:32 UTC",
     );
   });
 });

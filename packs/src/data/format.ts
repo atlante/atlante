@@ -33,19 +33,3 @@ export function formatSyncTime(iso: string): string {
   }).format(new Date(iso));
   return `${date} at ${time} UTC`;
 }
-
-export function formatShortSyncTime(iso: string): string {
-  const date = new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "2-digit",
-    timeZone: "UTC",
-  }).format(new Date(iso));
-  const time = new Intl.DateTimeFormat("en-GB", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: "UTC",
-  }).format(new Date(iso));
-  return `${date} at ${time} UTC`;
-}
