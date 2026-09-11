@@ -2,7 +2,7 @@
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
-import { copyFile, mkdir } from "node:fs/promises";
+import { copyFile, cp, mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
@@ -116,12 +116,37 @@ if (!existsSync(worktree)) {
     await $`git worktree add ${worktree} -b ${slug} ${branch}`.cwd(root);
   }
 
-  const models = join(root, ".opencode", "models.json");
+  const opencodeDir = join(root, ".opencode");
+  const worktreeOpencodeDir = join(worktree, ".opencode");
+  const models = join(opencodeDir, "models.json");
   if (existsSync(models)) {
-    await mkdir(join(worktree, ".opencode"), { recursive: true });
-    const worktreeModels = join(worktree, ".opencode", "models.json");
+    await mkdir(worktreeOpencodeDir, { recursive: true });
+    const worktreeModels = join(worktreeOpencodeDir, "models.json");
     await copyFile(models, worktreeModels);
     await maybeAdjustModels(worktreeModels);
+  }
+
+  // Seed the opencode plugin runtime dependencies from the main checkout so
+  // the first `opencode` run in the worktree resolves `.opencode/plugin/*`
+  // imports locally instead of installing them from the network on startup.
+  const pluginDepFiles = ["package.json", "package-lock.json", "bun.lock"];
+  const opencodeNodeModules = join(opencodeDir, "node_modules");
+  if (
+    existsSync(opencodeNodeModules) ||
+    pluginDepFiles.some((file) => existsSync(join(opencodeDir, file)))
+  ) {
+    await mkdir(worktreeOpencodeDir, { recursive: true });
+    for (const file of pluginDepFiles) {
+      const source = join(opencodeDir, file);
+      if (existsSync(source)) {
+        await copyFile(source, join(worktreeOpencodeDir, file));
+      }
+    }
+    if (existsSync(opencodeNodeModules)) {
+      await cp(opencodeNodeModules, join(worktreeOpencodeDir, "node_modules"), {
+        recursive: true,
+      });
+    }
   }
 
   await $`bun i`.cwd(worktree);
