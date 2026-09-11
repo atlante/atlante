@@ -6,6 +6,9 @@ on:
     paths:
       - "docs/**"
       - "brand/**"
+      # Docs pages link to SPECIFICATION.md, and the docs lane validates
+      # those links.
+      - "SPECIFICATION.md"
       - "package.json"
       - "bun.lock"
       - ".bun-version"
