@@ -61,9 +61,10 @@ runtime.
 The site deploys natively from Vercel. The project uses `website` as its root
 directory with "Include source files outside of the Root Directory in the Build
 Step" enabled, because the build materializes the authoritative `../brand` and
-`../packages/schema` sources. The install step resolves the pinned `atlante`
-version from npm, so any deployed playground runs a version that npm already
-serves.
+`../packages/schema` sources. The install step runs
+`npm install --workspaces=false --no-package-lock --no-audit --no-fund`, which
+resolves the pinned `atlante` version from npm instead of linking the local Bun
+workspace, so any deployed playground runs a version that npm already serves.
 
 `ignoreCommand` in `vercel.json` keeps preview builds enabled and cancels
 production builds unless the current commit subject matches `release: vX.Y.Z`.

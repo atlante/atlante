@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -18,6 +19,7 @@ describe("website deployment contract", () => {
     const vercel = JSON.parse(read("website/vercel.json")) as {
       buildCommand: string;
       ignoreCommand: string;
+      installCommand: string;
       cleanUrls: boolean;
       trailingSlash: boolean;
       functions: {
@@ -29,6 +31,7 @@ describe("website deployment contract", () => {
       }>;
     };
     const releaseWorkflow = read(".github/workflows/release.yml");
+    const releaseScript = read("scripts/release.ts");
     const websiteReadme = read("website/README.md");
     const rootIgnore = read(".gitignore");
     const normalizedReadme = websiteReadme.replace(/\s+/g, " ");
@@ -45,7 +48,10 @@ describe("website deployment contract", () => {
     expect(websiteIgnore).toContain("public/schema/");
     expect(vercel.buildCommand).toBe("bun run build");
     expect(vercel.ignoreCommand).toBe(
-      'if [ "$VERCEL_ENV" != "production" ] || printf \'%s\\n\' "$VERCEL_GIT_COMMIT_MESSAGE" | grep -Eq \'^release: v[0-9]+\\.[0-9]+\\.[0-9]+$\'; then exit 1; else exit 0; fi',
+      'if [ "$VERCEL_ENV" != "production" ]; then exit 1; fi; if printf \'%s\\n\' "$VERCEL_GIT_COMMIT_MESSAGE" | head -n 1 | grep -Eq \'^release: v[0-9]+\\.[0-9]+\\.[0-9]+$\'; then exit 1; fi; exit 0',
+    );
+    expect(vercel.installCommand).toBe(
+      "npm install --workspaces=false --no-package-lock --no-audit --no-fund",
     );
     expect(vercel.cleanUrls).toBe(true);
     expect(vercel.trailingSlash).toBe(false);
@@ -81,6 +87,11 @@ describe("website deployment contract", () => {
     ]) {
       expect(releaseWorkflow).not.toContain(forbidden);
     }
+    expect(releaseScript).toContain("const PINS = [");
+    expect(releaseScript).toContain("validatePins");
+    expect(releaseScript).not.toContain("const DEPENDENTS = [");
+    expect(releaseScript).not.toContain("readDependents");
+    expect(releaseScript).not.toContain("bumpDependents");
 
     expect(rootIgnore).not.toContain("website/schema/");
 
@@ -91,6 +102,9 @@ describe("website deployment contract", () => {
     );
     expect(normalizedReadme).toContain(
       "advances independently in ordinary pull requests",
+    );
+    expect(normalizedReadme).toContain(
+      "npm install --workspaces=false --no-package-lock --no-audit --no-fund",
     );
     expect(normalizedReadme).toContain("../brand");
     expect(normalizedReadme).toContain("../packages/schema");
@@ -103,5 +117,20 @@ describe("website deployment contract", () => {
     ]) {
       expect(normalizedReadme).not.toContain(stale);
     }
+  });
+
+  it("matches only the commit subject for production release gating", () => {
+    const { ignoreCommand } = JSON.parse(read("website/vercel.json")) as {
+      ignoreCommand: string;
+    };
+    const result = spawnSync("sh", ["-c", ignoreCommand], {
+      env: {
+        ...process.env,
+        VERCEL_ENV: "production",
+        VERCEL_GIT_COMMIT_MESSAGE: "chore: update docs\n\nrelease: v1.2.3",
+      },
+    });
+
+    expect(result.status).toBe(0);
   });
 });
