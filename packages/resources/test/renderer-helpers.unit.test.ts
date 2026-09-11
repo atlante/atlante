@@ -148,10 +148,15 @@ describe("codeSpan", () => {
 
   test("pads values that both start and end with a space", () => {
     expect(codeSpan(" a ")).toBe("`  a  `");
-    expect(codeSpan(" ")).toBe("`   `");
+    expect(codeSpan(" \t ")).toBe("`  \t  `");
     expect(codeSpan(" a")).toBe("` a`");
     expect(codeSpan("a ")).toBe("`a `");
     expect(codeSpan("a  ")).toBe("`a  `");
+  });
+
+  test("keeps all-space values unpadded so they are preserved as-is", () => {
+    expect(codeSpan(" ")).toBe("` `");
+    expect(codeSpan("  ")).toBe("`  `");
   });
 
   test("renders the empty code span", () => {

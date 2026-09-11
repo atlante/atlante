@@ -138,9 +138,11 @@ function longestRun(value: string, character: "`" | "~"): number {
 /**
  * Renders `value` as a CommonMark code span, widening the delimiter past any
  * embedded backtick run. CommonMark strips one surrounding space when the
- * content both starts and ends with one, so values that touch both delimiters
- * with spaces (or start/end with a backtick) are padded to keep the content
- * literal. Inside a GFM table cell, pipes are escaped so the cell cannot split.
+ * content both starts and ends with one and does not consist entirely of
+ * spaces, so values that would lose content to that strip are padded with one
+ * space on each side (all-space values are preserved as-is and need no
+ * padding). Inside a GFM table cell, pipes are escaped so the cell cannot
+ * split.
  */
 export function codeSpan(value: string, options?: HelperOptions): string {
   if (value === "") return "`` ``";
@@ -152,7 +154,7 @@ export function codeSpan(value: string, options?: HelperOptions): string {
   const padded =
     content.startsWith("`") ||
     content.endsWith("`") ||
-    (content.startsWith(" ") && content.endsWith(" "));
+    (content.startsWith(" ") && content.endsWith(" ") && /[^ ]/.test(content));
   return padded
     ? `${delimiter} ${content} ${delimiter}`
     : `${delimiter}${content}${delimiter}`;

@@ -716,6 +716,32 @@ describe("Markdown importer lowering", () => {
     expect(sanitizeResourceId("a".repeat(64))).toBe("a".repeat(64));
   });
 
+  test("rejects invalid frontmatter names without falling back silently", () => {
+    const invalid = mapFrontmatter(
+      { name: "!!!", title: "T", overview: "O", description: "D" },
+      "skill",
+    );
+    expect(invalid.metadata.id).toBeUndefined();
+    expect(invalid.diagnostics).toEqual([
+      expect.objectContaining({
+        code: "invalid-import-name",
+        severity: "error",
+      }),
+    ]);
+
+    expect(
+      mapFrontmatter(
+        { name: 42, title: "T", overview: "O", description: "D" },
+        "skill",
+      ).diagnostics,
+    ).toEqual([
+      expect.objectContaining({
+        code: "invalid-frontmatter-value",
+        message: 'frontmatter key "name" must be a string',
+      }),
+    ]);
+  });
+
   test("resolves the generated ID from --name, frontmatter name, then the stem", () => {
     const schemas = firstPartyFacetInputSchemas();
     const files = new Map<string, string>();
