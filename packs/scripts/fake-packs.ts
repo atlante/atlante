@@ -216,10 +216,7 @@ export function fakePacks(count = FAKE_PACKS.length): RegistrySnapshot {
   return next;
 }
 
-if (
-  process.argv[1] &&
-  process.argv[1] === fileURLToPath(import.meta.url)
-) {
+if (process.argv[1] && process.argv[1] === fileURLToPath(import.meta.url)) {
   const result = fakePacks();
   console.log(
     `fake-packs: catalog now holds ${result.packs.length} packs (fixtures are local only)`,
