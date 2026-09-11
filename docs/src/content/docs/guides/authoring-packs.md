@@ -294,3 +294,11 @@ output and generated prompts. A build covers only its selected content and
 dependencies, so exercise other supported selections separately. If you have
 not evaluated the generated harness yet, run [Evaluate your harness](/guides/evaluating-a-harness)
 before sharing the pack.
+
+## List the pack in the explorer
+
+The [pack explorer](https://packs.atlante.sh/) is a curated directory of
+Atlante packs published on npm, synchronized at build time from npm and public
+GitHub data. To list your pack, open an issue or pull request in the
+[Atlante repository](https://github.com/atlante/atlante) that adds its package
+name to the explorer's manifest.

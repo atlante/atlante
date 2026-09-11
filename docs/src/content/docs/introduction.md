@@ -64,6 +64,9 @@ them to run defined scenarios in disposable sandboxes.
 Atlante prepares this structure but does not run it: model calls, permissions,
 tools, modes, and project execution remain with the host and configured model.
 Workflows describe a process for the model to follow, but Atlante does not
-schedule them, track their progress, or manage runtime checkpoints.
+schedule them, track their progress, or manage runtime checkpoints. Packs
+published as npm packages are listed in the
+[pack explorer](https://packs.atlante.sh/), a curated directory for
+inspecting a pack before installing it.
 
 Follow [Getting started](/getting-started) to create your first configuration.

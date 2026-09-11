@@ -111,6 +111,7 @@ export default defineConfig({
           ],
         },
         { slug: "troubleshooting", label: "Troubleshooting" },
+        { link: "https://packs.atlante.sh/", label: "Pack explorer" },
       ],
     }),
   ],
