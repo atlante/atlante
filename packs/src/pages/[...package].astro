@@ -1,12 +1,12 @@
 ---
-import "../../styles/packs.css";
-import BaseLayout from "../../layouts/BaseLayout.astro";
-import SiteNav from "../../components/SiteNav.astro";
-import SiteFooter from "../../components/SiteFooter.astro";
-import type { RegistryFile } from "../../data/registry";
-import { formatCount, formatDate, formatSyncTime } from "../../data/format";
-import { encodeJsonForScript } from "../../data/json";
-import snapshot from "../../data/registry-snapshot.json";
+import "../styles/packs.css";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SiteNav from "../components/SiteNav.astro";
+import SiteFooter from "../components/SiteFooter.astro";
+import type { RegistryFile } from "../data/registry";
+import { formatCount, formatDate, formatSyncTime } from "../data/format";
+import { encodeJsonForScript } from "../data/json";
+import snapshot from "../data/registry-snapshot.json";
 
 export function getStaticPaths() {
   return snapshot.packs.map((pack) => ({
@@ -51,14 +51,14 @@ const bindingSummary = (binding: { agents: number; skills: number }): string => 
 <BaseLayout
   title={`${pack.name} | Atlante pack explorer`}
   description={pack.description}
-  canonicalPath={`/packs/${pack.name}`}
+  canonicalPath={`/${pack.name}`}
 >
   <SiteNav current="packs" />
 
   <main id="main">
     <div class="shell">
       <nav class="breadcrumb" aria-label="Breadcrumb">
-        <a href="/packs">Packs</a>
+        <a href="/">Packs</a>
         <span aria-hidden="true">/</span>
         <span>{pack.name}</span>
       </nav>
@@ -276,7 +276,7 @@ const bindingSummary = (binding: { agents: number; skills: number }): string => 
   <script type="application/json" id="pack-files" set:html={filesPayload} />
 
   <script>
-    import { installPanel } from "../../lib/pack-detail";
+    import { installPanel } from "../lib/pack-detail";
 
     installPanel();
   </script>

@@ -11,17 +11,17 @@ function read(relativePath: string): string {
 describe.skipIf(process.env.ATLANTE_BUILT_OUTPUT_TESTS !== "1")(
   "packs built output",
   () => {
-    it("keeps the catalog linked from the site root", () => {
-      const index = read("dist/index.html");
-      expect(index).toContain("url=/packs");
+    it("redirects the legacy /packs path to the subdomain root", () => {
+      const index = read("dist/packs.html");
+      expect(index).toContain("url=/");
       expect(index).toContain('http-equiv="refresh"');
     });
 
     it("renders the curated catalog from the registry snapshot", () => {
-      const html = read("dist/packs.html");
+      const html = read("dist/index.html");
       expect(html).toContain("Pack explorer");
       expect(html).toContain("@atlante/pack");
-      expect(html).toContain('href="/packs/@atlante/pack"');
+      expect(html).toContain('href="/@atlante/pack"');
       expect(html).toContain("in the curated index");
       expect(html).toContain("synchronized");
       expect(html).toContain('id="pack-search"');
@@ -29,7 +29,7 @@ describe.skipIf(process.env.ATLANTE_BUILT_OUTPUT_TESTS !== "1")(
     });
 
     it("renders the pack detail page with installation and inspection", () => {
-      const html = read("dist/packs/@atlante/pack.html");
+      const html = read("dist/@atlante/pack.html");
       expect(html).toContain("npx atlante@latest init --pack @atlante/pack");
       expect(html).toContain("npm install --save-dev @atlante/pack");
       expect(html).toContain("atlante.format: 1");
@@ -46,7 +46,7 @@ describe.skipIf(process.env.ATLANTE_BUILT_OUTPUT_TESTS !== "1")(
       const html = read("dist/404.html");
       expect(html).toContain("This star is off the map");
       expect(html).toContain("The page you requested was not found.");
-      expect(html).toContain('href="/packs"');
+      expect(html).toContain('href="/"');
     });
   },
 );

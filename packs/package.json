@@ -7,7 +7,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "bun run sync:brand && astro dev --port 4322",
+    "dev": "bun run sync:brand && astro dev --port 4323",
     "build": "bun run sync:brand && bun run sync:packs && astro build",
     "check": "bun run build && ATLANTE_BUILT_OUTPUT_TESTS=1 bun test scripts src/data",
     "preview": "astro preview",

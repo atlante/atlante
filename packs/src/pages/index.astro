@@ -1,10 +1,10 @@
 ---
-import "../../styles/packs.css";
-import BaseLayout from "../../layouts/BaseLayout.astro";
-import SiteNav from "../../components/SiteNav.astro";
-import SiteFooter from "../../components/SiteFooter.astro";
-import { formatCount, formatSyncTime } from "../../data/format";
-import snapshot from "../../data/registry-snapshot.json";
+import "../styles/packs.css";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SiteNav from "../components/SiteNav.astro";
+import SiteFooter from "../components/SiteFooter.astro";
+import { formatCount, formatSyncTime } from "../data/format";
+import snapshot from "../data/registry-snapshot.json";
 
 const packs = snapshot.packs;
 ---
@@ -12,7 +12,7 @@ const packs = snapshot.packs;
 <BaseLayout
   title="Pack explorer | Atlante"
   description="Find reusable Atlante presets, templates, and harness configurations. Inspect every pack before adding it to your project."
-  canonicalPath="/packs"
+  canonicalPath="/"
 >
   <SiteNav current="packs" />
 
@@ -117,7 +117,7 @@ const packs = snapshot.packs;
               <div class="pack-name-line">
                 <a
                   class="pack-link"
-                  href={`/packs/${pack.name}`}
+                  href={`/${pack.name}`}
                 >{pack.name}</a>
                 <span class={`badge ${pack.official ? "official" : "community"}`}>
                   {pack.official ? "Official" : "Community"}

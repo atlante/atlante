@@ -5,5 +5,5 @@ export default defineConfig({
   trailingSlash: "never",
   build: { format: "file" },
   image: { service: passthroughImageService() },
-  redirects: { "/": "/packs" },
+  redirects: { "/packs": "/" },
 });

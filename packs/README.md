@@ -11,14 +11,19 @@ the network fetch fails and is never edited by hand.
 ## Commands
 
 ```sh
-bun run --cwd packs dev    # dev server on port 4322
+bun run --cwd packs dev    # dev server on port 4323
 bun run --cwd packs build  # sync brand assets, sync the registry, build Astro
 bun run --cwd packs check  # build, then run the workspace test suite
 ```
 
+The catalog lives at the subdomain root: `/` lists the packs and
+`/<package>` opens a pack detail page, mirroring how the site resolves on
+packs.atlante.sh. The legacy `/packs` path redirects to `/`.
+
 ## Layout
 
-- `src/pages/packs/` — the catalog and pack detail routes.
+- `src/pages/index.astro` — the catalog at the site root.
+- `src/pages/[...package].astro` — the pack detail routes.
 - `src/data/registry-manifest.json` — the curated pack manifest (authored).
 - `src/data/registry-snapshot.json` — the generated registry snapshot.
 - `scripts/sync-packs.ts` — the registry synchronization step.

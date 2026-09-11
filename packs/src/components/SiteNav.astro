@@ -10,13 +10,13 @@ const { current } = Astro.props;
 
 <header class="site-header">
   <div class="shell header-inner">
-    <a class="brand-link" href="/packs" aria-label="Atlante pack explorer">
+    <a class="brand-link" href="/" aria-label="Atlante pack explorer">
       <span class="brand-holder">
         <BrandLogo variant="horizontal" />
       </span>
     </a>
     <nav class="primary-nav" aria-label="Primary">
-      <a class="nav-link" href="/packs" aria-current={current === "packs" ? "page" : undefined}>Packs</a>
+      <a class="nav-link" href="/" aria-current={current === "packs" ? "page" : undefined}>Packs</a>
       <a class="nav-link" href="https://docs.atlante.sh">Docs</a>
       <a class="nav-link" href="https://github.com/atlante/atlante">GitHub</a>
     </nav>

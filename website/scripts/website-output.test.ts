@@ -24,7 +24,7 @@ describe.skipIf(process.env.ATLANTE_BUILT_OUTPUT_TESTS !== "1")(
       for (const href of [
         "https://docs.atlante.sh",
         "https://docs.atlante.sh/getting-started",
-        "https://packs.atlante.sh/packs",
+        "https://packs.atlante.sh/",
         "#quick-start",
         "https://github.com/atlante/atlante",
         "https://github.com/atlante/atlante/releases",
