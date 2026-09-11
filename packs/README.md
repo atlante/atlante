@@ -52,11 +52,13 @@ unauthenticated requests.
 
 ## Deployment
 
-The site deploys to [packs.atlante.sh](https://packs.atlante.sh) through the
-release workflow's `deploy-packs` job, which builds the workspace with its own
-registry synchronization and deploys prebuilt artifacts to the `packs` Vercel
-project. Configure `VERCEL_PACKS_PROJECT_ID` in repository secrets (alongside
-the shared `VERCEL_TOKEN` and `VERCEL_ORG_ID`) before the first deployment.
+The site deploys natively through Vercel's git integration: the `packs` Vercel
+project uses `packs` as its Root Directory, installs dependencies from the
+repository root, and runs the workspace build — which includes the registry
+synchronization — on every build. The configured `ignoreCommand` skips
+non-production deployments and restricts production deployments to commits
+whose message is `release: <version>`, so deployment is tied to the release
+transaction like the other sites.
 
 The snapshot is regenerated on every build, so deployed metrics reflect the
 latest release's `sync:packs` run; the committed snapshot keeps local builds

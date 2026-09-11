@@ -17,6 +17,8 @@ describe("packs deployment contract", () => {
     const packsIgnore = read("packs/.gitignore");
     const vercel = JSON.parse(read("packs/vercel.json")) as {
       buildCommand: string;
+      installCommand: string;
+      ignoreCommand: string;
       cleanUrls: boolean;
       trailingSlash: boolean;
     };
@@ -38,13 +40,20 @@ describe("packs deployment contract", () => {
     expect(packsIgnore).toContain("public/brand/");
     expect(packsIgnore).toContain("src/styles/atlante-tokens.css");
     expect(vercel.buildCommand).toBe("bun run build");
+    expect(vercel.installCommand).toBe(
+      "npm install --workspaces=false --no-package-lock --no-audit --no-fund",
+    );
+    expect(vercel.ignoreCommand).toBe(
+      'if [ "$VERCEL_ENV" != "production" ]; then exit 1; fi; if printf \'%s\\n\' "$VERCEL_GIT_COMMIT_MESSAGE" | head -n 1 | grep -Eq \'^release: v[0-9]+\\.[0-9]+\\.[0-9]+$\'; then exit 1; fi; exit 0',
+    );
     expect(vercel.cleanUrls).toBe(true);
     expect(vercel.trailingSlash).toBe(false);
 
-    expect(releaseWorkflow).toContain(
-      'npx vercel@59.3.0 deploy --prebuilt --prod packs --token="$VERCEL_TOKEN"',
-    );
-    expect(releaseWorkflow).toContain("VERCEL_PACKS_PROJECT_ID");
+    // The release transaction is publication only: Vercel owns the packs
+    // deployment through its git integration, like the other sites.
+    expect(releaseWorkflow).not.toContain("deploy-packs");
+    expect(releaseWorkflow).not.toContain("VERCEL_PACKS_PROJECT_ID");
+    expect(releaseWorkflow).not.toContain("vercel deploy");
 
     expect(rootPackage.workspaces).toContain("packs");
     expect(rootPackage.scripts["packs:check"]).toBe(

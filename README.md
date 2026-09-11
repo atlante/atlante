@@ -212,4 +212,6 @@ To publish your own reusable content, read
 
 ## License
 
-See [LICENSE](LICENSE).
+Atlante is licensed under the MIT License; see [LICENSE](LICENSE). The Atlante
+name, logo, and related branding are governed separately by
+[TRADEMARKS.md](TRADEMARKS.md).

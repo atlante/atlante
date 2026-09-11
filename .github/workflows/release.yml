@@ -3,24 +3,12 @@ name: Release
 on:
   push:
     tags: ['v*']
-  workflow_dispatch:
-    inputs:
-      deploy_only:
-        description: Deploy the already-published release without publishing packages again
-        required: true
-        default: false
-        type: boolean
-      version:
-        description: Published version to deploy, without the leading v
-        required: true
-        type: string
 
 permissions:
   contents: read
 
 jobs:
   publish-packages:
-    if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -71,7 +59,6 @@ jobs:
 
   create-release:
     needs: publish-packages
-    if: ${{ github.event_name == 'push' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -83,193 +70,3 @@ jobs:
           name: ${{ github.ref_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  deploy-website:
-    needs: publish-packages
-    if: ${{ always() && (needs.publish-packages.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.deploy_only)) }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version-file: ".bun-version"
-
-      - name: Wait for the released packages on npm
-        shell: bash
-        run: |
-          set -euo pipefail
-          VERSION="${DEPLOY_VERSION:-}"
-          if [[ -z "$VERSION" ]]; then
-            VERSION="${GITHUB_REF#refs/tags/v}"
-          fi
-          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Invalid deployment version: $VERSION" >&2
-            exit 1
-          fi
-          # The published CLI declares @atlante/pack as a registry dependency,
-          # so the website's npm install resolves both; pack's propagation can
-          # lag behind the CLI's, so wait for each before installing.
-          for package in atlante @atlante/pack; do
-            available=0
-            for attempt in $(seq 1 30); do
-              if npm view "$package@$VERSION" version >/dev/null 2>&1; then
-                echo "$package@$VERSION is available on npm"
-                available=1
-                break
-              fi
-              echo "Waiting for $package@$VERSION on npm (attempt $attempt/30)..."
-              sleep 10
-            done
-            if [ "$available" -ne 1 ]; then
-              echo "$package@$VERSION did not become available in time" >&2
-              exit 1
-            fi
-          done
-        env:
-          DEPLOY_VERSION: ${{ inputs.version }}
-
-      - name: Install website dependencies
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm install --prefix website --no-package-lock --no-audit --no-fund
-
-      - name: Pull Vercel project settings
-        shell: bash
-        working-directory: website
-        run: |
-          set -euo pipefail
-          npx vercel@59.3.0 pull --yes --environment=production --token="$VERCEL_TOKEN"
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-
-      - name: Build website artifacts
-        shell: bash
-        working-directory: website
-        run: |
-          set -euo pipefail
-          npx vercel@59.3.0 build --prod --token="$VERCEL_TOKEN"
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-
-      - name: Bundle pack assets into the playground function
-        shell: bash
-        run: |
-          set -euo pipefail
-          function_root="website/.vercel/output/functions/api/playground.func"
-          pack_source="website/node_modules/@atlante/pack"
-          pack_target="$function_root/website/node_modules/@atlante/pack"
-          test -d "$pack_source"
-          mkdir -p "$(dirname "$pack_target")"
-          cp -R "$pack_source" "$pack_target"
-          test -f "$pack_target/package.json"
-
-      - name: Deploy website to Vercel
-        shell: bash
-        run: |
-          set -euo pipefail
-          npx vercel@59.3.0 deploy --prebuilt --prod website --token="$VERCEL_TOKEN"
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-
-  deploy-docs:
-    needs: publish-packages
-    if: ${{ always() && (needs.publish-packages.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.deploy_only)) }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version-file: ".bun-version"
-
-      - name: Install dependencies
-        shell: bash
-        run: bun install --frozen-lockfile
-
-      - name: Sync docs brand assets
-        shell: bash
-        working-directory: docs
-        run: |
-          set -euo pipefail
-          bun run sync:brand
-
-      - name: Pull Vercel project settings
-        shell: bash
-        working-directory: docs
-        run: |
-          set -euo pipefail
-          npx vercel@59.3.0 pull --yes --environment=production --token="$VERCEL_TOKEN"
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_DOCS_PROJECT_ID }}
-
-      - name: Build docs artifacts
-        shell: bash
-        working-directory: docs
-        run: |
-          set -euo pipefail
-          npx vercel@59.3.0 build --prod --token="$VERCEL_TOKEN"
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_DOCS_PROJECT_ID }}
-
-      - name: Deploy docs to Vercel
-        shell: bash
-        run: |
-          set -euo pipefail
-          npx vercel@59.3.0 deploy --prebuilt --prod docs --token="$VERCEL_TOKEN"
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-
-  deploy-packs:
-    needs: publish-packages
-    if: ${{ always() && (needs.publish-packages.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.deploy_only)) }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version-file: ".bun-version"
-
-      - name: Install dependencies
-        shell: bash
-        run: bun install --frozen-lockfile
-
-      - name: Pull Vercel project settings
-        shell: bash
-        working-directory: packs
-        run: |
-          set -euo pipefail
-          npx vercel@59.3.0 pull --yes --environment=production --token="$VERCEL_TOKEN"
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PACKS_PROJECT_ID }}
-
-      - name: Build packs artifacts
-        shell: bash
-        working-directory: packs
-        run: |
-          set -euo pipefail
-          npx vercel@59.3.0 build --prod --token="$VERCEL_TOKEN"
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PACKS_PROJECT_ID }}
-
-      - name: Deploy packs to Vercel
-        shell: bash
-        run: |
-          set -euo pipefail
-          npx vercel@59.3.0 deploy --prebuilt --prod packs --token="$VERCEL_TOKEN"
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}

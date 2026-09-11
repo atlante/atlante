@@ -37,6 +37,30 @@ hosts the Astro landing site, and `packs/` hosts the Astro pack explorer. The
 publishable packages are `pack` and the CLI; the other toolchain workspaces
 remain private.
 
+## Licensing
+
+Unless a file or directory states otherwise, original Atlante source code,
+first-party pack content, schemas, and documentation are licensed under the MIT
+License; see the repository [`LICENSE`](LICENSE). Published packages carry
+their own `LICENSE` file as well as the MIT package metadata.
+
+Source-file license headers are optional. When a standalone source file needs a
+copyright and license notice, use the following SPDX form:
+
+```ts
+// Copyright © 2026 Omar Desogus, Giacomo Corrias
+// SPDX-License-Identifier: MIT
+```
+
+Third-party dependencies, bundled fonts, and other third-party assets retain
+their own notices and licenses. Do not mark third-party material as MIT. The
+Atlante name, logo, and related branding are governed separately by
+[`TRADEMARKS.md`](TRADEMARKS.md). Contributors should confirm that they have
+the right to contribute their changes under MIT; copyright ownership and any
+future relicensing agreement are separate matters. When changing code bundled
+into the CLI, update `packages/cli/THIRD-PARTY-NOTICES.md` and verify the npm
+package contents.
+
 ## Checks and tests
 
 The checks are organized in lanes, and each lane is one npm command, so the
@@ -150,17 +174,16 @@ changes, run `sync:brand` and review the generated result instead.
 ## Build and deploy the docs
 
 For local verification, `bun run --cwd docs build` synchronizes the approved
-brand assets and builds Astro. The docs Vercel project uses `docs` as its project
-root and the configured deployment command is:
+brand assets and builds Astro. The docs Vercel project uses `docs` as its
+project root and the configured deployment command is:
 
 ```sh
-npx astro build
+bun run sync:brand && npx astro build
 ```
 
-The release workflow synchronizes brand assets before sending the docs workspace
-to Vercel, so the remote build does not need Bun or access to the repository-level
-`brand/` directory. Configure `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and
-`VERCEL_DOCS_PROJECT_ID` in repository secrets before publishing a release.
+The project configuration keeps preview builds available and cancels
+production builds unless the current commit subject matches `release: vX.Y.Z`.
+The release workflow does not deploy the docs or configure Vercel.
 
 ## Write documentation
 

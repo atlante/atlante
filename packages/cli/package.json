@@ -29,7 +29,8 @@
   },
   "files": [
     "dist",
-    "LICENSE"
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md"
   ],
   "bin": {
     "atlante": "./dist/bin/atlante.js"
