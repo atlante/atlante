@@ -298,8 +298,6 @@
     justify-items: center;
     gap: var(--space-3);
     padding-block: var(--space-12);
-    border-block-end: var(--line);
-    text-align: center;
   }
 
   .catalog-note p {
