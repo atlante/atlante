@@ -228,3 +228,48 @@ jobs:
           npx vercel@59.3.0 deploy --prebuilt --prod docs --token="$VERCEL_TOKEN"
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+  deploy-packs:
+    needs: publish-packages
+    if: ${{ always() && (needs.publish-packages.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.deploy_only)) }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: ".bun-version"
+
+      - name: Install dependencies
+        shell: bash
+        run: bun install --frozen-lockfile
+
+      - name: Pull Vercel project settings
+        shell: bash
+        working-directory: packs
+        run: |
+          set -euo pipefail
+          npx vercel@59.3.0 pull --yes --environment=production --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PACKS_PROJECT_ID }}
+
+      - name: Build packs artifacts
+        shell: bash
+        working-directory: packs
+        run: |
+          set -euo pipefail
+          npx vercel@59.3.0 build --prod --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PACKS_PROJECT_ID }}
+
+      - name: Deploy packs to Vercel
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx vercel@59.3.0 deploy --prebuilt --prod packs --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
