@@ -295,6 +295,8 @@
 
   .catalog-note {
     padding-block: var(--space-12);
+    border-block-start: var(--line);
+    text-align: center;
   }
 
   .catalog-note p {
