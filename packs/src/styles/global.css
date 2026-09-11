@@ -65,8 +65,8 @@ body {
 }
 
 :root {
-  /* The pack pages share one reading width with the design prototype. */
-  --container-wide: 1240px;
+  /* Shared reading width with the landing site. */
+  --container-wide: 1200px;
   --container-content: 70ch;
 }
 

@@ -99,5 +99,36 @@ const ogImage = Astro.site ? new URL("og.png", Astro.site) : "/og.png";
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
     <slot />
+
+    <!-- The page-wide reveal language shared with the landing site: sections
+         fade and rise once as they enter the viewport. -->
+    <script>
+      const sections = document.querySelectorAll("main section");
+
+      for (const section of sections) {
+        if (
+          section instanceof HTMLElement &&
+          matchMedia("(prefers-reduced-motion: reduce)").matches === false
+        ) {
+          section.classList.add("js-reveal");
+        }
+      }
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (entry.isIntersecting) {
+              entry.target.classList.add("is-visible");
+              observer.unobserve(entry.target);
+            }
+          }
+        },
+        { threshold: 0.15 },
+      );
+
+      for (const section of sections) {
+        observer.observe(section);
+      }
+    </script>
   </body>
 </html>
