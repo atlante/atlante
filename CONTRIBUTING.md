@@ -36,6 +36,30 @@ The docs site is the `@atlante/docs` workspace in `docs/`, and `website/`
 hosts the Astro landing site. The publishable packages are `pack` and the
 CLI; the other toolchain workspaces remain private.
 
+## Licensing
+
+Unless a file or directory states otherwise, original Atlante source code,
+first-party pack content, schemas, and documentation are licensed under the MIT
+License; see the repository [`LICENSE`](LICENSE). Published packages carry
+their own `LICENSE` file as well as the MIT package metadata.
+
+Source-file license headers are optional. When a standalone source file needs a
+copyright and license notice, use the following SPDX form:
+
+```ts
+// Copyright © 2026 Omar Desogus, Giacomo Corrias
+// SPDX-License-Identifier: MIT
+```
+
+Third-party dependencies, bundled fonts, and other third-party assets retain
+their own notices and licenses. Do not mark third-party material as MIT. The
+Atlante name, logo, and related branding are governed separately by
+[`TRADEMARKS.md`](TRADEMARKS.md). Contributors should confirm that they have
+the right to contribute their changes under MIT; copyright ownership and any
+future relicensing agreement are separate matters. When changing code bundled
+into the CLI, update `packages/cli/THIRD-PARTY-NOTICES.md` and verify the npm
+package contents.
+
 ## Checks and tests
 
 The checks are organized in lanes, and each lane is one npm command, so the
