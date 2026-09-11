@@ -61,7 +61,7 @@ export function installPanel(): void {
     const pack = commandText.dataset.package ?? "";
     const commands = new Map<string, string>([
       ["init", `npx atlante@latest init --pack ${pack}`],
-      ["install", `npm install --save-dev ${pack}`],
+      ["install", `npx atlante pack install ${pack}`],
     ]);
     const tabs = [
       ...document.querySelectorAll<HTMLButtonElement>("[data-command-kind]"),

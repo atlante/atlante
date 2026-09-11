@@ -300,8 +300,7 @@
     padding-block: var(--space-3);
     border-block-end: var(--line);
     transition:
-      background-color var(--duration-utility) var(--ease-standard),
-      padding-inline var(--duration-utility) var(--ease-standard);
+      background-color var(--duration-utility) var(--ease-standard);
   }
 
   /* The footer's separator closes the list; the last row must not double it. */
@@ -311,7 +310,6 @@
 
   .pack-row:hover {
     background: var(--surface-soft);
-    padding-inline: var(--space-3);
   }
 
   .pack-rank {
@@ -1002,10 +1000,6 @@
       grid-template-columns: 28px minmax(0, 1fr) 22px;
       gap: var(--space-3);
       padding-block: var(--space-6);
-    }
-
-    .pack-row:hover {
-      padding-inline: var(--space-2);
     }
 
     .pack-row > .metric {
