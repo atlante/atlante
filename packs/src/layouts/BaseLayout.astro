@@ -125,7 +125,9 @@ const ogImage = Astro.site ? new URL("og.png", Astro.site) : "/og.png";
             }
           }
         },
-        { threshold: 0.15 },
+        // Any visible pixel reveals: tall content sections (the rendered
+        // README) would otherwise wait for most of a viewport of scroll.
+        { threshold: 0 },
       );
 
       for (const section of sections) {
