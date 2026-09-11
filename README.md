@@ -208,4 +208,16 @@ To publish your own reusable content, read
 
 ## License
 
-See [LICENSE](LICENSE).
+Unless a file or directory states otherwise, Atlante's original source code,
+first-party pack content, schemas, and documentation are licensed under the MIT
+License. See [LICENSE](LICENSE).
+
+Third-party dependencies and bundled third-party assets retain their own
+licenses. In particular, the bundled fonts are distributed under the SIL Open
+Font License 1.1; see [brand/fonts/README.md](brand/fonts/README.md). The
+Atlante name, logo, and related branding are not licensed under MIT; see
+[TRADEMARKS.md](TRADEMARKS.md).
+
+User-authored configuration and generated files in projects using Atlante are
+not automatically Atlante-owned material. Content copied from the first-party
+pack remains subject to its applicable notice.
