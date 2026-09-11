@@ -295,17 +295,23 @@
 
   .catalog-note {
     display: grid;
-    grid-template-columns: 160px minmax(0, 1fr);
-    gap: var(--space-8);
+    justify-items: center;
+    gap: var(--space-3);
     padding-block: var(--space-12);
     border-block-end: var(--line);
+    text-align: center;
   }
 
   .catalog-note p {
-    max-width: 760px;
+    max-width: 62ch;
     color: var(--ds-muted);
     font-family: var(--font-body);
     font-size: var(--text-body);
+  }
+
+  .catalog-sync {
+    color: var(--ds-muted);
+    font: var(--text-meta) / 1.4 var(--font-mono);
   }
 
   .toast {
@@ -841,7 +847,6 @@
     }
 
     .controls-row,
-    .catalog-note,
     .detail-hero,
     .detail-grid {
       grid-template-columns: 1fr;

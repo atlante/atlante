@@ -2,7 +2,6 @@
 import "../styles/packs.css";
 import BaseLayout from "../layouts/BaseLayout.astro";
 import SiteNav from "../components/SiteNav.astro";
-import SiteFooter from "../components/SiteFooter.astro";
 import { formatCount, formatSyncTime } from "../data/format";
 import snapshot from "../data/registry-snapshot.json";
 
@@ -144,10 +143,10 @@ const packs = snapshot.packs;
         synchronized from npm and public GitHub data, then published as a
         static snapshot. Raw metrics are shown without a composite score.
       </p>
+      <p class="catalog-sync">Pack data synchronized {formatSyncTime(snapshot.syncedAt)}</p>
     </aside>
   </main>
 
-  <SiteFooter syncedAt={snapshot.syncedAt} />
 
   <script>
     const packList = document.querySelector<HTMLOListElement>("#pack-list");
