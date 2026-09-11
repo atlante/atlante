@@ -34,7 +34,7 @@ describe("website deployment contract", () => {
       "bun run sync:brand && bun run sync:schema && astro build",
     );
     expect(websitePackage.scripts.check).toBe(
-      "bun run build && ATLANTE_BUILT_OUTPUT_TESTS=1 bun test scripts/website-output.test.ts",
+      "bun run build && ATLANTE_BUILT_OUTPUT_TESTS=1 bun test scripts api",
     );
     expect(websitePackage.scripts["sync:schema"]).toBe(
       "bun scripts/sync-schema.ts",
