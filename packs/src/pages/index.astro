@@ -24,10 +24,28 @@ const packs = snapshot.packs;
           your harness.
         </p>
         <div class="command-row">
+          <div class="runner-tabs" role="group" aria-label="Package runner">
+            <button
+              class="runner-tab"
+              type="button"
+              data-runner="npx"
+              aria-selected="true"
+            >
+              npx
+            </button>
+            <button class="runner-tab" type="button" data-runner="bunx">
+              bunx
+            </button>
+            <button class="runner-tab" type="button" data-runner="pnpx">
+              pnpx
+            </button>
+          </div>
           <div class="command-box">
             <code
               ><span class="command-prompt" aria-hidden="true">$ </span
-              >npx atlante@latest init --pack @atlante/pack</code
+              ><span id="try-command-text"
+                >npx atlante@latest init --pack @atlante/pack</span
+              ></code
             >
             <button
               class="command-copy"
@@ -215,6 +233,28 @@ const packs = snapshot.packs;
         }, 1600);
       });
     });
+
+    // The try-it-now command switches between package runners.
+    const runnerTabs = [
+      ...document.querySelectorAll<HTMLButtonElement>("[data-runner]"),
+    ];
+    const tryCommandText =
+      document.querySelector<HTMLElement>("#try-command-text");
+    const tryCopyButton = document.querySelector<HTMLButtonElement>(
+      ".command-row button[data-copy-text]",
+    );
+    for (const tab of runnerTabs) {
+      tab.addEventListener("click", () => {
+        for (const candidate of runnerTabs) {
+          candidate.setAttribute("aria-selected", String(candidate === tab));
+        }
+        const command = `${
+          tab.dataset.runner ?? "npx"
+        } atlante@latest init --pack @atlante/pack`;
+        if (tryCommandText) tryCommandText.textContent = command;
+        if (tryCopyButton) tryCopyButton.dataset.copyText = command;
+      });
+    }
 
     const packList = document.querySelector<HTMLOListElement>("#pack-list");
     const searchInput = document.querySelector<HTMLInputElement>("#pack-search");

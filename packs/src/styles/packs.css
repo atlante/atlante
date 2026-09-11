@@ -105,16 +105,42 @@
     max-width: 100%;
   }
 
+  .runner-tabs {
+    display: inline-flex;
+    gap: var(--space-1);
+  }
+
+  .runner-tab {
+    min-height: 34px;
+    padding-inline: var(--space-3);
+    color: var(--ds-muted);
+    background: transparent;
+    border: 0;
+    border-radius: 4px;
+    font: 600 var(--text-small) / 1 var(--font-mono);
+  }
+
+  .runner-tab[aria-selected="true"] {
+    color: var(--ds-fg);
+    background: var(--surface-raised);
+  }
+
+  /* Command boxes share the landing site's skin: a light bordered strip
+     with foreground ink, not a dark code surface. */
   .command-box {
     display: flex;
     align-items: center;
     gap: var(--space-2);
     min-width: 0;
     max-width: 100%;
-    padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3);
     border: 1px solid rgb(160 160 160 / 0.5);
     border-radius: 4px;
     background: color-mix(in oklab, var(--ds-bg) 96%, var(--ds-fg));
+    color: var(--ds-fg);
+  }
+
+  .command-row .command-box {
+    padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3);
   }
 
   .command-row code {
@@ -507,27 +533,20 @@
     background: var(--surface-raised);
   }
 
-  .command-box {
+  .install-panel .command-box {
     position: relative;
-    display: flex;
-    align-items: center;
     min-height: 64px;
     padding: var(--space-3) 64px var(--space-3) var(--space-4);
-    color: var(--ds-code-fg);
-    background: var(--ds-code-bg);
-    border: 1px solid var(--ds-border-subtle);
-    border-radius: 4px;
-    overflow-x: auto;
   }
 
-  .command-box code {
+  .install-panel .command-box code {
     font-size: var(--text-small);
     white-space: nowrap;
   }
 
-  .command-box .prompt {
+  .install-panel .command-box .prompt {
     margin-inline-end: var(--space-2);
-    color: var(--ds-code-muted);
+    color: var(--ds-muted);
   }
 
   .copy-button {
@@ -539,14 +558,14 @@
     display: grid;
     place-items: center;
     padding: 0;
-    color: var(--ds-code-fg);
+    color: var(--ds-fg);
     background: transparent;
-    border: 1px solid color-mix(in oklab, var(--ds-code-fg) 28%, transparent);
+    border: 1px solid color-mix(in oklab, var(--ds-fg) 28%, transparent);
     border-radius: 4px;
   }
 
   .copy-button:hover {
-    background: color-mix(in oklab, var(--ds-code-fg) 10%, transparent);
+    background: color-mix(in oklab, var(--ds-fg) 10%, transparent);
   }
 
   .copy-button svg {
