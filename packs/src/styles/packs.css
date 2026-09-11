@@ -673,6 +673,14 @@
     font-size: 0.86em;
   }
 
+  .presets-note {
+    max-width: 70ch;
+    margin-block: 0 var(--space-6);
+    color: var(--ds-muted);
+    font: 400 1rem / 1.65 var(--font-body);
+    text-wrap: pretty;
+  }
+
   .presets-section h2,
   .file-section h2 {
     margin-block: 0 var(--space-6);

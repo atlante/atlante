@@ -159,8 +159,13 @@ const bindingSummary = (binding: { agents: number; skills: number }): string => 
           </section>
 
           <section class="presets-section" aria-labelledby="presets-title">
-            <span class="section-label">Selectors</span>
+            <span class="section-label">Presets</span>
             <h2 id="presets-title">Included presets</h2>
+            <p class="presets-note">
+              Select a preset in your configuration through its locator with
+              <code>extends</code>, or during <code>init</code> with
+              <code>--pack</code>.
+            </p>
             <ul class="preset-list">
               {pack.presets.map((preset) => (
                 <li class="preset-item">
