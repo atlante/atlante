@@ -47,12 +47,19 @@
 
   a {
     color: inherit;
-    text-decoration-color: var(--ds-border);
-    text-underline-offset: 0.22em;
   }
 
-  a:hover {
+  /* Content links share the site's link treatment: quiet until hovered. */
+  main a {
+    text-decoration: none;
+  }
+
+  main a:hover,
+  main a:focus-visible {
+    text-decoration: underline;
+    text-decoration-color: var(--ds-border);
     text-decoration-thickness: 2px;
+    text-underline-offset: 0.25em;
   }
 
   .catalog-hero {

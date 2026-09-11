@@ -1,5 +1,6 @@
 ---
 import "../styles/global.css";
+import Stars from "../components/Stars.astro";
 
 interface Props {
   title: string;
@@ -98,6 +99,7 @@ const ogImage = Astro.site ? new URL("og.png", Astro.site) : "/og.png";
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
+    <Stars />
     <slot />
 
     <!-- The page-wide reveal language shared with the landing site: sections

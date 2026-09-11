@@ -1,11 +1,5 @@
 ---
 import BrandLogo from "./BrandLogo.astro";
-
-interface Props {
-  current?: "packs";
-}
-
-const { current } = Astro.props;
 ---
 
 <nav class="site-nav" aria-label="Primary">
@@ -13,11 +7,7 @@ const { current } = Astro.props;
     <BrandLogo variant="horizontal" />
   </a>
   <div class="nav-actions">
-    <a
-      class="nav-link desktop-only"
-      href="/"
-      aria-current={current === "packs" ? "page" : undefined}>Packs</a
-    >
+    <a class="nav-link desktop-only" href="https://atlante.sh">Website</a>
     <a class="nav-link desktop-only" href="https://docs.atlante.sh">Docs</a>
     <a
       class="nav-link desktop-only"
