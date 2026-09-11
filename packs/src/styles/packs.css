@@ -303,6 +303,11 @@
     font-size: var(--text-small);
   }
 
+  .catalog-sync {
+    color: var(--ds-muted);
+    font: var(--text-meta) / 1.4 var(--font-mono);
+  }
+
   .toast {
     position: fixed;
     inset-inline-end: var(--space-6);

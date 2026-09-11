@@ -2,7 +2,7 @@
 import "../styles/packs.css";
 import BaseLayout from "../layouts/BaseLayout.astro";
 import SiteNav from "../components/SiteNav.astro";
-import { formatCount, formatSyncTime } from "../data/format";
+import { formatCount, formatShortSyncTime } from "../data/format";
 import snapshot from "../data/registry-snapshot.json";
 
 const packs = snapshot.packs;
@@ -138,10 +138,10 @@ const packs = snapshot.packs;
 
     <aside class="shell catalog-note" aria-label="Catalog note">
       <p>
-        Note: This curated directory publishes npm and GitHub metadata as a
-        static snapshot. It was last synchronized {formatSyncTime(snapshot.syncedAt)};
-        metrics remain separate rather than forming a score.
+        The <em>packs</em> are fetched through a static snapshot from npm and
+        public GitHub.
       </p>
+      <p class="catalog-sync">Last update {formatShortSyncTime(snapshot.syncedAt)}</p>
     </aside>
   </main>
 

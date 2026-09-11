@@ -23,7 +23,8 @@ describe.skipIf(process.env.ATLANTE_BUILT_OUTPUT_TESTS !== "1")(
       expect(html).toContain("@atlante/pack");
       expect(html).toContain('href="/@atlante/pack"');
       expect(html).toContain("indexed");
-      expect(html).toContain("synchronized");
+      expect(html).toContain("static snapshot");
+      expect(html).toContain("Last update");
       expect(html).toContain('id="pack-search"');
       expect(html).toContain('id="pack-sort"');
     });
