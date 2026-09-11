@@ -241,6 +241,7 @@ describe("runEval", () => {
         task: { ...base.scenario.task, fixture: "eval/fixtures/absent" },
       },
       source: "eval/scenarios/broken.eval.json",
+      origin: base.origin,
     };
     const report = await runEval({
       projectRoot,

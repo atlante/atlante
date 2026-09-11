@@ -84,6 +84,30 @@ describe("discoverEvalScenarios", () => {
     expect(result.scenarios[0]?.scenario.checks.length).toBe(2);
   });
 
+  test("attaches a pack origin while resolving fixtures from that origin root", () => {
+    const result = discoverEvalScenarios(
+      fixturesRoot,
+      "scenarios/alpha.eval.jsonc",
+      {
+        origin: {
+          kind: "package",
+          root: fixturesRoot,
+          packageName: "@acme/review-pack",
+          packageVersion: "1.2.3",
+          locator: "@acme/review-pack",
+        },
+      },
+    );
+    expect(result.diagnostics).toEqual([]);
+    expect(result.scenarios[0]?.origin).toEqual({
+      kind: "package",
+      root: fixturesRoot,
+      packageName: "@acme/review-pack",
+      packageVersion: "1.2.3",
+      locator: "@acme/review-pack",
+    });
+  });
+
   test("rejects empty match sets with recovery guidance", () => {
     const result = discoverEvalScenarios(
       fixturesRoot,

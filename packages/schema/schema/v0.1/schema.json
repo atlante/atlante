@@ -190,53 +190,153 @@
       }
     },
     "eval": {
-      "type": "object",
-      "properties": {
-        "host": {
-          "type": "string",
-          "const": "opencode"
+      "anyOf": [
+        {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "host": {
+                  "type": "string",
+                  "const": "opencode"
+                },
+                "scenarios": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "include": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "uniqueItems": true
+                },
+                "model": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "budget": {
+                  "type": "object",
+                  "properties": {
+                    "trials": {
+                      "default": 3,
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 50
+                    },
+                    "timeoutMs": {
+                      "default": 600000,
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 3600000
+                    },
+                    "maxSessions": {
+                      "default": 15,
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "maxTokens": {
+                      "default": 400000,
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "required": ["host", "scenarios"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "host": {
+                  "type": "string",
+                  "const": "opencode"
+                },
+                "scenarios": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "include": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "uniqueItems": true
+                },
+                "model": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "budget": {
+                  "type": "object",
+                  "properties": {
+                    "trials": {
+                      "default": 3,
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 50
+                    },
+                    "timeoutMs": {
+                      "default": 600000,
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 3600000
+                    },
+                    "maxSessions": {
+                      "default": 15,
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "maxTokens": {
+                      "default": 400000,
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "required": ["host", "include"],
+              "additionalProperties": false
+            }
+          ]
         },
-        "scenarios": {
-          "type": "string",
-          "minLength": 1
-        },
-        "model": {
-          "type": "string",
-          "minLength": 1
-        },
-        "budget": {
+        {
           "type": "object",
           "properties": {
-            "trials": {
-              "default": 3,
-              "type": "integer",
-              "exclusiveMinimum": 0,
-              "maximum": 50
+            "host": {
+              "type": "string",
+              "const": "opencode"
             },
-            "timeoutMs": {
-              "default": 600000,
-              "type": "integer",
-              "exclusiveMinimum": 0,
-              "maximum": 3600000
+            "scenarios": {
+              "type": "string",
+              "minLength": 1
             },
-            "maxSessions": {
-              "default": 15,
-              "type": "integer",
-              "exclusiveMinimum": 0,
-              "maximum": 9007199254740991
+            "fixtures": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^(?!.*\\0)(?![\\\\/])(?!.*[\\\\/]$)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$))(?!.*(?:^|[\\\\/])(?:\\.git|node_modules)(?:[\\\\/]|$)).+$"
             },
-            "maxTokens": {
-              "default": 400000,
-              "type": "integer",
-              "exclusiveMinimum": 0,
-              "maximum": 9007199254740991
+            "report": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^(?!.*\\0)(?![\\\\/])(?!.*[\\\\/]$)(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$))(?!.*(?:^|[\\\\/])(?:\\.git|node_modules)(?:[\\\\/]|$)).+$"
             }
           },
+          "required": ["scenarios"],
           "additionalProperties": false
         }
-      },
-      "required": ["host", "scenarios"],
-      "additionalProperties": false
+      ]
     }
   },
   "required": ["$schema"],

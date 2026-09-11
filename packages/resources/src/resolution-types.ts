@@ -12,6 +12,7 @@ import type {
   InstanceFacet,
   JsonObject,
   JsonValue,
+  PackageResourceLocator,
   Preset,
   RawResourceLocator,
   ResourceGraphNode,
@@ -131,6 +132,14 @@ export type ResolvedResourceDocument = Readonly<{
   readonly dependencies: readonly string[];
   readonly unresolvedParents: readonly string[];
   readonly trustedRoots: readonly ResourceWatchRoot[];
+  /** Package roots reached while resolving the selected project resources. */
+  readonly packagePacks: readonly ResolvedResourcePackage[];
+}>;
+
+/** A selected package root and the package locators that reached it. */
+export type ResolvedResourcePackage = Readonly<{
+  readonly pack: ResourcePack;
+  readonly locators: readonly PackageResourceLocator[];
 }>;
 
 /** A facet read through the locator checks, with its authoring context. */

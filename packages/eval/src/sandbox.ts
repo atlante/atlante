@@ -102,16 +102,12 @@ export async function assembleSandbox(
     mkdirSync(join(stateDir, sub), { recursive: true });
   }
 
-  // (a) Fixture copy: the sandbox root starts as a copy of the fixture.
-  assertNoSymlinkPath(
-    input.projectRoot,
-    join(input.projectRoot, input.scenario.scenario.task.fixture),
-    "fixture",
-  );
-  copyFixtureTree(
-    join(input.projectRoot, input.scenario.scenario.task.fixture),
-    root,
-  );
+  // (a) Fixture copy: project scenarios use the project root, while pack
+  // scenarios use the root that supplied their discovery result.
+  const fixtureRoot = input.scenario.origin.root;
+  const fixture = join(fixtureRoot, input.scenario.scenario.task.fixture);
+  assertNoSymlinkPath(fixtureRoot, fixture, "fixture");
+  copyFixtureTree(fixture, root);
 
   // (b) Verified native outputs, copied from manifest-backed bytes. The
   // manifest itself stays in the source project; the host only needs the

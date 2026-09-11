@@ -26,6 +26,8 @@ export {
 export type {
   DiscoveredEvalScenario,
   EvalScenarioDiscovery,
+  EvalScenarioDiscoveryOptions,
+  EvalScenarioOrigin,
 } from "./eval-scenario.js";
 export { discoverEvalScenarios } from "./eval-scenario.js";
 export { globFiles, globHasMagic } from "./glob.js";

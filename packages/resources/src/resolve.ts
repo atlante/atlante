@@ -26,6 +26,7 @@ import type {
   ResolvedResourceBinding,
   ResolvedResourceDocument,
   ResolvedResourceInstance,
+  ResolvedResourcePackage,
   ResolvedTemplate,
   ResolvedTemplateSlot,
   ResourceBindingCollectionSpec,
@@ -56,6 +57,7 @@ import type {
   InstanceFacet,
   JsonObject,
   JsonValue,
+  PackageResourceLocator,
   Preset,
   RawResourceLocator,
   ResourceFailureCode,
@@ -70,6 +72,7 @@ export type {
   ResolvedResourceBinding,
   ResolvedResourceDocument,
   ResolvedResourceInstance,
+  ResolvedResourcePackage,
   ResolvedTemplate,
   ResolvedTemplateSlot,
   ResolveInstanceRequest,
@@ -92,6 +95,13 @@ export class ResourceResolver {
   private readonly resolvedInstances = new Map<
     string,
     ResolvedResourceInstance
+  >();
+  private readonly packagePacks = new Map<
+    string,
+    {
+      readonly pack: ResourcePack;
+      readonly locators: Set<PackageResourceLocator>;
+    }
   >();
 
   constructor(
@@ -247,7 +257,9 @@ export class ResourceResolver {
     locator: RawResourceLocator,
     authoringFile: string,
   ): LoadedFacet<TemplateFacet> {
-    return this.facets.loadTemplate(pack, locator, authoringFile);
+    const loaded = this.facets.loadTemplate(pack, locator, authoringFile);
+    this.collectPackagePack(loaded);
+    return loaded;
   }
 
   private loadInstance(
@@ -255,7 +267,9 @@ export class ResourceResolver {
     locator: RawResourceLocator,
     authoringFile: string,
   ): LoadedFacet<InstanceFacet> {
-    return this.facets.loadInstance(pack, locator, authoringFile);
+    const loaded = this.facets.loadInstance(pack, locator, authoringFile);
+    this.collectPackagePack(loaded);
+    return loaded;
   }
 
   private loadPreset(
@@ -263,7 +277,26 @@ export class ResourceResolver {
     locator: RawResourceLocator,
     authoringFile: string,
   ): LoadedFacet<Preset> {
-    return this.facets.loadPreset(pack, locator, authoringFile);
+    const loaded = this.facets.loadPreset(pack, locator, authoringFile);
+    this.collectPackagePack(loaded);
+    return loaded;
+  }
+
+  private collectPackagePack(
+    loaded: LoadedFacet<TemplateFacet | InstanceFacet | Preset>,
+  ): void {
+    if (loaded.pack.kind !== "package") return;
+    const locator = loaded.target.locator as PackageResourceLocator;
+    if (locator.startsWith("./") || locator.startsWith("../")) return;
+    const existing = this.packagePacks.get(loaded.pack.root);
+    if (existing) {
+      existing.locators.add(locator);
+      return;
+    }
+    this.packagePacks.set(loaded.pack.root, {
+      pack: loaded.pack,
+      locators: new Set([locator]),
+    });
   }
 
   private enterLoaded<T extends TemplateFacet | InstanceFacet>(
@@ -721,6 +754,18 @@ export class ResourceResolver {
       dependencies: Object.freeze([...this.dependencies].sort()),
       unresolvedParents: Object.freeze([...this.unresolvedParents].sort()),
       trustedRoots: Object.freeze(this.traversal.watchRoots),
+      packagePacks: Object.freeze(
+        [...this.packagePacks.values()]
+          .sort((left, right) => left.pack.root.localeCompare(right.pack.root))
+          .map(
+            ({ pack, locators }): ResolvedResourcePackage => ({
+              pack,
+              locators: Object.freeze(
+                [...locators].sort((left, right) => left.localeCompare(right)),
+              ),
+            }),
+          ),
+      ),
     });
     return result;
   }

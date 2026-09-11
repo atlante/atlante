@@ -61,6 +61,38 @@ function scenarioDocument(): string {
   })}\n`;
 }
 
+function writePackEvalSuite(project: string): void {
+  const packRoot = join(project, "node_modules", ...FIXTURE_PACK.split("/"));
+  const packConfigPath = join(packRoot, "atlante.jsonc");
+  const packConfig = JSON.parse(readFileSync(packConfigPath, "utf8")) as Record<
+    string,
+    unknown
+  >;
+  packConfig.eval = {
+    scenarios: "eval/scenarios/*.eval.json",
+    fixtures: "eval/fixtures",
+  };
+  writeFileSync(packConfigPath, `${JSON.stringify(packConfig)}\n`);
+  mkdirSync(join(packRoot, "eval", "scenarios"), { recursive: true });
+  mkdirSync(join(packRoot, "eval", "fixtures", "pack"), {
+    recursive: true,
+  });
+  writeFileSync(
+    join(packRoot, "eval", "scenarios", "pack-happy.eval.json"),
+    `${JSON.stringify({
+      $schema: EVAL_SCENARIO_SCHEMA_URI,
+      version: "0.1",
+      name: "pack-happy",
+      task: { fixture: "eval/fixtures/pack", prompt: "Create the file." },
+      checks: [{ type: "file-exists", path: "pack-only.txt" }],
+    })}\n`,
+  );
+  writeFileSync(
+    join(packRoot, "eval", "fixtures", "pack", "pack-only.txt"),
+    "pack fixture\n",
+  );
+}
+
 /** Authors a full eval-enabled project; native outputs stay unbuilt by default. */
 function evalProject(options: { evalSection?: object } = {}): string {
   const project = writeEvalProject(options);
@@ -228,6 +260,91 @@ describe("runEvalCommand", () => {
       "utf8",
     );
     expect(gitignore.split("\n")).toContain("eval/");
+  });
+
+  test("discovers pack scenarios but does not execute them without explicit inclusion", async () => {
+    const project = evalProject();
+    writePackEvalSuite(project);
+    await buildFixtureOutputs(project);
+    const errors: string[] = [];
+    const errorSpy = spyOn(console, "error").mockImplementation(
+      (...parts: unknown[]) => {
+        errors.push(parts.join(" "));
+      },
+    );
+    try {
+      const exit = await runEvalCommand(
+        project,
+        {},
+        undefined,
+        fakeRunner(true),
+      );
+      expect(exit).toBe(0);
+      const { file } = reportPaths(project);
+      const report = JSON.parse(readFileSync(file, "utf8"));
+      expect(report.scenarios["cli-happy"].passRate).toBe(1);
+      expect(report.scenarios["pack-happy"]).toBeUndefined();
+      expect(errors.join("\n")).toContain("pack-happy");
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  test("executes an explicitly included pack scenario against the pack fixture", async () => {
+    const project = evalProject({
+      evalSection: { host: "opencode", include: [FIXTURE_PACK] },
+    });
+    writePackEvalSuite(project);
+    await buildFixtureOutputs(project);
+    let calls = 0;
+    const exit = await runEvalCommand(project, {}, undefined, {
+      name: "fake",
+      prepareHostIntegration() {},
+      async runTrial(input) {
+        calls += 1;
+        expect(existsSync(join(input.sandbox.root, "pack-only.txt"))).toBe(
+          true,
+        );
+        return {
+          outcome: "completed",
+          durationMs: 5,
+          model: "test/model",
+          modelVersion: "model-x",
+        };
+      },
+    });
+    expect(exit).toBe(0);
+    expect(calls).toBe(3);
+    const { file } = reportPaths(project);
+    const report = JSON.parse(readFileSync(file, "utf8"));
+    expect(report.scenarios["pack-happy"].passRate).toBe(1);
+  });
+
+  test("exits 2 when an explicitly included pack has no eval suite", async () => {
+    const project = evalProject({
+      evalSection: { host: "opencode", include: [FIXTURE_PACK] },
+    });
+    await buildFixtureOutputs(project);
+    const errors: string[] = [];
+    const errorSpy = spyOn(console, "error").mockImplementation(
+      (...parts: unknown[]) => {
+        errors.push(parts.join(" "));
+      },
+    );
+    try {
+      const exit = await runEvalCommand(
+        project,
+        {},
+        undefined,
+        fakeRunner(true),
+      );
+      expect(exit).toBe(2);
+      expect(errors.join("\n")).toContain(
+        "eval.include locator has no pack eval suite",
+      );
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 
   test("exits 1 when a check fails", async () => {

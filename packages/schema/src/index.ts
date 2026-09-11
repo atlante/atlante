@@ -37,10 +37,12 @@ export {
 } from "./document.js";
 export type {
   AuthoredEvalConfig,
+  AuthoredEvalPackConfig,
   AuthoredEvalScenario,
   EvalBudget,
   EvalCheck,
   EvalConfig,
+  EvalPackConfig,
   EvalScenario,
   EvalScenarioTask,
   SandboxRelativePath,
@@ -53,6 +55,7 @@ export {
   EVAL_SCENARIO_SCHEMA_URI,
   evalCheckSchema,
   evalConfigSchema,
+  evalPackConfigSchema,
   evalScenarioSchema,
 } from "./eval.js";
 export type { Value, ValuesMap, ValuesMapOverlay } from "./values.js";
