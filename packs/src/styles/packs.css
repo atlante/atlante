@@ -457,7 +457,7 @@
     grid-template-columns: minmax(0, 1fr) 350px;
     gap: var(--space-12);
     padding-block: var(--space-12) var(--space-16);
-    border-block-end: 1px solid var(--ds-border);
+    border-block-end: var(--line);
   }
 
   .detail-title-line {
