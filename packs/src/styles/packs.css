@@ -306,7 +306,7 @@
     max-width: 62ch;
     color: var(--ds-muted);
     font-family: var(--font-body);
-    font-size: var(--text-body);
+    font-size: var(--text-small);
   }
 
   .catalog-sync {
