@@ -77,10 +77,16 @@ npx atlante validate
 npx atlante build
 ```
 
+A pack collects agents and skills. Point `--out` at the same pack directory to
+add another import: the command detects the existing pack, appends the binding
+to its preset, and writes the new instance alongside the previous ones. An ID
+that already exists in the pack is refused; use `--name` to import under a
+different ID.
+
 The importer supports the CommonMark and GFM nodes listed in the
 [template reference](/concepts/templates#canonical-markdown-input). Unsupported
 syntax, unresolved references, invalid metadata, and failed validation stop the
-operation before the output directory is created.
+operation before anything is written.
 
 The manual workflow below is a separate alternative to importing an existing
 file. If you used `atlante import`, stop after the commands above and inspect

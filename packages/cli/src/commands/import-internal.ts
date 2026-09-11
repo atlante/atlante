@@ -30,6 +30,7 @@ import {
   validateTemplateFacetInput,
   warning,
 } from "@atlante/validator";
+import { type ParseError, parse as parseJsonc } from "jsonc-parser";
 import type { AlignType, PhrasingContent, Root, RootContent } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { frontmatterFromMarkdown } from "mdast-util-frontmatter";
@@ -1061,10 +1062,27 @@ function jsonc(value: unknown): string {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
 
+function instanceFacetFor(
+  kind: ImportKind,
+  metadata: MappedFrontmatter,
+  ast: readonly MarkdownBlockContent[],
+): Record<string, unknown> {
+  return {
+    $template: kind === "skill" ? SKILL_TEMPLATE : AGENT_TEMPLATE,
+    ...instanceInput(metadata, ast, kind),
+  };
+}
+
+function collectionFor(kind: ImportKind): "agents" | "skills" {
+  return kind === "skill" ? "skills" : "agents";
+}
+
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 export function planLocalPack(input: LocalPackPlanInput): LocalPackPlan {
-  const template = input.kind === "skill" ? SKILL_TEMPLATE : AGENT_TEMPLATE;
-  const collection = input.kind === "skill" ? "skills" : "agents";
-  const instance = instanceInput(input.metadata, input.ast, input.kind);
+  const collection = collectionFor(input.kind);
   const packageManifest = {
     name: input.id,
     version: "0.0.0",
@@ -1080,10 +1098,6 @@ export function planLocalPack(input: LocalPackPlanInput): LocalPackPlan {
       },
     },
   };
-  const instanceFacet = {
-    $template: template,
-    ...instance,
-  };
   return {
     outputDirectory: input.outputDirectory,
     id: input.id,
@@ -1098,9 +1112,58 @@ export function planLocalPack(input: LocalPackPlanInput): LocalPackPlan {
       },
       {
         path: join(input.outputDirectory, input.id, "instance.jsonc"),
-        contents: jsonc(instanceFacet),
+        contents: jsonc(
+          instanceFacetFor(input.kind, input.metadata, input.ast),
+        ),
       },
     ],
+  };
+}
+
+export type LocalPackMergePlan = Readonly<{
+  outputDirectory: string;
+  id: string;
+  instancePath: string;
+  instanceContents: string;
+  presetPath: string;
+  presetContents: string;
+}>;
+
+export type LocalPackMergePlanInput = Readonly<{
+  outputDirectory: string;
+  id: string;
+  kind: ImportKind;
+  metadata: MappedFrontmatter;
+  ast: readonly MarkdownBlockContent[];
+  preset: Record<string, unknown>;
+}>;
+
+/** Plans the two writes that add one resource to an existing local pack. */
+export function planLocalPackMerge(
+  input: LocalPackMergePlanInput,
+): LocalPackMergePlan {
+  const collection = collectionFor(input.kind);
+  const existingBindings = input.preset[collection];
+  const bindings = isJsonObject(existingBindings) ? existingBindings : {};
+  const preset = {
+    ...input.preset,
+    [collection]: {
+      ...bindings,
+      [input.id]: {
+        $instance: `./${input.id}`,
+        description: input.metadata.description,
+      },
+    },
+  };
+  return {
+    outputDirectory: input.outputDirectory,
+    id: input.id,
+    instancePath: join(input.outputDirectory, input.id, "instance.jsonc"),
+    instanceContents: jsonc(
+      instanceFacetFor(input.kind, input.metadata, input.ast),
+    ),
+    presetPath: join(input.outputDirectory, "atlante.jsonc"),
+    presetContents: jsonc(preset),
   };
 }
 
@@ -1204,6 +1267,81 @@ export function writeLocalPack(
   }
 }
 
+/**
+ * Applies a merge plan through a staging directory inside the pack: the
+ * instance lands first, then the preset; a failure before the preset rename
+ * removes the written instance directory so the pack keeps its previous
+ * state. After both renames the merge is committed and staging cleanup is
+ * best-effort only.
+ */
+export function mergeLocalPack(
+  plan: LocalPackMergePlan,
+  fileSystem: ImportFileSystem = defaultImportFileSystem,
+): WriteLocalPackResult {
+  let stagingDirectory: string | undefined;
+  const instanceDirectory = join(plan.outputDirectory, plan.id);
+  try {
+    stagingDirectory = fileSystem.mkdtempSync(
+      join(plan.outputDirectory, `.${plan.id}.tmp-`),
+    );
+    fileSystem.writeFileSync(
+      join(stagingDirectory, "instance.jsonc"),
+      plan.instanceContents,
+    );
+    fileSystem.writeFileSync(
+      join(stagingDirectory, "atlante.jsonc"),
+      plan.presetContents,
+    );
+    fileSystem.mkdirSync(instanceDirectory, { recursive: true });
+    fileSystem.renameSync(
+      join(stagingDirectory, "instance.jsonc"),
+      plan.instancePath,
+    );
+    fileSystem.renameSync(
+      join(stagingDirectory, "atlante.jsonc"),
+      plan.presetPath,
+    );
+  } catch (cause) {
+    const cleanupErrors: string[] = [];
+    if (stagingDirectory !== undefined) {
+      try {
+        fileSystem.rmSync(stagingDirectory, { recursive: true, force: true });
+      } catch (cleanupCause) {
+        cleanupErrors.push(
+          cleanupCause instanceof Error
+            ? cleanupCause.message
+            : String(cleanupCause),
+        );
+      }
+    }
+    try {
+      fileSystem.rmSync(instanceDirectory, { recursive: true, force: true });
+    } catch (cleanupCause) {
+      cleanupErrors.push(
+        cleanupCause instanceof Error
+          ? cleanupCause.message
+          : String(cleanupCause),
+      );
+    }
+    const primaryError = cause instanceof Error ? cause.message : String(cause);
+    return {
+      writtenPaths: [],
+      error:
+        cleanupErrors.length === 0
+          ? primaryError
+          : `${primaryError}; cleanup failed: ${cleanupErrors.join(", ")}`,
+    };
+  }
+  // The merge is committed. Removing the now-empty staging directory is
+  // best-effort: its failure must never roll back a committed merge.
+  try {
+    fileSystem.rmSync(stagingDirectory, { recursive: true, force: true });
+  } catch {
+    // A leftover staging directory is harmless.
+  }
+  return { writtenPaths: [plan.instancePath, plan.presetPath] };
+}
+
 export type ImportOptions = Readonly<{
   kind: ImportKind;
   name?: string;
@@ -1301,13 +1439,88 @@ export function runImportWithDependencies(
     return 1;
   }
 
+  // Auto-detection: an existing directory merges only when it is a local
+  // pack (package.json + atlante.jsonc); anything else is refused.
+  let mergePreset: Record<string, unknown> | undefined;
   if (fileSystem.existsSync(outputDirectory)) {
-    diagnostics.push(
-      importError(
-        "import-target-exists",
-        `output directory already exists: ${outputDirectory}`,
-      ),
-    );
+    const presetPath = join(outputDirectory, "atlante.jsonc");
+    const manifestPath = join(outputDirectory, "package.json");
+    if (
+      !fileSystem.existsSync(manifestPath) ||
+      !fileSystem.existsSync(presetPath)
+    ) {
+      diagnostics.push(
+        importError(
+          "import-target-exists",
+          `output directory exists but is not an Atlante local pack: ${outputDirectory}`,
+        ),
+      );
+    } else if (id) {
+      const collection = collectionFor(options.kind);
+      let parsedPreset: unknown;
+      try {
+        const parseErrors: ParseError[] = [];
+        parsedPreset = parseJsonc(
+          fileSystem.readFileSync(presetPath, "utf8"),
+          parseErrors,
+        );
+        if (parseErrors.length > 0 || !isJsonObject(parsedPreset)) {
+          diagnostics.push(
+            importError(
+              "malformed-jsonc",
+              "the existing pack preset is not valid JSONC",
+              presetPath,
+            ),
+          );
+        }
+      } catch (cause) {
+        diagnostics.push(
+          importError(
+            "malformed-jsonc",
+            "the existing pack preset could not be read",
+            presetPath,
+            cause,
+          ),
+        );
+      }
+      const existingBindings = isJsonObject(parsedPreset)
+        ? parsedPreset[collection]
+        : undefined;
+      if (
+        isJsonObject(parsedPreset) &&
+        existingBindings !== undefined &&
+        !isJsonObject(existingBindings)
+      ) {
+        diagnostics.push(
+          importError(
+            "malformed-jsonc",
+            `the existing pack preset "${collection}" collection is not an object`,
+            presetPath,
+          ),
+        );
+      } else if (isJsonObject(parsedPreset)) {
+        if (fileSystem.existsSync(join(outputDirectory, id))) {
+          diagnostics.push(
+            importError(
+              "import-binding-exists",
+              `the target pack already contains a resource named "${id}"; pass --name to use a different ID`,
+            ),
+          );
+        } else if (isJsonObject(existingBindings) && id in existingBindings) {
+          diagnostics.push(
+            importError(
+              "import-binding-exists",
+              `the target pack already has a "${collection}" binding named "${id}"; pass --name to use a different ID`,
+            ),
+          );
+        } else {
+          mergePreset = parsedPreset;
+        }
+      }
+    }
+  }
+
+  if (hasErrors(diagnostics)) {
     printDiagnostics(sortDiagnostics(diagnostics));
     return 1;
   }
@@ -1343,15 +1556,29 @@ export function runImportWithDependencies(
     return 1;
   }
 
-  const plan = planLocalPack({
-    outputDirectory,
-    id: id as string,
-    kind: options.kind,
-    metadata: mapped.metadata,
-    ast: lowered.ast,
-    packVersion,
-  });
-  const written = writeLocalPack(plan, fileSystem);
+  const written = mergePreset
+    ? mergeLocalPack(
+        planLocalPackMerge({
+          outputDirectory,
+          id: id as string,
+          kind: options.kind,
+          metadata: mapped.metadata,
+          ast: lowered.ast,
+          preset: mergePreset,
+        }),
+        fileSystem,
+      )
+    : writeLocalPack(
+        planLocalPack({
+          outputDirectory,
+          id: id as string,
+          kind: options.kind,
+          metadata: mapped.metadata,
+          ast: lowered.ast,
+          packVersion,
+        }),
+        fileSystem,
+      );
   if (written.error) {
     diagnostics.push(
       importError(

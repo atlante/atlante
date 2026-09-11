@@ -236,4 +236,109 @@ Review the diff and report findings.
     ).toBe(1);
     expect(readFileSync(join(output, "sentinel"), "utf8")).toBe("keep\n");
   });
+
+  test("adds a second skill to an existing pack that validates and builds", () => {
+    const root = tempDir();
+    const pack = join(root, "site-pack");
+    const docInput = join(root, "doc.md");
+    const otherInput = join(root, "other.md");
+    writeFileSync(
+      docInput,
+      "---\nname: Doc Skill\ntitle: Doc skill\ndescription: Document the feature.\n---\n\nBody text.\n",
+    );
+    writeFileSync(
+      otherInput,
+      "---\nname: Other Skill\ntitle: Other skill\ndescription: Another imported skill.\n---\n\nOther body.\n",
+    );
+
+    expect(
+      runQuiet(() =>
+        runImportWithDependencies(docInput, pack, { kind: "skill" }),
+      ),
+    ).toBe(0);
+    expect(
+      runQuiet(() =>
+        runImportWithDependencies(otherInput, pack, { kind: "skill" }),
+      ),
+    ).toBe(0);
+
+    expect(json(join(pack, "atlante.jsonc"))).toEqual({
+      $schema: SCHEMA_URI,
+      skills: {
+        "doc-skill": {
+          $instance: "./doc-skill",
+          description: "Document the feature.",
+        },
+        "other-skill": {
+          $instance: "./other-skill",
+          description: "Another imported skill.",
+        },
+      },
+    });
+    // The pack manifest written by the first import is untouched.
+    expect(json(join(pack, "package.json"))).toEqual({
+      name: "doc-skill",
+      version: "0.0.0",
+      atlante: { format: 1 },
+      dependencies: { "@atlante/pack": firstPartyPackVersion() },
+    });
+
+    writeFileSync(
+      join(root, "package.json"),
+      '{ "name": "import-consumer", "version": "0.0.0" }\n',
+    );
+    writeFileSync(
+      join(root, "atlante.jsonc"),
+      `${JSON.stringify({ $schema: SCHEMA_URI, extends: "./site-pack" })}\n`,
+    );
+
+    const context = firstPartyProjectContext();
+    const validated = validateProject(join(root, "atlante.jsonc"), context);
+    expect(hasErrors(validated.diagnostics)).toBe(false);
+    expect(validated.diagnostics).toEqual([]);
+
+    const built = buildProject(join(root, "atlante.jsonc"), context, {
+      materializers: [openCodeMaterializer],
+    });
+    expect(hasErrors(built.diagnostics)).toBe(false);
+    expect(built.diagnostics).toEqual([]);
+    expect(
+      existsSync(join(root, ".opencode", "skills", "doc-skill", "SKILL.md")),
+    ).toBe(true);
+    expect(
+      existsSync(join(root, ".opencode", "skills", "other-skill", "SKILL.md")),
+    ).toBe(true);
+  });
+
+  test("refuses a duplicate import without changing the target pack", () => {
+    const root = tempDir();
+    const pack = join(root, "site-pack");
+    const input = join(root, "doc.md");
+    writeFileSync(
+      input,
+      "---\nname: Doc Skill\ntitle: Doc skill\ndescription: Document the feature.\n---\n\nBody text.\n",
+    );
+
+    expect(
+      runQuiet(() => runImportWithDependencies(input, pack, { kind: "skill" })),
+    ).toBe(0);
+    const presetBefore = readFileSync(join(pack, "atlante.jsonc"), "utf8");
+    const instanceBefore = readFileSync(
+      join(pack, "doc-skill", "instance.jsonc"),
+      "utf8",
+    );
+    writeFileSync(join(pack, "sentinel"), "keep\n");
+
+    expect(
+      runQuiet(() => runImportWithDependencies(input, pack, { kind: "skill" })),
+    ).toBe(1);
+
+    expect(readFileSync(join(pack, "atlante.jsonc"), "utf8")).toBe(
+      presetBefore,
+    );
+    expect(
+      readFileSync(join(pack, "doc-skill", "instance.jsonc"), "utf8"),
+    ).toBe(instanceBefore);
+    expect(readFileSync(join(pack, "sentinel"), "utf8")).toBe("keep\n");
+  });
 });

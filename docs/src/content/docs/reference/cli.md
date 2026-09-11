@@ -111,13 +111,20 @@ npx atlante import <input> --kind skill --out <dir> --name <id>
   and binding metadata, while the frontmatter itself does not render as body content.
 - `--kind <kind>` is required and accepts `agent` or `skill`. The command does
   not infer a host kind or synthesize missing metadata.
-- `--out <dir>` is required and names a new local pack directory. An existing
-  directory is never overwritten.
+- `--out <dir>` is required and names the local pack directory. When the
+  directory does not exist, the command creates a new pack. When it exists and
+  is an Atlante local pack (contains `package.json` and `atlante.jsonc`), the
+  command adds the imported resource to it: the instance lands in its own
+  subdirectory and the binding is appended to the preset, leaving the existing
+  `package.json` untouched. The preset is re-serialized deterministically, so
+  comments in a hand-edited `atlante.jsonc` are dropped by a merge. Any other
+  existing directory is never overwritten.
 - `--name <id>` overrides the generated pack, resource, and binding ID.
   Without it, the ID comes from the frontmatter `name` key or the sanitized
   input filename stem. The final extension is removed before sanitization. IDs
   contain lowercase ASCII letters, digits, and hyphens, with a maximum length
-  of 64 characters after sanitization.
+  of 64 characters after sanitization. An ID that already exists in the target
+  pack is refused; pass `--name` to import under a different ID.
 
 Frontmatter requires only `description`, which becomes binding lookup
 metadata — the field hosts consume directly. The optional template input maps

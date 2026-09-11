@@ -10,8 +10,10 @@ import {
   firstPartyFacetInputSchemas,
   lowerToAtlanteAst,
   mapFrontmatter,
+  mergeLocalPack,
   parseMarkdownSource,
   planLocalPack,
+  planLocalPackMerge,
   runImportWithDependencies,
   sanitizeResourceId,
   validateImportedInputs,
@@ -993,5 +995,411 @@ describe("Markdown importer lowering", () => {
 
     expect(result.writtenPaths).toEqual([]);
     expect(result.error).toBe("disk full; cleanup failed: permission denied");
+  });
+});
+
+describe("import into an existing local pack", () => {
+  const SKILL_SOURCE =
+    "---\ntitle: Doc skill\ndescription: Doc it.\n---\n\nBody text.\n";
+
+  const PACK_PRESET =
+    '{\n  "skills": {\n    "other": {\n      "$instance": "./other",\n      "description": "Other"\n    }\n  }\n}\n';
+  const PACK_MANIFEST = '{\n  "name": "site-pack",\n  "version": "0.0.0"\n}\n';
+
+  function memoryFileSystem() {
+    const files = new Map<string, string>();
+    const directories = new Set<string>();
+    const fileSystem = {
+      existsSync: (path: string) => files.has(path) || directories.has(path),
+      readFileSync: (path: string) => {
+        const contents = files.get(path);
+        if (contents === undefined) throw new Error(`ENOENT: ${path}`);
+        return contents;
+      },
+      mkdtempSync: (prefix: string) => {
+        const path = `${prefix}stage`;
+        directories.add(path);
+        return path;
+      },
+      mkdirSync: (path: string) => {
+        directories.add(path);
+      },
+      renameSync: (source: string, destination: string) => {
+        const contents = files.get(source);
+        if (contents !== undefined) {
+          files.delete(source);
+          files.set(destination, contents);
+          return;
+        }
+        directories.delete(source);
+        directories.add(destination);
+        for (const [path, fileContents] of [...files])
+          if (path.startsWith(`${source}${sep}`)) {
+            files.delete(path);
+            files.set(
+              join(destination, path.slice(source.length + 1)),
+              fileContents,
+            );
+          }
+      },
+      writeFileSync: (path: string, contents: string) => {
+        files.set(path, contents);
+      },
+      rmSync: (path: string) => {
+        directories.delete(path);
+        for (const filePath of [...files.keys()])
+          if (filePath === path || filePath.startsWith(`${path}${sep}`))
+            files.delete(filePath);
+      },
+    };
+    return { fileSystem, files, directories };
+  }
+
+  function existingPack(output: string, presetText = PACK_PRESET) {
+    const memory = memoryFileSystem();
+    memory.directories.add(output);
+    memory.files.set(join(output, "package.json"), PACK_MANIFEST);
+    memory.files.set(join(output, "atlante.jsonc"), presetText);
+    return memory;
+  }
+
+  function importDependencies(memory: ReturnType<typeof memoryFileSystem>) {
+    return {
+      ...memory.fileSystem,
+      packVersion: "0.2.2",
+      facetInputSchemas: firstPartyFacetInputSchemas(),
+    };
+  }
+
+  function printedErrors(run: () => number): {
+    exit: number;
+    output: string;
+  } {
+    const lines: string[] = [];
+    const previousError = console.error;
+    console.error = (line: string) => {
+      lines.push(line);
+    };
+    try {
+      return { exit: run(), output: lines.join("\n") };
+    } finally {
+      console.error = previousError;
+    }
+  }
+
+  test("plans a merge that appends the binding and keeps existing entries", () => {
+    const metadata = {
+      description: "Doc it.",
+      title: "Doc skill",
+    };
+    const ast: MarkdownBlockContent[] = [
+      { type: "paragraph", children: [{ type: "text", value: "Body text." }] },
+    ];
+    const mergePlan = planLocalPackMerge({
+      outputDirectory: "/packs/site",
+      id: "doc",
+      kind: "skill",
+      metadata,
+      ast,
+      preset: {
+        $schema: "https://atlante.sh/schema/v0.1/project.json",
+        skills: {
+          other: { $instance: "./other", description: "Other" },
+        },
+      },
+    });
+
+    expect(mergePlan.instancePath).toBe("/packs/site/doc/instance.jsonc");
+    expect(mergePlan.presetPath).toBe("/packs/site/atlante.jsonc");
+    expect(JSON.parse(mergePlan.presetContents)).toEqual({
+      $schema: "https://atlante.sh/schema/v0.1/project.json",
+      skills: {
+        other: { $instance: "./other", description: "Other" },
+        doc: { $instance: "./doc", description: "Doc it." },
+      },
+    });
+    expect(Object.keys(JSON.parse(mergePlan.presetContents).skills)).toEqual([
+      "other",
+      "doc",
+    ]);
+    // The instance facet matches what a fresh pack would contain.
+    const freshPlan = planLocalPack({
+      outputDirectory: "/packs/fresh",
+      id: "doc",
+      kind: "skill",
+      metadata,
+      ast,
+      packVersion: "0.2.2",
+    });
+    expect(mergePlan.instanceContents).toBe(freshPlan.files[2]?.contents ?? "");
+  });
+
+  test("imports a second skill into an existing pack end to end", () => {
+    const output = "/packs/site";
+    const memory = existingPack(output);
+    memory.files.set("/input/doc.md", SKILL_SOURCE);
+
+    const { exit } = printedErrors(() =>
+      runImportWithDependencies(
+        "/input/doc.md",
+        output,
+        { kind: "skill" },
+        importDependencies(memory),
+      ),
+    );
+
+    expect(exit).toBe(0);
+    const preset = JSON.parse(
+      memory.files.get(join(output, "atlante.jsonc")) ?? "null",
+    ) as { skills: Record<string, unknown> };
+    expect(Object.keys(preset.skills)).toEqual(["other", "doc"]);
+    expect(preset.skills.doc).toEqual({
+      $instance: "./doc",
+      description: "Doc it.",
+    });
+    // The pack manifest is untouched by a merge.
+    expect(memory.files.get(join(output, "package.json"))).toBe(PACK_MANIFEST);
+    expect(memory.files.has(join(output, "doc", "instance.jsonc"))).toBe(true);
+  });
+
+  test("refuses a binding that already exists in the target pack", () => {
+    const output = "/packs/site";
+    const memory = existingPack(
+      output,
+      `${JSON.stringify(
+        {
+          skills: { doc: { $instance: "./doc", description: "Existing" } },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    memory.files.set("/input/doc.md", SKILL_SOURCE);
+
+    const { exit, output: printed } = printedErrors(() =>
+      runImportWithDependencies(
+        "/input/doc.md",
+        output,
+        { kind: "skill" },
+        importDependencies(memory),
+      ),
+    );
+
+    expect(exit).toBe(1);
+    expect(printed).toContain("import-binding-exists");
+    expect(memory.files.get(join(output, "atlante.jsonc"))).toContain(
+      '"Existing"',
+    );
+    expect(memory.files.has(join(output, "doc", "instance.jsonc"))).toBe(false);
+  });
+
+  test("refuses a resource directory that already exists in the target pack", () => {
+    const output = "/packs/site";
+    const memory = existingPack(output);
+    memory.directories.add(join(output, "doc"));
+    memory.files.set("/input/doc.md", SKILL_SOURCE);
+
+    const { exit, output: printed } = printedErrors(() =>
+      runImportWithDependencies(
+        "/input/doc.md",
+        output,
+        { kind: "skill" },
+        importDependencies(memory),
+      ),
+    );
+
+    expect(exit).toBe(1);
+    expect(printed).toContain("import-binding-exists");
+    expect(memory.files.get(join(output, "atlante.jsonc"))).not.toContain(
+      '"Doc it."',
+    );
+  });
+
+  test("fails when the output directory exists but is not a local pack", () => {
+    const output = "/tmp/somewhere-else";
+    const memory = memoryFileSystem();
+    memory.directories.add(output);
+    memory.files.set("/input/doc.md", SKILL_SOURCE);
+
+    const { exit, output: printed } = printedErrors(() =>
+      runImportWithDependencies(
+        "/input/doc.md",
+        output,
+        { kind: "skill" },
+        importDependencies(memory),
+      ),
+    );
+
+    expect(exit).toBe(1);
+    expect(printed).toContain("import-target-exists");
+    expect(memory.files.has(join(output, "doc", "instance.jsonc"))).toBe(false);
+  });
+
+  test("reports a malformed or misshapen existing preset", () => {
+    for (const presetText of ["{oops\n", '{ "skills": "not-an-object" }\n']) {
+      const output = "/packs/site";
+      const memory = existingPack(output, presetText);
+      memory.files.set("/input/doc.md", SKILL_SOURCE);
+
+      const { exit, output: printed } = printedErrors(() =>
+        runImportWithDependencies(
+          "/input/doc.md",
+          output,
+          { kind: "skill" },
+          importDependencies(memory),
+        ),
+      );
+
+      expect(exit).toBe(1);
+      expect(printed).toContain("malformed-jsonc");
+      expect(memory.files.has(join(output, "doc", "instance.jsonc"))).toBe(
+        false,
+      );
+    }
+  });
+
+  test("writes the staged merge in instance-then-preset order", () => {
+    const mergePlan = planLocalPackMerge({
+      outputDirectory: "/packs/site",
+      id: "doc",
+      kind: "skill",
+      metadata: { description: "Doc it.", title: "Doc skill" },
+      ast: [
+        {
+          type: "paragraph",
+          children: [{ type: "text", value: "Body text." }],
+        },
+      ],
+      preset: { skills: { other: { $instance: "./other" } } },
+    });
+    const writes: string[] = [];
+    const renames: Array<[string, string]> = [];
+    const removed: string[] = [];
+    const result = mergeLocalPack(mergePlan, {
+      existsSync: () => true,
+      readFileSync: () => "",
+      mkdtempSync: (prefix) => `${prefix}stage`,
+      mkdirSync: () => undefined,
+      renameSync: (source, destination) => {
+        renames.push([source, destination]);
+      },
+      writeFileSync: (path) => writes.push(path),
+      rmSync: (path) => removed.push(path),
+    });
+
+    expect(result.error).toBeUndefined();
+    expect(result.writtenPaths).toEqual([
+      mergePlan.instancePath,
+      mergePlan.presetPath,
+    ]);
+    expect(writes).toEqual([
+      "/packs/site/.doc.tmp-stage/instance.jsonc",
+      "/packs/site/.doc.tmp-stage/atlante.jsonc",
+    ]);
+    expect(renames).toEqual([
+      ["/packs/site/.doc.tmp-stage/instance.jsonc", mergePlan.instancePath],
+      ["/packs/site/.doc.tmp-stage/atlante.jsonc", mergePlan.presetPath],
+    ]);
+    expect(removed).toEqual(["/packs/site/.doc.tmp-stage"]);
+  });
+
+  test("restores the pack when the preset write fails", () => {
+    const mergePlan = planLocalPackMerge({
+      outputDirectory: "/packs/site",
+      id: "doc",
+      kind: "skill",
+      metadata: { description: "Doc it.", title: "Doc skill" },
+      ast: [
+        {
+          type: "paragraph",
+          children: [{ type: "text", value: "Body text." }],
+        },
+      ],
+      preset: { skills: { other: { $instance: "./other" } } },
+    });
+    const removed: string[] = [];
+    const result = mergeLocalPack(mergePlan, {
+      existsSync: () => true,
+      readFileSync: () => "",
+      mkdtempSync: (prefix) => `${prefix}stage`,
+      mkdirSync: () => undefined,
+      renameSync: (source, destination) => {
+        if (destination === mergePlan.presetPath)
+          throw new Error("preset rename failed");
+      },
+      writeFileSync: () => undefined,
+      rmSync: (path) => removed.push(path),
+    });
+
+    expect(result.writtenPaths).toEqual([]);
+    expect(result.error).toBe("preset rename failed");
+    // Both the staging directory and the written instance directory are removed.
+    expect(removed).toEqual(["/packs/site/.doc.tmp-stage", "/packs/site/doc"]);
+  });
+
+  test("keeps a committed merge when post-commit staging cleanup fails", () => {
+    // Regression: staging cleanup used to run inside the guarded block, so a
+    // cleanup failure after both renames deleted the committed instance.
+    const mergePlan = planLocalPackMerge({
+      outputDirectory: "/packs/site",
+      id: "doc",
+      kind: "skill",
+      metadata: { description: "Doc it.", title: "Doc skill" },
+      ast: [
+        {
+          type: "paragraph",
+          children: [{ type: "text", value: "Body text." }],
+        },
+      ],
+      preset: { skills: { other: { $instance: "./other" } } },
+    });
+    const result = mergeLocalPack(mergePlan, {
+      existsSync: () => true,
+      readFileSync: () => "",
+      mkdtempSync: (prefix) => `${prefix}stage`,
+      mkdirSync: () => undefined,
+      renameSync: () => undefined,
+      writeFileSync: () => undefined,
+      rmSync: () => {
+        throw new Error("EBUSY: resource busy");
+      },
+    });
+
+    expect(result.error).toBeUndefined();
+    expect(result.writtenPaths).toEqual([
+      mergePlan.instancePath,
+      mergePlan.presetPath,
+    ]);
+  });
+
+  test("merges an agent into a pack that only has skills", () => {
+    const output = "/packs/site";
+    const memory = existingPack(output);
+    memory.files.set(
+      "/input/review.md",
+      "---\nname: Review Agent\nmission: Review changes.\ndescription: Reviews the project.\n---\n\nReview the diff.\n",
+    );
+
+    const { exit } = printedErrors(() =>
+      runImportWithDependencies(
+        "/input/review.md",
+        output,
+        { kind: "agent" },
+        importDependencies(memory),
+      ),
+    );
+
+    expect(exit).toBe(0);
+    const preset = JSON.parse(
+      memory.files.get(join(output, "atlante.jsonc")) ?? "null",
+    ) as { skills: Record<string, unknown>; agents: Record<string, unknown> };
+    expect(Object.keys(preset.skills)).toEqual(["other"]);
+    expect(preset.agents["review-agent"]).toEqual({
+      $instance: "./review-agent",
+      description: "Reviews the project.",
+    });
+    expect(
+      memory.files.has(join(output, "review-agent", "instance.jsonc")),
+    ).toBe(true);
   });
 });
