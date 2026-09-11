@@ -44,8 +44,11 @@ bun run test:e2e                # full command-path tests (CLI spawns, real bun 
 bun run type:check              # type-check all packages
 bun run lint:check              # lint + format check
 bun run build                   # build publishable CLI + internal adapter artifacts (pack is static)
-bun run quick:check             # type:check + lint:check + test:unit (fast inner loop)
-bun run full:check              # build + complete checks/tests + smoke/docs/website checks (CI gate)
+bun run quick:check             # type:check + lint:check + test:unit (PR gate, fast inner loop)
+bun run core:check              # toolchain lane: build + type + lint + all tests + both smokes
+bun run docs:check              # docs lane: site build + docs test suite
+bun run website:check           # website lane: site build + website test suite
+bun run full:check              # all three lanes at once
 bun run cli                     # run the CLI (packages/cli/bin/atlante.ts)
 bun run worktree <issue|branch> # create + bootstrap an isolated worktree (.worktrees/issue-<n>; pass an existing branch to adopt it; omit for a random one)
 ```
@@ -58,10 +61,11 @@ scripts filter on; new test files must pick one. `scripts/`, `docs/`, and
 Bun is the package manager and the build/release/smoke/packaging/test runtime.
 
 During implementation, use Fallow for codebase analysis and lightweight
-feedback, and run `bun run quick:check` for fast iteration. Reserve
-`bun run full:check` as the heavyweight final verification before declaring
-work ready. The OpenCode host smoke that CI runs as its own step after
-`full:check` (`bun scripts/opencode-smoke.ts`) is load-bearing:
+feedback, and run the lane command matching the area you touch
+(`quick:check`, `core:check`, `docs:check`, `website:check`) for fast
+iteration. Reserve `bun run full:check` as the heavyweight final verification
+before declaring work ready. The OpenCode host smoke inside `core:check`
+(`bun scripts/opencode-smoke.ts`) is load-bearing:
 unit tests cover the materializer against synthetic fixtures, so the smoke is
 the only automated check of the real pack → build → materialize → host
 discovery flow (pinned OpenCode in a sandbox) and must never be downgraded to

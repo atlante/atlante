@@ -38,12 +38,20 @@ CLI; the other toolchain workspaces remain private.
 
 ## Checks and tests
 
-Run the root checks before opening a change:
+The checks are organized in lanes, and each lane is one npm command, so the
+same command gates a change locally and in CI. Run the lane that matches the
+area you touched; run `full:check` before opening a change that spans areas:
 
 ```sh
-bun run quick:check   # type:check + lint:check + test:unit; fast inner loop
-bun run full:check    # build + complete checks/tests + smoke/docs/website checks; the CI gate
+bun run quick:check    # type:check + lint:check + test:unit; the PR gate and fast inner loop
+bun run core:check     # toolchain lane: build, type, lint, all test tiers, both smokes
+bun run docs:check     # docs lane: site build + docs test suite
+bun run website:check  # website lane: site build + website test suite
+bun run full:check     # all three lanes at once
 ```
+
+CI mirrors this split: pull requests run `quick:check`, and pushes to `main`
+run one lane workflow per changed area (`ci-core`, `ci-docs`, `ci-website`).
 
 Tests run on `bun:test` and live next to the code they test:
 
@@ -56,11 +64,11 @@ Tests run on `bun:test` and live next to the code they test:
   own their tests internally. Do not add tests in ad-hoc locations outside
   these trees.
 
-The OpenCode host smoke that CI runs as its own step after `full:check`
-(`bun scripts/opencode-smoke.ts`) is load-bearing: unit tests cover the
-materializer against synthetic fixtures, so the smoke is the only automated
-check of the real pack → build → materialize → host discovery flow and must
-never be downgraded to a manual step.
+The OpenCode host smoke inside `core:check` (`bun scripts/opencode-smoke.ts`)
+is load-bearing: unit tests cover the materializer against synthetic fixtures,
+so the smoke is the only automated check of the real pack → build →
+materialize → host discovery flow and must never be downgraded to a manual
+step.
 
 ## Architecture constraints
 
