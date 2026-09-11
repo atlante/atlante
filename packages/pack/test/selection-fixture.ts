@@ -113,29 +113,17 @@ function skillListItems(
   return items;
 }
 
-type FlowKind = "p" | "ul" | "ol";
-type HeadingKind = "h2" | "h3";
-
-function flowLines(record: Record<string, unknown>, kind: FlowKind): string[] {
-  const items = record[kind];
-  if (!Array.isArray(items)) return [];
-  return items
-    .filter((item): item is string => typeof item === "string")
-    .map((item) => (kind === "p" ? item : `- ${item}`));
-}
-
-function headingLines(
-  record: Record<string, unknown>,
-  kind: HeadingKind,
-): string[] {
-  const heading = record[kind];
-  if (typeof heading !== "object" || heading === null || Array.isArray(heading))
-    return [];
-  const { title, block } = heading as Record<string, unknown>;
-  return [
-    ...(typeof title === "string" ? [title] : []),
-    ...markdownBlockLines(block),
-  ];
+function inlineText(value: unknown): string {
+  if (typeof value !== "object" || value === null || Array.isArray(value))
+    return "";
+  const record = value as Record<string, unknown>;
+  if (record.type === "text" && typeof record.value === "string")
+    return record.value;
+  if (record.type === "inlineCode" && typeof record.value === "string")
+    return record.value;
+  if (Array.isArray(record.children))
+    return record.children.map(inlineText).join("");
+  return "";
 }
 
 function markdownBlockLines(value: unknown): string[] {
@@ -144,13 +132,22 @@ function markdownBlockLines(value: unknown): string[] {
     if (typeof block !== "object" || block === null || Array.isArray(block))
       return [];
     const record = block as Record<string, unknown>;
-    const flowKinds: FlowKind[] = ["p", "ul", "ol"];
-    const headingKinds: HeadingKind[] = ["h2", "h3"];
-    return [
-      ...flowKinds.flatMap((kind) => flowLines(record, kind)),
-      ...headingKinds.flatMap((kind) => headingLines(record, kind)),
-    ];
+    if (record.type === "list" && Array.isArray(record.children))
+      return record.children.flatMap((item) =>
+        typeof item === "object" &&
+        item !== null &&
+        Array.isArray((item as Record<string, unknown>).children)
+          ? markdownBlockLines((item as Record<string, unknown>).children)
+          : [],
+      );
+    if (Array.isArray(record.children))
+      return [inlineChildren(record.children)];
+    return [];
   });
+}
+
+function inlineChildren(children: unknown[]): string {
+  return children.map(inlineText).join("");
 }
 
 function skillMarkdownText(sections: readonly JsonObject[]): string {

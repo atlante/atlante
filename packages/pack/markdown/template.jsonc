@@ -1,176 +1,466 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "Ordered Markdown blocks rendered in authored array order. Flow blocks (p, ul, ol) may interleave freely; at most one h2 section per array; h3 subsections live only inside an h2 block. Inline content such as code spans, bold, and links stays free Markdown inside strings. Block-level Markdown syntax inside flow strings is emitted verbatim; use structural blocks when hierarchy must be validated.",
+  "description": "Canonical Markdown AST rendered in authored array order. Nodes are type-discriminated and intentionally close to MDAST, without parser-only fields such as position or data, and without null placeholders: optional fields are omitted when absent. Ordered lists carry their start number; task list items carry checked. Raw HTML, footnotes, and syntax outside the supported CommonMark + GFM profile are not representable.",
   "type": "array",
   "minItems": 1,
-  "contains": { "type": "object", "required": ["h2"] },
-  "minContains": 0,
-  "maxContains": 1,
   "items": {
-    "oneOf": [
-      {
-        "type": "object",
-        "properties": {
-          "p": {
-            "type": "array",
-            "items": { "type": "string", "minLength": 1 },
-            "minItems": 1
-          }
+    "$ref": "#mdBlock"
+  },
+  "$defs": {
+    "paragraph": {
+      "$anchor": "mdParagraph",
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "paragraph"
         },
-        "required": ["p"],
-        "additionalProperties": false
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#mdPhrasing"
+          },
+          "minItems": 1
+        }
       },
-      {
-        "type": "object",
-        "properties": {
-          "ul": {
-            "type": "array",
-            "items": { "type": "string", "minLength": 1 },
-            "minItems": 1
-          }
+      "required": [
+        "type",
+        "children"
+      ],
+      "additionalProperties": false
+    },
+    "heading": {
+      "$anchor": "mdHeading",
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "heading"
         },
-        "required": ["ul"],
-        "additionalProperties": false
+        "depth": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#mdPhrasing"
+          },
+          "minItems": 1
+        }
       },
-      {
-        "type": "object",
-        "properties": {
-          "ol": {
-            "type": "array",
-            "items": { "type": "string", "minLength": 1 },
-            "minItems": 1
-          }
+      "required": [
+        "type",
+        "depth",
+        "children"
+      ],
+      "additionalProperties": false
+    },
+    "code": {
+      "$anchor": "mdCode",
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "code"
         },
-        "required": ["ol"],
-        "additionalProperties": false
+        "value": {
+          "type": "string"
+        },
+        "lang": {
+          "type": "string",
+          "minLength": 1
+        },
+        "meta": {
+          "type": "string",
+          "minLength": 1
+        }
       },
-      {
-        "type": "object",
-        "properties": {
-          "h2": {
-            "type": "object",
-            "properties": {
-              "title": { "type": "string", "minLength": 1 },
-              "block": {
-                "type": "array",
-                "minItems": 1,
-                "items": {
-                  "oneOf": [
-                    {
-                      "type": "object",
-                      "properties": {
-                        "p": {
-                          "type": "array",
-                          "items": { "type": "string", "minLength": 1 },
-                          "minItems": 1
-                        }
-                      },
-                      "required": ["p"],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "ul": {
-                          "type": "array",
-                          "items": { "type": "string", "minLength": 1 },
-                          "minItems": 1
-                        }
-                      },
-                      "required": ["ul"],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "ol": {
-                          "type": "array",
-                          "items": { "type": "string", "minLength": 1 },
-                          "minItems": 1
-                        }
-                      },
-                      "required": ["ol"],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "h3": {
-                          "type": "object",
-                          "properties": {
-                            "title": { "type": "string", "minLength": 1 },
-                            "block": {
-                              "type": "array",
-                              "minItems": 1,
-                              "items": {
-                                "oneOf": [
-                                  {
-                                    "type": "object",
-                                    "properties": {
-                                      "p": {
-                                        "type": "array",
-                                        "items": {
-                                          "type": "string",
-                                          "minLength": 1
-                                        },
-                                        "minItems": 1
-                                      }
-                                    },
-                                    "required": ["p"],
-                                    "additionalProperties": false
-                                  },
-                                  {
-                                    "type": "object",
-                                    "properties": {
-                                      "ul": {
-                                        "type": "array",
-                                        "items": {
-                                          "type": "string",
-                                          "minLength": 1
-                                        },
-                                        "minItems": 1
-                                      }
-                                    },
-                                    "required": ["ul"],
-                                    "additionalProperties": false
-                                  },
-                                  {
-                                    "type": "object",
-                                    "properties": {
-                                      "ol": {
-                                        "type": "array",
-                                        "items": {
-                                          "type": "string",
-                                          "minLength": 1
-                                        },
-                                        "minItems": 1
-                                      }
-                                    },
-                                    "required": ["ol"],
-                                    "additionalProperties": false
-                                  }
-                                ]
-                              }
-                            }
-                          },
-                          "required": ["title", "block"],
-                          "additionalProperties": false
-                        }
-                      },
-                      "required": ["h3"],
-                      "additionalProperties": false
-                    }
-                  ]
-                }
-              }
-            },
-            "required": ["title", "block"],
-            "additionalProperties": false
+      "required": [
+        "type",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "blockquote": {
+      "$anchor": "mdBlockquote",
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "blockquote"
+        },
+        "children": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#mdBlock"
+          }
+        }
+      },
+      "required": [
+        "type",
+        "children"
+      ],
+      "additionalProperties": false
+    },
+    "list": {
+      "$anchor": "mdList",
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "list"
+        },
+        "ordered": {
+          "type": "boolean"
+        },
+        "start": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "children": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#mdListItem"
+          }
+        }
+      },
+      "required": [
+        "type",
+        "ordered",
+        "children"
+      ],
+      "additionalProperties": false
+    },
+    "listItem": {
+      "$anchor": "mdListItem",
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "listItem"
+        },
+        "checked": {
+          "type": "boolean"
+        },
+        "children": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#mdBlock"
+          }
+        }
+      },
+      "required": [
+        "type",
+        "children"
+      ],
+      "additionalProperties": false
+    },
+    "table": {
+      "$anchor": "mdTable",
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "table"
+        },
+        "align": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "enum": [
+              "left",
+              "right",
+              "center",
+              null
+            ]
           }
         },
-        "required": ["h2"],
-        "additionalProperties": false
-      }
-    ]
+        "children": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#mdTableRow"
+          }
+        }
+      },
+      "required": [
+        "type",
+        "align",
+        "children"
+      ],
+      "additionalProperties": false
+    },
+    "tableRow": {
+      "$anchor": "mdTableRow",
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "tableRow"
+        },
+        "children": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#mdTableCell"
+          }
+        }
+      },
+      "required": [
+        "type",
+        "children"
+      ],
+      "additionalProperties": false
+    },
+    "tableCell": {
+      "$anchor": "mdTableCell",
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "tableCell"
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#mdPhrasing"
+          }
+        }
+      },
+      "required": [
+        "type",
+        "children"
+      ],
+      "additionalProperties": false
+    },
+    "thematicBreak": {
+      "$anchor": "mdThematicBreak",
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "thematicBreak"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "additionalProperties": false
+    },
+    "text": {
+      "$anchor": "mdText",
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "text"
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "type",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "emphasis": {
+      "$anchor": "mdEmphasis",
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "emphasis"
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#mdPhrasing"
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "type",
+        "children"
+      ],
+      "additionalProperties": false
+    },
+    "strong": {
+      "$anchor": "mdStrong",
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "strong"
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#mdPhrasing"
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "type",
+        "children"
+      ],
+      "additionalProperties": false
+    },
+    "inlineCode": {
+      "$anchor": "mdInlineCode",
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "inlineCode"
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "type",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "link": {
+      "$anchor": "mdLink",
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "link"
+        },
+        "url": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#mdPhrasing"
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "type",
+        "url",
+        "children"
+      ],
+      "additionalProperties": false
+    },
+    "image": {
+      "$anchor": "mdImage",
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "image"
+        },
+        "url": {
+          "type": "string"
+        },
+        "alt": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "type",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "break": {
+      "$anchor": "mdBreak",
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "break"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "additionalProperties": false
+    },
+    "delete": {
+      "$anchor": "mdDelete",
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "delete"
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#mdPhrasing"
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "type",
+        "children"
+      ],
+      "additionalProperties": false
+    },
+    "block": {
+      "$anchor": "mdBlock",
+      "oneOf": [
+        {
+          "$ref": "#mdParagraph"
+        },
+        {
+          "$ref": "#mdHeading"
+        },
+        {
+          "$ref": "#mdCode"
+        },
+        {
+          "$ref": "#mdBlockquote"
+        },
+        {
+          "$ref": "#mdList"
+        },
+        {
+          "$ref": "#mdTable"
+        },
+        {
+          "$ref": "#mdThematicBreak"
+        }
+      ]
+    },
+    "phrasing": {
+      "$anchor": "mdPhrasing",
+      "oneOf": [
+        {
+          "$ref": "#mdText"
+        },
+        {
+          "$ref": "#mdEmphasis"
+        },
+        {
+          "$ref": "#mdStrong"
+        },
+        {
+          "$ref": "#mdInlineCode"
+        },
+        {
+          "$ref": "#mdLink"
+        },
+        {
+          "$ref": "#mdImage"
+        },
+        {
+          "$ref": "#mdBreak"
+        },
+        {
+          "$ref": "#mdDelete"
+        }
+      ]
+    }
   }
 }

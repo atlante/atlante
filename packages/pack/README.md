@@ -126,11 +126,32 @@ explicit developer approval and run as their own delivery cycle.
 
 ## Pack behavior
 
-The `@atlante/pack/markdown` template expects an ordered block array, not a
-string. This is a breaking change for authored configurations that used the old
-form: rewrite `{ "markdown": "Body" }` as
-`{ "markdown": [{ "p": ["Body"] }] }` before upgrading to a release that
-contains this block-array change.
+The `@atlante/pack/markdown` template accepts an ordered array of canonical,
+type-discriminated Markdown nodes. For example:
+
+```json
+[
+  {
+    "type": "heading",
+    "depth": 2,
+    "children": [{ "type": "text", "value": "Installation" }]
+  },
+  {
+    "type": "paragraph",
+    "children": [
+      { "type": "text", "value": "Run " },
+      { "type": "inlineCode", "value": "bun install" }
+    ]
+  }
+]
+```
+
+The AST supports the selected CommonMark and GFM block and inline nodes,
+including nested lists, block quotes, fenced code, links, images, tables, task
+items, hard breaks, and strikethrough. Parser-only fields such as `position`
+and plugin-specific `data` are not part of the contract. The v0.2.x contract is
+breaking; unsupported syntax is rejected rather than emitted through a raw
+fallback.
 
 This is a static pack with `atlante.format: 1`; it has no runtime
 JavaScript entry point. Atlante loads only the selected template or instance
