@@ -49,6 +49,12 @@
     color: inherit;
   }
 
+  code,
+  pre,
+  .mono {
+    font-family: var(--font-mono);
+  }
+
   /* Content links share the site's link treatment: quiet until hovered. */
   main a {
     text-decoration: none;
