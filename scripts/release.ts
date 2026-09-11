@@ -21,12 +21,11 @@ const PACKAGES = [
   "cli",
 ] as const;
 
-// Exact-pinned consumers outside the package graph must track the released
-// version. Deployment installs (npm inside website/) resolve the pin from
-// the registry, where the tagged version exists by the time they run, while
-// the local workspace install links the workspace package so dev exercises
-// the current source bundle.
-const DEPENDENTS = [
+// Exact-pinned consumers outside the package graph are checked against the
+// lockfile, but their pins advance in separate commits. In particular, the
+// website stays on its last published CLI until a deliberate website change
+// updates the pin; a release must not create a registry race for Vercel.
+const PINS = [
   { manifest: "website/package.json", dependency: "atlante" },
 ] as const;
 
@@ -71,14 +70,6 @@ interface Pkg {
   path: string;
   json: Record<string, unknown>;
   currentVersion: string;
-}
-
-interface Dependent {
-  manifest: string;
-  path: string;
-  json: Record<string, unknown>;
-  dependency: string;
-  currentPin: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -187,7 +178,7 @@ function validateLock() {
   console.log("\nValidating bun.lock against the bumped manifests...");
   const { synced, remaining } = syncLockToManifests({
     packages: PACKAGES,
-    pins: DEPENDENTS,
+    pins: PINS,
   });
   if (remaining.length > 0)
     throw new Error(
@@ -223,12 +214,11 @@ async function readPackages(): Promise<Pkg[]> {
   return pkgs;
 }
 
-async function readDependents(): Promise<Dependent[]> {
-  const dependents: Dependent[] = [];
-  for (const { manifest, dependency } of DEPENDENTS) {
-    const path = join(ROOT, manifest);
+/** Validate exact-pinned consumers without changing their manifests. */
+export async function validatePins(root: string = ROOT): Promise<void> {
+  for (const { manifest, dependency } of PINS) {
     const json: Record<string, unknown> = JSON.parse(
-      await readFile(path, "utf8"),
+      await readFile(join(root, manifest), "utf8"),
     );
     const dependencies = json.dependencies as Record<string, unknown>;
     const pin = dependencies?.[dependency];
@@ -240,9 +230,7 @@ async function readDependents(): Promise<Dependent[]> {
       throw new Error(
         `${manifest} must pin ${dependency} to an exact X.Y.Z version, got "${pin}"`,
       );
-    dependents.push({ manifest, path, json, dependency, currentPin: pin });
   }
-  return dependents;
 }
 
 // ---------------------------------------------------------------------------
@@ -257,31 +245,8 @@ async function bump(pkgs: Pkg[], v: ReturnType<typeof parseVersion>) {
   }
 }
 
-/** Pin dependents to the version being released. */
-async function bumpDependents(
-  dependents: Dependent[],
-  releasedVersion: string,
-) {
-  for (const d of dependents) {
-    (d.json.dependencies as Record<string, unknown>)[d.dependency] =
-      releasedVersion;
-    await writeFile(d.path, `${JSON.stringify(d.json, null, 2)}\n`, "utf8");
-    console.log(
-      `${d.manifest}: ${d.dependency} ${d.currentPin} → ${releasedVersion}`,
-    );
-  }
-}
-
-async function commitAndTag(
-  pkgs: Pkg[],
-  dependents: Dependent[],
-  v: ReturnType<typeof parseVersion>,
-) {
-  const paths = [
-    ...pkgs.map((p) => p.path.slice(ROOT.length + 1)),
-    ...dependents.map((d) => d.manifest),
-    "bun.lock",
-  ];
+async function commitAndTag(pkgs: Pkg[], v: ReturnType<typeof parseVersion>) {
+  const paths = [...pkgs.map((p) => p.path.slice(ROOT.length + 1)), "bun.lock"];
   await run`git add -- ${paths}`;
   await run`git commit --allow-empty -m ${`release: v${v.raw}`}`;
   await run`git tag -a ${`v${v.raw}`} -m ${`v${v.raw}`}`;
@@ -306,15 +271,11 @@ async function main() {
   await validateRepo();
   await validateVersion(version);
   const pkgs = await readPackages();
-  const dependents = await readDependents();
+  await validatePins();
 
   console.log("\nVersion bump plan:");
   for (const p of pkgs)
     console.log(`  ${p.path}: ${p.currentVersion} → ${version.raw}`);
-  for (const d of dependents)
-    console.log(
-      `  ${d.manifest}: ${d.dependency} ${d.currentPin} → ${version.raw}`,
-    );
 
   if (dryRun) {
     console.log(`\nDry run complete; no files were changed`);
@@ -324,16 +285,17 @@ async function main() {
   }
 
   await bump(pkgs, version);
-  await bumpDependents(dependents, version.raw);
   console.log("\nRefreshing bun.lock...");
   await run`bun install`;
   validateLock();
-  await commitAndTag(pkgs, dependents, version);
+  await commitAndTag(pkgs, version);
   await pushRelease(version);
 }
 
-main().catch((err: unknown) => {
-  const msg = err instanceof Error ? err.message : String(err);
-  console.error(`${msg}`);
-  process.exitCode = 1;
-});
+if (import.meta.main) {
+  main().catch((err: unknown) => {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`${msg}`);
+    process.exitCode = 1;
+  });
+}

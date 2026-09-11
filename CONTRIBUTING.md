@@ -171,17 +171,16 @@ changes, run `sync:brand` and review the generated result instead.
 ## Build and deploy the docs
 
 For local verification, `bun run --cwd docs build` synchronizes the approved
-brand assets and builds Astro. The docs Vercel project uses `docs` as its project
-root and the configured deployment command is:
+brand assets and builds Astro. The docs Vercel project uses `docs` as its
+project root and the configured deployment command is:
 
 ```sh
-npx astro build
+bun run sync:brand && npx astro build
 ```
 
-The release workflow synchronizes brand assets before sending the docs workspace
-to Vercel, so the remote build does not need Bun or access to the repository-level
-`brand/` directory. Configure `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and
-`VERCEL_DOCS_PROJECT_ID` in repository secrets before publishing a release.
+The project configuration keeps preview builds available and cancels
+production builds unless the current commit subject matches `release: vX.Y.Z`.
+The release workflow does not deploy the docs or configure Vercel.
 
 ## Write documentation
 
