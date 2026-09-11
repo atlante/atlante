@@ -23,6 +23,31 @@ const packs = snapshot.packs;
           Packs are collections of presets, templates, skills, and agents for
           your harness.
         </p>
+        <div class="command-row">
+          <div class="command-box">
+            <code
+              ><span class="command-prompt" aria-hidden="true">$ </span
+              >npx atlante@latest init --pack @atlante/pack</code
+            >
+            <button
+              class="command-copy"
+              type="button"
+              aria-label="Copy the pack installation command"
+              data-copy-text="npx atlante@latest init --pack @atlante/pack"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                aria-hidden="true"
+              >
+                <rect x="4" y="4" width="12" height="12" rx="2"></rect>
+                <rect x="8" y="8" width="12" height="12" rx="2"></rect>
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -147,6 +172,50 @@ const packs = snapshot.packs;
 
 
   <script>
+    const createDoneIcon = () => {
+      const icon = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "svg",
+      );
+      icon.setAttribute("viewBox", "0 0 24 24");
+      icon.setAttribute("fill", "none");
+      icon.setAttribute("stroke", "currentColor");
+      icon.setAttribute("stroke-width", "1.5");
+      icon.setAttribute("stroke-linecap", "round");
+      icon.setAttribute("stroke-linejoin", "round");
+      icon.setAttribute("aria-hidden", "true");
+      icon.classList.add("copy-done-icon");
+
+      const path = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "path",
+      );
+      path.setAttribute("d", "m5 12 4 4L19 6");
+      icon.append(path);
+
+      return icon;
+    };
+
+    const originalChildrenByButton = new WeakMap<HTMLButtonElement, Node[]>();
+    document.addEventListener("click", (event) => {
+      if (!(event.target instanceof Element)) return;
+      const button = event.target.closest<HTMLButtonElement>(
+        "button[data-copy-text]",
+      );
+      if (!button) return;
+
+      const originalChildren =
+        originalChildrenByButton.get(button) ?? [...button.childNodes];
+      originalChildrenByButton.set(button, originalChildren);
+      const text = button.dataset.copyText ?? "";
+      navigator.clipboard.writeText(text).then(() => {
+        button.replaceChildren(createDoneIcon());
+        setTimeout(() => {
+          button.replaceChildren(...originalChildren);
+        }, 1600);
+      });
+    });
+
     const packList = document.querySelector<HTMLOListElement>("#pack-list");
     const searchInput = document.querySelector<HTMLInputElement>("#pack-search");
     const sortSelect = document.querySelector<HTMLSelectElement>("#pack-sort");
