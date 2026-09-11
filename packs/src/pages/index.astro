@@ -10,7 +10,7 @@ const packs = snapshot.packs;
 
 <BaseLayout
   title="Pack explorer | Atlante"
-  description="Find reusable Atlante presets, templates, and harness configurations. Inspect every pack before adding it to your project."
+  description="Discover Atlante packs and inspect their presets, templates, files, and package metadata before installation."
   canonicalPath="/"
 >
   <SiteNav />
@@ -20,8 +20,8 @@ const packs = snapshot.packs;
       <div class="hero-copy">
         <h1 id="catalog-title">Pack explorer</h1>
         <p>
-          Packs are to your harness what libraries are to your code: curated
-          presets and templates you can inspect before installing.
+          Like a library for your code, each pack gives your harness reusable
+          presets, templates, and instances to inspect before installation.
         </p>
       </div>
     </section>
@@ -47,30 +47,30 @@ const packs = snapshot.packs;
             class="search-input"
             id="pack-search"
             type="search"
-            placeholder="Search by package, description, preset, or tag"
+            placeholder="Search packages, presets, or tags"
             autocomplete="off"
           />
         </div>
         <label class="sort-control" for="pack-sort">
           <span class="section-label">Sort by</span>
           <select class="sort-select" id="pack-sort">
-            <option value="downloads">npm downloads</option>
+            <option value="downloads">Monthly downloads</option>
             <option value="stars">GitHub stars</option>
-            <option value="updated">Recently updated</option>
+            <option value="updated">Latest publish</option>
             <option value="name">Package name</option>
           </select>
         </label>
       </div>
       <div class="catalog-status" aria-live="polite">
-        <span><strong id="result-count">{packs.length} {packs.length === 1 ? "pack" : "packs"}</strong> in the curated index</span>
-        <span>Raw metrics · synchronized {formatSyncTime(snapshot.syncedAt)}</span>
+        <span><strong id="result-count">{packs.length} {packs.length === 1 ? "pack" : "packs"}</strong> indexed</span>
+        <span>Monthly npm downloads · GitHub stars</span>
       </div>
     </section>
 
     <section class="shell" aria-labelledby="pack-list-title">
       <h2 class="sr-only" id="pack-list-title">Available packs</h2>
       <div class="pack-table-header" aria-hidden="true">
-        <span class="column-label">No.</span>
+        <span class="column-label">Rank</span>
         <span class="column-label">Pack</span>
         <span class="column-label">Presets</span>
         <span class="column-label">Downloads</span>
@@ -110,7 +110,7 @@ const packs = snapshot.packs;
               </div>
               <div class="pack-mobile-metrics" aria-label="Pack metrics">
                 <span><strong>{pack.presets.length}</strong> presets</span>
-                <span><strong>{formatCount(pack.metrics.downloads)}</strong> downloads</span>
+                <span><strong>{formatCount(pack.metrics.downloads)}</strong> downloads / month</span>
                 <span><strong>{formatCount(pack.metrics.stars)}</strong> stars</span>
               </div>
             </div>
@@ -131,16 +131,16 @@ const packs = snapshot.packs;
         ))}
       </ol>
       <div class="empty-state" id="empty-state" hidden>
-        <h2>This stretch of the sky is empty</h2>
-        <p>No pack matches your search. Try a package name, preset, or broader tag.</p>
+        <h2>Nothing on this chart</h2>
+        <p>No pack matches your search. Try a package name, preset, or tag.</p>
       </div>
     </section>
 
     <aside class="shell catalog-note" aria-label="Catalog note">
       <p>
-        A note: this is a curated directory, not a registry. Pack data comes
-        from npm and public GitHub, is published as a static snapshot, and was
-        last synchronized on {formatSyncTime(snapshot.syncedAt)}.
+        Note: This curated directory publishes npm and GitHub metadata as a
+        static snapshot. It was last synchronized {formatSyncTime(snapshot.syncedAt)};
+        metrics remain separate rather than forming a score.
       </p>
     </aside>
   </main>

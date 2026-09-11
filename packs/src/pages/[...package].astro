@@ -79,7 +79,7 @@ const bindingSummary = (binding: { agents: number; skills: number }): string => 
             <strong>{pack.version}</strong>
           </div>
           <div class="summary-stat">
-            <span class="meta-label">Downloads</span>
+            <span class="meta-label">Downloads / month</span>
             <strong>{formatCount(pack.metrics.downloads)}</strong>
           </div>
           <div class="summary-stat">
@@ -152,7 +152,7 @@ const bindingSummary = (binding: { agents: number; skills: number }): string => 
           <section class="readme" aria-label="Pack README">
             <span class="section-label">README.md</span>
             {readmeHtml === "" ? (
-              <p>This pack does not publish a README.</p>
+              <p>This pack does not include a README.</p>
             ) : (
               <div set:html={readmeHtml} />
             )}
@@ -175,7 +175,7 @@ const bindingSummary = (binding: { agents: number; skills: number }): string => 
 
           <section class="file-section" aria-labelledby="files-title">
             <span class="section-label">Package contents</span>
-            <h2 id="files-title">Files</h2>
+            <h2 id="files-title">Inspectable files</h2>
             <div class="file-browser">
               <nav class="file-tree" aria-label="Pack files">
                 <ul>
@@ -253,15 +253,15 @@ const bindingSummary = (binding: { agents: number; skills: number }): string => 
             <section class="sidebar-section">
               <div class="trust-note">
                 <strong>Review before installing</strong>
-                Installing an npm pack delegates to your package manager and
-                may run package install scripts. Inspect the pack and its
-                repository before use.
+                Installing this package delegates to your package manager and
+                may run install scripts. Review its contents and repository
+                before use.
               </div>
             </section>
 
             <section class="sidebar-section">
               <span class="section-label">Snapshot</span>
-              <p class="sidebar-sync">Synchronized {formatSyncTime(snapshot.syncedAt)}</p>
+              <p class="sidebar-sync">Last synchronized {formatSyncTime(snapshot.syncedAt)}</p>
             </section>
           </div>
         </aside>

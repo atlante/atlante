@@ -49,7 +49,7 @@ export function installPanel(): void {
       await navigator.clipboard.writeText(command);
       showToast("Command copied");
     } catch {
-      showToast("Select the command to copy");
+      showToast("Clipboard unavailable; select the command to copy");
     }
   });
 
