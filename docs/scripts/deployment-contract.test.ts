@@ -19,6 +19,11 @@ describe("docs deployment contract", () => {
       ignoreCommand: string;
       cleanUrls: boolean;
       trailingSlash: boolean;
+      redirects: Array<{
+        source: string;
+        destination: string;
+        permanent: boolean;
+      }>;
     };
     const releaseWorkflow = read(".github/workflows/release.yml");
 
@@ -29,6 +34,13 @@ describe("docs deployment contract", () => {
     );
     expect(vercel.cleanUrls).toBe(true);
     expect(vercel.trailingSlash).toBe(false);
+    // The root redirect is answered at the edge; the Astro-generated refresh
+    // stub must never reach a production visitor.
+    expect(vercel.redirects).toContainEqual({
+      source: "/",
+      destination: "/introduction",
+      permanent: false,
+    });
     expect(releaseWorkflow).not.toContain("deploy-docs");
     expect(releaseWorkflow).not.toContain("sync:brand");
   });
