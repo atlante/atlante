@@ -22,8 +22,6 @@ export function installPanel(): void {
     }, 1800);
   };
 
-  bindCopyTextButtons();
-
   // Installation commands.
   if (commandText) {
     const pack = commandText.dataset.package ?? "";
