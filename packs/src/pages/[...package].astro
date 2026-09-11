@@ -2,6 +2,7 @@
 import "../styles/packs.css";
 import BaseLayout from "../layouts/BaseLayout.astro";
 import SiteNav from "../components/SiteNav.astro";
+import SiteFooter from "../components/SiteFooter.astro";
 import type { RegistryFile } from "../data/registry";
 import { formatCount, formatDate, formatSyncTime } from "../data/format";
 import { encodeJsonForScript } from "../data/json";
@@ -262,17 +263,13 @@ const bindingSummary = (binding: { agents: number; skills: number }): string => 
                 before use.
               </div>
             </section>
-
-            <section class="sidebar-section">
-              <span class="section-label">Registry snapshot</span>
-              <p class="sidebar-sync">Last synchronized {formatSyncTime(snapshot.syncedAt)}</p>
-            </section>
           </div>
         </aside>
       </div>
     </div>
   </main>
 
+  <SiteFooter syncedAt={snapshot.syncedAt} />
 
   <div class="toast" role="status" aria-live="polite" id="toast" hidden>Command copied</div>
 
