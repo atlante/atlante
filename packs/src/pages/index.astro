@@ -2,6 +2,8 @@
 import "../styles/packs.css";
 import BaseLayout from "../layouts/BaseLayout.astro";
 import SiteNav from "../components/SiteNav.astro";
+import SiteFooter from "../components/SiteFooter.astro";
+import IdentitySymbol from "../components/IdentitySymbol.astro";
 import { formatCount, formatSyncTime } from "../data/format";
 import snapshot from "../data/registry-snapshot.json";
 
@@ -48,6 +50,9 @@ const packs = snapshot.packs;
             </button>
           </div>
         </div>
+      </div>
+      <div class="hero-visual" aria-hidden="true">
+        <IdentitySymbol kind="sphere" />
       </div>
     </section>
 
@@ -166,9 +171,10 @@ const packs = snapshot.packs;
         The <em>packs</em> are fetched through a static snapshot from npm and
         public GitHub.
       </p>
-      <p class="catalog-sync">Last synchronized {formatSyncTime(snapshot.syncedAt)}</p>
     </aside>
   </main>
+
+  <SiteFooter syncedAt={snapshot.syncedAt} />
 
 
   <script>
