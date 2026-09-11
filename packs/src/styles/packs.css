@@ -373,12 +373,10 @@
   .row-arrow {
     justify-self: end;
     color: var(--ds-muted);
-    transition: transform var(--duration-utility) var(--ease-standard);
   }
 
   .pack-row:hover .row-arrow {
     color: var(--ds-fg);
-    transform: translateX(3px);
   }
 
   .empty-state {
