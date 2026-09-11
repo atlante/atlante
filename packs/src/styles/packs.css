@@ -174,7 +174,7 @@
   .pack-row {
     display: grid;
     grid-template-columns: 56px minmax(0, 1fr) 120px 110px 110px 28px;
-    column-gap: var(--space-4);
+    column-gap: var(--space-6);
     align-items: center;
   }
 
@@ -198,6 +198,7 @@
   .pack-row {
     position: relative;
     min-height: 132px;
+    padding-block: var(--space-3);
     border-block-end: var(--line);
     transition:
       background-color var(--duration-utility) var(--ease-standard),
