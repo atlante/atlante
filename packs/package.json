@@ -8,13 +8,17 @@
   },
   "scripts": {
     "dev": "bun run sync:brand && astro dev --port 4322",
-    "build": "bun run sync:brand && astro build",
-    "check": "bun run build",
+    "build": "bun run sync:brand && bun run sync:packs && astro build",
+    "check": "bun run build && ATLANTE_BUILT_OUTPUT_TESTS=1 bun test scripts src/data",
     "preview": "astro preview",
     "sync:brand": "bun scripts/sync-brand.ts",
+    "sync:packs": "bun scripts/sync-packs.ts",
     "astro": "astro"
   },
   "devDependencies": {
-    "astro": "^5.0.0"
+    "astro": "^5.0.0",
+    "marked": "^18.0.12",
+    "sanitize-html": "^2.17.7",
+    "tar": "^7.5.22"
   }
 }

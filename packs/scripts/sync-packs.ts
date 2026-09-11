@@ -1,0 +1,543 @@
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { marked } from "marked";
+import sanitizeHtml from "sanitize-html";
+import * as tar from "tar";
+import {
+  loadRegistryManifest,
+  loadRegistrySnapshot,
+  type RegistryFile,
+  type RegistryManifest,
+  type RegistryPack,
+  type RegistrySnapshot,
+} from "../src/data/registry";
+
+type SyncPacksOptions = {
+  websiteRoot?: string;
+  manifest?: RegistryManifest;
+  fetch?: typeof fetch;
+  env?: Record<string, string | undefined>;
+  now?: () => string;
+};
+
+type SyncPacksResult = {
+  snapshotPath: string;
+  packs: number;
+  reusedPacks: number;
+  snapshot: RegistrySnapshot;
+};
+
+const MAX_PREVIEW_FILES = 24;
+const MAX_PREVIEW_CHARS = 8192;
+
+const NPM_REGISTRY_BASE = "https://registry.npmjs.org";
+const NPM_DOWNLOADS_BASE = "https://api.npmjs.org/downloads/point/last-month";
+const GITHUB_API_BASE = "https://api.github.com/repos";
+
+const STRICT_SEMVER =
+  /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+
+const README_SANITIZER_OPTIONS: sanitizeHtml.IOptions = {
+  allowedTags: [
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "p",
+    "a",
+    "ul",
+    "ol",
+    "li",
+    "blockquote",
+    "code",
+    "pre",
+    "em",
+    "strong",
+    "img",
+    "table",
+    "thead",
+    "tbody",
+    "tr",
+    "th",
+    "td",
+    "hr",
+    "br",
+    "del",
+    "sup",
+    "sub",
+    "details",
+    "summary",
+    "kbd",
+    "picture",
+    "source",
+  ],
+  allowedAttributes: {
+    a: ["href", "title"],
+    img: ["src", "srcset", "alt", "title", "width", "height"],
+    code: ["class"],
+    span: ["class"],
+  },
+  allowedSchemes: ["http", "https", "mailto"],
+};
+
+type NpmRegistryDoc = {
+  "dist-tags"?: Record<string, string>;
+  versions?: Record<
+    string,
+    {
+      name?: string;
+      version?: string;
+      description?: string;
+      license?: string;
+      maintainers?: Array<{ name?: string }>;
+      repository?: { url?: string };
+      atlante?: { format?: unknown };
+      dist?: { tarball?: string };
+    }
+  >;
+  time?: Record<string, string>;
+};
+
+type NpmDownloadsDoc = { downloads?: number };
+
+type GitHubRepoDoc = {
+  stargazers_count?: number;
+  pushed_at?: string;
+};
+
+/**
+ * Strips `//` and `/* *\/` comments from JSONC while keeping string contents
+ * intact, then removes trailing commas so the result is plain JSON.
+ */
+function parseJsonc<T>(source: string): T {
+  let stripped = "";
+  let index = 0;
+  let inString = false;
+  let blockOpen = false;
+  let lineOpen = false;
+
+  while (index < source.length) {
+    const char = source[index];
+    const next = source[index + 1];
+
+    if (inString) {
+      stripped += char;
+      if (char === "\\") {
+        stripped += next ?? "";
+        index += 2;
+        continue;
+      }
+      if (char === '"') inString = false;
+      index += 1;
+      continue;
+    }
+    if (blockOpen) {
+      if (char === "*" && next === "/") {
+        blockOpen = false;
+        index += 2;
+        continue;
+      }
+      if (char === "\n") stripped += "\n";
+      index += 1;
+      continue;
+    }
+    if (lineOpen) {
+      if (char === "\n") {
+        lineOpen = false;
+        stripped += "\n";
+      }
+      index += 1;
+      continue;
+    }
+    if (char === '"') {
+      inString = true;
+      stripped += char;
+      index += 1;
+      continue;
+    }
+    if (char === "/" && next === "*") {
+      blockOpen = true;
+      index += 2;
+      continue;
+    }
+    if (char === "/" && next === "/") {
+      lineOpen = true;
+      index += 2;
+      continue;
+    }
+    stripped += char;
+    index += 1;
+  }
+
+  return JSON.parse(stripped.replace(/,(\s*[}\]])/g, "$1")) as T;
+}
+
+type PresetDocument = {
+  agents?: Record<string, unknown>;
+  skills?: Record<string, unknown>;
+};
+
+/**
+ * Maps a git repository URL to the `owner/name` GitHub slug; returns null for
+ * non-GitHub or unparseable URLs.
+ */
+function repositorySlug(url: string): string | null {
+  const withoutFragment = url.split("#")[0];
+  const match = /github\.com[/:]([^/]+)\/([^/]+?)(?:\.git)?$/i.exec(
+    withoutFragment,
+  );
+  return match ? `${match[1]}/${match[2]}` : null;
+}
+
+function isPreviewCandidate(path: string): boolean {
+  const name = basename(path);
+  return (
+    name === "atlante.jsonc" ||
+    name === "atlante.json" ||
+    name === "instance.jsonc" ||
+    name === "template.jsonc" ||
+    name === "template.md" ||
+    name === "README.md"
+  );
+}
+
+type ExtractedPack = {
+  files: RegistryFile[];
+  presets: Array<{
+    name: string;
+    default: boolean;
+    bindings: { agents: number; skills: number };
+  }>;
+};
+
+/**
+ * Extracts the pack tree from the npm tarball: preset discovery (every
+ * directory containing an `atlante.jsonc`/`atlante.json`), preset binding
+ * counts, and the capped set of inspectable pack files.
+ */
+function extractTarball(tarball: Buffer, packageName: string): ExtractedPack {
+  const workDir = mkdtempSync(join(tmpdir(), "atlante-packs-"));
+  try {
+    const tarballPath = join(workDir, "pack.tgz");
+    writeFileSync(tarballPath, tarball);
+    const extractDir = join(workDir, "unpacked");
+    mkdirSync(extractDir, { recursive: true });
+    tar.x({ sync: true, gzip: true, file: tarballPath, cwd: extractDir });
+
+    // npm tarballs extract to a single root directory; flatten its name away.
+    const rootEntries = readdirSync(extractDir);
+    const rootDir =
+      rootEntries.length === 1 &&
+      statSync(join(extractDir, rootEntries[0])).isDirectory()
+        ? rootEntries[0]
+        : "";
+    const packRootPrefix = rootDir === "" ? "" : `${rootDir}/`;
+
+    const entries: string[] = [];
+    const walk = (relative: string): void => {
+      const absolute = join(extractDir, relative);
+      for (const name of readdirSync(absolute)) {
+        const entryPath = relative === "" ? name : `${relative}/${name}`;
+        if (statSync(join(extractDir, entryPath)).isDirectory()) {
+          walk(entryPath);
+        } else {
+          entries.push(entryPath);
+        }
+      }
+    };
+    walk(rootDir);
+    const packFiles = entries.map((entry) =>
+      packRootPrefix === "" ? entry : entry.slice(packRootPrefix.length),
+    );
+
+    const presetDirs = new Map<string, { path: string; file: string }>();
+    for (const file of packFiles) {
+      const name = basename(file);
+      if (name === "atlante.jsonc" || name === "atlante.json") {
+        const dir = dirname(file) === "." ? "" : dirname(file);
+        presetDirs.set(dir, {
+          path: join(extractDir, packRootPrefix, file),
+          file,
+        });
+      }
+    }
+
+    const presets = [...presetDirs.entries()]
+      .map(([dir, { path }]) => {
+        const doc = parseJsonc<PresetDocument>(readFileSync(path, "utf8"));
+        return {
+          name: dir === "" ? "default" : dir,
+          default: dir === "",
+          bindings: {
+            agents: Object.keys(doc.agents ?? {}).length,
+            skills: Object.keys(doc.skills ?? {}).length,
+          },
+        };
+      })
+      .sort((a, b) => {
+        if (a.default !== b.default) return a.default ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
+
+    const previewSources = packFiles
+      .filter((file) => isPreviewCandidate(file))
+      .sort((a, b) => {
+        const aRoot = dirname(a) === ".";
+        const bRoot = dirname(b) === ".";
+        if (aRoot !== bRoot) return aRoot ? -1 : 1;
+        return a.localeCompare(b);
+      });
+
+    const files: RegistryFile[] = previewSources
+      .slice(0, MAX_PREVIEW_FILES)
+      .map((file) => {
+        const content = readFileSync(
+          join(extractDir, packRootPrefix, file),
+          "utf8",
+        );
+        return {
+          path: file,
+          content: content.length > MAX_PREVIEW_CHARS ? null : content,
+        };
+      });
+
+    if (presets.length === 0) {
+      throw new Error(
+        `${packageName}: no presets discovered; a pack must expose atlante.jsonc or atlante.json`,
+      );
+    }
+
+    return { files, presets };
+  } finally {
+    rmSync(workDir, { recursive: true, force: true });
+  }
+}
+
+async function fetchJson(
+  url: string,
+  fetchImpl: typeof fetch,
+  headers?: Record<string, string>,
+): Promise<unknown> {
+  const response = await fetchImpl(url, { headers });
+  if (!response.ok) {
+    throw new Error(`${url} responded ${response.status}`);
+  }
+  return (await response.json()) as unknown;
+}
+
+/**
+ * Synchronizes the curated manifest against npm and public GitHub data and
+ * writes the registry snapshot consumed by the pack pages. A pack whose live
+ * fetch fails is served from the previous snapshot; when no previous data
+ * exists, the failure is fatal so the build never publishes an unverifiable
+ * pack. The snapshot timestamp stays at the last fully successful
+ * synchronization.
+ */
+export async function syncPacks(
+  options: SyncPacksOptions = {},
+): Promise<SyncPacksResult> {
+  const websiteRoot =
+    options.websiteRoot ?? dirname(dirname(fileURLToPath(import.meta.url)));
+  const fetchImpl = options.fetch ?? fetch;
+  const env = options.env ?? process.env;
+  const now = options.now ?? (() => new Date().toISOString());
+  const manifest = options.manifest ?? loadRegistryManifest(websiteRoot);
+
+  const snapshotPath = join(
+    websiteRoot,
+    "src",
+    "data",
+    "registry-snapshot.json",
+  );
+  let previous: RegistrySnapshot | null = null;
+  try {
+    previous = loadRegistrySnapshot(websiteRoot);
+  } catch {
+    previous = null;
+  }
+  const previousByName = new Map(
+    (previous?.packs ?? []).map((pack) => [pack.name, pack]),
+  );
+
+  const packs: RegistryPack[] = [];
+  let reusedPacks = 0;
+
+  for (const entry of manifest.packs) {
+    const packageName = entry.package;
+    let pack: RegistryPack | null = null;
+    try {
+      const registryDoc = (await fetchJson(
+        `${NPM_REGISTRY_BASE}/${encodeURIComponent(packageName)}`,
+        fetchImpl,
+      )) as NpmRegistryDoc;
+      const latest = registryDoc["dist-tags"]?.latest;
+      const version = latest ? registryDoc.versions?.[latest] : undefined;
+      if (!latest || !version) {
+        throw new Error(`${packageName}: no published version on npm`);
+      }
+      if (version.name !== packageName) {
+        throw new Error(
+          `${packageName}: registry served a mismatched name (${version.name})`,
+        );
+      }
+      if (!STRICT_SEMVER.test(version.version ?? "")) {
+        throw new Error(
+          `${packageName}: version ${version.version} is not strict semver`,
+        );
+      }
+      if (version.atlante?.format !== 1) {
+        throw new Error(
+          `${packageName}: npm manifest does not declare atlante.format: 1`,
+        );
+      }
+      if (!version.dist?.tarball) {
+        throw new Error(`${packageName}: registry metadata has no tarball URL`);
+      }
+
+      let downloads: number | null = null;
+      try {
+        const downloadsDoc = (await fetchJson(
+          `${NPM_DOWNLOADS_BASE}/${encodeURIComponent(packageName)}`,
+          fetchImpl,
+        )) as NpmDownloadsDoc;
+        downloads =
+          typeof downloadsDoc.downloads === "number"
+            ? downloadsDoc.downloads
+            : null;
+      } catch {
+        downloads = null;
+      }
+
+      const repositoryUrl = version.repository?.url ?? null;
+      const repositorySlugValue = repositoryUrl
+        ? repositorySlug(repositoryUrl)
+        : null;
+      let stars: number | null = null;
+      let updatedAt: string | null = null;
+      if (repositorySlugValue) {
+        try {
+          const headers: Record<string, string> = {
+            Accept: "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+          };
+          if (env.GITHUB_TOKEN) {
+            headers.Authorization = `Bearer ${env.GITHUB_TOKEN}`;
+          }
+          const repoDoc = (await fetchJson(
+            `${GITHUB_API_BASE}/${repositorySlugValue}`,
+            fetchImpl,
+            headers,
+          )) as GitHubRepoDoc;
+          stars =
+            typeof repoDoc.stargazers_count === "number"
+              ? repoDoc.stargazers_count
+              : null;
+          updatedAt =
+            typeof repoDoc.pushed_at === "string" ? repoDoc.pushed_at : null;
+        } catch {
+          stars = null;
+          updatedAt = null;
+        }
+      }
+
+      const tarballResponse = await fetchImpl(version.dist.tarball);
+      if (!tarballResponse.ok) {
+        throw new Error(
+          `${packageName}: tarball fetch responded ${tarballResponse.status}`,
+        );
+      }
+      const tarball = Buffer.from(await tarballResponse.arrayBuffer());
+      const extracted = extractTarball(tarball, packageName);
+      const readme = extracted.files.find((file) => file.path === "README.md");
+
+      pack = {
+        name: packageName,
+        official: entry.official,
+        tags: [...entry.tags],
+        description: version.description ?? "",
+        version: version.version ?? latest,
+        license: typeof version.license === "string" ? version.license : null,
+        maintainers: (version.maintainers ?? [])
+          .map((maintainer) => maintainer.name ?? "")
+          .filter((name) => name !== ""),
+        repository:
+          repositoryUrl === null
+            ? null
+            : { url: repositoryUrl, slug: repositorySlugValue },
+        npmUrl: `https://www.npmjs.com/package/${packageName}`,
+        metrics: {
+          downloads,
+          stars,
+          publishedAt:
+            typeof registryDoc.time?.[latest] === "string"
+              ? (registryDoc.time?.[latest] ?? null)
+              : null,
+          updatedAt,
+        },
+        presets: extracted.presets.map((preset) => ({
+          ...preset,
+          locator: preset.default
+            ? packageName
+            : `${packageName}/${preset.name}`,
+        })),
+        readmeHtml: readme?.content
+          ? sanitizeHtml(
+              marked.parse(readme.content) as string,
+              README_SANITIZER_OPTIONS,
+            )
+          : "",
+        files: extracted.files,
+      };
+    } catch {
+      const fallback = previousByName.get(packageName);
+      if (!fallback) {
+        throw new Error(
+          `${packageName}: live synchronization failed and no previous snapshot is available`,
+        );
+      }
+      reusedPacks += 1;
+      packs.push(fallback);
+      continue;
+    }
+    packs.push(pack);
+  }
+
+  const snapshot: RegistrySnapshot = {
+    syncedAt: reusedPacks === 0 ? now() : (previous?.syncedAt ?? now()),
+    packs,
+  };
+  writeFileSync(snapshotPath, `${JSON.stringify(snapshot, null, 2)}\n`);
+
+  return {
+    snapshotPath,
+    packs: packs.length,
+    reusedPacks,
+    snapshot,
+  };
+}
+
+if (
+  process.argv[1] &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
+  const result = await syncPacks();
+  const reused =
+    result.reusedPacks > 0
+      ? ` (${result.reusedPacks} reused from the previous snapshot)`
+      : "";
+  console.log(
+    `sync-packs: synchronized ${result.packs} pack(s)${reused} → ${result.snapshotPath}`,
+  );
+}
