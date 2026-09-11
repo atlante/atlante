@@ -15,6 +15,73 @@ Run this guide from the root of an initialized project with a
 [Customize your harness](/guides/building-a-harness), but includes every file
 needed to follow it independently and notes when a command runs elsewhere.
 
+## Import an existing Markdown file
+
+Use `atlante import` when an agent or skill already exists as a Markdown file.
+The command creates a source pack with a preset and one resource instance.
+
+For an agent, add the required metadata to the file's YAML frontmatter:
+
+```md
+---
+identity: You are a senior reviewer.
+mission: Find defects before changes are merged.
+description: Reviews the project for defects.
+---
+
+Read the relevant source and tests before reporting findings.
+```
+
+Import the file into `packs/review`:
+
+```sh
+npx atlante import review.md --kind agent --out packs/review
+```
+
+The required `--kind` option selects `agent` or `skill`. Skills require
+`title`, `overview`, and `description`; agents require `identity`, `mission`,
+and `description`. Atlante does not infer missing metadata.
+
+Without `--name`, the command uses the sanitized Markdown filename stem as the
+pack, resource, and binding ID. The final filename extension is removed before
+sanitization. Use `--name <id>` to choose a different ID; resulting IDs use
+lowercase kebab-case and contain at most 64 characters.
+
+The generated pack has this structure:
+
+```text
+packs/review/
+├── atlante.jsonc
+├── package.json
+└── review/
+    └── instance.jsonc
+```
+
+Add the generated preset to the project's source configuration:
+
+```jsonc title="atlante.jsonc"
+{
+  "$schema": "https://atlante.sh/schema/v0.1/schema.json",
+  "extends": ["@atlante/pack", "./packs/review"]
+}
+```
+
+Validate and build the consuming project:
+
+```sh
+npx atlante validate
+npx atlante build
+```
+
+The importer supports the CommonMark and GFM nodes listed in the
+[template reference](/concepts/templates#canonical-markdown-input). Unsupported
+syntax, unresolved references, invalid metadata, and failed validation stop the
+operation before the output directory is created.
+
+The manual workflow below is a separate alternative to importing an existing
+file. If you used `atlante import`, stop after the commands above and inspect
+the generated ID instead of the `reviewer` example when checking native output.
+
 ## Create a reusable reviewer instance
 
 Create the resource directory and instance file:

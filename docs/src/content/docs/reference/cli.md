@@ -1,6 +1,6 @@
 ---
 title: CLI
-description: Command reference for init, pack management, validate, build, MCP, and eval.
+description: Command reference for init, Markdown import, pack management, validate, build, MCP, and eval.
 ---
 
 The `atlante` package provides the `atlante` command and requires
@@ -96,6 +96,54 @@ Use `--pack` only with packages you trust. Custom pack installation can run
 package-manager install scripts before Atlante validates the installed pack or
 selects a preset.
 :::
+
+## `atlante import`
+
+Convert an existing Markdown agent or skill into a project-local source pack.
+
+```sh
+npx atlante import <input> --kind agent --out <dir>
+npx atlante import <input> --kind skill --out <dir>
+npx atlante import <input> --kind skill --out <dir> --name <id>
+```
+
+- `<input>` is the Markdown source file. YAML frontmatter supplies template input
+  and binding metadata, while the frontmatter itself does not render as body content.
+- `--kind <kind>` is required and accepts `agent` or `skill`. The command does
+  not infer a host kind or synthesize missing metadata.
+- `--out <dir>` is required and names a new local pack directory. An existing
+  directory is never overwritten.
+- `--name <id>` overrides the sanitized input filename stem used for the
+  generated pack, resource, and binding IDs. The final extension is removed
+  before sanitization. IDs contain lowercase ASCII letters, digits, and hyphens,
+  with a maximum length of 64 characters after sanitization.
+
+Agent frontmatter requires `identity`, `mission`, and `description`. Skill
+frontmatter requires `title`, `overview`, and `description`. Other frontmatter
+keys produce warnings when the importer does not map them explicitly.
+`description` becomes binding lookup metadata; the other required fields become
+input for the selected agent or skill template.
+
+The importer accepts the CommonMark and GFM profile described in
+[Templates](/concepts/templates#canonical-markdown-input), including nested
+blocks, inline formatting, links, images, code, tables, task items, and
+strikethrough. HTML, footnotes, unknown nodes, unresolved references, invalid
+metadata, and schema failures produce diagnostics without a partial pack.
+
+The output is source configuration, not generated native output:
+
+```text
+<dir>/
+├── atlante.jsonc
+├── package.json
+└── <id>/
+    └── instance.jsonc
+```
+
+`package.json` records the bundled `@atlante/pack` version. Add the generated
+preset to `extends`, then run `atlante validate` and `atlante build` from the
+consuming project's root. A successful import exits with status `0`; failures
+exit with status `1`.
 
 ## `atlante pack`
 
@@ -255,7 +303,7 @@ warnings and diagnostics written to that stream.
 ## Exit status
 
 - `0` means the command completed without errors. In watch mode, interruption also produces exit status `0`.
-- `1` means `init`, `validate`, or `build` failed for a one-shot command.
+- `1` means `init`, `import`, `validate`, or `build` failed for a one-shot command.
 
 Eval has its own exit statuses; see [Eval](/reference/eval#reports-and-exit-status).
 

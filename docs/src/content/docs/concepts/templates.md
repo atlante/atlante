@@ -9,6 +9,45 @@ while a binding assigns selected content to a named agent or skill. Together,
 these roles separate reusable structure, configured content, and host-facing
 identity.
 
+## Canonical Markdown input
+
+The first-party `@atlante/pack/markdown` template accepts a canonical Markdown
+AST rather than the former shorthand blocks. Each node identifies its kind with
+`type`, and recursive content appears in `children`.
+
+```json
+[
+  {
+    "type": "heading",
+    "depth": 2,
+    "children": [{ "type": "text", "value": "Installation" }]
+  },
+  {
+    "type": "paragraph",
+    "children": [
+      { "type": "text", "value": "Run " },
+      { "type": "inlineCode", "value": "bun install" }
+    ]
+  },
+  { "type": "code", "lang": "ts", "value": "const value = 1;" }
+]
+```
+
+Supported block nodes include paragraphs, headings, code blocks, blockquotes,
+nested ordered and unordered lists, thematic breaks, and GFM tables. Supported
+phrasing nodes include emphasis, strong text, inline code, links, images, hard
+breaks, and strikethrough. GFM task items use the optional `checked` field, and
+ordered lists use `start` when numbering begins above one.
+
+The persisted AST contains no parser positions or plugin-specific `data`. The
+[Markdown input schema](https://github.com/atlante/atlante/blob/main/packages/pack/markdown/template.jsonc)
+defines the accepted JSON contract, while the shared
+[TypeScript AST union](https://github.com/atlante/atlante/blob/main/packages/schema/src/markdown-ast.ts)
+describes the same node shapes for code that constructs input.
+
+The 0.2.x Markdown contract is a breaking change. Existing shorthand blocks are
+not accepted, and the current release provides no compatibility migration path.
+
 ## From input to a Markdown file
 
 A template consists of two files: `template.jsonc` defines its input
