@@ -4,6 +4,12 @@
     "project": "{{sys.cwd.basename}}",
     "workflow-root": ".atlante/workflows"
   },
+  "eval": {
+    "host": "opencode",
+    "scenarios": "eval/scenarios/*.eval.json",
+    "fixtures": "eval/fixtures",
+    "report": "eval/report.json"
+  },
   "agents": {
     "architect": {
       "$instance": "@atlante/pack/architect"

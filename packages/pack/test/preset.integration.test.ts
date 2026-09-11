@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   createProjectResourcePack,
   interpolateValues,
@@ -13,6 +15,7 @@ import {
   resolveResourceTemplate,
 } from "@atlante/resources";
 import {
+  parseDocumentOverlay,
   validateDocumentText,
   validateResolvedDocument,
 } from "@atlante/validator";
@@ -36,6 +39,8 @@ const focusedSkillLandmarks: Record<string, readonly string[]> = {
   review: ["`PASS` or `BLOCKED` verdict"],
   harness: ["Permanent policy"],
 };
+
+const firstPartyPackRoot = fileURLToPath(new URL("../", import.meta.url));
 
 interface PresetContext {
   readonly document: JsonObject;
@@ -97,7 +102,7 @@ describe("first-party preset surface", () => {
     expect(Object.keys(document.skills)).toEqual([...expectedSkillOrder]);
   });
 
-  test("validates the authored preset document against the user configuration schema", {
+  test("validates the authored pack document against the overlay schema", {
     timeout: 20_000,
   }, () => {
     const { root, config } = packResourceFixture();
@@ -106,13 +111,22 @@ describe("first-party preset surface", () => {
       "@atlante/pack",
       config,
     );
-    const result = validateDocumentText(
+    const result = parseDocumentOverlay(
       JSON.stringify(source.facet.document),
       config,
     );
 
     expect(result.diagnostics).toEqual([]);
-    expect(result.document).toBeDefined();
+    expect(result.overlay).toBeDefined();
+    // The project validator still validates the resolved, metadata-free
+    // document; pack metadata is intentionally not a canonical project field.
+    const { eval: _packEval, ...projectDocument } = source.facet.document;
+    const projectResult = validateDocumentText(
+      JSON.stringify(projectDocument),
+      config,
+    );
+    expect(projectResult.diagnostics).toEqual([]);
+    expect(projectResult.document).toBeDefined();
   });
 
   test("keeps the public skill bindings as locator-only while each instance owns its description", () => {
@@ -161,6 +175,68 @@ describe("first-party preset surface", () => {
       project: "{{sys.cwd.basename}}",
       "workflow-root": ".atlante/workflows",
     });
+  });
+
+  test("declares the bundled eval suite as pack metadata", () => {
+    const { document } = firstPartyPreset();
+
+    expect(document.eval).toEqual({
+      host: "opencode",
+      scenarios: "eval/scenarios/*.eval.json",
+      fixtures: "eval/fixtures",
+      report: "eval/report.json",
+    });
+  });
+
+  test("ships all suite assets and the self-reported run", () => {
+    const { root } = packResourceFixture();
+    for (const path of [
+      "eval/scenarios/harness-red-green.eval.json",
+      "eval/scenarios/policy-invariant.eval.json",
+      "eval/scenarios/scope-discipline.eval.json",
+      "eval/fixtures/calculator/verify.ts",
+      "eval/fixtures/policy-shim/harness/policy.jsonc",
+      "eval/fixtures/scope/docs/notes.md",
+      "eval/report.json",
+    ])
+      expect(
+        existsSync(join(root, "node_modules", "@atlante", "pack", path)),
+        path,
+      ).toBe(true);
+
+    const report = JSON.parse(
+      readFileSync(
+        join(root, "node_modules", "@atlante", "pack", "eval/report.json"),
+        "utf8",
+      ),
+    ) as { scenarios?: Record<string, unknown> };
+    expect(Object.keys(report.scenarios ?? {}).sort()).toEqual([
+      "harness-red-green",
+      "policy-invariant",
+      "scope-discipline",
+    ]);
+
+    const packed = spawnSync("npm", ["pack", "--dry-run", "--json"], {
+      cwd: firstPartyPackRoot,
+      encoding: "utf8",
+    });
+    expect(packed.status).toBe(0);
+    expect(packed.error).toBeUndefined();
+    const archive = JSON.parse(packed.stdout) as {
+      [key: string]: { files?: Array<{ path: string }> };
+    };
+    const files =
+      Object.values(archive)[0]?.files?.map(({ path }) => path) ?? [];
+    for (const path of [
+      "eval/scenarios/harness-red-green.eval.json",
+      "eval/scenarios/policy-invariant.eval.json",
+      "eval/scenarios/scope-discipline.eval.json",
+      "eval/fixtures/calculator/verify.ts",
+      "eval/fixtures/policy-shim/harness/policy.jsonc",
+      "eval/fixtures/scope/docs/notes.md",
+      "eval/report.json",
+    ])
+      expect(files, path).toContain(path);
   });
 
   test("rejects the removed legacy brainstorming and workflow resources", () => {
