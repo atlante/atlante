@@ -105,26 +105,6 @@
     max-width: 100%;
   }
 
-  .runner-tabs {
-    display: inline-flex;
-    gap: var(--space-1);
-  }
-
-  .runner-tab {
-    min-height: 34px;
-    padding-inline: var(--space-3);
-    color: var(--ds-muted);
-    background: transparent;
-    border: 0;
-    border-radius: 4px;
-    font: 600 var(--text-small) / 1 var(--font-mono);
-  }
-
-  .runner-tab[aria-selected="true"] {
-    color: var(--ds-fg);
-    background: var(--surface-raised);
-  }
-
   /* Command boxes share the landing site's skin: a light bordered strip
      with foreground ink, not a dark code surface. */
   .command-box {
