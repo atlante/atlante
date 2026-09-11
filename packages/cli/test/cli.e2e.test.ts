@@ -245,7 +245,7 @@ test("CLI resolves first-party package resource facets", async () => {
     "skills": {
       "plan": { "$instance": "@atlante/pack/plan", "description": "Plan" },
       "review": { "$instance": "@atlante/pack/review", "description": "Review" },
-      "skill": { "$template": "@atlante/pack/skill", "description": "Skill", "title": "Skill", "overview": "Overview", "sections": [{ "markdown": [{ "p": ["Body"] }] }] }
+      "skill": { "$template": "@atlante/pack/skill", "description": "Skill", "title": "Skill", "overview": "Overview", "sections": [{ "markdown": [{ "type": "paragraph", "children": [{ "type": "text", "value": "Body" }] }] }] }
     }
   }`);
 
