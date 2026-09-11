@@ -571,37 +571,45 @@
     border-block-start: var(--line);
   }
 
+  /* Rendered markdown reads like the docs: serif prose at the docs scale
+     with 500-weight headings. */
+  .readme {
+    font: 400 1rem / 1.65 var(--font-body);
+  }
+
   .readme h1,
   .readme h2,
   .readme h3 {
     margin-block: var(--space-8) var(--space-3);
-    font-family: var(--font-body);
-    font-weight: 520;
+    font-family: var(--font-heading);
+    font-weight: 500;
+    letter-spacing: -0.015em;
+    line-height: 1.1;
     text-wrap: balance;
   }
 
+  /* The pack name is already the page title, so the README's own h1 reads
+     at the docs h2 scale. */
   .readme h1 {
-    font-size: clamp(30px, 4vw, 42px);
-    line-height: 1.12;
+    font-size: clamp(1.75rem, 3vw, 2.25rem);
   }
 
   .readme h2 {
-    font-size: var(--text-heading-2);
-    line-height: 1.2;
+    font-size: clamp(1.375rem, 2vw, 1.75rem);
   }
 
   .readme h3 {
-    font-size: var(--text-heading-3);
+    font-size: 1.2rem;
   }
 
   .readme h4 {
-    font-size: var(--text-ui);
+    font-size: 1rem;
   }
 
   .readme p,
   .readme li {
     max-width: 70ch;
-    font: var(--text-body) / 1.68 var(--font-body);
+    text-wrap: pretty;
   }
 
   .readme p + p,
@@ -667,10 +675,11 @@
   .presets-section h2,
   .file-section h2 {
     margin-block: 0 var(--space-6);
-    font-size: clamp(30px, 4vw, 42px);
-    line-height: 1.12;
-    font-family: var(--font-body);
-    font-weight: 520;
+    font-family: var(--font-heading);
+    font-size: clamp(1.75rem, 3vw, 2.25rem);
+    font-weight: 500;
+    letter-spacing: -0.015em;
+    line-height: 1.1;
     text-wrap: balance;
   }
 
