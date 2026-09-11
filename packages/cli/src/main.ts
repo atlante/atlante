@@ -4,6 +4,11 @@ import { runBuild } from "./commands/build.js";
 import { runBuildWatch } from "./commands/build-watch.js";
 import type { EvalCommandOptions } from "./commands/eval.js";
 import { runEvalCommand } from "./commands/eval.js";
+import {
+  type ImportKind,
+  parseImportKind,
+  runImport,
+} from "./commands/import.js";
 import { runInit } from "./commands/init.js";
 import { runMcp } from "./commands/mcp.js";
 import {
@@ -21,6 +26,7 @@ function collect(value: string, previous: string[]): string[] {
 export { runBuild } from "./commands/build.js";
 export { runBuildWatch } from "./commands/build-watch.js";
 export { runEvalCommand } from "./commands/eval.js";
+export { runImport } from "./commands/import.js";
 export { runInit } from "./commands/init.js";
 export { runMcp } from "./commands/mcp.js";
 export {
@@ -85,6 +91,29 @@ export function createProgram(): Command {
           pack: options.pack,
           force: options.force,
           noMcp: options.mcp === false,
+        });
+      },
+    );
+
+  program
+    .command("import")
+    .argument("<input>", "Markdown source file")
+    .requiredOption("--out <dir>", "directory for the generated local pack")
+    .requiredOption(
+      "--kind <kind>",
+      "import as an agent or skill",
+      parseImportKind,
+    )
+    .option("--name <id>", "override the generated pack and resource ID")
+    .description("import a Markdown agent or skill into a local pack")
+    .action(
+      (
+        input: string,
+        options: { out: string; kind: ImportKind; name?: string },
+      ) => {
+        process.exitCode = runImport(input, options.out, {
+          kind: options.kind,
+          ...(options.name === undefined ? {} : { name: options.name }),
         });
       },
     );

@@ -378,12 +378,13 @@ describe("runBuild", () => {
   });
 });
 
-test("registers validate, build, mcp, init, pack, and eval, but not resolve", () => {
+test("registers validate, build, mcp, init, import, pack, and eval, but not resolve", () => {
   expect(createProgram().commands.map((command) => command.name())).toEqual([
     "validate",
     "build",
     "mcp",
     "init",
+    "import",
     "pack",
     "eval",
   ]);
