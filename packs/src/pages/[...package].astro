@@ -145,6 +145,12 @@ const bindingSummary = (binding: { agents: number; skills: number }): string => 
             </svg>
           </button>
         </div>
+        <div class="trust-note">
+          <strong>Read before installing</strong>
+          Installing an npm pack delegates to your package manager, which may
+          run install scripts before Atlante validates the pack. Inspect the
+          files and repository here first.
+        </div>
       </section>
 
       <div class="detail-grid">
@@ -253,15 +259,6 @@ const bindingSummary = (binding: { agents: number; skills: number }): string => 
                   <dd><code>atlante.format: 1</code></dd>
                 </div>
               </dl>
-            </section>
-
-            <section class="sidebar-section">
-              <div class="trust-note">
-                <strong>Review before installing</strong>
-                Installing this package delegates to your package manager and
-                may run install scripts. Review its contents and repository
-                before use.
-              </div>
             </section>
           </div>
         </aside>
