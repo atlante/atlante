@@ -1,6 +1,6 @@
 {
   "name": "@atlante/eval",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "type": "module",
   "description": "Atlante eval: sandboxed harness evaluation with deterministic checks",
   "license": "MIT",
