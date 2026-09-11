@@ -33,7 +33,7 @@
     "build": "bun scripts/build.ts",
     "docs:build": "bun run --cwd docs build",
     "docs:check": "bun run --cwd docs check",
-    "website:check": "bun run --cwd website check",
+    "website:check": "bun run build && bun run --cwd website check",
     "quick:check": "bun scripts/parallel.ts type:check lint:check test:unit",
     "core:check": "bun run build && bun scripts/parallel.ts type:check lint:check test smoke:test smoke:opencode",
     "full:check": "bun run core:check && bun scripts/parallel.ts docs:check website:check",
