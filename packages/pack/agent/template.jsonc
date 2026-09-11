@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "Root agent prompt renderer with identity, mission, and ordered sections.",
+  "description": "Root agent prompt renderer with an optional identity and mission, and ordered sections. Identity and mission render only when provided; OpenCode itself only consumes the binding description.",
   "type": "object",
   "properties": {
     "identity": { "type": "string", "minLength": 1 },
@@ -53,6 +53,5 @@
       "minItems": 1
     }
   },
-  "required": ["identity", "mission"],
   "additionalProperties": false
 }

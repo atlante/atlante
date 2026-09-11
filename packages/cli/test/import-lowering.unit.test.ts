@@ -667,7 +667,7 @@ describe("Markdown importer lowering", () => {
     });
   });
 
-  test("reports unknown and missing metadata without inferring values", () => {
+  test("requires only a description and reports unmapped keys", () => {
     const mapped = mapFrontmatter(
       { model: "gpt", title: "" },
       "skill",
@@ -678,24 +678,26 @@ describe("Markdown importer lowering", () => {
     expect(
       mapped.diagnostics.filter(({ severity }) => severity === "warning"),
     ).toHaveLength(1);
-    expect(
-      mapped.diagnostics.filter(({ code }) => code === "missing-metadata"),
-    ).toHaveLength(3);
-    expect(
-      mapped.diagnostics.filter(({ code }) => code === "missing-metadata")[0]
-        ?.message,
-    ).toContain('"title"');
-    expect(
-      mapped.diagnostics.filter(({ code }) => code === "missing-metadata"),
-    ).toContainEqual(
+    expect(mapped.diagnostics).toContainEqual(
       expect.objectContaining({
+        code: "missing-metadata",
+        message: 'required frontmatter key "title" must not be empty',
+      }),
+    );
+    expect(
+      mapped.diagnostics.filter(({ message }) =>
+        message.includes("missing required"),
+      ),
+    ).toEqual([
+      expect.objectContaining({
+        message: 'missing required skill frontmatter key "description"',
         location: { line: 1, column: 1 },
         source: "missing.md",
       }),
-    );
+    ]);
 
-    expect(mapFrontmatter({}, "skill").diagnostics).toHaveLength(3);
-    expect(mapFrontmatter({}, "agent").diagnostics).toHaveLength(3);
+    expect(mapFrontmatter({}, "skill").diagnostics).toHaveLength(1);
+    expect(mapFrontmatter({}, "agent").diagnostics).toHaveLength(1);
     expect(
       mapFrontmatter(
         { description: 42, identity: "identity", mission: "mission" },
@@ -707,6 +709,20 @@ describe("Markdown importer lowering", () => {
         message: 'frontmatter key "description" must be a string',
       }),
     ]);
+  });
+
+  test("derives the skill title from the name when the frontmatter omits it", () => {
+    expect(mapFrontmatter({ name: "doc", description: "D" }, "skill")).toEqual({
+      metadata: { description: "D", id: "doc", title: "doc" },
+      diagnostics: [],
+    });
+    // No fabricated values for the remaining presentation fields.
+    expect(mapFrontmatter({ description: "D" }, "skill").metadata).toEqual({
+      description: "D",
+    });
+    expect(mapFrontmatter({ description: "D" }, "agent").metadata).toEqual({
+      description: "D",
+    });
   });
 
   test("sanitizes explicit identifiers and rejects punctuation-only names", () => {

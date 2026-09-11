@@ -839,10 +839,10 @@ export function mapFrontmatter(
       ? ["name", "description", "title", "overview"]
       : ["name", "description", "identity", "mission"],
   );
-  const required =
-    kind === "skill"
-      ? (["title", "overview", "description"] as const)
-      : (["identity", "mission", "description"] as const);
+  // Description is the only required field: hosts consume it directly
+  // (OpenCode skill discovery and binding lookup metadata). The remaining
+  // mapped fields are template presentation input and stay optional.
+  const required = ["description"] as const;
   const location = frontmatterLocation
     ? { source, location: frontmatterLocation }
     : { source };
@@ -932,6 +932,17 @@ export function mapFrontmatter(
     );
   }
 
+  // Skills render their title heading from the template input; derive it from
+  // the source name when the frontmatter carries no explicit title so common
+  // name+description skill files import without editing.
+  if (
+    kind === "skill" &&
+    metadata.title === undefined &&
+    typeof frontmatter.name === "string" &&
+    frontmatter.name.trim().length > 0
+  )
+    metadata.title = frontmatter.name.trim();
+
   return { metadata, diagnostics };
 }
 
@@ -973,13 +984,19 @@ function instanceInput(
   const sections = [{ markdown: ast }];
   return kind === "skill"
     ? {
-        title: metadata.title,
-        overview: metadata.overview,
+        ...(metadata.title === undefined ? {} : { title: metadata.title }),
+        ...(metadata.overview === undefined
+          ? {}
+          : { overview: metadata.overview }),
         sections,
       }
     : {
-        identity: metadata.identity,
-        mission: metadata.mission,
+        ...(metadata.identity === undefined
+          ? {}
+          : { identity: metadata.identity }),
+        ...(metadata.mission === undefined
+          ? {}
+          : { mission: metadata.mission }),
         sections,
       };
 }

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "Structured project skill with a title, overview, and ordered content sections.",
+  "description": "Structured project skill with an optional title and overview, and ordered content sections. Title and overview render only when provided; OpenCode itself only consumes the binding description.",
   "type": "object",
   "properties": {
     "title": { "type": "string", "minLength": 1 },
@@ -60,6 +60,6 @@
       "minItems": 1
     }
   },
-  "required": ["title", "overview", "sections"],
+  "required": ["sections"],
   "additionalProperties": false
 }

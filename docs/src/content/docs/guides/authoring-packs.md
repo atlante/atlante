@@ -20,7 +20,12 @@ needed to follow it independently and notes when a command runs elsewhere.
 Use `atlante import` when an agent or skill already exists as a Markdown file.
 The command creates a source pack with a preset and one resource instance.
 
-For an agent, add the required metadata to the file's YAML frontmatter:
+Only `description` is required in the file's YAML frontmatter — hosts consume
+it directly, and it becomes the binding's lookup metadata. The remaining
+mapped fields are optional template input: skills accept `title` and
+`overview`, agents accept `identity` and `mission`, and each renders only when
+present. A skill without `title` derives it from `name`. A typical agent file
+looks like this:
 
 ```md
 ---
@@ -38,9 +43,8 @@ Import the file into `packs/review`:
 npx atlante import review.md --kind agent --out packs/review
 ```
 
-The required `--kind` option selects `agent` or `skill`. Skills require
-`title`, `overview`, and `description`; agents require `identity`, `mission`,
-and `description`. Atlante does not infer missing metadata.
+The required `--kind` option selects `agent` or `skill`; the command never
+infers a kind or fabricates metadata.
 
 The pack, resource, and binding ID resolves from the `--name` option, the
 frontmatter `name` key, or the input filename stem, in that order. The final

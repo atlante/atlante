@@ -1,11 +1,10 @@
-# Identity
+{{#if identity}}# Identity
 
 {{identity}}
 
-# Mission
+{{/if}}{{#if mission}}# Mission
 
-{{mission}}
-{{#each sections}}
+{{mission}}{{/if}}{{#each sections}}
 {{#if invariants}}
 
 {{> slot/sections/invariants invariants}}

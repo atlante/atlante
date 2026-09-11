@@ -119,12 +119,13 @@ npx atlante import <input> --kind skill --out <dir> --name <id>
   contain lowercase ASCII letters, digits, and hyphens, with a maximum length
   of 64 characters after sanitization.
 
-Agent frontmatter requires `identity`, `mission`, and `description`. Skill
-frontmatter requires `title`, `overview`, and `description`. A `name` key sets
-the generated ID, taking precedence over the filename stem but not over
-`--name`. Other frontmatter keys produce warnings when the importer does not
-map them explicitly. `description` becomes binding lookup metadata; the other
-required fields become input for the selected agent or skill template.
+Frontmatter requires only `description`, which becomes binding lookup
+metadata — the field hosts consume directly. The optional template input maps
+when present: `title` and `overview` for skills, `identity` and `mission` for
+agents, each rendering only when provided; a skill without `title` derives it
+from `name`. A `name` key sets the generated ID, taking precedence over the
+filename stem but not over `--name`. Other frontmatter keys produce warnings
+when the importer does not map them explicitly.
 
 The importer accepts the CommonMark and GFM profile described in
 [Templates](/concepts/templates#canonical-markdown-input), including nested
