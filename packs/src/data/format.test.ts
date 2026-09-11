@@ -15,8 +15,8 @@ describe("formatCount", () => {
     expect(formatCount(999)).toBe("999");
   });
 
-  it("renders missing metrics as an em dash", () => {
-    expect(formatCount(null)).toBe("—");
+  it("renders missing metrics as zero", () => {
+    expect(formatCount(null)).toBe("0");
     expect(formatCount(0)).toBe("0");
   });
 });

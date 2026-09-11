@@ -1,5 +1,5 @@
 export function formatCount(value: number | null): string {
-  if (value === null) return "—";
+  if (value === null) return "0";
   if (value >= 1000) {
     return `${(value / 1000)
       .toFixed(value >= 10000 ? 1 : 2)

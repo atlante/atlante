@@ -58,7 +58,7 @@ const bindingSummary = (binding: { agents: number; skills: number }): string => 
   <main id="main">
     <div class="shell">
       <nav class="breadcrumb" aria-label="Breadcrumb">
-        <a href="/">Packs</a>
+        <a href="/">packs</a>
         <span aria-hidden="true">/</span>
         <span>{pack.name}</span>
       </nav>
@@ -79,7 +79,7 @@ const bindingSummary = (binding: { agents: number; skills: number }): string => 
             <strong>{pack.version}</strong>
           </div>
           <div class="summary-stat">
-            <span class="meta-label">Downloads / month</span>
+            <span class="meta-label">Downloads</span>
             <strong>{formatCount(pack.metrics.downloads)}</strong>
           </div>
           <div class="summary-stat">
