@@ -19,7 +19,9 @@ describe("website deployment contract", () => {
       buildCommand: string;
       cleanUrls: boolean;
       trailingSlash: boolean;
-      functions: { "api/**": { maxDuration: number } };
+      functions: {
+        "api/**": { maxDuration: number; includeFiles: string };
+      };
       headers: Array<{
         source: string;
         headers: Array<{ key: string; value: string }>;
@@ -43,7 +45,10 @@ describe("website deployment contract", () => {
     expect(vercel.buildCommand).toBe("bun run build");
     expect(vercel.cleanUrls).toBe(true);
     expect(vercel.trailingSlash).toBe(false);
-    expect(vercel.functions["api/**"]).toEqual({ maxDuration: 30 });
+    expect(vercel.functions["api/**"]).toEqual({
+      maxDuration: 30,
+      includeFiles: "node_modules/@atlante/pack/**",
+    });
 
     const schemaHeader = vercel.headers.find(
       (header) => header.source === "/schema/v0.1/:name.json",
@@ -53,47 +58,44 @@ describe("website deployment contract", () => {
       value: "application/schema+json",
     });
 
-    expect(releaseWorkflow).toContain(
-      'npx vercel@59.3.0 build --prod --token="$VERCEL_TOKEN"',
-    );
-    expect(releaseWorkflow).toContain(
-      "npx vercel@59.3.0 deploy --prebuilt --prod website",
-    );
-    expect(releaseWorkflow).toContain("workflow_dispatch:");
-    expect(releaseWorkflow).toContain("deploy_only:");
-    expect(releaseWorkflow).toContain("version:");
-    expect(releaseWorkflow).toContain(
-      "if: $" + "{{ github.event_name == 'push' }}",
-    );
-    expect(releaseWorkflow).toContain(
-      "if: $" +
-        "{{ always() && (needs.publish-packages.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.deploy_only)) }}",
-    );
-    expect(releaseWorkflow).toContain(
-      "DEPLOY_VERSION: $" + "{{ inputs.version }}",
-    );
-    expect(releaseWorkflow).toContain(
-      'pack_target="$function_root/website/node_modules/@atlante/pack"',
-    );
-    expect(releaseWorkflow).toContain('mkdir -p "$(dirname "$pack_target")"');
-    expect(releaseWorkflow).toContain('cp -R "$pack_source" "$pack_target"');
-    expect(releaseWorkflow).not.toContain(
-      'pack_target="$function_root/packages/cli/node_modules/@atlante/pack"',
-    );
-    expect(releaseWorkflow).not.toContain("Copy schema files");
-    expect(releaseWorkflow).not.toContain(
-      "cp -r packages/schema/schema website/",
-    );
+    // The release transaction is publication only: Vercel owns the website
+    // and docs deployments through its git integration.
+    expect(releaseWorkflow).toContain("publish-packages:");
+    expect(releaseWorkflow).toContain("create-release:");
+    expect(releaseWorkflow).toContain("bun scripts/publish-packages.ts");
+    expect(releaseWorkflow).toContain("tags: ['v*']");
+    for (const forbidden of [
+      "workflow_dispatch",
+      "deploy-website",
+      "deploy-docs",
+      "npm view",
+      "vercel build",
+      "vercel deploy",
+      "playground.func",
+      "cp -R",
+      "VERCEL_TOKEN",
+    ]) {
+      expect(releaseWorkflow).not.toContain(forbidden);
+    }
+
     expect(rootIgnore).not.toContain("website/schema/");
 
-    expect(normalizedReadme).toContain("prebuilt Vercel artifacts");
-    expect(normalizedReadme).toContain("npm install --prefix website");
+    expect(normalizedReadme).toContain("deploys natively from Vercel");
+    expect(normalizedReadme).toContain("includeFiles");
     expect(normalizedReadme).toContain(
-      "vercel deploy --prebuilt --prod website",
+      "Include source files outside of the Root Directory in the Build Step",
     );
-    expect(normalizedReadme).toContain("@atlante/pack");
-    expect(normalizedReadme).toContain("59.3.0");
+    expect(normalizedReadme).toContain("advances in ordinary pull requests");
     expect(normalizedReadme).toContain("../brand");
     expect(normalizedReadme).toContain("../packages/schema");
+    expect(normalizedReadme).toContain("@atlante/pack");
+    for (const stale of [
+      "prebuilt Vercel artifacts",
+      "npm install --prefix website",
+      "vercel deploy --prebuilt",
+      "59.3.0",
+    ]) {
+      expect(normalizedReadme).not.toContain(stale);
+    }
   });
 });

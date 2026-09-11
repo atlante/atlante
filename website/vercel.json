@@ -5,7 +5,8 @@
   "trailingSlash": false,
   "functions": {
     "api/**": {
-      "maxDuration": 30
+      "maxDuration": 30,
+      "includeFiles": "node_modules/@atlante/pack/**"
     }
   },
   "headers": [
