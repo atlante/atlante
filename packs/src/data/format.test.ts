@@ -4,7 +4,7 @@ import { formatCount, formatDate, formatSyncTime } from "./format";
 describe("formatCount", () => {
   it("formats large counts in k", () => {
     expect(formatCount(12840)).toBe("12.8k");
-    expect(formatCount(9210)).toBe("9.2k");
+    expect(formatCount(9210)).toBe("9.21k");
     expect(formatCount(4880)).toBe("4.88k");
     expect(formatCount(2710)).toBe("2.71k");
     expect(formatCount(999)).toBe("999");
