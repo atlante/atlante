@@ -1,0 +1,46 @@
+name: ci-core
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/**"
+      - "scripts/**"
+      - "resources/**"
+      - "eval/**"
+      - "atlante.jsonc"
+      - "package.json"
+      - "bun.lock"
+      - ".bun-version"
+      - "tsconfig.base.json"
+      - "tsconfig.test.json"
+      - ".github/workflows/ci-core.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-core-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: ".bun-version"
+      - run: bun install --frozen-lockfile
+
+      # core:check is the toolchain gate: build, type, lint, all test tiers,
+      # the CLI smoke, and the OpenCode host smoke in one command that mirrors
+      # what a developer runs locally. The smoke tests exist because every
+      # other test calls the command handlers as functions: a broken shebang,
+      # a mis-wired Commander option, or an import that only fails at process
+      # start would pass the suite and still ship a CLI that does not run.
+      # The OpenCode host smoke boots the real pinned host against a built
+      # project and asserts the native agent and skills are discovered — the
+      # only automated check of the full pack → build → materialize → host
+      # discovery flow.
+      - run: bun run core:check
