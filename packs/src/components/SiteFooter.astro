@@ -14,6 +14,8 @@ const { syncedAt } = Astro.props;
 
 <style>
   .site-footer {
+    width: min(calc(100% - 48px), var(--page-width));
+    margin-inline: auto;
     border-block-start: var(--line);
   }
 
@@ -22,5 +24,11 @@ const { syncedAt } = Astro.props;
     color: var(--ds-muted);
     font: var(--text-meta) / 1.4 var(--font-mono);
     text-align: center;
+  }
+
+  @media (max-width: 760px) {
+    .site-footer {
+      width: min(calc(100% - 32px), var(--page-width));
+    }
   }
 </style>

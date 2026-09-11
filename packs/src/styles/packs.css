@@ -70,7 +70,7 @@
 
   .catalog-hero {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
+    grid-template-columns: minmax(0, 1fr) minmax(180px, 220px);
     align-items: center;
     column-gap: clamp(var(--space-12), 5vw, var(--space-24));
     width: min(calc(100% - 2 * var(--space-4)), var(--page-width));
@@ -81,11 +81,11 @@
 
   .hero-visual {
     display: grid;
-    place-items: center;
+    place-items: center start;
     min-width: 0;
   }
 
-  .hero-visual :global(.identity-symbol) {
+  .hero-visual .identity-symbol {
     width: clamp(140px, 15vw, 210px);
   }
 
@@ -188,7 +188,7 @@
     height: 18px;
   }
 
-  :global(button[data-copy-text] .copy-done-icon) {
+  button[data-copy-text] .copy-done-icon {
     width: 14px;
     height: 14px;
   }
