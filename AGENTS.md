@@ -17,13 +17,18 @@ packages/
   eval/            — private host-runner orchestration and deterministic evaluation checks
   cli/             — user-facing command orchestration (validate, build, init, eval), initialization defaults, host registration
 website/           — private Astro landing site workspace (@atlante/website, not published)
+packs/             — private Astro pack explorer workspace (@atlante/packs, not published)
 ```
 
 The eight workspaces are `schema`, `resources`, `validator`, `builder`,
 `pack`, `opencode`, `eval`, and `cli`. The publishable packages are `pack` and
-the CLI; `resources`, `builder`, `opencode`, and `eval` remain private. The separate `website` workspace hosts the Astro landing site for [atlante.sh](https://atlante.sh); it stays outside the toolchain package graph and is not covered by these constraints.
+the CLI; `resources`, `builder`, `opencode`, and `eval` remain private. The
+separate `website` workspace hosts the Astro landing site for
+[atlante.sh](https://atlante.sh), and the separate `packs` workspace hosts the
+Astro pack explorer for [packs.atlante.sh](https://packs.atlante.sh); they stay
+outside the toolchain package graph and are not covered by these constraints.
 
-Schema changes require building and validating (`atlante validate`, `atlante build`). `atlante init` runs the first build automatically; run `atlante build` after later source configuration changes. Tests live next to the code they test: `packages/<workspace>/test/` mirrors `src/`, `scripts/*.test.ts` files sit beside their scripts, and `website` and `docs` own their tests internally. Do not add tests in ad-hoc locations outside these trees.
+Schema changes require building and validating (`atlante validate`, `atlante build`). `atlante init` runs the first build automatically; run `atlante build` after later source configuration changes. Tests live next to the code they test: `packages/<workspace>/test/` mirrors `src/`, `scripts/*.test.ts` files sit beside their scripts, and `website`, `packs`, and `docs` own their tests internally. Do not add tests in ad-hoc locations outside these trees.
 
 ### Architecture constraints
 
@@ -48,22 +53,24 @@ bun run quick:check             # type:check + lint:check + test:unit (PR gate, 
 bun run core:check              # toolchain lane: build + type + lint + all tests + both smokes
 bun run docs:check              # docs lane: site build + docs test suite
 bun run website:check           # website lane: site build + website test suite
-bun run full:check              # all three lanes at once
+bun run packs:check             # packs lane: site build + packs test suite
+bun run full:check              # all lanes at once
 bun run cli                     # run the CLI (packages/cli/bin/atlante.ts)
 bun run worktree <issue|branch> # create + bootstrap an isolated worktree (.worktrees/issue-<n>; pass an existing branch to adopt it; omit for a random one)
 ```
 
 Test files under `packages/<workspace>/test/` carry a tier suffix
 (`*.unit.test.ts`, `*.integration.test.ts`, `*.e2e.test.ts`) that the tier
-scripts filter on; new test files must pick one. `scripts/`, `docs/`, and
-`website/` tests are unsuffixed and run only via plain `bun run test`.
+scripts filter on; new test files must pick one. `scripts/`, `docs/`,
+`website/`, and `packs/` tests are unsuffixed and run only via plain
+`bun run test`.
 
 Bun is the package manager and the build/release/smoke/packaging/test runtime.
 
 During implementation, use Fallow for codebase analysis and lightweight
 feedback, and run the lane command matching the area you touch
-(`quick:check`, `core:check`, `docs:check`, `website:check`) for fast
-iteration. Reserve `bun run full:check` as the heavyweight final verification
+(`quick:check`, `core:check`, `docs:check`, `website:check`, `packs:check`)
+for fast iteration. Reserve `bun run full:check` as the heavyweight final verification
 before declaring work ready. The OpenCode host smoke inside `core:check`
 (`bun scripts/opencode-smoke.ts`) is load-bearing:
 unit tests cover the materializer against synthetic fixtures, so the smoke is

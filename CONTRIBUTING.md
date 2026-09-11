@@ -32,9 +32,10 @@ Eight toolchain workspaces live under `packages/`:
 - `cli` — user-facing command orchestration, initialization defaults, host
   registration.
 
-The docs site is the `@atlante/docs` workspace in `docs/`, and `website/`
-hosts the Astro landing site. The publishable packages are `pack` and the
-CLI; the other toolchain workspaces remain private.
+The docs site is the `@atlante/docs` workspace in `docs/`, `website/`
+hosts the Astro landing site, and `packs/` hosts the Astro pack explorer. The
+publishable packages are `pack` and the CLI; the other toolchain workspaces
+remain private.
 
 ## Licensing
 
@@ -71,11 +72,13 @@ bun run quick:check    # type:check + lint:check + test:unit; the PR gate and fa
 bun run core:check     # toolchain lane: build, type, lint, all test tiers, both smokes
 bun run docs:check     # docs lane: site build + docs test suite
 bun run website:check  # website lane: site build + website test suite
-bun run full:check     # all three lanes at once
+bun run packs:check    # packs lane: site build + packs test suite
+bun run full:check     # all lanes at once
 ```
 
 CI mirrors this split: pull requests run `quick:check`, and pushes to `main`
-run one lane workflow per changed area (`ci-core`, `ci-docs`, `ci-website`).
+run one lane workflow per changed area (`ci-core`, `ci-docs`, `ci-website`,
+`ci-packs`).
 
 Tests run on `bun:test` and live next to the code they test:
 
@@ -84,9 +87,9 @@ Tests run on `bun:test` and live next to the code they test:
   for tests doing real builds or temp-directory filesystem work, and
   `*.e2e.test.ts` for full command-path tests. The tier scripts filter on the
   suffix, so new test files must pick one.
-- `scripts/*.test.ts` files sit beside their scripts; `docs/` and `website/`
-  own their tests internally. Do not add tests in ad-hoc locations outside
-  these trees.
+- `scripts/*.test.ts` files sit beside their scripts; `docs/`, `website/`, and
+  `packs/` own their tests internally. Do not add tests in ad-hoc locations
+  outside these trees.
 
 The OpenCode host smoke inside `core:check` (`bun scripts/opencode-smoke.ts`)
 is load-bearing: unit tests cover the materializer against synthetic fixtures,

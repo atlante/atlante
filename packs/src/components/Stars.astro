@@ -1,0 +1,89 @@
+---
+const stars = [
+  { x: 6, y: 14, s: 10, t: "spark", d: 13 },
+  { x: 15, y: 72, s: 6, t: "dot", d: 17 },
+  { x: 24, y: 32, s: 14, t: "spark", d: 21 },
+  { x: 33, y: 84, s: 5, t: "dot", d: 15 },
+  { x: 42, y: 10, s: 7, t: "dot", d: 19 },
+  { x: 51, y: 58, s: 12, t: "spark", d: 23 },
+  { x: 60, y: 88, s: 6, t: "dot", d: 14 },
+  { x: 68, y: 22, s: 16, t: "spark", d: 25 },
+  { x: 76, y: 66, s: 5, t: "dot", d: 16 },
+  { x: 84, y: 40, s: 9, t: "spark", d: 18 },
+  { x: 92, y: 78, s: 12, t: "spark", d: 22 },
+  { x: 47, y: 38, s: 5, t: "dot", d: 20 },
+  { x: 10, y: 48, s: 5, t: "dot", d: 24 },
+  { x: 95, y: 12, s: 6, t: "dot", d: 15 },
+];
+---
+
+<div class="starfield" aria-hidden="true">
+  {
+    stars.map(({ x, y, s, t, d }) => (
+      <span
+        class={t}
+        style={`--x:${x};--y:${y};--s:${s}px;--d:${d}s;`}
+      />
+    ))
+  }
+</div>
+
+<style>
+  .starfield {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  span {
+    position: absolute;
+    inset-block-start: calc(var(--y) * 1%);
+    inset-inline-start: calc(var(--x) * 1%);
+    width: var(--s);
+    aspect-ratio: 1;
+    background: var(--ds-border);
+    opacity: 0.26;
+  }
+
+  .dot {
+    border-radius: 50%;
+    opacity: 0.16;
+  }
+
+  .spark {
+    clip-path: polygon(
+      50% 0,
+      62% 38%,
+      100% 50%,
+      62% 62%,
+      50% 100%,
+      38% 62%,
+      0 50%,
+      38% 38%
+    );
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .spark,
+    .dot {
+      animation: drift var(--d) ease-in-out infinite alternate;
+    }
+
+    .spark:nth-child(odd),
+    .dot:nth-child(odd) {
+      animation-direction: alternate-reverse;
+    }
+  }
+
+  @keyframes drift {
+    from {
+      translate: 0 0;
+    }
+
+    to {
+      translate: 0 -42px;
+    }
+  }
+</style>

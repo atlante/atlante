@@ -1,0 +1,40 @@
+---
+import glyphSource from "../assets/atlante-glyph.svg?raw";
+import horizontalSource from "../assets/atlante-horizontal.svg?raw";
+
+interface Props {
+  variant: "glyph" | "horizontal";
+  label?: string;
+}
+
+const { variant, label } = Astro.props;
+const source = variant === "glyph" ? glyphSource : horizontalSource;
+const markup = source
+  .replace(/\s*<rect\b[^>]*\/>/, "")
+  .replaceAll("../../../fonts/", "/fonts/");
+---
+
+<span
+  class="brand-logo"
+  role={label ? "img" : undefined}
+  aria-label={label}
+  aria-hidden={label ? undefined : "true"}
+  set:html={markup}
+></span>
+
+<style>
+  .brand-logo {
+    display: block;
+    width: var(--brand-logo-width, 100%);
+  }
+
+  .brand-logo :global(svg) {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  :global(html[data-theme="dark"]) .brand-logo {
+    filter: brightness(0) invert(1);
+  }
+</style>

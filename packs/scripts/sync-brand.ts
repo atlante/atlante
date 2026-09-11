@@ -2,6 +2,6 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { syncBrandAssets } from "../../scripts/sync-brand-assets";
 
-const websiteRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+const packsRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
-syncBrandAssets({ workspaceRoot: websiteRoot });
+syncBrandAssets({ workspaceRoot: packsRoot });

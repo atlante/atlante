@@ -191,6 +191,10 @@ Atlante publishes two packages to npm:
   first-party presets, the `agent` and `skill` templates, and their
   instances.
 
+Published packs are listed in the
+[pack explorer](https://packs.atlante.sh/), a curated directory for
+inspecting a pack before installing it.
+
 To publish your own reusable content, read
 [Author a pack](https://docs.atlante.sh/guides/authoring-packs).
 

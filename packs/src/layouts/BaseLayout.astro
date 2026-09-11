@@ -1,0 +1,138 @@
+---
+import "../styles/global.css";
+import Stars from "../components/Stars.astro";
+
+interface Props {
+  title: string;
+  description: string;
+  canonicalPath: string;
+}
+
+const { title, description, canonicalPath } = Astro.props;
+const canonical = Astro.site
+  ? new URL(canonicalPath, Astro.site)
+  : new URL(canonicalPath, "https://packs.atlante.sh");
+const ogImage = Astro.site ? new URL("og.png", Astro.site) : "/og.png";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#F4ECE4" />
+    <script is:inline>
+      // Apply the stored or system theme before first paint to avoid a flash.
+      // Colors mirror --atlante-linen and --atlante-jet from the brand tokens.
+      let stored = null;
+      try {
+        stored = localStorage.getItem("atlante-theme");
+      } catch {
+        // Storage is unavailable; fall back to the system preference.
+      }
+      const dark =
+        stored === "dark" ||
+        (stored !== "light" &&
+          matchMedia("(prefers-color-scheme: dark)").matches);
+      document.documentElement.dataset.theme = dark ? "dark" : "light";
+    </script>
+    <script>
+      import {
+        createThemeController,
+        type Theme,
+        type ThemeDocument,
+        type ThemeStorage,
+      } from "../lib/theme";
+
+      let storage: ThemeStorage | null = null;
+      try {
+        storage = localStorage;
+      } catch {
+        // Storage is unavailable; the controller still handles this page load.
+      }
+      const current = document.documentElement.dataset.theme;
+      const initialTheme: Theme | null =
+        current === "dark" || current === "light" ? current : null;
+      const controller = createThemeController(
+        document as unknown as ThemeDocument,
+        storage,
+        initialTheme,
+        matchMedia("(prefers-color-scheme: dark)").matches,
+      );
+      controller.initialize();
+      controller.bind();
+    </script>
+    <link
+      rel="preload"
+      href="/fonts/sourceserif4/source-serif-4-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link rel="canonical" href={canonical} />
+
+    <link
+      rel="icon"
+      href="/brand/favicons/atlante-favicon.svg"
+      type="image/svg+xml"
+    />
+    <link
+      rel="icon"
+      href="/brand/favicons/atlante-favicon-32.png"
+      type="image/png"
+      sizes="32x32"
+    />
+    <link
+      rel="apple-touch-icon"
+      href="/brand/favicons/atlante-favicon-128.png"
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Atlante" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="generator" content={Astro.generator} />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <Stars />
+    <slot />
+
+    <!-- The page-wide reveal language shared with the landing site: sections
+         fade and rise once as they enter the viewport. -->
+    <script>
+      const sections = document.querySelectorAll("main section");
+
+      for (const section of sections) {
+        if (
+          section instanceof HTMLElement &&
+          matchMedia("(prefers-reduced-motion: reduce)").matches === false
+        ) {
+          section.classList.add("js-reveal");
+        }
+      }
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (entry.isIntersecting) {
+              entry.target.classList.add("is-visible");
+              observer.unobserve(entry.target);
+            }
+          }
+        },
+        // Any visible pixel reveals: tall content sections (the rendered
+        // README) would otherwise wait for most of a viewport of scroll.
+        { threshold: 0 },
+      );
+
+      for (const section of sections) {
+        observer.observe(section);
+      }
+    </script>
+  </body>
+</html>

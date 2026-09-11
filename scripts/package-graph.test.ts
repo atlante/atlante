@@ -47,7 +47,12 @@ test("removes old workspace entries, manifests, imports, scripts, and lock entri
   }
 
   const rootManifest = readJson(join(ROOT, "package.json"));
-  expect(rootManifest.workspaces).toEqual(["packages/*", "website", "docs"]);
+  expect(rootManifest.workspaces).toEqual([
+    "packages/*",
+    "website",
+    "docs",
+    "packs",
+  ]);
   expect(rootManifest.name).toBe("@atlante/repo");
 
   const lockfile = readFileSync(join(ROOT, "bun.lock"), "utf8");

@@ -1,0 +1,9 @@
+{
+  "packs": [
+    {
+      "package": "@atlante/pack",
+      "official": true,
+      "tags": ["agents", "skills", "workflow"]
+    }
+  ]
+}

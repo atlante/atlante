@@ -1,0 +1,289 @@
+---
+import "../styles/packs.css";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SiteNav from "../components/SiteNav.astro";
+import SiteFooter from "../components/SiteFooter.astro";
+import IdentitySymbol from "../components/IdentitySymbol.astro";
+import { formatCount, formatSyncTime } from "../data/format";
+import snapshot from "../data/registry-snapshot.json";
+
+const packs = snapshot.packs;
+---
+
+<BaseLayout
+  title="Pack explorer | Atlante"
+  description="Discover Atlante packs and inspect their presets, templates, files, and package metadata before installation."
+  canonicalPath="/"
+>
+  <SiteNav />
+
+  <main id="main">
+    <section class="catalog-hero" aria-labelledby="catalog-title">
+      <div class="hero-copy">
+        <h1 id="catalog-title">Packs</h1>
+        <p>
+          Packs are collections of presets, templates, skills, and agents for
+          your harness.
+        </p>
+        <div class="command-row">
+          <div class="command-box">
+            <code
+              ><span class="command-prompt" aria-hidden="true">$ </span
+              >npx atlante@latest init --pack @atlante/pack</code
+            >
+            <button
+              class="command-copy"
+              type="button"
+              aria-label="Copy the pack installation command"
+              data-copy-text="npx atlante@latest init --pack @atlante/pack"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                aria-hidden="true"
+              >
+                <rect x="4" y="4" width="12" height="12" rx="2"></rect>
+                <rect x="8" y="8" width="12" height="12" rx="2"></rect>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="hero-visual" aria-hidden="true">
+        <IdentitySymbol kind="sphere" />
+      </div>
+    </section>
+
+    <section class="shell catalog-controls" aria-label="Pack filters">
+      <div class="controls-row">
+        <div class="search-wrap">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle
+              cx="10.5"
+              cy="10.5"
+              r="6.5"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"></circle>
+            <path
+              d="m15.5 15.5 4.5 4.5"
+              stroke="currentColor"
+              stroke-width="1.6"></path>
+          </svg>
+          <label class="sr-only" for="pack-search">Search packs</label>
+          <input
+            class="search-input"
+            id="pack-search"
+            type="search"
+            placeholder="Search packages, presets, or tags"
+            autocomplete="off"
+          />
+        </div>
+        <label class="sort-control" for="pack-sort">
+          <span class="section-label">Sort by</span>
+          <select class="sort-select" id="pack-sort">
+            <option value="downloads">Monthly downloads</option>
+            <option value="stars">GitHub stars</option>
+            <option value="updated">Latest publish</option>
+            <option value="name">Package name</option>
+          </select>
+        </label>
+      </div>
+      <div class="catalog-status" aria-live="polite">
+        <span><strong id="result-count">{packs.length} {packs.length === 1 ? "pack" : "packs"}</strong> indexed</span>
+        <span>Monthly npm downloads · GitHub stars</span>
+      </div>
+    </section>
+
+    <section class="shell" aria-labelledby="pack-list-title">
+      <h2 class="sr-only" id="pack-list-title">Available packs</h2>
+      <div class="pack-table-header" aria-hidden="true">
+        <span class="column-label">Rank</span>
+        <span class="column-label">Pack</span>
+        <span class="column-label">Presets</span>
+        <span class="column-label">Downloads</span>
+        <span class="column-label">Stars</span>
+        <span></span>
+      </div>
+      <ol class="pack-list" id="pack-list">
+        {packs.map((pack, index) => (
+          <li
+            class="pack-row"
+            data-pack-row
+            data-name={pack.name}
+            data-description={pack.description}
+            data-tags={pack.tags.join(" ")}
+            data-presets={pack.presets.map((preset) => preset.locator).join(" ")}
+            data-downloads={pack.metrics.downloads ?? -1}
+            data-stars={pack.metrics.stars ?? -1}
+            data-updated={pack.metrics.publishedAt ?? ""}
+            data-position={index + 1}
+          >
+            <span class="pack-rank">{String(index + 1).padStart(2, "0")}</span>
+            <div>
+              <div class="pack-name-line">
+                <a
+                  class="pack-link"
+                  href={`/${pack.name}`}
+                >{pack.name}</a>
+                <span class={`badge ${pack.official ? "official" : "community"}`}>
+                  {pack.official ? "Official" : "Community"}
+                </span>
+              </div>
+              <p class="pack-description">{pack.description}</p>
+              <div class="pack-tags">
+                {pack.tags.map((tag) => (
+                  <span class="tag">{tag}</span>
+                ))}
+              </div>
+              <div class="pack-mobile-metrics" aria-label="Pack metrics">
+                <span><strong>{pack.presets.length}</strong> presets</span>
+                <span><strong>{formatCount(pack.metrics.downloads)}</strong> downloads / month</span>
+                <span><strong>{formatCount(pack.metrics.stars)}</strong> stars</span>
+              </div>
+            </div>
+            <div class="metric">
+              <span class="metric-value">{pack.presets.length}</span>
+              <span class="metric-label-mobile"> presets</span>
+            </div>
+            <div class="metric">
+              <span class="metric-value">{formatCount(pack.metrics.downloads)}</span>
+              <span class="metric-label-mobile"> downloads</span>
+            </div>
+            <div class="metric">
+              <span class="metric-value">{formatCount(pack.metrics.stars)}</span>
+              <span class="metric-label-mobile"> stars</span>
+            </div>
+            <span class="row-arrow" aria-hidden="true">→</span>
+          </li>
+        ))}
+      </ol>
+      <div class="empty-state" id="empty-state" hidden>
+        <h2>Nothing on this chart</h2>
+        <p>No pack matches your search. Try a package name, preset, or tag.</p>
+      </div>
+    </section>
+
+  </main>
+
+  <SiteFooter syncedAt={snapshot.syncedAt} />
+
+
+  <script>
+    const createDoneIcon = () => {
+      const icon = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "svg",
+      );
+      icon.setAttribute("viewBox", "0 0 24 24");
+      icon.setAttribute("fill", "none");
+      icon.setAttribute("stroke", "currentColor");
+      icon.setAttribute("stroke-width", "1.5");
+      icon.setAttribute("stroke-linecap", "round");
+      icon.setAttribute("stroke-linejoin", "round");
+      icon.setAttribute("aria-hidden", "true");
+      icon.classList.add("copy-done-icon");
+
+      const path = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "path",
+      );
+      path.setAttribute("d", "m5 12 4 4L19 6");
+      icon.append(path);
+
+      return icon;
+    };
+
+    const originalChildrenByButton = new WeakMap<HTMLButtonElement, Node[]>();
+    document.addEventListener("click", (event) => {
+      if (!(event.target instanceof Element)) return;
+      const button = event.target.closest<HTMLButtonElement>(
+        "button[data-copy-text]",
+      );
+      if (!button) return;
+
+      const originalChildren =
+        originalChildrenByButton.get(button) ?? [...button.childNodes];
+      originalChildrenByButton.set(button, originalChildren);
+      const text = button.dataset.copyText ?? "";
+      navigator.clipboard.writeText(text).then(() => {
+        button.replaceChildren(createDoneIcon());
+        setTimeout(() => {
+          button.replaceChildren(...originalChildren);
+        }, 1600);
+      });
+    });
+
+    const packList = document.querySelector<HTMLOListElement>("#pack-list");
+    const searchInput = document.querySelector<HTMLInputElement>("#pack-search");
+    const sortSelect = document.querySelector<HTMLSelectElement>("#pack-sort");
+    const resultCount = document.querySelector<HTMLElement>("#result-count");
+    const emptyState = document.querySelector<HTMLElement>("#empty-state");
+
+    if (packList && searchInput && sortSelect && resultCount && emptyState) {
+      const rows = [...packList.querySelectorAll<HTMLElement>("[data-pack-row]")];
+      const state = { search: "", sort: "downloads" };
+
+      const searchableText = (element: HTMLElement): string =>
+        [
+          element.dataset.name ?? "",
+          element.dataset.description ?? "",
+          element.dataset.tags ?? "",
+          element.dataset.presets ?? "",
+        ]
+          .join(" ")
+          .toLowerCase();
+
+      const metrics = (row: HTMLElement): Record<string, string> => ({
+        downloads: row.dataset.downloads ?? "-1",
+        stars: row.dataset.stars ?? "-1",
+        updated: row.dataset.updated ?? "",
+        name: row.dataset.name ?? "",
+      });
+
+      const render = (): void => {
+        const query = state.search.trim().toLowerCase();
+        const visible = rows.filter((row) =>
+          searchableText(row).includes(query),
+        );
+
+        visible.sort((a, b) => {
+          const left = metrics(a);
+          const right = metrics(b);
+          if (state.sort === "name") {
+            return left.name.localeCompare(right.name);
+          }
+          if (state.sort === "updated") {
+            return right.updated.localeCompare(left.updated);
+          }
+          return Number(right[state.sort]) - Number(left[state.sort]);
+        });
+
+        for (const row of rows) {
+          const position = visible.indexOf(row);
+          row.hidden = position === -1;
+          if (position !== -1) {
+            row.style.order = String(position);
+            const rank = row.querySelector<HTMLElement>(".pack-rank");
+            if (rank) rank.textContent = String(position + 1).padStart(2, "0");
+          }
+        }
+
+        resultCount.textContent = `${visible.length} ${visible.length === 1 ? "pack" : "packs"}`;
+        emptyState.hidden = visible.length !== 0;
+      };
+
+      searchInput.addEventListener("input", () => {
+        state.search = searchInput.value;
+        render();
+      });
+
+      sortSelect.addEventListener("change", () => {
+        state.sort = sortSelect.value;
+        render();
+      });
+    }
+  </script>
+</BaseLayout>

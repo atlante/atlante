@@ -1,0 +1,259 @@
+---
+import "../styles/packs.css";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import SiteNav from "../components/SiteNav.astro";
+import SiteFooter from "../components/SiteFooter.astro";
+import type { RegistryFile } from "../data/registry";
+import { formatCount, formatDate, formatSyncTime } from "../data/format";
+import { encodeJsonForScript } from "../data/json";
+import { highlightFile } from "../lib/highlight";
+import snapshot from "../data/registry-snapshot.json";
+
+export function getStaticPaths() {
+  return snapshot.packs.map((pack) => ({
+    params: { package: pack.name },
+    props: { pack },
+  }));
+}
+
+interface Props {
+  pack: (typeof snapshot.packs)[number];
+}
+
+const { pack } = Astro.props;
+
+// readmeHtml is sanitized by scripts/sync-packs.ts before it is written to
+// the snapshot, so it is the only authorized set:html on this page.
+const readmeHtml = pack.readmeHtml;
+const files: RegistryFile[] = pack.files;
+const selectedFile = files.find((file) => file.path !== "README.md") ?? files[0];
+const filesPayload = encodeJsonForScript(
+  files.map((file) => ({ path: file.path, content: file.content })),
+);
+
+const bindingSummary = (binding: { agents: number; skills: number }): string => {
+  const parts: string[] = [];
+  if (binding.agents > 0) {
+    parts.push(`${binding.agents} ${binding.agents === 1 ? "agent" : "agents"}`);
+  }
+  if (binding.skills > 0) {
+    parts.push(`${binding.skills} ${binding.skills === 1 ? "skill" : "skills"}`);
+  }
+  return parts.join(" · ");
+};
+---
+
+<BaseLayout
+  title={`${pack.name} | Atlante pack explorer`}
+  description={pack.description}
+  canonicalPath={`/${pack.name}`}
+>
+  <SiteNav />
+
+  <main id="main">
+    <div class="shell">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="/">packs</a>
+        <span aria-hidden="true">/</span>
+        <span>{pack.name}</span>
+      </nav>
+
+      <section class="detail-hero" aria-labelledby="detail-title">
+        <div>
+          <div class="detail-title-line">
+            <h1 class="detail-title" id="detail-title">{pack.name}</h1>
+            <span class={`badge ${pack.official ? "official" : "community"}`}>
+              {pack.official ? "Official" : "Community"}
+            </span>
+          </div>
+          <p class="detail-description">{pack.description}</p>
+        </div>
+        <div class="detail-summary" role="group" aria-label="Pack summary">
+          <div class="summary-stat">
+            <span class="meta-label">Version</span>
+            <strong>{pack.version}</strong>
+          </div>
+          <div class="summary-stat">
+            <span class="meta-label">Downloads</span>
+            <strong>{formatCount(pack.metrics.downloads)}</strong>
+          </div>
+          <div class="summary-stat">
+            <span class="meta-label">Stars</span>
+            <strong>{formatCount(pack.metrics.stars)}</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="install-panel" aria-label="Installation">
+        <div class="install-panel-header">
+          <div class="command-tabs" role="tablist" aria-label="Installation command">
+            <button
+              class="command-tab"
+              type="button"
+              role="tab"
+              aria-selected="true"
+              data-command-kind="init"
+            >
+              Init
+            </button>
+            <button
+              class="command-tab"
+              type="button"
+              role="tab"
+              aria-selected="false"
+              data-command-kind="install"
+            >
+              Install
+            </button>
+          </div>
+        </div>
+        <div class="command-box">
+          <code
+            ><span class="command-prompt" aria-hidden="true">$ </span
+            ><span id="command-text" data-package={pack.name}
+              >npx atlante@latest init --pack {pack.name}</span
+            ></code
+          >
+          <button
+            class="command-copy"
+            type="button"
+            aria-label="Copy installation command"
+            data-install-copy
+            data-copy-text={`npx atlante@latest init --pack ${pack.name}`}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              aria-hidden="true"
+            >
+              <rect x="4" y="4" width="12" height="12" rx="2"></rect>
+              <rect x="8" y="8" width="12" height="12" rx="2"></rect>
+            </svg>
+          </button>
+        </div>
+      </section>
+
+      <div class="detail-grid">
+        <div class="detail-main">
+          <section class="readme" aria-label="Pack README">
+            <span class="section-label">README.md</span>
+            {readmeHtml === "" ? (
+              <p>This pack does not include a README.</p>
+            ) : (
+              <div set:html={readmeHtml} />
+            )}
+          </section>
+
+          <section class="presets-section" aria-label="Included presets">
+            <span class="section-label">Presets</span>
+            <p class="presets-note">
+              Select a preset in your configuration through its locator with
+              <code>extends</code>, or during <code>init</code> with
+              <code>--pack</code>.
+            </p>
+            <ul class="preset-list">
+              {pack.presets.map((preset) => (
+                <li class="preset-item">
+                  <code>{preset.locator}</code>
+                  <span>
+                    {preset.default ? "Default preset" : "Named preset"}{preset.bindings.agents + preset.bindings.skills > 0 && ` · ${bindingSummary(preset.bindings)}`}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section class="file-section" aria-label="Pack contents">
+            <span class="section-label">Pack contents</span>
+            <div class="file-inspector">
+              <div class="file-head">
+                <div class="file-head-title">
+                  <span>File</span>
+                  <strong data-file-name>{selectedFile?.path}</strong>
+                </div>
+              </div>
+              <pre
+                class="file-view"
+                tabindex="0"
+                data-file-view
+              ><code set:html={selectedFile?.content === null || selectedFile === undefined ? "Preview not available: this file is too large." : highlightFile(selectedFile.path, selectedFile.content)} /></pre>
+              <div class="file-selector">
+                <label for="pack-file">Files</label>
+                <select id="pack-file" data-file-select aria-label="Select a pack file">
+                  {files.map((file) => (
+                    <option
+                      value={file.path}
+                      selected={file.path === selectedFile?.path}
+                    >
+                      {file.path}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <aside class="detail-sidebar" aria-label="Pack metadata">
+          <div class="sidebar-sticky">
+            <section class="sidebar-section">
+              <span class="section-label">Pack metadata</span>
+              <dl class="metadata-list">
+                <div class="metadata-item">
+                  <dt class="meta-label">npm</dt>
+                  <dd><a href={pack.npmUrl} rel="noopener noreferrer">{pack.name}</a></dd>
+                </div>
+                <div class="metadata-item">
+                  <dt class="meta-label">Repository</dt>
+                  <dd>
+                    {pack.repository === null ? (
+                      <span>{formatDate(null)}</span>
+                    ) : pack.repository.slug === null ? (
+                      <a href={pack.repository.url} rel="noopener noreferrer">{pack.repository.url}</a>
+                    ) : (
+                      <a
+                        href={`https://github.com/${pack.repository.slug}`}
+                        rel="noopener noreferrer"
+                      >{pack.repository.slug}</a
+                      >
+                    )}
+                  </dd>
+                </div>
+                <div class="metadata-item">
+                  <dt class="meta-label">License</dt>
+                  <dd>{pack.license ?? "—"}</dd>
+                </div>
+                <div class="metadata-item">
+                  <dt class="meta-label">Last published</dt>
+                  <dd>{formatDate(pack.metrics.publishedAt)}</dd>
+                </div>
+                <div class="metadata-item">
+                  <dt class="meta-label">Maintainers</dt>
+                  <dd>
+                    {pack.maintainers.length > 0 ? pack.maintainers.join(", ") : "—"}
+                  </dd>
+                </div>
+                <div class="metadata-item">
+                  <dt class="meta-label">Pack format</dt>
+                  <dd><code>atlante.format: 1</code></dd>
+                </div>
+              </dl>
+            </section>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </main>
+
+  <SiteFooter syncedAt={snapshot.syncedAt} />
+
+  <script type="application/json" id="pack-files" set:html={filesPayload} />
+
+  <script>
+    import { installPanel } from "../lib/pack-detail";
+
+    installPanel();
+  </script>
+</BaseLayout>
