@@ -47,7 +47,7 @@ Source-file license headers are optional. When a standalone source file needs a
 copyright and license notice, use the following SPDX form:
 
 ```ts
-// Copyright © 2026 Omar Desogus and Giacomo Corrias
+// Copyright © 2026 Omar Desogus, Giacomo Corrias
 // SPDX-License-Identifier: MIT
 ```
 

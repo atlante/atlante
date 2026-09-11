@@ -1,6 +1,6 @@
 # Atlante trademarks
 
-Copyright © 2026 Omar Desogus and Giacomo Corrias.
+Copyright © 2026 Omar Desogus, Giacomo Corrias.
 
 This policy describes use of the Atlante name, logo, and related branding. It
 is not a software license and does not grant trademark rights.
