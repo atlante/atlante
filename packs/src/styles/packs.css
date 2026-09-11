@@ -546,7 +546,8 @@
 
   .install-panel .command-box code {
     font-size: var(--text-small);
-    white-space: nowrap;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   .install-panel .command-box .prompt {
@@ -948,7 +949,7 @@
 
   @media (max-width: 860px) {
     .catalog-hero {
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(0, 1fr);
       row-gap: var(--space-12);
     }
 
@@ -998,11 +999,11 @@
     .controls-row,
     .detail-hero,
     .detail-grid {
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(0, 1fr);
     }
 
     .sort-control {
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(0, 1fr);
       gap: var(--space-2);
     }
 
@@ -1061,7 +1062,7 @@
     }
 
     .detail-summary {
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(0, 1fr);
     }
 
     .summary-stat + .summary-stat {
@@ -1087,7 +1088,7 @@
     }
 
     .file-browser {
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(0, 1fr);
     }
 
     .file-tree {
@@ -1110,7 +1111,7 @@
     }
 
     .preset-item {
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(0, 1fr);
     }
   }
 
