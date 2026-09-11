@@ -15,7 +15,11 @@ export interface MarkdownText {
   value: string;
 }
 
-/** Emphasized phrasing, rendered with one asterisk on each side. */
+/**
+ * Emphasized phrasing, rendered with one asterisk on each side. Valid input
+ * has at least one child (enforced by the input schema): Markdown has no
+ * syntax that reparses to an empty phrasing node.
+ */
 export interface MarkdownEmphasis {
   type: "emphasis";
   children: MarkdownPhrasingContent[];
@@ -27,7 +31,11 @@ export interface MarkdownStrong {
   children: MarkdownPhrasingContent[];
 }
 
-/** Inline code span. The value excludes the delimiting backticks. */
+/**
+ * Inline code span. The value excludes the delimiting backticks, is never
+ * empty, and contains no line endings: code spans render line endings as
+ * spaces, so importers store the space directly.
+ */
 export interface MarkdownInlineCode {
   type: "inlineCode";
   value: string;
@@ -54,7 +62,7 @@ export interface MarkdownBreak {
   type: "break";
 }
 
-/** GFM strikethrough phrasing. */
+/** GFM strikethrough phrasing with at least one child (see emphasis). */
 export interface MarkdownDelete {
   type: "delete";
   children: MarkdownPhrasingContent[];

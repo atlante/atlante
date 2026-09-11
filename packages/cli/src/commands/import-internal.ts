@@ -599,7 +599,12 @@ function lowerPhrasingNode(
         children: lowerPhrasing(node.children, context),
       };
     case "inlineCode":
-      return { type: "inlineCode", value: node.value };
+      // CommonMark renders code-span line endings as spaces, so the persisted
+      // value stores the space directly (the schema forbids line endings).
+      return {
+        type: "inlineCode",
+        value: node.value.replace(/\r\n?|\n/g, " "),
+      };
     case "link":
       return {
         type: "link",
@@ -1262,7 +1267,8 @@ export function runImportWithDependencies(
   );
   diagnostics.push(...mapped.diagnostics);
 
-  const requestedId = options.name ?? inputStem(input);
+  // Precedence: explicit --name, then frontmatter name, then the file stem.
+  const requestedId = options.name ?? mapped.metadata.id ?? inputStem(input);
   const id = sanitizeResourceId(requestedId);
   if (!id) {
     diagnostics.push(

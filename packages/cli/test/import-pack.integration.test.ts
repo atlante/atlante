@@ -87,13 +87,13 @@ bun install
     const firstFiles = [
       "package.json",
       "atlante.jsonc",
-      "source/instance.jsonc",
+      "example-skill/instance.jsonc",
     ];
     for (const file of firstFiles)
       expect(existsSync(join(firstOutput, file))).toBe(true);
 
     expect(json(join(firstOutput, "package.json"))).toEqual({
-      name: "source",
+      name: "example-skill",
       version: "0.0.0",
       atlante: { format: 1 },
       dependencies: { "@atlante/pack": firstPartyPackVersion() },
@@ -101,8 +101,8 @@ bun install
     expect(json(join(firstOutput, "atlante.jsonc"))).toEqual({
       $schema: SCHEMA_URI,
       skills: {
-        source: {
-          $instance: "./source",
+        "example-skill": {
+          $instance: "./example-skill",
           description: "Lookup metadata for the imported skill.",
         },
       },
@@ -184,9 +184,9 @@ Review the diff and report findings.
     });
     expect(hasErrors(built.diagnostics)).toBe(false);
     expect(built.diagnostics).toEqual([]);
-    expect(existsSync(join(root, ".opencode", "agents", "agent.md"))).toBe(
-      true,
-    );
+    expect(
+      existsSync(join(root, ".opencode", "agents", "review-agent.md")),
+    ).toBe(true);
   });
 
   test.each([

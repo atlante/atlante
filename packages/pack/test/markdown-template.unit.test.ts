@@ -281,7 +281,7 @@ describe("canonical Markdown template", () => {
     ).toEqual([]);
   });
 
-  test("accepts empty nodes emitted by CommonMark", () => {
+  test("accepts empty structural nodes emitted by CommonMark", () => {
     expect(
       validateMarkdownInput([
         { type: "heading", depth: 1, children: [] },
@@ -293,13 +293,45 @@ describe("canonical Markdown template", () => {
         },
         {
           type: "paragraph",
-          children: [
-            { type: "inlineCode", value: "" },
-            { type: "link", url: "/empty", children: [] },
-          ],
+          children: [{ type: "link", url: "/empty", children: [] }],
         },
       ]),
     ).toEqual([]);
     expect(validateMarkdownInput([])).toEqual([]);
+  });
+
+  test("rejects phrasing nodes that cannot round-trip as empty or multiline", () => {
+    const invalidInputs = [
+      [{ type: "paragraph", children: [{ type: "emphasis", children: [] }] }],
+      [{ type: "paragraph", children: [{ type: "strong", children: [] }] }],
+      [{ type: "paragraph", children: [{ type: "delete", children: [] }] }],
+      [{ type: "paragraph", children: [{ type: "inlineCode", value: "" }] }],
+      [
+        {
+          type: "paragraph",
+          children: [{ type: "inlineCode", value: "a\nb" }],
+        },
+      ],
+    ];
+
+    for (const input of invalidInputs)
+      expect(validateMarkdownInput(input)).toContain("invalid-prompt-input");
+  });
+
+  test("renders whitespace-sensitive values so they reparse unchanged", () => {
+    const rendered = renderMarkdown([
+      {
+        type: "paragraph",
+        children: [
+          { type: "text", value: "  indented" },
+          { type: "inlineCode", value: " padded " },
+        ],
+      },
+      { type: "code", value: "a\n```\nb\n" },
+    ]);
+
+    expect(rendered).toContain("&#32;&#32;indented");
+    expect(rendered).toContain("`  padded  `");
+    expect(rendered).toContain("~~~\na\n```\nb\n\n~~~");
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import {
   renderResolvedTemplate,
   resolveResourceTemplate,
@@ -12,6 +12,7 @@ import {
   mapFrontmatter,
   parseMarkdownSource,
   planLocalPack,
+  runImportWithDependencies,
   sanitizeResourceId,
   validateImportedInputs,
   writeLocalPack,
@@ -139,6 +140,12 @@ describe("Markdown importer lowering", () => {
     ]);
     expect(lower("    const value = 1;").ast).toEqual([
       { type: "code", value: "const value = 1;" },
+    ]);
+  });
+
+  test("normalizes code-span line endings to spaces", () => {
+    expect(lower("`a\nb`").ast).toEqual([
+      { type: "paragraph", children: [{ type: "inlineCode", value: "a b" }] },
     ]);
   });
 
@@ -468,6 +475,93 @@ describe("Markdown importer lowering", () => {
     expect(relowered.ast).toEqual(lowered.ast);
   });
 
+  const whitespaceRoundTripCases: readonly {
+    readonly label: string;
+    readonly ast: readonly MarkdownBlockContent[];
+  }[] = [
+    {
+      label: "indented continuation line",
+      ast: loweredToAst("first line\n  continued with indentation\n\nback"),
+    },
+    {
+      label: "table-delimiter-looking text",
+      ast: [
+        {
+          type: "paragraph",
+          children: [
+            { type: "text", value: "| not | a | table |\n| --- | --- |" },
+          ],
+        },
+      ],
+    },
+    {
+      label: "list look-alike text",
+      ast: loweredToAst(
+        "leading list look-alike\n\n\\- not a list\n\\| not a table\n\nafter",
+      ),
+    },
+    {
+      label: "padded code span and fenced block",
+      ast: loweredToAst(
+        "padded code span and fence\n\n` spaced `\n\n```ts\nconst a = 1;\n\n```\n\ntail",
+      ),
+    },
+    {
+      label: "code with trailing newline and backtick line",
+      ast: [{ type: "code", value: "a\n```\nb\n" }],
+    },
+  ];
+
+  function loweredToAst(source: string): readonly MarkdownBlockContent[] {
+    return lowerToAtlanteAst(parseMarkdownSource(source, "in.md").tree, "in.md")
+      .ast;
+  }
+
+  function renderToMarkdown(
+    ast: readonly MarkdownBlockContent[],
+  ): ReturnType<typeof renderResolvedTemplate> {
+    const pack = resolveFirstPartyPack();
+    return renderResolvedTemplate({
+      template: resolveResourceTemplate(
+        pack,
+        "@atlante/pack/markdown",
+        join(pack.root, "package.json"),
+      ),
+      input: ast,
+    });
+  }
+
+  test.each(whitespaceRoundTripCases)("round-trips $label", ({ ast }) => {
+    const rendered = renderToMarkdown(ast);
+    const reparsed = parseMarkdownSource(rendered, "out.md");
+    const relowered = lowerToAtlanteAst(reparsed.tree, "out.md");
+    expect(reparsed.diagnostics).toEqual([]);
+    expect(relowered.diagnostics).toEqual([]);
+    expect(relowered.ast).toEqual(ast);
+  });
+
+  test("renders autolink-reading text so it reparses as an equivalent link", () => {
+    // GFM autolink literals cannot be escaped with byte fidelity, so text
+    // reading as a URL reparses as a link with the same visible content.
+    const lowered = lower(
+      "See https://example.com/docs and www.example.com now.",
+    ).ast;
+    const rendered = renderToMarkdown(lowered);
+    const relowered = lowerToAtlanteAst(
+      parseMarkdownSource(rendered, "out.md").tree,
+      "out.md",
+    );
+
+    expect(relowered.diagnostics).toEqual([]);
+    expect(rendered).toContain("https://example.com/docs");
+    expect(JSON.stringify(relowered.ast)).toContain(
+      '"url":"https://example.com/docs"',
+    );
+    expect(JSON.stringify(relowered.ast)).toContain(
+      '"url":"http://www.example.com"',
+    );
+  });
+
   test("fails closed for HTML and footnotes with source-aware diagnostics", () => {
     const html = lower("before\n\n<span>raw</span>", "html.md");
     expect(html.diagnostics).toHaveLength(2);
@@ -620,6 +714,82 @@ describe("Markdown importer lowering", () => {
     expect(sanitizeResourceId("!!!")).toBeUndefined();
     expect(sanitizeResourceId("a".repeat(65))).toBeUndefined();
     expect(sanitizeResourceId("a".repeat(64))).toBe("a".repeat(64));
+  });
+
+  test("resolves the generated ID from --name, frontmatter name, then the stem", () => {
+    const schemas = firstPartyFacetInputSchemas();
+    const files = new Map<string, string>();
+    const directories = new Set<string>();
+    const fileSystem = {
+      existsSync: (path: string) => files.has(path) || directories.has(path),
+      readFileSync: (path: string) => files.get(path) ?? "",
+      mkdtempSync: (prefix: string) => `${prefix}stage`,
+      mkdirSync: (path: string) => {
+        directories.add(path);
+      },
+      renameSync: (source: string, destination: string) => {
+        directories.delete(source);
+        directories.add(destination);
+        for (const [path, contents] of [...files])
+          if (path.startsWith(`${source}${sep}`)) {
+            files.delete(path);
+            files.set(
+              join(destination, path.slice(source.length + 1)),
+              contents,
+            );
+          }
+      },
+      writeFileSync: (path: string, contents: string) => {
+        files.set(path, contents);
+      },
+      rmSync: (path: string) => {
+        directories.delete(path);
+      },
+    };
+    const dependencies = {
+      ...fileSystem,
+      packVersion: "0.2.2",
+      facetInputSchemas: schemas,
+    };
+    const importedId = (
+      fileName: string,
+      frontmatter: string,
+      options: { kind: "skill"; name?: string },
+    ): string | undefined => {
+      const input = join("/input", fileName);
+      const output = join("/out", fileName.replace(/\.md$/, ""));
+      files.set(input, `---\n${frontmatter}\n---\n\nBody text.\n`);
+      expect(
+        runImportWithDependencies(input, output, options, dependencies),
+      ).toBe(0);
+      return directories.has(output)
+        ? (
+            JSON.parse(files.get(join(output, "package.json")) ?? "{}") as {
+              name?: string;
+            }
+          ).name
+        : undefined;
+    };
+
+    const fullFrontmatter = "title: T\noverview: O\ndescription: D";
+
+    // Frontmatter name wins over the stem.
+    expect(
+      importedId("guide.md", `name: My Skill\n${fullFrontmatter}`, {
+        kind: "skill",
+      }),
+    ).toBe("my-skill");
+    // --name wins over everything.
+    expect(
+      importedId("named.md", `name: My Skill\n${fullFrontmatter}`, {
+        kind: "skill",
+        name: "custom",
+      }),
+    ).toBe("custom");
+    // The stem is the last fallback.
+    expect(importedId("plain.md", fullFrontmatter, { kind: "skill" })).toBe(
+      "plain",
+    );
   });
 
   test("uses validator-owned schemas for AST and instance validation", () => {

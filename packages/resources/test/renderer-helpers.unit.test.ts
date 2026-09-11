@@ -76,6 +76,18 @@ describe("escapeProse", () => {
     expect(escapeProse("a\n12) x")).toBe("a\n12\\) x");
     expect(escapeProse("1. x")).toBe("1\\. x");
   });
+
+  test("encodes leading whitespace as character references", () => {
+    expect(escapeProse("  text")).toBe("&#32;&#32;text");
+    expect(escapeProse("\ttext")).toBe("&#9;text");
+    expect(escapeProse("a\n  - b")).toBe("a\n&#32;&#32;\\- b");
+    expect(escapeProse("a - b")).toBe("a - b");
+  });
+
+  test("escapes table-delimiter pipes at line starts", () => {
+    expect(escapeProse("| a |\n| --- |")).toBe("\\| a |\n\\| --- |");
+    expect(escapeProse("a | b")).toBe("a | b");
+  });
 });
 
 describe("table-context escaping", () => {
@@ -134,13 +146,21 @@ describe("codeSpan", () => {
     expect(codeSpan("a`")).toBe("`` a` ``");
   });
 
+  test("pads values that both start and end with a space", () => {
+    expect(codeSpan(" a ")).toBe("`  a  `");
+    expect(codeSpan(" ")).toBe("`   `");
+    expect(codeSpan(" a")).toBe("` a`");
+    expect(codeSpan("a ")).toBe("`a `");
+    expect(codeSpan("a  ")).toBe("`a  `");
+  });
+
   test("renders the empty code span", () => {
     expect(codeSpan("")).toBe("`` ``");
   });
 });
 
 describe("fencedCode", () => {
-  test("emits a fenced block with info string and trailing newline", () => {
+  test("emits a fenced block with info string and terminating newline", () => {
     expect(fencedCode("const value = 1;", "ts", 'title="x"')).toBe(
       '```ts title="x"\nconst value = 1;\n```',
     );
@@ -151,9 +171,20 @@ describe("fencedCode", () => {
     expect(fencedCode("a\nb")).toBe("```\na\nb\n```");
   });
 
-  test("widens the fence past embedded backtick runs", () => {
-    expect(fencedCode("```\ninner")).toBe("````\n```\ninner\n````");
-    expect(fencedCode("x````y")).toBe("`````\nx````y\n`````");
+  test("preserves a trailing newline with a blank line before the fence", () => {
+    expect(fencedCode("a\n")).toBe("```\na\n\n```");
+    expect(fencedCode("")).toBe("```\n\n```");
+  });
+
+  test("switches to a tilde fence past long backtick runs", () => {
+    expect(fencedCode("```\ninner")).toBe("~~~\n```\ninner\n~~~");
+    expect(fencedCode("x````y")).toBe("~~~\nx````y\n~~~");
+  });
+
+  test("uses a tilde fence when the info string contains backticks", () => {
+    expect(fencedCode("x", "ts", "`meta`")).toBe("~~~ts `meta`\nx\n~~~");
+    expect(fencedCode("~~~\nbody")).toBe("```\n~~~\nbody\n```");
+    expect(fencedCode("```\n~~~")).toBe("````\n```\n~~~\n````");
   });
 });
 

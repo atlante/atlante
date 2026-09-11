@@ -113,16 +113,18 @@ npx atlante import <input> --kind skill --out <dir> --name <id>
   not infer a host kind or synthesize missing metadata.
 - `--out <dir>` is required and names a new local pack directory. An existing
   directory is never overwritten.
-- `--name <id>` overrides the sanitized input filename stem used for the
-  generated pack, resource, and binding IDs. The final extension is removed
-  before sanitization. IDs contain lowercase ASCII letters, digits, and hyphens,
-  with a maximum length of 64 characters after sanitization.
+- `--name <id>` overrides the generated pack, resource, and binding ID.
+  Without it, the ID comes from the frontmatter `name` key or the sanitized
+  input filename stem. The final extension is removed before sanitization. IDs
+  contain lowercase ASCII letters, digits, and hyphens, with a maximum length
+  of 64 characters after sanitization.
 
 Agent frontmatter requires `identity`, `mission`, and `description`. Skill
-frontmatter requires `title`, `overview`, and `description`. Other frontmatter
-keys produce warnings when the importer does not map them explicitly.
-`description` becomes binding lookup metadata; the other required fields become
-input for the selected agent or skill template.
+frontmatter requires `title`, `overview`, and `description`. A `name` key sets
+the generated ID, taking precedence over the filename stem but not over
+`--name`. Other frontmatter keys produce warnings when the importer does not
+map them explicitly. `description` becomes binding lookup metadata; the other
+required fields become input for the selected agent or skill template.
 
 The importer accepts the CommonMark and GFM profile described in
 [Templates](/concepts/templates#canonical-markdown-input), including nested

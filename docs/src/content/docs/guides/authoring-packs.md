@@ -42,10 +42,10 @@ The required `--kind` option selects `agent` or `skill`. Skills require
 `title`, `overview`, and `description`; agents require `identity`, `mission`,
 and `description`. Atlante does not infer missing metadata.
 
-Without `--name`, the command uses the sanitized Markdown filename stem as the
-pack, resource, and binding ID. The final filename extension is removed before
-sanitization. Use `--name <id>` to choose a different ID; resulting IDs use
-lowercase kebab-case and contain at most 64 characters.
+The pack, resource, and binding ID resolves from the `--name` option, the
+frontmatter `name` key, or the input filename stem, in that order. The final
+filename extension is removed before sanitization. Resulting IDs use lowercase
+kebab-case and contain at most 64 characters.
 
 The generated pack has this structure:
 

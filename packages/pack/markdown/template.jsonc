@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "Canonical Markdown AST rendered in authored array order. Nodes are type-discriminated and intentionally close to MDAST, without parser-only fields such as position or data, and without null placeholders: optional fields are omitted when absent. Ordered lists carry their start number; task list items carry checked. Raw HTML, footnotes, and syntax outside the supported CommonMark + GFM profile are not representable.",
+  "description": "Canonical Markdown AST rendered in authored array order. Nodes are type-discriminated and intentionally close to MDAST, without parser-only fields such as position or data, and without null placeholders: optional fields are omitted when absent. Ordered lists carry their start number; task list items carry checked. Emphasis, strong, delete, and inlineCode are non-empty because Markdown has no representation that reparses to an empty phrasing node; inline code spans are single-line because code spans render line endings as spaces. Text that reads as a GFM autolink literal (https://, www., name@host.tld) renders as literal text and parses back as a link with the same visible content. Raw HTML, footnotes, and syntax outside the supported CommonMark + GFM profile are not representable.",
   "type": "array",
   "items": {
     "$ref": "#mdBlock"
@@ -263,6 +263,7 @@
         },
         "children": {
           "type": "array",
+          "minItems": 1,
           "items": {
             "$ref": "#mdPhrasing"
           }
@@ -283,6 +284,7 @@
         },
         "children": {
           "type": "array",
+          "minItems": 1,
           "items": {
             "$ref": "#mdPhrasing"
           }
@@ -302,7 +304,9 @@
           "const": "inlineCode"
         },
         "value": {
-          "type": "string"
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[^\\r\\n]*$"
         }
       },
       "required": [
@@ -385,6 +389,7 @@
         },
         "children": {
           "type": "array",
+          "minItems": 1,
           "items": {
             "$ref": "#mdPhrasing"
           }

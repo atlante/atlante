@@ -35,7 +35,7 @@ const ALWAYS_ESCAPED = new Set([
   '"',
   "~",
 ]);
-const LINE_START_ESCAPED = new Set(["-", "+", "#", ">", "="]);
+const LINE_START_ESCAPED = new Set(["-", "+", "#", ">", "=", "|"]);
 const ENTITY_PATTERN = /&(#[0-9]+|#[xX][0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);/;
 
 type HelperOptions = { data?: { gfmTable?: boolean } };
@@ -90,19 +90,28 @@ function escapedProseCharacter(
 /**
  * Backslash-escapes prose so re-parsing yields the same literal text:
  * characters that open inline constructs everywhere, entity-like ampersands,
- * and line-start-sensitive characters at line starts. Inside a GFM table cell
- * (see the `tableCell` block helper), pipes are escaped as well.
+ * and line-start-sensitive characters at line starts. Leading spaces and tabs
+ * on a line are encoded as character references so they stay literal text
+ * instead of block indentation or list-marker alignment. Inside a GFM table
+ * cell (see the `tableCell` block helper), pipes are escaped as well.
  */
 export function escapeProse(value: string, options?: HelperOptions): string {
   const escapePipes = insideTableCell(options);
   let output = "";
+  let index = 0;
   let lineStart = true;
-  for (let index = 0; index < value.length; index += 1) {
+  while (index < value.length) {
     const character = value[index];
     if (character === undefined) break;
     if (character === "\n") {
       output += character;
+      index += 1;
       lineStart = true;
+      continue;
+    }
+    if (lineStart && (character === " " || character === "\t")) {
+      output += character === " " ? "&#32;" : "&#9;";
+      index += 1;
       continue;
     }
     const escaped = escapedProseCharacter(
@@ -113,50 +122,67 @@ export function escapeProse(value: string, options?: HelperOptions): string {
       escapePipes,
     );
     output += escaped.text;
-    index = escaped.end - 1;
+    index = escaped.end;
     lineStart = false;
   }
   return output;
 }
 
-function longestBacktickRun(value: string): number {
+function longestRun(value: string, character: "`" | "~"): number {
   let longest = 0;
-  for (const run of value.match(/`+/g) ?? [])
+  for (const run of value.match(new RegExp(`${character}+`, "g")) ?? [])
     longest = Math.max(longest, run.length);
   return longest;
 }
 
 /**
  * Renders `value` as a CommonMark code span, widening the delimiter past any
- * embedded backtick run and padding when the value touches its delimiters.
- * Inside a GFM table cell, pipes are escaped so the cell cannot split.
+ * embedded backtick run. CommonMark strips one surrounding space when the
+ * content both starts and ends with one, so values that touch both delimiters
+ * with spaces (or start/end with a backtick) are padded to keep the content
+ * literal. Inside a GFM table cell, pipes are escaped so the cell cannot split.
  */
 export function codeSpan(value: string, options?: HelperOptions): string {
   if (value === "") return "`` ``";
-  const delimiter = repeatText("`", longestBacktickRun(value) + 1);
-  const padded = value.startsWith("`") || value.endsWith("`");
   const content =
     insideTableCell(options) && value.includes("|")
       ? value.replaceAll("|", "\\|")
       : value;
+  const delimiter = repeatText("`", longestRun(content, "`") + 1);
+  const padded =
+    content.startsWith("`") ||
+    content.endsWith("`") ||
+    (content.startsWith(" ") && content.endsWith(" "));
   return padded
     ? `${delimiter} ${content} ${delimiter}`
     : `${delimiter}${content}${delimiter}`;
 }
 
 /**
- * Renders a CommonMark fenced code block whose fence is longer than every
- * backtick run in `value`, so the body can never close the block early.
+ * Renders a CommonMark fenced code block. The fence always exceeds every run
+ * of its character in `value`, so the body can never close the block early;
+ * when backticks cannot be used (a long backtick run, or backticks in the info
+ * string, which backtick fences forbid), a tilde fence of the same guarantee
+ * is chosen. The body always ends with a newline so a value's own trailing
+ * newline is preserved by the blank line before the closing fence.
  */
 export function fencedCode(
   value: string,
   lang?: string,
   meta?: string,
 ): string {
-  const fence = repeatText("`", Math.max(3, longestBacktickRun(value) + 1));
-  const info = [lang, meta].filter((part) => part !== undefined && part !== "");
-  const body = value === "" || value.endsWith("\n") ? value : `${value}\n`;
-  return `${fence}${info.join(" ")}\n${body}${fence}`;
+  const info = [lang, meta].filter(
+    (part): part is string => part !== undefined && part !== "",
+  );
+  const backtickRun = longestRun(value, "`");
+  const tildeRun = longestRun(value, "~");
+  const useBackticks =
+    !info.some((part) => part.includes("`")) && backtickRun < tildeRun + 1;
+  const fence = repeatText(
+    useBackticks ? "`" : "~",
+    Math.max(3, (useBackticks ? backtickRun : tildeRun) + 1),
+  );
+  return `${fence}${info.join(" ")}\n${value}\n${fence}`;
 }
 
 /**

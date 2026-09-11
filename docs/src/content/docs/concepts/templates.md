@@ -37,7 +37,15 @@ Supported block nodes include paragraphs, headings, code blocks, blockquotes,
 nested ordered and unordered lists, thematic breaks, and GFM tables. Supported
 phrasing nodes include emphasis, strong text, inline code, links, images, hard
 breaks, and strikethrough. GFM task items use the optional `checked` field, and
-ordered lists use `start` when numbering begins above one.
+ordered lists use `start` when numbering begins above one. Emphasis, strong,
+strikethrough, and inline code are never empty: Markdown has no syntax that
+reparses to an empty phrasing node, and code spans render line endings as
+spaces.
+
+Text that reads as a GFM autolink literal (`https://…`, `www.…`,
+`name@host.tld`) renders as that literal text and parses back as a link with
+the same visible content. Author an explicit `link` node when you need control
+over the destination.
 
 The persisted AST contains no parser positions or plugin-specific `data`. The
 [Markdown input schema](https://github.com/atlante/atlante/blob/main/packages/pack/markdown/template.jsonc)
