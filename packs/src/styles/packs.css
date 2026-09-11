@@ -140,6 +140,10 @@
     color: var(--ds-fg);
   }
 
+  .install-panel .command-box {
+    width: fit-content;
+  }
+
   .command-box code {
     display: block;
     flex: 1 1 auto;
