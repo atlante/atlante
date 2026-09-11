@@ -514,23 +514,6 @@
     background: var(--surface-raised);
   }
 
-  .install-panel .command-box {
-    position: relative;
-    min-height: 64px;
-    padding: var(--space-3) 64px var(--space-3) var(--space-4);
-  }
-
-  .install-panel .command-box code {
-    font-size: var(--text-small);
-    white-space: normal;
-    overflow-wrap: anywhere;
-  }
-
-  .install-panel .command-box .prompt {
-    margin-inline-end: var(--space-2);
-    color: var(--ds-muted);
-  }
-
   .detail-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 310px;
