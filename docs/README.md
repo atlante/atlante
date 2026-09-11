@@ -49,10 +49,9 @@ or rebuilt on every development and production build; do not edit them directly.
 
 ## Deployment
 
-The Vercel project should use `docs` as its project root. Its configured build
-command is `npx astro build`. The release workflow synchronizes the approved
-brand assets before it sends the docs workspace to Vercel, so the remote build
-does not need Bun or access to the repository-level `brand/` directory.
-
-Configure `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_DOCS_PROJECT_ID` in the
-repository secrets before publishing a release.
+The docs site deploys natively from Vercel: the project builds on every push
+to `main` and opens preview deployments for pull requests. The Vercel project
+uses `docs` as its root directory with "Include source files outside of the
+Root Directory in the Build Step" enabled, and its build command is
+`bun run sync:brand && npx astro build`, so the remote build materializes
+brand assets from `../brand` exactly like a local build.
