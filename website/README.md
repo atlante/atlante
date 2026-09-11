@@ -58,13 +58,17 @@ runtime.
 
 ## Deployment
 
-The site deploys natively from Vercel: the project builds on every push to
-`main` and opens preview deployments for pull requests. The Vercel project
-uses `website` as its root directory with "Include source files outside of
-the Root Directory in the Build Step" enabled, because the build
-materializes the authoritative `../brand` and `../packages/schema` sources.
-The install step resolves the pinned `atlante` version from npm, so any
-deployed playground runs a version that npm already serves.
+The site deploys natively from Vercel. The project uses `website` as its root
+directory with "Include source files outside of the Root Directory in the Build
+Step" enabled, because the build materializes the authoritative `../brand` and
+`../packages/schema` sources. The install step resolves the pinned `atlante`
+version from npm, so any deployed playground runs a version that npm already
+serves.
+
+`ignoreCommand` in `vercel.json` keeps preview builds enabled and cancels
+production builds unless the current commit subject matches `release: vX.Y.Z`.
+This keeps ordinary pushes to `main` out of the public website until a package
+release is made.
 
 `vercel.json` in this directory holds hosting configuration: clean URLs, no
 trailing slash, the `application/schema+json` content type for the published
@@ -73,6 +77,6 @@ schema, the playground function's 30-second timeout, and `includeFiles` for
 installation with filesystem calls, so Vercel's file tracer cannot reach
 them and the pack is included explicitly.
 
-The pinned `atlante` version advances in ordinary pull requests. A release
-does not redeploy the site; bump the pin to move the playground to a
-released version.
+The pinned `atlante` version advances independently in ordinary pull requests.
+A release does not change that dependency; bump the pin separately when the
+playground should consume a newer published CLI.

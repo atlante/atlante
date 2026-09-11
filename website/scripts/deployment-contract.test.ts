@@ -17,6 +17,7 @@ describe("website deployment contract", () => {
     const websiteIgnore = read("website/.gitignore");
     const vercel = JSON.parse(read("website/vercel.json")) as {
       buildCommand: string;
+      ignoreCommand: string;
       cleanUrls: boolean;
       trailingSlash: boolean;
       functions: {
@@ -43,6 +44,9 @@ describe("website deployment contract", () => {
     );
     expect(websiteIgnore).toContain("public/schema/");
     expect(vercel.buildCommand).toBe("bun run build");
+    expect(vercel.ignoreCommand).toBe(
+      'if [ "$VERCEL_ENV" != "production" ] || printf \'%s\\n\' "$VERCEL_GIT_COMMIT_MESSAGE" | grep -Eq \'^release: v[0-9]+\\.[0-9]+\\.[0-9]+$\'; then exit 1; else exit 0; fi',
+    );
     expect(vercel.cleanUrls).toBe(true);
     expect(vercel.trailingSlash).toBe(false);
     expect(vercel.functions["api/**"]).toEqual({
@@ -85,7 +89,9 @@ describe("website deployment contract", () => {
     expect(normalizedReadme).toContain(
       "Include source files outside of the Root Directory in the Build Step",
     );
-    expect(normalizedReadme).toContain("advances in ordinary pull requests");
+    expect(normalizedReadme).toContain(
+      "advances independently in ordinary pull requests",
+    );
     expect(normalizedReadme).toContain("../brand");
     expect(normalizedReadme).toContain("../packages/schema");
     expect(normalizedReadme).toContain("@atlante/pack");

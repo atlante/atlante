@@ -49,9 +49,13 @@ or rebuilt on every development and production build; do not edit them directly.
 
 ## Deployment
 
-The docs site deploys natively from Vercel: the project builds on every push
-to `main` and opens preview deployments for pull requests. The Vercel project
-uses `docs` as its root directory with "Include source files outside of the
-Root Directory in the Build Step" enabled, and its build command is
-`bun run sync:brand && npx astro build`, so the remote build materializes
-brand assets from `../brand` exactly like a local build.
+The docs site deploys natively from Vercel. The project uses `docs` as its
+root directory with "Include source files outside of the Root Directory in the
+Build Step" enabled, and its build command is
+`bun run sync:brand && npx astro build`, so the remote build materializes brand
+assets from `../brand` exactly like a local build.
+
+`ignoreCommand` in `vercel.json` keeps preview builds enabled and cancels
+production builds unless the current commit subject matches `release: vX.Y.Z`.
+Ordinary documentation changes therefore remain in previews until the next
+package release.

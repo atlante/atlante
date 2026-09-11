@@ -16,6 +16,7 @@ describe("docs deployment contract", () => {
     };
     const vercel = JSON.parse(read("docs/vercel.json")) as {
       buildCommand: string;
+      ignoreCommand: string;
       cleanUrls: boolean;
       trailingSlash: boolean;
     };
@@ -23,6 +24,9 @@ describe("docs deployment contract", () => {
 
     expect(docsPackage.scripts["sync:brand"]).toBe("bun scripts/sync-brand.ts");
     expect(vercel.buildCommand).toBe("bun run sync:brand && npx astro build");
+    expect(vercel.ignoreCommand).toBe(
+      'if [ "$VERCEL_ENV" != "production" ] || printf \'%s\\n\' "$VERCEL_GIT_COMMIT_MESSAGE" | grep -Eq \'^release: v[0-9]+\\.[0-9]+\\.[0-9]+$\'; then exit 1; else exit 0; fi',
+    );
     expect(vercel.cleanUrls).toBe(true);
     expect(vercel.trailingSlash).toBe(false);
     expect(releaseWorkflow).not.toContain("deploy-docs");
