@@ -280,4 +280,26 @@ describe("canonical Markdown template", () => {
       ]),
     ).toEqual([]);
   });
+
+  test("accepts empty nodes emitted by CommonMark", () => {
+    expect(
+      validateMarkdownInput([
+        { type: "heading", depth: 1, children: [] },
+        { type: "blockquote", children: [] },
+        {
+          type: "list",
+          ordered: false,
+          children: [{ type: "listItem", children: [] }],
+        },
+        {
+          type: "paragraph",
+          children: [
+            { type: "inlineCode", value: "" },
+            { type: "link", url: "/empty", children: [] },
+          ],
+        },
+      ]),
+    ).toEqual([]);
+    expect(validateMarkdownInput([])).toEqual([]);
+  });
 });

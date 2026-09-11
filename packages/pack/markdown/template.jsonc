@@ -2,7 +2,6 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Canonical Markdown AST rendered in authored array order. Nodes are type-discriminated and intentionally close to MDAST, without parser-only fields such as position or data, and without null placeholders: optional fields are omitted when absent. Ordered lists carry their start number; task list items carry checked. Raw HTML, footnotes, and syntax outside the supported CommonMark + GFM profile are not representable.",
   "type": "array",
-  "minItems": 1,
   "items": {
     "$ref": "#mdBlock"
   },
@@ -18,8 +17,7 @@
           "type": "array",
           "items": {
             "$ref": "#mdPhrasing"
-          },
-          "minItems": 1
+          }
         }
       },
       "required": [
@@ -44,8 +42,7 @@
           "type": "array",
           "items": {
             "$ref": "#mdPhrasing"
-          },
-          "minItems": 1
+          }
         }
       },
       "required": [
@@ -89,7 +86,6 @@
         },
         "children": {
           "type": "array",
-          "minItems": 1,
           "items": {
             "$ref": "#mdBlock"
           }
@@ -142,7 +138,6 @@
         },
         "children": {
           "type": "array",
-          "minItems": 1,
           "items": {
             "$ref": "#mdBlock"
           }
@@ -250,8 +245,7 @@
           "const": "text"
         },
         "value": {
-          "type": "string",
-          "minLength": 1
+          "type": "string"
         }
       },
       "required": [
@@ -271,8 +265,7 @@
           "type": "array",
           "items": {
             "$ref": "#mdPhrasing"
-          },
-          "minItems": 1
+          }
         }
       },
       "required": [
@@ -292,8 +285,7 @@
           "type": "array",
           "items": {
             "$ref": "#mdPhrasing"
-          },
-          "minItems": 1
+          }
         }
       },
       "required": [
@@ -310,8 +302,7 @@
           "const": "inlineCode"
         },
         "value": {
-          "type": "string",
-          "minLength": 1
+          "type": "string"
         }
       },
       "required": [
@@ -338,8 +329,7 @@
           "type": "array",
           "items": {
             "$ref": "#mdPhrasing"
-          },
-          "minItems": 1
+          }
         }
       },
       "required": [
@@ -397,8 +387,7 @@
           "type": "array",
           "items": {
             "$ref": "#mdPhrasing"
-          },
-          "minItems": 1
+          }
         }
       },
       "required": [
