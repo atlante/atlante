@@ -66,10 +66,9 @@ Step" enabled, because the build materializes the authoritative `../brand` and
 resolves the pinned `atlante` version from npm instead of linking the local Bun
 workspace, so any deployed playground runs a version that npm already serves.
 
-`ignoreCommand` in `vercel.json` keeps preview builds enabled and cancels
-production builds unless the current commit subject matches `release: vX.Y.Z`.
-This keeps ordinary pushes to `main` out of the public website until a package
-release is made.
+Production deploys follow Vercel's git integration defaults: every push to the
+production branch builds and deploys the site, and pull requests get preview
+deployments. No `ignoreCommand` gates either path.
 
 `vercel.json` in this directory holds hosting configuration: clean URLs, no
 trailing slash, the `application/schema+json` content type for the published

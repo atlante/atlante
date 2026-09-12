@@ -55,10 +55,9 @@ unauthenticated requests.
 The site deploys natively through Vercel's git integration: the `packs` Vercel
 project uses `packs` as its Root Directory, installs dependencies from the
 repository root, and runs the workspace build — which includes the registry
-synchronization — on every build. The configured `ignoreCommand` skips
-non-production deployments and restricts production deployments to commits
-whose message is `release: <version>`, so deployment is tied to the release
-transaction like the other sites.
+synchronization — on every build. Production deploys run on every push to the
+production branch and pull requests get preview deployments; no ignored-build
+step is configured.
 
 The snapshot is regenerated on every build, so deployed metrics reflect the
 latest release's `sync:packs` run; the committed snapshot keeps local builds
