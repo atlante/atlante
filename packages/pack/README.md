@@ -124,6 +124,35 @@ command-level mechanics as provisional, so deterministic tools can absorb the
 mechanics later without changing the policy. Harness changes always require
 explicit developer approval and run as their own delivery cycle.
 
+## Evaluation suite
+
+The first-party pack publishes a small evaluation suite under `eval/`, including
+scenario documents, their fixtures, and a self-reported run report. A project
+that extends the pack does not run this suite automatically. Opt in from the
+project configuration:
+
+```jsonc
+{
+  "eval": {
+    "host": "opencode",
+    "include": ["@atlante/pack"]
+  }
+}
+```
+
+Pack scenario fixtures resolve relative to the pack root. The consuming
+project's host, model, and budget remain authoritative. Atlante reads pack
+metadata during discovery, but resolution, validation, build, and package sync
+do not execute the suite; only an explicit `atlante eval` run delegates it to
+the host.
+
+The published report is labeled **self-reported evaluation** wherever a pack
+consumer displays it. Its run date, Atlante version, host, model, model
+version, and per-scenario pass rates provide provenance, not Atlante
+certification or an independent security or quality verdict. Fixtures, setup
+commands, and checks remain executable tool-level policy and should be reviewed
+before running a pack suite.
+
 ## Pack behavior
 
 The `@atlante/pack/markdown` template expects an ordered block array, not a
