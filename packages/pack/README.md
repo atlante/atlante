@@ -187,3 +187,8 @@ JavaScript entry point. Atlante loads only the selected template or instance
 and its transitive dependencies. It does not scan installed packages or install
 dependencies, so direct project references must be declared and installed by
 the project's package manager.
+
+## Community
+
+Join the [Atlante Discord](https://discord.com/invite/W5EcwZvx7) to discuss the
+project and ask questions.

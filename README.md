@@ -206,6 +206,11 @@ To publish your own reusable content, read
 - Reference: [MCP](https://docs.atlante.sh/reference/mcp), [CLI](https://docs.atlante.sh/reference/cli), [Eval](https://docs.atlante.sh/reference/eval), [Template syntax](https://docs.atlante.sh/reference/template-syntax), [Schema](https://docs.atlante.sh/reference/schema), [Materialization](https://docs.atlante.sh/reference/materialization), [Diagnostics](https://docs.atlante.sh/reference/diagnostics)
 - [Troubleshooting](https://docs.atlante.sh/troubleshooting)
 
+## Community
+
+Join the [Atlante Discord](https://discord.com/invite/W5EcwZvx7) to discuss the
+project, ask questions, and share packs.
+
 ## Status
 
 [`SPECIFICATION.md`](SPECIFICATION.md) defines the normative `v0.1` contract.
