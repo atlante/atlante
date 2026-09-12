@@ -197,7 +197,7 @@ describe("first-party package resources as user configurations", () => {
             "description": "Testing guidance",
             "title": "Testing",
             "overview": "Run tests.",
-            "sections": [{ "markdown": [{ "p": ["Run tests."] }] }]
+            "sections": [{ "markdown": [{ "type": "paragraph", "children": [{ "type": "text", "value": "Run tests." }] }] }]
           }
         }
       }`,

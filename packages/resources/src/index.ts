@@ -87,6 +87,21 @@ export {
   slotPartialName,
   ValueReferenceCollisionError,
 } from "./renderer.js";
+export {
+  codeSpan,
+  continuationIndent,
+  escapeProse,
+  fencedCode,
+  indentExceptFirst,
+  inTableCell,
+  linePrefix,
+  linkDestination,
+  listItemMarker,
+  newlines,
+  prefixLines,
+  repeatText,
+  tableAlignments,
+} from "./renderer-helpers.js";
 export type {
   ResourceTemplateSelection,
   ResourceValueTombstones,

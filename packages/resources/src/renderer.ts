@@ -1,5 +1,20 @@
 import Handlebars from "handlebars";
 import {
+  codeSpan,
+  continuationIndent,
+  escapeProse,
+  fencedCode,
+  indentExceptFirst,
+  inTableCell,
+  linePrefix,
+  linkDestination,
+  listItemMarker,
+  newlines,
+  prefixLines,
+  repeatText,
+  tableAlignments,
+} from "./renderer-helpers.js";
+import {
   copyResourceTemplateSelection,
   resourceTemplateSelection,
 } from "./resolution.js";
@@ -277,6 +292,78 @@ export function renderResolvedTemplate(
   );
   handlebars.registerHelper("anyEqual", anyEqual);
   handlebars.registerHelper("anyTruthy", anyTruthy);
+  handlebars.registerHelper("repeatText", (fragment: unknown, count: unknown) =>
+    repeatText(String(fragment), Number(count)),
+  );
+  handlebars.registerHelper("prefixLines", (value: unknown, prefix: unknown) =>
+    prefixLines(String(value), String(prefix)),
+  );
+  handlebars.registerHelper("escapeProse", (value: unknown, options: unknown) =>
+    escapeProse(String(value), options as { data?: { gfmTable?: boolean } }),
+  );
+  handlebars.registerHelper("codeSpan", (value: unknown, options: unknown) =>
+    codeSpan(String(value), options as { data?: { gfmTable?: boolean } }),
+  );
+  handlebars.registerHelper("hardBreak", () => "  \n");
+  handlebars.registerHelper("newlines", (count: unknown) =>
+    newlines(Number(count)),
+  );
+  handlebars.registerHelper(
+    "fencedCode",
+    (value: unknown, lang: unknown, meta: unknown) =>
+      fencedCode(
+        String(value),
+        lang === undefined ? undefined : String(lang),
+        meta === undefined ? undefined : String(meta),
+      ),
+  );
+  handlebars.registerHelper(
+    "linkDestination",
+    (url: unknown, options: unknown) =>
+      linkDestination(
+        String(url),
+        options as { data?: { gfmTable?: boolean } },
+      ),
+  );
+  handlebars.registerHelper("tableAlignments", tableAlignments);
+  handlebars.registerHelper(
+    "listItemMarker",
+    (index: unknown, start: unknown, ordered: unknown) =>
+      listItemMarker(
+        Number(index),
+        start === undefined ? undefined : Number(start),
+        Boolean(ordered),
+      ),
+  );
+  handlebars.registerHelper("continuationIndent", (marker: unknown) =>
+    continuationIndent(String(marker)),
+  );
+  handlebars.registerHelper(
+    "linePrefix",
+    function (
+      this: unknown,
+      prefix: unknown,
+      options: Parameters<typeof linePrefix>[1],
+    ) {
+      return linePrefix(String(prefix), options, this);
+    },
+  );
+  handlebars.registerHelper(
+    "indentExceptFirst",
+    function (
+      this: unknown,
+      prefix: unknown,
+      options: Parameters<typeof indentExceptFirst>[1],
+    ) {
+      return indentExceptFirst(String(prefix), options, this);
+    },
+  );
+  handlebars.registerHelper(
+    "tableCell",
+    function (this: unknown, options: Parameters<typeof inTableCell>[0]) {
+      return inTableCell(options, this);
+    },
+  );
   const nextStack = [...stack, template.key];
   const slots = template.slots;
 

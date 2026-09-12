@@ -87,6 +87,7 @@ const expectedPackFiles = [
   "test/brainstorm.unit.test.ts",
   "test/build.unit.test.ts",
   "test/harness.unit.test.ts",
+  "test/markdown-template.unit.test.ts",
   "test/normative-language.unit.test.ts",
   "test/plan.unit.test.ts",
   "test/preset.integration.test.ts",

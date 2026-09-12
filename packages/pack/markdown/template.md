@@ -1,13 +1,1 @@
-{{#*inline "blocks"}}{{#each this~}}{{#unless @first}}
-
-{{/unless~}}{{#if p}}{{#each p}}{{this}}{{#unless @last}}
-
-{{/unless}}{{/each}}{{/if~}}{{#if ul}}{{#each ul}}- {{this}}{{#unless @last}}
-{{/unless}}{{/each}}{{/if~}}{{#if ol}}{{#each ol}}{{increment @index}}. {{this}}{{#unless @last}}
-{{/unless}}{{/each}}{{/if~}}{{#if h2}}## {{h2.title}}
-
-{{> blocks h2.block}}{{/if~}}{{#if h3}}### {{h3.title}}
-
-{{> blocks h3.block}}{{/if}}{{/each}}{{/inline~}}
-{{> blocks (input)}}{{! trailing separation survives; bare trailing newlines are stripped}}
-{{! by Handlebars at compile time, so the newline between comments carries it}}
+{{#*inline "md-inline"}}{{#each this}}{{#if (isEqual type "text")}}{{escapeProse value}}{{else if (isEqual type "emphasis")}}*{{> md-inline children}}*{{else if (isEqual type "strong")}}**{{> md-inline children}}**{{else if (isEqual type "inlineCode")}}{{codeSpan value}}{{else if (isEqual type "link")}}[{{> md-inline children}}]({{linkDestination url}}{{#if title}} "{{escapeProse title}}"{{/if}}){{else if (isEqual type "image")}}![{{#if alt}}{{escapeProse alt}}{{/if}}]({{linkDestination url}}{{#if title}} "{{escapeProse title}}"{{/if}}){{else if (isEqual type "break")}}{{hardBreak}}{{else if (isEqual type "delete")}}~~{{> md-inline children}}~~{{/if}}{{/each}}{{/inline}}{{#*inline "md-cell"}}{{#tableCell}}{{> md-inline children}}{{/tableCell}}{{/inline}}{{#*inline "md-table-row"}}| {{#each children}}{{#unless @first}} | {{/unless}}{{> md-cell this}}{{/each}} |{{/inline}}{{#*inline "md-table-align"}}| {{#each this}}{{#unless @first}} | {{/unless}}{{#if (isEqual this "left")}}:--{{else if (isEqual this "right")}}--:{{else if (isEqual this "center")}}:-:{{else}}---{{/if}}{{/each}} |{{/inline}}{{#*inline "md-block"}}{{#if (isEqual type "heading")}}{{repeatText "#" depth}} {{> md-inline children}}{{else if (isEqual type "paragraph")}}{{> md-inline children}}{{else if (isEqual type "code")}}{{fencedCode value lang meta}}{{else if (isEqual type "blockquote")}}{{#linePrefix "> "}}{{> md-blocks children}}{{/linePrefix}}{{else if (isEqual type "list")}}{{#each children}}{{#unless @first}}{{newlines 1}}{{/unless}}{{listItemMarker @index ../start ../ordered}}{{#if checked}}[x] {{else if (isEqual checked false)}}[ ] {{/if}}{{#indentExceptFirst (continuationIndent (listItemMarker @index ../start ../ordered))}}{{> md-blocks children}}{{/indentExceptFirst}}{{/each}}{{else if (isEqual type "table")}}{{#each children}}{{#if @first}}{{> md-table-row this}}{{newlines 1}}{{> md-table-align (tableAlignments ../align ../children)}}{{else}}{{newlines 1}}{{> md-table-row this}}{{/if}}{{/each}}{{else if (isEqual type "thematicBreak")}}---{{/if}}{{/inline}}{{#*inline "md-blocks"}}{{#each this}}{{#unless @first}}{{newlines 2}}{{/unless}}{{> md-block this}}{{/each}}{{/inline}}{{> md-blocks (input)~}}

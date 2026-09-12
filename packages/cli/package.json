@@ -1,6 +1,6 @@
 {
   "name": "atlante",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "type": "module",
   "description": "Atlante command-line interface for structured, versionable AI agent prompts",
   "license": "MIT",
@@ -46,7 +46,14 @@
     "@atlante/resources": "workspace:*",
     "@atlante/schema": "workspace:*",
     "@atlante/validator": "workspace:*",
+    "@types/mdast": "^4.0.4",
     "commander": "^12.1.0",
-    "jsonc-parser": "^3.3.1"
+    "jsonc-parser": "^3.3.1",
+    "mdast-util-frontmatter": "^2.0.1",
+    "mdast-util-from-markdown": "^2.0.3",
+    "mdast-util-gfm": "^3.1.0",
+    "micromark-extension-frontmatter": "^2.0.0",
+    "micromark-extension-gfm": "^3.0.0",
+    "yaml": "^2.9.0"
   }
 }

@@ -215,23 +215,90 @@ describe("normative authoring convention", () => {
 
     test("markdown renders ordered blocks with headings and lists", () => {
       const output = renderPackTemplate("@atlante/pack/markdown", [
-        { p: ["First.", "Second."] },
-        { ul: ["alpha", "beta"] },
-        { ol: ["one", "two"] },
-        { p: ["Interleaved closing."] },
+        { type: "paragraph", children: [{ type: "text", value: "First." }] },
+        { type: "paragraph", children: [{ type: "text", value: "Second." }] },
         {
-          h2: {
-            title: "Context",
-            block: [
-              { p: ["Intro."] },
-              {
-                h3: {
-                  title: "Sub",
-                  block: [{ ul: ["deep"] }, { p: ["Deep prose."] }],
+          type: "list",
+          ordered: false,
+          children: [
+            {
+              type: "listItem",
+              children: [
+                {
+                  type: "paragraph",
+                  children: [{ type: "text", value: "alpha" }],
                 },
-              },
-            ],
-          },
+              ],
+            },
+            {
+              type: "listItem",
+              children: [
+                {
+                  type: "paragraph",
+                  children: [{ type: "text", value: "beta" }],
+                },
+              ],
+            },
+          ],
+        },
+        {
+          type: "list",
+          ordered: true,
+          start: 1,
+          children: [
+            {
+              type: "listItem",
+              children: [
+                {
+                  type: "paragraph",
+                  children: [{ type: "text", value: "one" }],
+                },
+              ],
+            },
+            {
+              type: "listItem",
+              children: [
+                {
+                  type: "paragraph",
+                  children: [{ type: "text", value: "two" }],
+                },
+              ],
+            },
+          ],
+        },
+        {
+          type: "paragraph",
+          children: [{ type: "text", value: "Interleaved closing." }],
+        },
+        {
+          type: "heading",
+          depth: 2,
+          children: [{ type: "text", value: "Context" }],
+        },
+        { type: "paragraph", children: [{ type: "text", value: "Intro." }] },
+        {
+          type: "heading",
+          depth: 3,
+          children: [{ type: "text", value: "Sub" }],
+        },
+        {
+          type: "list",
+          ordered: false,
+          children: [
+            {
+              type: "listItem",
+              children: [
+                {
+                  type: "paragraph",
+                  children: [{ type: "text", value: "deep" }],
+                },
+              ],
+            },
+          ],
+        },
+        {
+          type: "paragraph",
+          children: [{ type: "text", value: "Deep prose." }],
         },
       ]);
 
@@ -258,7 +325,6 @@ describe("normative authoring convention", () => {
           "- deep",
           "",
           "Deep prose.",
-          "",
         ].join("\n"),
       );
       expect(output).not.toMatch(normativeKeyword);
@@ -267,8 +333,22 @@ describe("normative authoring convention", () => {
     test("structural templates render without normative keywords", () => {
       expect(
         renderPackTemplate("@atlante/pack/markdown", [
-          { p: ["Body."] },
-          { ul: ["Item."] },
+          { type: "paragraph", children: [{ type: "text", value: "Body." }] },
+          {
+            type: "list",
+            ordered: false,
+            children: [
+              {
+                type: "listItem",
+                children: [
+                  {
+                    type: "paragraph",
+                    children: [{ type: "text", value: "Item." }],
+                  },
+                ],
+              },
+            ],
+          },
         ]),
       ).not.toMatch(normativeKeyword);
       expect(
@@ -282,7 +362,16 @@ describe("normative authoring convention", () => {
         renderPackTemplate("@atlante/pack/skill", {
           title: "Skill",
           overview: "Overview.",
-          sections: [{ markdown: [{ p: ["Body."] }] }],
+          sections: [
+            {
+              markdown: [
+                {
+                  type: "paragraph",
+                  children: [{ type: "text", value: "Body." }],
+                },
+              ],
+            },
+          ],
         }),
       ).not.toMatch(normativeKeyword);
       expect(

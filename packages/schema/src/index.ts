@@ -58,6 +58,29 @@ export {
   evalPackConfigSchema,
   evalScenarioSchema,
 } from "./eval.js";
+export type {
+  MarkdownBlockContent,
+  MarkdownBlockquote,
+  MarkdownBreak,
+  MarkdownCode,
+  MarkdownDelete,
+  MarkdownEmphasis,
+  MarkdownHeading,
+  MarkdownImage,
+  MarkdownInlineCode,
+  MarkdownLink,
+  MarkdownList,
+  MarkdownListItem,
+  MarkdownNode,
+  MarkdownParagraph,
+  MarkdownPhrasingContent,
+  MarkdownStrong,
+  MarkdownTable,
+  MarkdownTableCell,
+  MarkdownTableRow,
+  MarkdownText,
+  MarkdownThematicBreak,
+} from "./markdown-ast.js";
 export type { Value, ValuesMap, ValuesMapOverlay } from "./values.js";
 export {
   VALUE_KEY_PATTERN,

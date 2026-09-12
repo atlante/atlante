@@ -268,7 +268,7 @@ describe("validateDocumentText", () => {
 
   test("accepts a skill-only document", () => {
     const result = validateWithFirstPartyPack(
-      `{ "$schema": "${SCHEMA_URI}", "skills": { "testing": { "description": "Run tests", "title": "Testing", "overview": "Run tests.", "sections": [{ "markdown": [{ "p": ["Run tests."] }] }] } } }`,
+      `{ "$schema": "${SCHEMA_URI}", "skills": { "testing": { "description": "Run tests", "title": "Testing", "overview": "Run tests.", "sections": [{ "markdown": [{ "type": "paragraph", "children": [{ "type": "text", "value": "Run tests." }] }] }] } } }`,
     );
     expect(result.diagnostics).toEqual([]);
     expect(result.document?.agents).toEqual({});
@@ -331,13 +331,13 @@ describe("validateDocumentText", () => {
 
   test("accepts a valid root skills map", () => {
     const result = validateWithFirstPartyPack(
-      `{ "$schema": "${SCHEMA_URI}", "agents": {}, "skills": { "testing": { "description": "Run tests", "title": "Testing", "overview": "Run tests.", "sections": [{ "markdown": [{ "p": ["Run tests."] }] }] } } }`,
+      `{ "$schema": "${SCHEMA_URI}", "agents": {}, "skills": { "testing": { "description": "Run tests", "title": "Testing", "overview": "Run tests.", "sections": [{ "markdown": [{ "type": "paragraph", "children": [{ "type": "text", "value": "Run tests." }] }] }] } } }`,
     );
     expect(result.diagnostics).toEqual([]);
     expect(result.document?.skills?.testing?.description).toBe("Run tests");
   });
 
-  test("rejects markdown blocks that break the heading hierarchy", () => {
+  test("rejects legacy Markdown shorthand nodes", () => {
     const skill = (markdown: unknown[]) =>
       `{ "$schema": "${SCHEMA_URI}", "skills": { "testing": { "description": "Run tests", "title": "Testing", "overview": "Run tests.", "sections": [{ "markdown": ${JSON.stringify(markdown)} }] } } }`;
 
@@ -369,7 +369,7 @@ describe("validateDocumentText", () => {
 
   test("accepts agent and skill bindings together", () => {
     const result = validateWithFirstPartyPack(
-      `{ "$schema": "${SCHEMA_URI}", "agents": { "reviewer": { "description": "Agent", "identity": "x", "mission": "y" } }, "skills": { "testing": { "description": "Run tests", "title": "Testing", "overview": "Run tests.", "sections": [{ "markdown": [{ "p": ["Run tests."] }] }] } } }`,
+      `{ "$schema": "${SCHEMA_URI}", "agents": { "reviewer": { "description": "Agent", "identity": "x", "mission": "y" } }, "skills": { "testing": { "description": "Run tests", "title": "Testing", "overview": "Run tests.", "sections": [{ "markdown": [{ "type": "paragraph", "children": [{ "type": "text", "value": "Run tests." }] }] }] } } }`,
     );
     expect(result.diagnostics).toEqual([]);
     expect(result.document?.agents?.reviewer?.mission).toBe("y");

@@ -256,7 +256,14 @@ describe("first-party package resources", () => {
           { responsibilities: ["Own the outcome."] },
           { instructions: ["Authored instruction."] },
           { invariants: ["Authored invariant."] },
-          { markdown: [{ p: ["Authored markdown."] }] },
+          {
+            markdown: [
+              {
+                type: "paragraph",
+                children: [{ type: "text", value: "Authored markdown." }],
+              },
+            ],
+          },
         ],
       },
     });

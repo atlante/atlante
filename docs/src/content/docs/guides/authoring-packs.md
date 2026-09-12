@@ -15,6 +15,83 @@ Run this guide from the root of an initialized project with a
 [Customize your harness](/guides/building-a-harness), but includes every file
 needed to follow it independently and notes when a command runs elsewhere.
 
+## Import an existing Markdown file
+
+Use `atlante import` when an agent or skill already exists as a Markdown file.
+The command creates a source pack with a preset and one resource instance.
+
+Only `description` is required in the file's YAML frontmatter — hosts consume
+it directly, and it becomes the binding's lookup metadata. The remaining
+mapped fields are optional template input: skills accept `title` and
+`overview`, agents accept `identity` and `mission`, and each renders only when
+present. A skill without `title` derives it from `name`. A typical agent file
+looks like this:
+
+```md
+---
+identity: You are a senior reviewer.
+mission: Find defects before changes are merged.
+description: Reviews the project for defects.
+---
+
+Read the relevant source and tests before reporting findings.
+```
+
+Import the file into `packs/review`:
+
+```sh
+npx atlante import review.md --kind agent --out packs/review
+```
+
+The required `--kind` option selects `agent` or `skill`; the command never
+infers a kind or fabricates metadata.
+
+The pack, resource, and binding ID resolves from the `--name` option, the
+frontmatter `name` key, or the input filename stem, in that order. The final
+filename extension is removed before sanitization. Resulting IDs use lowercase
+kebab-case and contain at most 64 characters.
+
+The generated pack has this structure:
+
+```text
+packs/review/
+├── atlante.jsonc
+├── package.json
+└── review/
+    └── instance.jsonc
+```
+
+Add the generated preset to the project's source configuration:
+
+```jsonc title="atlante.jsonc"
+{
+  "$schema": "https://atlante.sh/schema/v0.1/schema.json",
+  "extends": ["@atlante/pack", "./packs/review"]
+}
+```
+
+Validate and build the consuming project:
+
+```sh
+npx atlante validate
+npx atlante build
+```
+
+A pack collects agents and skills. Point `--out` at the same pack directory to
+add another import: the command detects the existing pack, appends the binding
+to its preset, and writes the new instance alongside the previous ones. An ID
+that already exists in the pack is refused; use `--name` to import under a
+different ID.
+
+The importer supports the CommonMark and GFM nodes listed in the
+[template reference](/concepts/templates#canonical-markdown-input). Unsupported
+syntax, unresolved references, invalid metadata, and failed validation stop the
+operation before anything is written.
+
+The manual workflow below is a separate alternative to importing an existing
+file. If you used `atlante import`, stop after the commands above and inspect
+the generated ID instead of the `reviewer` example when checking native output.
+
 ## Create a reusable reviewer instance
 
 Create the resource directory and instance file:
