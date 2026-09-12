@@ -175,4 +175,14 @@ describe.skipIf(!runOutputTests)("docs built output", () => {
       join("concepts", "native-outputs", "index.html"),
     );
   });
+
+  it("keeps Starlight search on full page loads", () => {
+    const generated = readFileSync(
+      join(outputRoot, "introduction", "index.html"),
+      "utf8",
+    );
+
+    expect(generated).not.toContain('name="astro-view-transitions-enabled"');
+    expect(generated).not.toContain("ClientRouter.astro");
+  });
 });
