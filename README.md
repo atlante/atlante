@@ -27,6 +27,7 @@ npx atlante@latest validate        # check the configuration without building
 npx atlante@latest build           # materialize the native outputs
 npx atlante@latest build --watch   # rebuild while you edit
 npx atlante@latest mcp             # start the read-only MCP server over stdio
+npx atlante@latest import agent.md --kind agent --out ./my-pack
 npx atlante@latest eval            # optional: run eval scenarios in a sandbox
 ```
 
@@ -55,6 +56,11 @@ installation uses the project's package manager, validates the installed pack,
 and rolls back dependency changes when validation fails. These commands do not
 change the configuration or generated outputs; the bundled `@atlante/pack` does
 not need to be installed as a project dependency.
+
+Use `atlante import` to convert an existing Markdown agent or skill into a
+project-local pack. Pass `--kind agent` or `--kind skill` and `--out <dir>`; see
+the [CLI reference](https://docs.atlante.sh/reference/cli#atlante-import) for
+the supported Markdown and frontmatter contract.
 
 After a build, OpenCode discovers the generated agents and skills when it
 starts; restart it to pick up new or changed files.
@@ -98,7 +104,7 @@ host-native files; the host executes them.
 {
   "$schema": "https://atlante.sh/schema/v0.1/schema.json",
   // The first-party preset: the general-purpose architect agent and the
-  // workflow skills (brainstorm, plan, build, review, harness).
+  // default skills (brainstorm, plan, build, review, and harness).
   "extends": "@atlante/pack",
   "values": {
     "project": "NEXORA",
@@ -185,7 +191,7 @@ trial counts only when every check passes.
 
 Atlante publishes two packages to npm:
 
-- [`atlante`](https://www.npmjs.com/package/atlante) — the `init`, `pack`,
+- [`atlante`](https://www.npmjs.com/package/atlante) — the `init`, `import`, `pack`,
   `validate`, `build`, `mcp`, and `eval` commands.
 - [`@atlante/pack`](https://www.npmjs.com/package/@atlante/pack) — the
   first-party presets, the `agent` and `skill` templates, and their
