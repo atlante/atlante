@@ -2,6 +2,7 @@
 import BrandLogo from "./BrandLogo.astro";
 
 const github = "https://github.com/atlante/atlante";
+const discord = "https://discord.com/invite/W5EcwZvx7";
 
 const groups = [
   {
@@ -9,19 +10,19 @@ const groups = [
     links: [
       { label: "Documentation", href: "https://docs.atlante.sh" },
       {
-        label: "Getting started",
+        label: "Getting Started",
         href: "https://docs.atlante.sh/getting-started",
       },
-      { label: "Pack explorer", href: "https://packs.atlante.sh/" },
       { label: "Playground", href: "#quick-start" },
     ],
   },
   {
     label: "Project",
     links: [
+      { label: "Packs", href: "https://packs.atlante.sh/" },
       { label: "GitHub", href: github },
-      { label: "Releases", href: `${github}/releases` },
-      { label: "Issues", href: `${github}/issues` },
+      { label: "Discord", href: discord },
+      { label: "NPM", href: "https://www.npmjs.com/package/atlante" },
     ],
   },
   {
@@ -31,9 +32,8 @@ const groups = [
         label: "Specification",
         href: `${github}/blob/main/SPECIFICATION.md`,
       },
-      { label: "npm", href: "https://www.npmjs.com/package/atlante" },
       { label: "Contributing", href: `${github}/blob/main/CONTRIBUTING.md` },
-      { label: "MIT", href: `${github}/blob/main/LICENSE` },
+      { label: "License", href: `${github}/blob/main/LICENSE` },
     ],
   },
 ];

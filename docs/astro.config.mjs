@@ -58,6 +58,11 @@ export default defineConfig({
           label: "GitHub",
           href: "https://github.com/atlante/atlante",
         },
+        {
+          icon: "discord",
+          label: "Discord",
+          href: "https://discord.com/invite/W5EcwZvx7",
+        },
       ],
       editLink: {
         baseUrl: "https://github.com/atlante/atlante/edit/main/docs/",
