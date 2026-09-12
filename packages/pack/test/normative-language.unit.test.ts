@@ -319,6 +319,7 @@ describe("normative authoring convention", () => {
     expect(Object.keys(document).sort()).toEqual([
       "$schema",
       "agents",
+      "eval",
       "skills",
       "values",
     ]);
