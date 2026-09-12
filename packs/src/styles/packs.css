@@ -129,28 +129,27 @@
     margin-block-start: var(--space-8);
   }
 
-  /* Secondary hero action paired with the install command: mirrors the
-     landing site's secondary button (see website Hero.astro). */
-  .hero-cta {
-    display: inline-flex;
-    align-items: center;
-    width: fit-content;
-    margin-block-start: var(--space-8);
-    min-height: var(--control-min);
-    padding-inline: var(--space-8);
-    border: 1px solid var(--ds-border);
-    border-radius: 4px;
-    color: var(--ds-fg);
+  /* Quiet caption under the install command: the author-a-pack guide stays
+     reachable without competing with the hero's single action. */
+  .command-sub {
+    margin: var(--space-2) 0 0;
+    color: var(--ds-muted);
     font-family: var(--font-ui);
-    font-size: var(--text-small);
-    font-weight: 520;
-    letter-spacing: 0.09em;
-    text-decoration: none;
+    font-size: var(--text-meta);
+    line-height: 1.6;
   }
 
-  .hero-cta:hover,
-  .hero-cta:focus-visible {
-    border-color: var(--ds-border);
+  .command-sub a {
+    color: var(--ds-fg);
+    text-decoration: underline;
+    text-decoration-color: var(--ds-border-subtle);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.25em;
+  }
+
+  .command-sub a:hover,
+  .command-sub a:focus-visible {
+    text-decoration-color: var(--ds-fg);
   }
 
   /* Command boxes share the landing site's skin: a light bordered strip
