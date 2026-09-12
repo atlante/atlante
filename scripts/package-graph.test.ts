@@ -433,7 +433,12 @@ test("publishes a static first-party pack with no executable API", async () => {
   expect(files).toContain("agent/template.jsonc");
   expect(files).toContain("agent/template.md");
   expect(files).toContain("architect/instance.jsonc");
-  expect(files.some((file) => /\.(?:c|m)?js$|\.ts$/.test(file))).toBe(false);
+  const executableFiles = files.filter((file) =>
+    /\.(?:c|m)?js$|\.ts$/.test(file),
+  );
+  // Eval fixtures are intentionally executable input, but the static pack has
+  // no runtime API outside its declared eval suite.
+  expect(executableFiles.every((file) => file.startsWith("eval/"))).toBe(true);
 }, 15_000);
 
 test("keeps the first-party pack as a CLI runtime dependency in source", () => {

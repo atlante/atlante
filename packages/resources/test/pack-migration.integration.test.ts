@@ -48,6 +48,19 @@ const expectedPackFiles = [
   "artifact/template.jsonc",
   "artifact/template.md",
   "atlante.jsonc",
+  "eval/fixtures/calculator/src/sum.ts",
+  "eval/fixtures/calculator/verify.ts",
+  "eval/fixtures/policy-shim/harness/policy.jsonc",
+  "eval/fixtures/policy-shim/src/app.ts",
+  "eval/fixtures/policy-shim/verify.ts",
+  "eval/fixtures/scope/docs/notes.md",
+  "eval/fixtures/scope/src/format.ts",
+  "eval/fixtures/scope/src/range.ts",
+  "eval/fixtures/scope/verify.ts",
+  "eval/report.json",
+  "eval/scenarios/harness-red-green.eval.json",
+  "eval/scenarios/policy-invariant.eval.json",
+  "eval/scenarios/scope-discipline.eval.json",
   "brainstorm/instance.jsonc",
   "build/instance.jsonc",
   "gotchas/template.jsonc",
@@ -140,6 +153,7 @@ describe("first-party static pack contract", () => {
       "**/*.json",
       "**/*.jsonc",
       "**/*.md",
+      "eval/**/*.ts",
       "README.md",
       "LICENSE",
     ]);
@@ -160,8 +174,9 @@ describe("first-party static pack contract", () => {
         .filter(
           (path) => !path.startsWith("test/") && !path.includes("node_modules"),
         )
-        .some((path) => /\.(?:[cm]?ts|[cm]?js)$/.test(path)),
-    ).toBe(false);
+        .filter((path) => /\.(?:[cm]?ts|[cm]?js)$/.test(path))
+        .every((path) => path.startsWith("eval/")),
+    ).toBe(true);
   });
 });
 

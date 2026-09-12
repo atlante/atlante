@@ -13,7 +13,6 @@ import { buildProject, loadProject, prepareProject } from "@atlante/builder";
 import { openCodeMaterializer } from "@atlante/opencode";
 import { createProjectResourcePack, loadPresetFacet } from "@atlante/resources";
 import { SCHEMA_URI } from "@atlante/schema";
-import { validateDocumentText } from "@atlante/validator";
 
 const created: string[] = [];
 const firstPartyPackRoot = fileURLToPath(
@@ -43,21 +42,33 @@ afterEach(() => {
 });
 
 describe("first-party package resources as user configurations", () => {
-  test("the first-party default preset validates against the user configuration schema", () => {
+  test("keeps pack eval metadata outside the user configuration", () => {
     const root = projectRoot();
     const configPath = join(root, "atlante.jsonc");
+    writeFileSync(
+      configPath,
+      `{
+        "$schema": "${SCHEMA_URI}",
+        "extends": "@atlante/pack"
+      }`,
+    );
     const source = loadPresetFacet(
       createProjectResourcePack(root),
       "@atlante/pack",
       configPath,
     );
-    const result = validateDocumentText(
-      JSON.stringify(source.facet.document),
-      configPath,
-    );
 
-    expect(result.diagnostics).toEqual([]);
-    expect(result.document).toBeDefined();
+    expect(source.facet.document.eval).toEqual({
+      host: "opencode",
+      scenarios: "eval/scenarios/*.eval.json",
+      fixtures: "eval/fixtures",
+      report: "eval/report.json",
+    });
+
+    const loaded = loadProject(root);
+    expect(loaded.diagnostics).toEqual([]);
+    expect(loaded.document).toBeDefined();
+    expect(loaded.document?.eval).toBeUndefined();
   });
 
   test("the first-party preset prepares one architect agent, the four phase skills, and the harness skill", () => {
