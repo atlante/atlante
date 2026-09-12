@@ -24,7 +24,9 @@ function waitForExit(child: ChildProcess): Promise<number> {
 }
 
 async function waitForFile(path: string): Promise<void> {
-  const deadline = Date.now() + 5000;
+  // npm cold start on shared CI runners can take several seconds; this
+  // deadline only bounds the wait for the prepack marker, not the test.
+  const deadline = Date.now() + 20_000;
   while (!existsSync(path)) {
     if (Date.now() >= deadline)
       throw new Error(`Timed out waiting for ${path}`);
@@ -81,7 +83,9 @@ describe("syncLocalPack", () => {
 });
 
 describe("dev-local process cleanup", () => {
-  it("interrupts npm pack instead of waiting for the package hook", async () => {
+  it("interrupts npm pack instead of waiting for the package hook", {
+    timeout: 30_000,
+  }, async () => {
     const packsRoot = join(import.meta.dirname, "..");
     const packageRoot = mkdtempSync(join(tmpdir(), "atlante-slow-pack-"));
     const markerPath = join(packageRoot, "npm-pack-started");

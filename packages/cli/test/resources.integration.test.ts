@@ -63,6 +63,7 @@ describe("first-party package resources as user configurations", () => {
       scenarios: "eval/scenarios/*.eval.json",
       fixtures: "eval/fixtures",
       report: "eval/report.json",
+      source: "packages/pack/eval",
     });
 
     const loaded = loadProject(root);
