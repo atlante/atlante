@@ -28,6 +28,12 @@ type SyncPacksOptions = {
   fetch?: typeof fetch;
   env?: Record<string, string | undefined>;
   now?: () => string;
+  localPacks?: ReadonlyMap<string, LocalPackSource>;
+};
+
+export type LocalPackSource = {
+  packageJson: Record<string, unknown>;
+  tarball: Buffer;
 };
 
 type SyncPacksResult = {
@@ -230,6 +236,54 @@ function recordValue(value: unknown): RecordValue | undefined {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? (value as RecordValue)
     : undefined;
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function packageRepositoryUrl(value: unknown): string | undefined {
+  if (typeof value === "string") return value;
+  return stringValue(recordValue(value)?.url);
+}
+
+function packageMaintainers(value: unknown): Array<{ name?: string }> {
+  if (!Array.isArray(value)) return [];
+  return value.map((person) => {
+    if (typeof person === "string") return { name: person };
+    const record = recordValue(person);
+    return { name: stringValue(record?.name) };
+  });
+}
+
+function localRegistryDoc(
+  packageName: string,
+  source: LocalPackSource,
+): NpmRegistryDoc {
+  const packageJson = source.packageJson;
+  const version = stringValue(packageJson.version) ?? "";
+  const repositoryUrl = packageRepositoryUrl(packageJson.repository);
+  const maintainers = packageMaintainers(
+    packageJson.maintainers ?? packageJson.contributors,
+  );
+
+  return {
+    "dist-tags": { latest: version },
+    versions: {
+      [version]: {
+        name: stringValue(packageJson.name),
+        version,
+        description: stringValue(packageJson.description),
+        license: stringValue(packageJson.license),
+        maintainers,
+        repository: repositoryUrl ? { url: repositoryUrl } : undefined,
+        atlante: recordValue(packageJson.atlante) as
+          | { format?: unknown }
+          | undefined,
+        dist: { tarball: `local://${packageName}` },
+      },
+    },
+  };
 }
 
 function isSafePackPath(path: string): boolean {
@@ -517,12 +571,15 @@ export async function syncPacks(
 
   for (const entry of manifest.packs) {
     const packageName = entry.package;
+    const localSource = options.localPacks?.get(packageName);
     let pack: RegistryPack | null = null;
     try {
-      const registryDoc = (await fetchJson(
-        `${NPM_REGISTRY_BASE}/${encodeURIComponent(packageName)}`,
-        fetchImpl,
-      )) as NpmRegistryDoc;
+      const registryDoc = localSource
+        ? localRegistryDoc(packageName, localSource)
+        : ((await fetchJson(
+            `${NPM_REGISTRY_BASE}/${encodeURIComponent(packageName)}`,
+            fetchImpl,
+          )) as NpmRegistryDoc);
       const latest = registryDoc["dist-tags"]?.latest;
       const version = latest ? registryDoc.versions?.[latest] : undefined;
       if (!latest || !version) {
@@ -548,17 +605,19 @@ export async function syncPacks(
       }
 
       let downloads: number | null = null;
-      try {
-        const downloadsDoc = (await fetchJson(
-          `${NPM_DOWNLOADS_BASE}/${encodeURIComponent(packageName)}`,
-          fetchImpl,
-        )) as NpmDownloadsDoc;
-        downloads =
-          typeof downloadsDoc.downloads === "number"
-            ? downloadsDoc.downloads
-            : null;
-      } catch {
-        downloads = null;
+      if (!localSource) {
+        try {
+          const downloadsDoc = (await fetchJson(
+            `${NPM_DOWNLOADS_BASE}/${encodeURIComponent(packageName)}`,
+            fetchImpl,
+          )) as NpmDownloadsDoc;
+          downloads =
+            typeof downloadsDoc.downloads === "number"
+              ? downloadsDoc.downloads
+              : null;
+        } catch {
+          downloads = null;
+        }
       }
 
       const repositoryUrl = version.repository?.url ?? null;
@@ -567,7 +626,7 @@ export async function syncPacks(
         : null;
       let stars: number | null = null;
       let updatedAt: string | null = null;
-      if (repositorySlugValue) {
+      if (!localSource && repositorySlugValue) {
         try {
           const headers: Record<string, string> = {
             Accept: "application/vnd.github+json",
@@ -593,13 +652,18 @@ export async function syncPacks(
         }
       }
 
-      const tarballResponse = await fetchImpl(version.dist.tarball);
-      if (!tarballResponse.ok) {
-        throw new Error(
-          `${packageName}: tarball fetch responded ${tarballResponse.status}`,
-        );
+      let tarball: Buffer;
+      if (localSource) {
+        tarball = localSource.tarball;
+      } else {
+        const tarballResponse = await fetchImpl(version.dist.tarball);
+        if (!tarballResponse.ok) {
+          throw new Error(
+            `${packageName}: tarball fetch responded ${tarballResponse.status}`,
+          );
+        }
+        tarball = Buffer.from(await tarballResponse.arrayBuffer());
       }
-      const tarball = Buffer.from(await tarballResponse.arrayBuffer());
       const extracted = extractTarball(tarball, packageName);
       const readme = extracted.files.find((file) => file.path === "README.md");
 
@@ -642,7 +706,13 @@ export async function syncPacks(
         files: extracted.files,
         ...(extracted.evaluation ? { evaluation: extracted.evaluation } : {}),
       };
-    } catch {
+    } catch (error) {
+      if (localSource) {
+        const detail = error instanceof Error ? `: ${error.message}` : "";
+        throw new Error(
+          `${packageName}: local synchronization failed${detail}`,
+        );
+      }
       const fallback = previousByName.get(packageName);
       if (!fallback) {
         throw new Error(

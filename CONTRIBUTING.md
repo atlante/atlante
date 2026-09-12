@@ -76,6 +76,13 @@ bun run packs:check    # packs lane: site build + packs test suite
 bun run full:check     # all lanes at once
 ```
 
+To preview a local pack's published contents and self-reported evaluation in
+the explorer without contacting npm or GitHub:
+
+```sh
+bun run --cwd packs dev:local -- ../packages/pack
+```
+
 CI mirrors this split: pull requests run `quick:check`, and pushes to `main`
 run one lane workflow per changed area (`ci-core`, `ci-docs`, `ci-website`,
 `ci-packs`).

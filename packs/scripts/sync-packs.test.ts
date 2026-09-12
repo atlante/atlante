@@ -104,7 +104,11 @@ function registryDoc(overrides: Record<string, unknown> = {}): unknown {
 }
 
 async function fixtureTarball(
-  options: { packConfig?: string; report?: unknown } = {},
+  options: {
+    includePreset?: boolean;
+    packConfig?: string;
+    report?: unknown;
+  } = {},
 ): Promise<Buffer> {
   const source = mkdtempSync(join(tmpdir(), "atlante-packs-src-"));
   const packageDir = join(source, "package");
@@ -121,10 +125,14 @@ async function fixtureTarball(
       atlante: { format: 1 },
     }),
   );
-  writeFile("atlante.jsonc", options.packConfig ?? PACK_JSONC);
+  if (options.includePreset !== false) {
+    writeFile("atlante.jsonc", options.packConfig ?? PACK_JSONC);
+  }
   if (options.report !== undefined)
     writeFile("eval/report.json", JSON.stringify(options.report));
-  writeFile("review/atlante.jsonc", REVIEW_JSONC);
+  if (options.includePreset !== false) {
+    writeFile("review/atlante.jsonc", REVIEW_JSONC);
+  }
   writeFile("README.md", README);
   for (const [path, content] of Object.entries(TEMPLATES)) {
     writeFile(path, content);
@@ -195,6 +203,125 @@ function tempWebsiteRoot(): string {
 }
 
 describe("syncPacks", () => {
+  it("synchronizes a local tarball without requesting remote metadata", async () => {
+    const websiteRoot = tempWebsiteRoot();
+    const tarball = await fixtureTarball({
+      packConfig: packWithEvaluation(),
+      report: VALID_EVAL_REPORT,
+    });
+    let remoteRequests = 0;
+
+    const result = await syncPacks({
+      websiteRoot,
+      manifest: MANIFEST,
+      localPacks: new Map([
+        [
+          PACKAGE,
+          {
+            packageJson: {
+              name: PACKAGE,
+              version: "1.0.0",
+              description: "A local test pack",
+              license: "MIT",
+              contributors: [{ name: "local-maintainer" }],
+              repository: { url: REPOSITORY_URL },
+              atlante: { format: 1 },
+            },
+            tarball,
+          },
+        ],
+      ]),
+      fetch: async (
+        _input: string | URL | Request,
+        _init?: RequestInit,
+      ): Promise<Response> => {
+        remoteRequests += 1;
+        throw new Error("local synchronization must not fetch remotely");
+      },
+      now: () => FIXED_NOW,
+    });
+
+    expect(remoteRequests).toBe(0);
+    expect(result.reusedPacks).toBe(0);
+    expect(result.snapshot.packs[0]).toMatchObject({
+      name: PACKAGE,
+      version: "1.0.0",
+      description: "A local test pack",
+      license: "MIT",
+      maintainers: ["local-maintainer"],
+      metrics: {
+        downloads: null,
+        stars: null,
+        publishedAt: null,
+        updatedAt: null,
+      },
+    });
+    expect(result.snapshot.packs[0]?.evaluation).toMatchObject({
+      source: "self-reported",
+      reportPath: "eval/report.json",
+      model: "test/model",
+    });
+
+    rmSync(websiteRoot, { recursive: true, force: true });
+  });
+
+  it("rejects an invalid local tarball instead of reusing the previous snapshot", async () => {
+    const websiteRoot = tempWebsiteRoot();
+    const previous: RegistrySnapshot = {
+      syncedAt: "2026-09-10T00:00:00.000Z",
+      packs: [
+        {
+          name: PACKAGE,
+          official: false,
+          tags: ["test"],
+          description: "previous",
+          version: "0.9.0",
+          license: null,
+          maintainers: [],
+          repository: null,
+          npmUrl: `https://www.npmjs.com/package/${PACKAGE}`,
+          metrics: {
+            downloads: null,
+            stars: null,
+            publishedAt: null,
+            updatedAt: null,
+          },
+          presets: [],
+          readmeHtml: "",
+          files: [],
+        },
+      ],
+    };
+    writeFileSync(
+      join(websiteRoot, "src", "data", "registry-snapshot.json"),
+      JSON.stringify(previous),
+    );
+    const tarball = await fixtureTarball({ includePreset: false });
+
+    await expect(
+      syncPacks({
+        websiteRoot,
+        manifest: MANIFEST,
+        localPacks: new Map([
+          [
+            PACKAGE,
+            {
+              packageJson: {
+                name: PACKAGE,
+                version: "1.0.0",
+                atlante: { format: 1 },
+              },
+              tarball,
+            },
+          ],
+        ]),
+      }),
+    ).rejects.toThrow("local synchronization failed");
+    expect(loadRegistrySnapshot(websiteRoot)).toEqual(previous);
+
+    rmSync(websiteRoot, { recursive: true, force: true });
+  });
+
   it("synchronizes a pack from npm, GitHub, and its tarball", async () => {
     const websiteRoot = tempWebsiteRoot();
     const tarball = await fixtureTarball();
