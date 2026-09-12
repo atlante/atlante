@@ -228,6 +228,8 @@ type ExtractedPack = {
     bindings: { agents: number; skills: number };
   }>;
   evaluation?: RegistryPack["evaluation"];
+  /** Authored repo-relative eval source path, composed into a URL at sync. */
+  evaluationSource?: string;
 };
 
 type RecordValue = Record<string, unknown>;
@@ -310,6 +312,10 @@ function nonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.length > 0;
 }
 
+function positiveNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
+}
+
 function reportRunDate(runId: string): string | undefined {
   const match =
     /^(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})-(\d{2})-[0-9a-f]{4}$/.exec(runId);
@@ -350,6 +356,7 @@ function readPackEvaluation(
   const metadataRecord = recordValue(metadata);
   const reportRecord = recordValue(report);
   const meta = recordValue(reportRecord?.meta);
+  const metaConfig = recordValue(meta?.config);
   const rawScenarios = recordValue(reportRecord?.scenarios);
   const runId = reportRecord?.runId;
   if (
@@ -360,6 +367,11 @@ function readPackEvaluation(
     !nonEmptyString(meta.host) ||
     !nonEmptyString(meta.model) ||
     !nonEmptyString(meta.modelVersion) ||
+    !metaConfig ||
+    !positiveNumber(metaConfig.trials) ||
+    !positiveNumber(metaConfig.timeoutMs) ||
+    !positiveNumber(metaConfig.maxSessions) ||
+    !positiveNumber(metaConfig.maxTokens) ||
     !rawScenarios
   )
     return undefined;
@@ -398,6 +410,12 @@ function readPackEvaluation(
     host: meta.host,
     model: meta.model,
     modelVersion: meta.modelVersion,
+    config: {
+      trials: metaConfig.trials,
+      timeoutMs: metaConfig.timeoutMs,
+      maxSessions: metaConfig.maxSessions,
+      maxTokens: metaConfig.maxTokens,
+    },
     scenarios,
   };
 }
@@ -517,10 +535,17 @@ function extractTarball(tarball: Buffer, packageName: string): ExtractedPack {
           )
         : undefined;
 
+    // Authored repo-relative path of the eval sources; the sync composes the
+    // deep link against the release tag once the published version is known.
+    const evaluationSource = evaluationMetadata?.source;
+
     return {
       files,
       presets,
       ...(evaluation ? { evaluation } : {}),
+      ...(nonEmptyString(evaluationSource) && isSafePackPath(evaluationSource)
+        ? { evaluationSource }
+        : {}),
     };
   } finally {
     rmSync(workDir, { recursive: true, force: true });
@@ -674,6 +699,16 @@ export async function syncPacks(
       const extracted = extractTarball(tarball, packageName);
       const readme = extracted.files.find((file) => file.path === "README.md");
 
+      // The eval source link pins the release tag (v<version>), so the
+      // published self-reported results stay inspectable at that version.
+      let evaluation = extracted.evaluation;
+      if (evaluation && repositorySlugValue && extracted.evaluationSource) {
+        evaluation = {
+          ...evaluation,
+          sourceUrl: `https://github.com/${repositorySlugValue}/tree/v${version.version ?? latest}/${extracted.evaluationSource}`,
+        };
+      }
+
       pack = {
         name: packageName,
         official: entry.official,
@@ -711,7 +746,7 @@ export async function syncPacks(
             )
           : "",
         files: extracted.files,
-        ...(extracted.evaluation ? { evaluation: extracted.evaluation } : {}),
+        ...(evaluation ? { evaluation } : {}),
       };
     } catch (error) {
       if (localSource) {

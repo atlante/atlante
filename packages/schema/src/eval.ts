@@ -108,6 +108,11 @@ export const evalPackConfigSchema = z.strictObject({
   fixtures: sandboxRelativePathSchema.optional(),
   /** Optional report path relative to the pack root. */
   report: sandboxRelativePathSchema.optional(),
+  /**
+   * Optional repo-relative path of the eval sources; registries deep-link it
+   * at the release tag (`v<version>`) of the pack's repository.
+   */
+  source: sandboxRelativePathSchema.optional(),
 });
 
 export type EvalPackConfig = z.infer<typeof evalPackConfigSchema>;

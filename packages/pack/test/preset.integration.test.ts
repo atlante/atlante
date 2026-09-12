@@ -185,6 +185,7 @@ describe("first-party preset surface", () => {
       scenarios: "eval/scenarios/*.eval.json",
       fixtures: "eval/fixtures",
       report: "eval/report.json",
+      source: "packages/pack/eval",
     });
   });
 

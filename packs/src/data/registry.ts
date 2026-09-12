@@ -39,7 +39,16 @@ export type RegistryEvaluation = {
   host: string;
   model: string;
   modelVersion: string;
+  /** Effective run budget as recorded in the report. */
+  config: {
+    trials: number;
+    timeoutMs: number;
+    maxSessions: number;
+    maxTokens: number;
+  };
   scenarios: Record<string, RegistryEvaluationScenario>;
+  /** GitHub tree URL of the authored evaluation sources, when resolvable. */
+  sourceUrl?: string;
 };
 
 export type RegistryPack = {

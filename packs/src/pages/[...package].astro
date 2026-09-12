@@ -168,6 +168,27 @@ const bindingSummary = (binding: { agents: number; skills: number }): string => 
               <dd>{formatDate(evaluation.runDate)}</dd>
             </div>
           </dl>
+          <div class="evaluation-budget">
+            <span class="section-label">Run budget</span>
+            <dl class="evaluation-budget-grid">
+              <div class="evaluation-metadata-item">
+                <dt class="meta-label">Trials</dt>
+                <dd>{evaluation.config.trials}</dd>
+              </div>
+              <div class="evaluation-metadata-item">
+                <dt class="meta-label">Timeout (ms)</dt>
+                <dd>{evaluation.config.timeoutMs}</dd>
+              </div>
+              <div class="evaluation-metadata-item">
+                <dt class="meta-label">Max sessions</dt>
+                <dd>{evaluation.config.maxSessions}</dd>
+              </div>
+              <div class="evaluation-metadata-item">
+                <dt class="meta-label">Max tokens</dt>
+                <dd>{evaluation.config.maxTokens}</dd>
+              </div>
+            </dl>
+          </div>
           <div class="evaluation-scenarios">
             <span class="section-label">Scenario pass rates</span>
             <ul class="evaluation-list">
@@ -187,6 +208,13 @@ const bindingSummary = (binding: { agents: number; skills: number }): string => 
                 </li>
               ))}
             </ul>
+            {evaluation.sourceUrl && (
+              <p class="evaluation-source">
+                <a href={evaluation.sourceUrl} rel="noopener noreferrer">
+                  Scenarios and checks on GitHub
+                </a>
+              </p>
+            )}
           </div>
         </section>
       )}
@@ -210,12 +238,12 @@ const bindingSummary = (binding: { agents: number; skills: number }): string => 
                 class="content-tab"
                 type="button"
                 role="tab"
-                id="content-tab-files"
+                id="content-tab-contents"
                 aria-selected="false"
-                aria-controls="content-panel-files"
-                data-content-tab="files"
+                aria-controls="content-panel-contents"
+                data-content-tab="contents"
               >
-                Files
+                Contents
               </button>
             </div>
 
@@ -225,6 +253,24 @@ const bindingSummary = (binding: { agents: number; skills: number }): string => 
               id="content-panel-overview"
               aria-labelledby="content-tab-overview"
               data-content-panel="overview"
+            >
+              <section class="readme" aria-label="Pack README">
+                <span class="section-label">README.md</span>
+                {readmeHtml === "" ? (
+                  <p>This pack does not include a README.</p>
+                ) : (
+                  <div set:html={readmeHtml} />
+                )}
+              </section>
+            </div>
+
+            <div
+              class="content-panel"
+              role="tabpanel"
+              id="content-panel-contents"
+              aria-labelledby="content-tab-contents"
+              data-content-panel="contents"
+              hidden
             >
               <section class="presets-section" aria-label="Included presets">
                 <span class="section-label">Presets</span>
@@ -245,24 +291,6 @@ const bindingSummary = (binding: { agents: number; skills: number }): string => 
                 </ul>
               </section>
 
-              <section class="readme" aria-label="Pack README">
-                <span class="section-label">README.md</span>
-                {readmeHtml === "" ? (
-                  <p>This pack does not include a README.</p>
-                ) : (
-                  <div set:html={readmeHtml} />
-                )}
-              </section>
-            </div>
-
-            <div
-              class="content-panel"
-              role="tabpanel"
-              id="content-panel-files"
-              aria-labelledby="content-tab-files"
-              data-content-panel="files"
-              hidden
-            >
               <section class="file-section" aria-label="Pack contents">
                 <span class="section-label">Pack contents</span>
                 <div class="file-inspector">

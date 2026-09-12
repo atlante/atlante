@@ -8,7 +8,8 @@
     "host": "opencode",
     "scenarios": "eval/scenarios/*.eval.json",
     "fixtures": "eval/fixtures",
-    "report": "eval/report.json"
+    "report": "eval/report.json",
+    "source": "packages/pack/eval"
   },
   "agents": {
     "architect": {

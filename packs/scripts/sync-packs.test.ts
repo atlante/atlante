@@ -38,6 +38,12 @@ const VALID_EVAL_REPORT = {
     host: "opencode",
     model: "test/model",
     modelVersion: "model-x",
+    config: {
+      trials: 2,
+      timeoutMs: 300000,
+      maxSessions: 10,
+      maxTokens: 200000,
+    },
   },
   scenarios: {
     "scope-discipline": { passRate: 1, description: "Stays in scope." },
@@ -51,6 +57,7 @@ function packWithEvaluation(reportPath = "eval/report.json"): string {
     `,
   "eval": {
     "scenarios": "eval/scenarios/*.eval.json",
+    "source": "eval",
     "report": "${reportPath}"
   }
 }`,
@@ -406,10 +413,17 @@ describe("syncPacks", () => {
       host: "opencode",
       model: "test/model",
       modelVersion: "model-x",
+      config: {
+        trials: 2,
+        timeoutMs: 300000,
+        maxSessions: 10,
+        maxTokens: 200000,
+      },
       scenarios: {
         "scope-discipline": { passRate: 1, description: "Stays in scope." },
         "policy-invariant": { passRate: 0.5 },
       },
+      sourceUrl: "https://github.com/acme/test-pack/tree/v1.0.0/eval",
     });
 
     rmSync(websiteRoot, { recursive: true, force: true });
@@ -438,6 +452,16 @@ describe("syncPacks", () => {
         { ...VALID_EVAL_REPORT, scenarios: { broken: { passRate: 2 } } },
       ],
       [packWithEvaluation(), { ...VALID_EVAL_REPORT, meta: undefined }],
+      [
+        packWithEvaluation(),
+        {
+          ...VALID_EVAL_REPORT,
+          meta: {
+            ...VALID_EVAL_REPORT.meta,
+            config: { ...VALID_EVAL_REPORT.meta.config, trials: 0 },
+          },
+        },
+      ],
       [packWithEvaluation("../report.json"), VALID_EVAL_REPORT],
       [packWithEvaluation("eval\\report.json"), VALID_EVAL_REPORT],
       [packWithEvaluation("C:/report.json"), VALID_EVAL_REPORT],

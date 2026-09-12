@@ -78,7 +78,7 @@ export function contentTabs(): void {
   };
 
   const tabFromHash = (): string =>
-    location.hash === "#files" ? "files" : "overview";
+    location.hash === "#contents" ? "contents" : "overview";
 
   for (const tab of tabs) {
     tab.addEventListener("click", () => {
