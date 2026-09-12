@@ -96,6 +96,24 @@ function signalExitCode(signal: NodeJS.Signals): number {
   return signal === "SIGINT" ? 130 : 143;
 }
 
+/**
+ * Interrupts a tracked child and its descendants. The child runs detached as
+ * its own process-group leader; a plain `child.kill()` would orphan the
+ * grandchildren that inherit its stdio — for example npm's prepack scripts —
+ * and keep this process's pipes open after the child itself is gone.
+ */
+function interruptChild(
+  child: ChildProcess | undefined,
+  signal: NodeJS.Signals,
+): void {
+  if (!child?.pid) return;
+  try {
+    process.kill(-child.pid, signal);
+  } catch {
+    child.kill(signal);
+  }
+}
+
 function packFilename(result: unknown): string | undefined {
   const entries = Array.isArray(result)
     ? result
@@ -115,7 +133,7 @@ async function createPublicationTarball(
     const npmPack = spawn(
       "npm",
       ["pack", "--json", "--pack-destination", outputDir, "."],
-      { cwd: packageRoot, stdio: ["ignore", "pipe", "pipe"] },
+      { cwd: packageRoot, stdio: ["ignore", "pipe", "pipe"], detached: true },
     );
     onChild(npmPack);
     const [stdout, stderr, exitCode] = await Promise.all([
@@ -255,7 +273,7 @@ if (
   const interruption: InterruptState = {};
   const handleSignal = (signal: NodeJS.Signals): void => {
     interruption.signal ??= signal;
-    interruption.child?.kill(signal);
+    interruptChild(interruption.child, signal);
   };
   process.on("SIGINT", handleSignal);
   process.on("SIGTERM", handleSignal);
