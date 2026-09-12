@@ -48,6 +48,56 @@ function bindCopyTextButtons(): void {
   });
 }
 
+/**
+ * Overview/Files content tabs. The selected tab is mirrored to the URL hash
+ (#files) so the Files inspector deep links; unknown hashes fall back to the
+ * overview.
+ */
+export function contentTabs(): void {
+  const tabs = [
+    ...document.querySelectorAll<HTMLButtonElement>("[data-content-tab]"),
+  ];
+  if (tabs.length === 0) return;
+
+  const panels = new Map(
+    [...document.querySelectorAll<HTMLElement>("[data-content-panel]")].map(
+      (panel) => [panel.dataset.contentPanel ?? "", panel],
+    ),
+  );
+
+  const select = (name: string): void => {
+    for (const tab of tabs) {
+      tab.setAttribute(
+        "aria-selected",
+        String(tab.dataset.contentTab === name),
+      );
+    }
+    for (const [panelName, panel] of panels) {
+      panel.hidden = panelName !== name;
+    }
+  };
+
+  const tabFromHash = (): string =>
+    location.hash === "#files" ? "files" : "overview";
+
+  for (const tab of tabs) {
+    tab.addEventListener("click", () => {
+      select(tab.dataset.contentTab ?? "overview");
+      history.replaceState(
+        null,
+        "",
+        `#${tab.dataset.contentTab ?? "overview"}`,
+      );
+    });
+  }
+
+  window.addEventListener("hashchange", () => {
+    select(tabFromHash());
+  });
+
+  select(tabFromHash());
+}
+
 export function installPanel(): void {
   bindCopyTextButtons();
 

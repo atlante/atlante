@@ -105,7 +105,6 @@ const packs = snapshot.packs;
         <span class="column-label">Presets</span>
         <span class="column-label">Downloads</span>
         <span class="column-label">Stars</span>
-        <span></span>
       </div>
       <ol class="pack-list" id="pack-list">
         {packs.map((pack, index) => (
@@ -156,7 +155,6 @@ const packs = snapshot.packs;
               <span class="metric-value">{formatCount(pack.metrics.stars)}</span>
               <span class="metric-label-mobile"> stars</span>
             </div>
-            <span class="row-arrow" aria-hidden="true">→</span>
           </li>
         ))}
       </ol>

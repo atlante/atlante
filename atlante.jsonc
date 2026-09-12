@@ -10,6 +10,7 @@
   "eval": {
     "host": "opencode",
     "include": ["@atlante/pack"],
+    "model": "zai-coding-plan/glm-5.3-flash",
     "budget": {
       "trials": 2,
       "timeoutMs": 300000,

@@ -147,12 +147,9 @@ const bindingSummary = (binding: { agents: number; skills: number }): string => 
       {evaluation && (
         <section class="evaluation-panel" aria-labelledby="evaluation-title">
           <div class="evaluation-header">
-            <div>
-              <span class="section-label">Evaluated</span>
-              <h2 class="evaluation-title" id="evaluation-title">
-                Self-reported evaluation
-              </h2>
-            </div>
+            <h2 class="evaluation-title" id="evaluation-title">
+              Evaluation
+            </h2>
             <span class="badge evaluation">Self-reported</span>
           </div>
           <p class="evaluation-disclaimer">
@@ -160,14 +157,12 @@ const bindingSummary = (binding: { agents: number; skills: number }): string => 
             it is not an Atlante certification.
           </p>
           <dl class="evaluation-metadata">
-            <div class="evaluation-metadata-item">
-              <dt class="meta-label">Model</dt>
-              <dd><code>{evaluation.model}</code></dd>
-            </div>
-            <div class="evaluation-metadata-item">
-              <dt class="meta-label">Model version</dt>
-              <dd><code>{evaluation.modelVersion}</code></dd>
-            </div>
+            {evaluation.model !== "unknown" && (
+              <div class="evaluation-metadata-item">
+                <dt class="meta-label">Model</dt>
+                <dd><code>{evaluation.model}</code></dd>
+              </div>
+            )}
             <div class="evaluation-metadata-item">
               <dt class="meta-label">Atlante</dt>
               <dd><code>{evaluation.atlante}</code></dd>
@@ -183,7 +178,9 @@ const bindingSummary = (binding: { agents: number; skills: number }): string => 
               {evaluationScenarios.map(([name, scenario]) => (
                 <li class="evaluation-item">
                   <code>{name}</code>
-                  <strong>{formatPassRate(scenario.passRate)}</strong>
+                  <strong
+                    class={scenario.passRate === 1 ? "rate-pass" : "rate-partial"}
+                  >{formatPassRate(scenario.passRate)}</strong>
                 </li>
               ))}
             </ul>
@@ -193,63 +190,107 @@ const bindingSummary = (binding: { agents: number; skills: number }): string => 
 
       <div class="detail-grid">
         <div class="detail-main">
-          <section class="readme" aria-label="Pack README">
-            <span class="section-label">README.md</span>
-            {readmeHtml === "" ? (
-              <p>This pack does not include a README.</p>
-            ) : (
-              <div set:html={readmeHtml} />
-            )}
-          </section>
-
-          <section class="presets-section" aria-label="Included presets">
-            <span class="section-label">Presets</span>
-            <p class="presets-note">
-              Select a preset in your configuration through its locator with
-              <code>extends</code>, or during <code>init</code> with
-              <code>--pack</code>.
-            </p>
-            <ul class="preset-list">
-              {pack.presets.map((preset) => (
-                <li class="preset-item">
-                  <code>{preset.locator}</code>
-                  <span>
-                    {preset.default ? "Default preset" : "Named preset"}{preset.bindings.agents + preset.bindings.skills > 0 && ` · ${bindingSummary(preset.bindings)}`}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          <section class="file-section" aria-label="Pack contents">
-            <span class="section-label">Pack contents</span>
-            <div class="file-inspector">
-              <div class="file-head">
-                <div class="file-head-title">
-                  <span>File</span>
-                  <strong data-file-name>{selectedFile?.path}</strong>
-                </div>
-              </div>
-              <pre
-                class="file-view"
-                tabindex="0"
-                data-file-view
-              ><code set:html={selectedFile?.content === null || selectedFile === undefined ? "Preview not available: this file is too large." : highlightFile(selectedFile.path, selectedFile.content)} /></pre>
-              <div class="file-selector">
-                <label for="pack-file">Files</label>
-                <select id="pack-file" data-file-select aria-label="Select a pack file">
-                  {files.map((file) => (
-                    <option
-                      value={file.path}
-                      selected={file.path === selectedFile?.path}
-                    >
-                      {file.path}
-                    </option>
-                  ))}
-                </select>
-              </div>
+          <div class="content-tabs">
+            <div class="content-tab-bar" role="tablist" aria-label="Pack content">
+              <button
+                class="content-tab"
+                type="button"
+                role="tab"
+                id="content-tab-overview"
+                aria-selected="true"
+                aria-controls="content-panel-overview"
+                data-content-tab="overview"
+              >
+                Overview
+              </button>
+              <button
+                class="content-tab"
+                type="button"
+                role="tab"
+                id="content-tab-files"
+                aria-selected="false"
+                aria-controls="content-panel-files"
+                data-content-tab="files"
+              >
+                Files
+              </button>
             </div>
-          </section>
+
+            <div
+              class="content-panel"
+              role="tabpanel"
+              id="content-panel-overview"
+              aria-labelledby="content-tab-overview"
+              data-content-panel="overview"
+            >
+              <section class="presets-section" aria-label="Included presets">
+                <span class="section-label">Presets</span>
+                <p class="presets-note">
+                  Select a preset in your configuration through its locator with
+                  <code>extends</code>, or during <code>init</code> with
+                  <code>--pack</code>.
+                </p>
+                <ul class="preset-list">
+                  {pack.presets.map((preset) => (
+                    <li class="preset-item">
+                      <code>{preset.locator}</code>
+                      <span>
+                        {preset.default ? "Default preset" : "Named preset"}{preset.bindings.agents + preset.bindings.skills > 0 && ` · ${bindingSummary(preset.bindings)}`}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+
+              <section class="readme" aria-label="Pack README">
+                <span class="section-label">README.md</span>
+                {readmeHtml === "" ? (
+                  <p>This pack does not include a README.</p>
+                ) : (
+                  <div set:html={readmeHtml} />
+                )}
+              </section>
+            </div>
+
+            <div
+              class="content-panel"
+              role="tabpanel"
+              id="content-panel-files"
+              aria-labelledby="content-tab-files"
+              data-content-panel="files"
+              hidden
+            >
+              <section class="file-section" aria-label="Pack contents">
+                <span class="section-label">Pack contents</span>
+                <div class="file-inspector">
+                  <div class="file-head">
+                    <div class="file-head-title">
+                      <span>File</span>
+                      <strong data-file-name>{selectedFile?.path}</strong>
+                    </div>
+                  </div>
+                  <pre
+                    class="file-view"
+                    tabindex="0"
+                    data-file-view
+                  ><code set:html={selectedFile?.content === null || selectedFile === undefined ? "Preview not available: this file is too large." : highlightFile(selectedFile.path, selectedFile.content)} /></pre>
+                  <div class="file-selector">
+                    <label for="pack-file">Files</label>
+                    <select id="pack-file" data-file-select aria-label="Select a pack file">
+                      {files.map((file) => (
+                        <option
+                          value={file.path}
+                          selected={file.path === selectedFile?.path}
+                        >
+                          {file.path}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
         </div>
 
         <aside class="detail-sidebar" aria-label="Pack metadata">
@@ -308,8 +349,9 @@ const bindingSummary = (binding: { agents: number; skills: number }): string => 
   <script type="application/json" id="pack-files" set:html={filesPayload} />
 
   <script>
-    import { installPanel } from "../lib/pack-detail";
+    import { contentTabs, installPanel } from "../lib/pack-detail";
 
+    contentTabs();
     installPanel();
   </script>
 </BaseLayout>
