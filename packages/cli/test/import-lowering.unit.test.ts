@@ -1323,7 +1323,7 @@ describe("import into an existing local pack", () => {
       readFileSync: () => "",
       mkdtempSync: (prefix) => `${prefix}stage`,
       mkdirSync: () => undefined,
-      renameSync: (source, destination) => {
+      renameSync: (_source, destination) => {
         if (destination === mergePlan.presetPath)
           throw new Error("preset rename failed");
       },
