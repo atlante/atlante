@@ -3,8 +3,13 @@ import "../styles/packs.css";
 import BaseLayout from "../layouts/BaseLayout.astro";
 import SiteNav from "../components/SiteNav.astro";
 import SiteFooter from "../components/SiteFooter.astro";
-import type { RegistryFile } from "../data/registry";
-import { formatCount, formatDate, formatSyncTime } from "../data/format";
+import type { RegistryFile, RegistryPack } from "../data/registry";
+import {
+  formatCount,
+  formatDate,
+  formatPassRate,
+  formatSyncTime,
+} from "../data/format";
 import { encodeJsonForScript } from "../data/json";
 import { highlightFile } from "../lib/highlight";
 import snapshot from "../data/registry-snapshot.json";
@@ -17,7 +22,7 @@ export function getStaticPaths() {
 }
 
 interface Props {
-  pack: (typeof snapshot.packs)[number];
+  pack: RegistryPack;
 }
 
 const { pack } = Astro.props;
@@ -27,6 +32,10 @@ const { pack } = Astro.props;
 const readmeHtml = pack.readmeHtml;
 const files: RegistryFile[] = pack.files;
 const selectedFile = files.find((file) => file.path !== "README.md") ?? files[0];
+const evaluation = pack.evaluation;
+const evaluationScenarios = evaluation
+  ? Object.entries(evaluation.scenarios)
+  : [];
 const filesPayload = encodeJsonForScript(
   files.map((file) => ({ path: file.path, content: file.content })),
 );
@@ -111,7 +120,7 @@ const bindingSummary = (binding: { agents: number; skills: number }): string => 
           <code
             ><span class="command-prompt" aria-hidden="true">$ </span
             ><span id="command-text" data-package={pack.name}
-              >npx atlante@latest init --pack {pack.name}</span
+              >npx atlante init --pack {pack.name}</span
             ></code
           >
           <button
@@ -119,7 +128,7 @@ const bindingSummary = (binding: { agents: number; skills: number }): string => 
             type="button"
             aria-label="Copy installation command"
             data-install-copy
-            data-copy-text={`npx atlante@latest init --pack ${pack.name}`}
+            data-copy-text={`npx atlante init --pack ${pack.name}`}
           >
             <svg
               viewBox="0 0 24 24"
@@ -135,65 +144,184 @@ const bindingSummary = (binding: { agents: number; skills: number }): string => 
         </div>
       </section>
 
-      <div class="detail-grid">
-        <div class="detail-main">
-          <section class="readme" aria-label="Pack README">
-            <span class="section-label">README.md</span>
-            {readmeHtml === "" ? (
-              <p>This pack does not include a README.</p>
-            ) : (
-              <div set:html={readmeHtml} />
+      {evaluation && (
+        <section class="evaluation-panel" aria-labelledby="evaluation-title">
+          <div class="evaluation-header">
+            <h2 class="evaluation-title" id="evaluation-title">
+              Evaluation
+            </h2>
+            <span class="badge evaluation">Self-reported</span>
+          </div>
+          <dl class="evaluation-metadata">
+            {evaluation.model !== "unknown" && (
+              <div class="evaluation-metadata-item">
+                <dt class="meta-label">Model</dt>
+                <dd><code>{evaluation.model}</code></dd>
+              </div>
             )}
-          </section>
-
-          <section class="presets-section" aria-label="Included presets">
-            <span class="section-label">Presets</span>
-            <p class="presets-note">
-              Select a preset in your configuration through its locator with
-              <code>extends</code>, or during <code>init</code> with
-              <code>--pack</code>.
-            </p>
-            <ul class="preset-list">
-              {pack.presets.map((preset) => (
-                <li class="preset-item">
-                  <code>{preset.locator}</code>
-                  <span>
-                    {preset.default ? "Default preset" : "Named preset"}{preset.bindings.agents + preset.bindings.skills > 0 && ` · ${bindingSummary(preset.bindings)}`}
-                  </span>
+            <div class="evaluation-metadata-item">
+              <dt class="meta-label">Atlante</dt>
+              <dd><code>{evaluation.atlante}</code></dd>
+            </div>
+            <div class="evaluation-metadata-item">
+              <dt class="meta-label">Run date</dt>
+              <dd>{formatDate(evaluation.runDate)}</dd>
+            </div>
+          </dl>
+          <div class="evaluation-budget">
+            <span class="section-label">Run budget</span>
+            <dl class="evaluation-budget-grid">
+              <div class="evaluation-metadata-item">
+                <dt class="meta-label">Trials</dt>
+                <dd>{evaluation.config.trials}</dd>
+              </div>
+              <div class="evaluation-metadata-item">
+                <dt class="meta-label">Timeout (ms)</dt>
+                <dd>{evaluation.config.timeoutMs}</dd>
+              </div>
+              <div class="evaluation-metadata-item">
+                <dt class="meta-label">Max sessions</dt>
+                <dd>{evaluation.config.maxSessions}</dd>
+              </div>
+              <div class="evaluation-metadata-item">
+                <dt class="meta-label">Max tokens</dt>
+                <dd>{evaluation.config.maxTokens}</dd>
+              </div>
+            </dl>
+          </div>
+          <div class="evaluation-scenarios">
+            <span class="section-label">Scenario pass rates</span>
+            <ul class="evaluation-list">
+              {evaluationScenarios.map(([name, scenario]) => (
+                <li class="evaluation-item">
+                  <div class="evaluation-item-main">
+                    <code>{name}</code>
+                    {scenario.description && (
+                      <p class="evaluation-description">
+                        {scenario.description}
+                      </p>
+                    )}
+                  </div>
+                  <strong
+                    class={scenario.passRate === 1 ? "rate-pass" : "rate-partial"}
+                  >{formatPassRate(scenario.passRate)}</strong>
                 </li>
               ))}
             </ul>
-          </section>
+            {evaluation.sourceUrl && (
+              <p class="evaluation-source">
+                <a href={evaluation.sourceUrl} rel="noopener noreferrer">
+                  Scenarios and checks on GitHub
+                </a>
+              </p>
+            )}
+          </div>
+        </section>
+      )}
 
-          <section class="file-section" aria-label="Pack contents">
-            <span class="section-label">Pack contents</span>
-            <div class="file-inspector">
-              <div class="file-head">
-                <div class="file-head-title">
-                  <span>File</span>
-                  <strong data-file-name>{selectedFile?.path}</strong>
-                </div>
-              </div>
-              <pre
-                class="file-view"
-                tabindex="0"
-                data-file-view
-              ><code set:html={selectedFile?.content === null || selectedFile === undefined ? "Preview not available: this file is too large." : highlightFile(selectedFile.path, selectedFile.content)} /></pre>
-              <div class="file-selector">
-                <label for="pack-file">Files</label>
-                <select id="pack-file" data-file-select aria-label="Select a pack file">
-                  {files.map((file) => (
-                    <option
-                      value={file.path}
-                      selected={file.path === selectedFile?.path}
-                    >
-                      {file.path}
-                    </option>
-                  ))}
-                </select>
-              </div>
+      <div class="detail-grid">
+        <div class="detail-main">
+          <div class="content-tabs">
+            <div class="content-tab-bar" role="tablist" aria-label="Pack content">
+              <button
+                class="content-tab"
+                type="button"
+                role="tab"
+                id="content-tab-overview"
+                aria-selected="true"
+                aria-controls="content-panel-overview"
+                data-content-tab="overview"
+              >
+                Overview
+              </button>
+              <button
+                class="content-tab"
+                type="button"
+                role="tab"
+                id="content-tab-contents"
+                aria-selected="false"
+                aria-controls="content-panel-contents"
+                data-content-tab="contents"
+              >
+                Contents
+              </button>
             </div>
-          </section>
+
+            <div
+              class="content-panel"
+              role="tabpanel"
+              id="content-panel-overview"
+              aria-labelledby="content-tab-overview"
+              data-content-panel="overview"
+            >
+              <section class="readme" aria-label="Pack README">
+                <span class="section-label">README.md</span>
+                {readmeHtml === "" ? (
+                  <p>This pack does not include a README.</p>
+                ) : (
+                  <div set:html={readmeHtml} />
+                )}
+              </section>
+            </div>
+
+            <div
+              class="content-panel"
+              role="tabpanel"
+              id="content-panel-contents"
+              aria-labelledby="content-tab-contents"
+              data-content-panel="contents"
+              hidden
+            >
+              <section class="presets-section" aria-label="Included presets">
+                <span class="section-label">Presets</span>
+                <p class="presets-note">
+                  Select a preset in your configuration through its locator with
+                  <code>extends</code>, or during <code>init</code> with
+                  <code>--pack</code>.
+                </p>
+                <ul class="preset-list">
+                  {pack.presets.map((preset) => (
+                    <li class="preset-item">
+                      <code>{preset.locator}</code>
+                      <span>
+                        {preset.default ? "Default preset" : "Named preset"}{preset.bindings.agents + preset.bindings.skills > 0 && ` · ${bindingSummary(preset.bindings)}`}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+
+              <section class="file-section" aria-label="Pack contents">
+                <span class="section-label">Pack contents</span>
+                <div class="file-inspector">
+                  <div class="file-head">
+                    <div class="file-head-title">
+                      <span>File</span>
+                      <strong data-file-name>{selectedFile?.path}</strong>
+                    </div>
+                  </div>
+                  <pre
+                    class="file-view"
+                    tabindex="0"
+                    data-file-view
+                  ><code set:html={selectedFile?.content === null || selectedFile === undefined ? "Preview not available: this file is too large." : highlightFile(selectedFile.path, selectedFile.content)} /></pre>
+                  <div class="file-selector">
+                    <label for="pack-file">Files</label>
+                    <select id="pack-file" data-file-select aria-label="Select a pack file">
+                      {files.map((file) => (
+                        <option
+                          value={file.path}
+                          selected={file.path === selectedFile?.path}
+                        >
+                          {file.path}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
         </div>
 
         <aside class="detail-sidebar" aria-label="Pack metadata">
@@ -252,8 +380,9 @@ const bindingSummary = (binding: { agents: number; skills: number }): string => 
   <script type="application/json" id="pack-files" set:html={filesPayload} />
 
   <script>
-    import { installPanel } from "../lib/pack-detail";
+    import { contentTabs, installPanel } from "../lib/pack-detail";
 
+    contentTabs();
     installPanel();
   </script>
 </BaseLayout>

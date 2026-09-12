@@ -105,6 +105,7 @@ describe("runEval", () => {
     if (!result) throw new Error("missing scenario result");
     expect(result.trials).toHaveLength(3);
     expect(result.passRate).toBe(1);
+    expect(result.description).toBe("Sandbox lifecycle fixture scenario.");
     expect(report.meta.model).toBe("provider/model");
     expect(report.meta.modelVersion).toBe("v9");
     expect(report.meta.host).toBe("fake");
@@ -241,6 +242,7 @@ describe("runEval", () => {
         task: { ...base.scenario.task, fixture: "eval/fixtures/absent" },
       },
       source: "eval/scenarios/broken.eval.json",
+      origin: base.origin,
     };
     const report = await runEval({
       projectRoot,

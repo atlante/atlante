@@ -9,7 +9,8 @@
   // real model calls through the host, so they never run in CI.
   "eval": {
     "host": "opencode",
-    "scenarios": "eval/scenarios/*.eval.json*",
+    "include": ["@atlante/pack"],
+    "model": "zai-coding-plan/glm-5.3-flash",
     "budget": {
       "trials": 2,
       "timeoutMs": 300000,

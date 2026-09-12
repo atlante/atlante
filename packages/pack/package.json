@@ -45,6 +45,7 @@
     "**/*.json",
     "**/*.jsonc",
     "**/*.md",
+    "eval/**/*.ts",
     "README.md",
     "LICENSE"
   ],

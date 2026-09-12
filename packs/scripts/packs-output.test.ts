@@ -36,7 +36,7 @@ describe.skipIf(process.env.ATLANTE_BUILT_OUTPUT_TESTS !== "1")(
 
     it("renders the pack detail page with installation and inspection", () => {
       const html = read("dist/@atlante/pack.html");
-      expect(html).toContain("npx atlante@latest init --pack @atlante/pack");
+      expect(html).toContain("npx atlante init --pack @atlante/pack");
       expect(html).toContain("npm install --save-dev @atlante/pack");
       expect(html).toContain("atlante.format: 1");
       expect(html).toContain("data-file-select");
@@ -47,6 +47,11 @@ describe.skipIf(process.env.ATLANTE_BUILT_OUTPUT_TESTS !== "1")(
       expect(html).toContain("@atlante/pack/architect");
       expect(html).toContain("https://www.npmjs.com/package/@atlante/pack");
       expect(html).toContain("https://github.com/atlante/atlante");
+    });
+
+    it("keeps the evaluation band absent when the snapshot has no report", () => {
+      const html = read("dist/@atlante/pack.html");
+      expect(html).not.toContain("Self-reported evaluation");
     });
 
     it("publishes the branded 404 output with recovery links", () => {

@@ -25,6 +25,32 @@ export type RegistryFile = {
   content: string | null;
 };
 
+export type RegistryEvaluationScenario = {
+  passRate: number;
+  description?: string;
+};
+
+export type RegistryEvaluation = {
+  source: "self-reported";
+  reportPath: string;
+  runId: string;
+  runDate: string;
+  atlante: string;
+  host: string;
+  model: string;
+  modelVersion: string;
+  /** Effective run budget as recorded in the report. */
+  config: {
+    trials: number;
+    timeoutMs: number;
+    maxSessions: number;
+    maxTokens: number;
+  };
+  scenarios: Record<string, RegistryEvaluationScenario>;
+  /** GitHub tree URL of the authored evaluation sources, when resolvable. */
+  sourceUrl?: string;
+};
+
 export type RegistryPack = {
   name: string;
   official: boolean;
@@ -39,6 +65,7 @@ export type RegistryPack = {
   presets: RegistryPreset[];
   readmeHtml: string;
   files: RegistryFile[];
+  evaluation?: RegistryEvaluation;
 };
 
 export type RegistrySnapshot = {

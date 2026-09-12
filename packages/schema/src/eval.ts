@@ -60,18 +60,63 @@ const evalBudgetSchema = z.strictObject({
 
 export type EvalBudget = z.infer<typeof evalBudgetSchema>;
 
-/** Optional `eval` section of an Atlante configuration document. */
-export const evalConfigSchema = z.strictObject({
+const evalIncludeSchema = z
+  .array(z.string().min(1))
+  .min(1)
+  .refine(
+    (locators) => new Set(locators).size === locators.length,
+    "eval.include must not contain duplicate locators",
+  );
+
+const evalProjectFields = {
   host: z.literal(EVAL_HOST),
   /** Glob of scenario documents, relative to the project root. */
-  scenarios: z.string().min(1),
+  scenarios: z.string().min(1).optional(),
+  /** Pack or preset locators whose scenarios may execute in this project. */
+  include: evalIncludeSchema.optional(),
   /** Passthrough to the host run (`--model`); default is the host default. */
   model: z.string().min(1).optional(),
   budget: evalBudgetSchema.optional(),
+};
+
+const evalProjectWithScenariosSchema = z.strictObject({
+  ...evalProjectFields,
+  scenarios: z.string().min(1),
 });
+
+const evalProjectWithIncludesSchema = z.strictObject({
+  ...evalProjectFields,
+  include: evalIncludeSchema,
+});
+
+/** Optional project `eval` section. A local glob or pack include is required. */
+export const evalConfigSchema = z.union([
+  evalProjectWithScenariosSchema,
+  evalProjectWithIncludesSchema,
+]);
 
 export type EvalConfig = z.infer<typeof evalConfigSchema>;
 export type AuthoredEvalConfig = z.input<typeof evalConfigSchema>;
+
+/** Metadata for an eval suite bundled by a resource pack. */
+export const evalPackConfigSchema = z.strictObject({
+  /** Host metadata is retained for pack compatibility, never execution policy. */
+  host: z.literal(EVAL_HOST).optional(),
+  /** Glob of scenario documents, relative to the pack root. */
+  scenarios: z.string().min(1),
+  /** Optional documentation path for the pack's fixture tree. */
+  fixtures: sandboxRelativePathSchema.optional(),
+  /** Optional report path relative to the pack root. */
+  report: sandboxRelativePathSchema.optional(),
+  /**
+   * Optional repo-relative path of the eval sources; registries deep-link it
+   * at the release tag (`v<version>`) of the pack's repository.
+   */
+  source: sandboxRelativePathSchema.optional(),
+});
+
+export type EvalPackConfig = z.infer<typeof evalPackConfigSchema>;
+export type AuthoredEvalPackConfig = z.input<typeof evalPackConfigSchema>;
 
 const commandCheckSchema = z.strictObject({
   type: z.literal("command"),

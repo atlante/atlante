@@ -145,6 +145,26 @@ values, agents, and skills; this excerpt shows only the new section:
 The glob selects the scenario you created. `task.agent` selects your named
 reviewer rather than relying on the host's default agent.
 
+### Include a pack-owned suite
+
+Evaluation scenarios can also ship with a resource pack. The pack's root
+preset declares the suite, and your project opts in explicitly:
+
+```jsonc title="atlante.jsonc — include a pack suite"
+{
+  "eval": {
+    "host": "opencode",
+    "include": ["@acme/review-pack"]
+  }
+}
+```
+
+Installing or extending a pack never runs its suite, and `--scenario` only
+narrows suites that are already included. Pack fixtures, setup commands, and
+checks are executable input, so review them before adding a pack to
+`eval.include`. [Pack-owned suites](/reference/eval#pack-owned-suites) defines
+the resolution and containment rules that apply.
+
 Build the current harness before evaluating it:
 
 ```sh
@@ -202,6 +222,10 @@ The failure determines what to inspect next:
 
 The [Eval reference](/reference/eval#reports-and-exit-status) describes the
 report format and exit statuses.
+
+When a pack publishes a completed report at its declared `eval.report` path,
+the pack explorer can display it as
+[self-reported evaluation](/reference/eval#reports-and-exit-status).
 
 ## Compare a harness change
 

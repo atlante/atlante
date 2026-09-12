@@ -324,6 +324,56 @@ describe("package resource loading", () => {
     });
   });
 
+  test("keeps package eval metadata out of the effective document while exposing selected package roots", () => {
+    const fixture = projectRoot({ "@acme/review-pack": "1.2.0" });
+    const packageRoot = installedPackage(fixture.root, "@acme/review-pack");
+    writePackContent(packageRoot);
+    writeJson(join(packageRoot, "atlante.jsonc"), {
+      agents: { packaged: "./reviewer" },
+      eval: {
+        scenarios: "eval/scenarios/*.eval.json",
+        fixtures: "eval/fixtures",
+        report: "eval/report.json",
+      },
+    });
+    writeJson(join(fixture.config), {
+      extends: "@acme/review-pack",
+      values: { project: "fixture" },
+    });
+
+    const result = resolveResourceDocument({
+      pack: createProjectResourcePack(fixture.root),
+      rootFile: fixture.config,
+    });
+
+    expect(result.normalized.eval).toBeUndefined();
+    expect(result.effectiveRaw.eval).toBeUndefined();
+    expect(result.packagePacks).toHaveLength(1);
+    expect(result.packagePacks[0]?.pack.root).toBe(realpathSync(packageRoot));
+    expect(result.packagePacks[0]?.locators).toEqual(["@acme/review-pack"]);
+  });
+
+  test("exposes package locators but not local inheritance locators", () => {
+    const fixture = projectRoot({ "@acme/review-pack": "1.2.0" });
+    const packageRoot = installedPackage(fixture.root, "@acme/review-pack");
+    writePackContent(packageRoot);
+    writeJson(join(packageRoot, "base", "atlante.jsonc"), {
+      values: { base: "package" },
+    });
+    writeJson(join(packageRoot, "atlante.jsonc"), {
+      extends: "./base",
+      agents: { packaged: "./reviewer" },
+    });
+    writeJson(join(fixture.config), { extends: "@acme/review-pack" });
+
+    const result = resolveResourceDocument({
+      pack: createProjectResourcePack(fixture.root),
+      rootFile: fixture.config,
+    });
+
+    expect(result.packagePacks[0]?.locators).toEqual(["@acme/review-pack"]);
+  });
+
   test("rejects undeclared, absent, unreadable, missing-format, and unsupported packages", () => {
     const undeclared = projectRoot();
     installedPackage(undeclared.root, "acme-pack");

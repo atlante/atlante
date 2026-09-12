@@ -115,6 +115,66 @@ describe("assembleSandbox", () => {
     expect(existsSync(sandbox.root)).toBe(false);
   });
 
+  test("copies a pack scenario fixture from its origin root while using project native outputs", async () => {
+    const packRoot = mkdtempSync(join(tmpdir(), "eval-sandbox-pack-"));
+    mkdirSync(join(packRoot, "eval", "scenarios"), { recursive: true });
+    mkdirSync(join(packRoot, "eval", "fixtures", "pack"), {
+      recursive: true,
+    });
+    writeFileSync(
+      join(packRoot, "eval", "fixtures", "pack", "pack-only.txt"),
+      "pack fixture\n",
+    );
+    writeFileSync(
+      join(packRoot, "eval", "scenarios", "pack.eval.json"),
+      `${JSON.stringify({
+        $schema: "https://atlante.sh/schema/v0.1/eval-scenario.json",
+        version: "0.1",
+        name: "pack-scenario",
+        task: { fixture: "eval/fixtures/pack", prompt: "Say hi." },
+        checks: [{ type: "file-exists", path: "pack-only.txt" }],
+      })}\n`,
+    );
+    try {
+      const discovered = discoverEvalScenarios(
+        packRoot,
+        "eval/scenarios/*.eval.json",
+        {
+          origin: {
+            kind: "package",
+            root: packRoot,
+            packageName: "@acme/review-pack",
+            packageVersion: "1.2.3",
+            locator: "@acme/review-pack",
+          },
+        },
+      ).scenarios.at(0);
+      if (!discovered) throw new Error("pack scenario not discovered");
+
+      const sandbox = await assembleSandbox(
+        {
+          runRoot,
+          projectRoot,
+          scenario: discovered,
+          trialIndex: 7,
+          budget: resolveBudget({ evalConfig: undefined }),
+          keep: false,
+        },
+        () => {},
+      );
+      try {
+        expect(existsSync(join(sandbox.root, "pack-only.txt"))).toBe(true);
+        expect(
+          existsSync(join(sandbox.root, ".opencode", "agents", "build.md")),
+        ).toBe(true);
+      } finally {
+        destroySandbox(sandbox);
+      }
+    } finally {
+      rmSync(packRoot, { recursive: true, force: true });
+    }
+  });
+
   test("kept sandboxes survive destruction", async () => {
     const discovered = discoverHappyScenario();
     const sandbox = await assembleSandbox(

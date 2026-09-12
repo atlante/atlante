@@ -254,7 +254,10 @@ export class PresetMerger {
       this.bindingCollections.map(({ key }) => key),
     );
     const base = this.loadPresetBase(loaded, raw, path, hops);
-    const local = withoutKeys(raw, new Set(["extends"]));
+    const local = withoutKeys(
+      raw,
+      new Set(["extends", ...(loaded.pack.kind === "package" ? ["eval"] : [])]),
+    );
     const localProvenance = provenanceForValue(
       local,
       loaded.loaded.facet.origin,

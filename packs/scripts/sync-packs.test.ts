@@ -31,6 +31,39 @@ const PACK_JSONC = `{
   }
 }`;
 
+const VALID_EVAL_REPORT = {
+  runId: "2026-09-11T10-00-00-a3b1",
+  meta: {
+    atlante: "0.3.1",
+    host: "opencode",
+    model: "test/model",
+    modelVersion: "model-x",
+    config: {
+      trials: 2,
+      timeoutMs: 300000,
+      maxSessions: 10,
+      maxTokens: 200000,
+    },
+  },
+  scenarios: {
+    "scope-discipline": { passRate: 1, description: "Stays in scope." },
+    "policy-invariant": { passRate: 0.5, description: 42 },
+  },
+};
+
+function packWithEvaluation(reportPath = "eval/report.json"): string {
+  return PACK_JSONC.replace(
+    "\n}",
+    `,
+  "eval": {
+    "scenarios": "eval/scenarios/*.eval.json",
+    "source": "eval",
+    "report": "${reportPath}"
+  }
+}`,
+  );
+}
+
 const REVIEW_JSONC = `{
   "$template": "@acme/test-pack/skill",
   "skills": { "strict": { "$instance": "strict" } }
@@ -77,7 +110,13 @@ function registryDoc(overrides: Record<string, unknown> = {}): unknown {
   };
 }
 
-async function fixtureTarball(): Promise<Buffer> {
+async function fixtureTarball(
+  options: {
+    includePreset?: boolean;
+    packConfig?: string;
+    report?: unknown;
+  } = {},
+): Promise<Buffer> {
   const source = mkdtempSync(join(tmpdir(), "atlante-packs-src-"));
   const packageDir = join(source, "package");
   const writeFile = (relative: string, content: string): void => {
@@ -93,8 +132,14 @@ async function fixtureTarball(): Promise<Buffer> {
       atlante: { format: 1 },
     }),
   );
-  writeFile("atlante.jsonc", PACK_JSONC);
-  writeFile("review/atlante.jsonc", REVIEW_JSONC);
+  if (options.includePreset !== false) {
+    writeFile("atlante.jsonc", options.packConfig ?? PACK_JSONC);
+  }
+  if (options.report !== undefined)
+    writeFile("eval/report.json", JSON.stringify(options.report));
+  if (options.includePreset !== false) {
+    writeFile("review/atlante.jsonc", REVIEW_JSONC);
+  }
   writeFile("README.md", README);
   for (const [path, content] of Object.entries(TEMPLATES)) {
     writeFile(path, content);
@@ -165,6 +210,125 @@ function tempWebsiteRoot(): string {
 }
 
 describe("syncPacks", () => {
+  it("synchronizes a local tarball without requesting remote metadata", async () => {
+    const websiteRoot = tempWebsiteRoot();
+    const tarball = await fixtureTarball({
+      packConfig: packWithEvaluation(),
+      report: VALID_EVAL_REPORT,
+    });
+    let remoteRequests = 0;
+
+    const result = await syncPacks({
+      websiteRoot,
+      manifest: MANIFEST,
+      localPacks: new Map([
+        [
+          PACKAGE,
+          {
+            packageJson: {
+              name: PACKAGE,
+              version: "1.0.0",
+              description: "A local test pack",
+              license: "MIT",
+              contributors: [{ name: "local-maintainer" }],
+              repository: { url: REPOSITORY_URL },
+              atlante: { format: 1 },
+            },
+            tarball,
+          },
+        ],
+      ]),
+      fetch: async (
+        _input: string | URL | Request,
+        _init?: RequestInit,
+      ): Promise<Response> => {
+        remoteRequests += 1;
+        throw new Error("local synchronization must not fetch remotely");
+      },
+      now: () => FIXED_NOW,
+    });
+
+    expect(remoteRequests).toBe(0);
+    expect(result.reusedPacks).toBe(0);
+    expect(result.snapshot.packs[0]).toMatchObject({
+      name: PACKAGE,
+      version: "1.0.0",
+      description: "A local test pack",
+      license: "MIT",
+      maintainers: ["local-maintainer"],
+      metrics: {
+        downloads: null,
+        stars: null,
+        publishedAt: null,
+        updatedAt: null,
+      },
+    });
+    expect(result.snapshot.packs[0]?.evaluation).toMatchObject({
+      source: "self-reported",
+      reportPath: "eval/report.json",
+      model: "test/model",
+    });
+
+    rmSync(websiteRoot, { recursive: true, force: true });
+  });
+
+  it("rejects an invalid local tarball instead of reusing the previous snapshot", async () => {
+    const websiteRoot = tempWebsiteRoot();
+    const previous: RegistrySnapshot = {
+      syncedAt: "2026-09-10T00:00:00.000Z",
+      packs: [
+        {
+          name: PACKAGE,
+          official: false,
+          tags: ["test"],
+          description: "previous",
+          version: "0.9.0",
+          license: null,
+          maintainers: [],
+          repository: null,
+          npmUrl: `https://www.npmjs.com/package/${PACKAGE}`,
+          metrics: {
+            downloads: null,
+            stars: null,
+            publishedAt: null,
+            updatedAt: null,
+          },
+          presets: [],
+          readmeHtml: "",
+          files: [],
+        },
+      ],
+    };
+    writeFileSync(
+      join(websiteRoot, "src", "data", "registry-snapshot.json"),
+      JSON.stringify(previous),
+    );
+    const tarball = await fixtureTarball({ includePreset: false });
+
+    await expect(
+      syncPacks({
+        websiteRoot,
+        manifest: MANIFEST,
+        localPacks: new Map([
+          [
+            PACKAGE,
+            {
+              packageJson: {
+                name: PACKAGE,
+                version: "1.0.0",
+                atlante: { format: 1 },
+              },
+              tarball,
+            },
+          ],
+        ]),
+      }),
+    ).rejects.toThrow("local synchronization failed");
+    expect(loadRegistrySnapshot(websiteRoot)).toEqual(previous);
+
+    rmSync(websiteRoot, { recursive: true, force: true });
+  });
+
   it("synchronizes a pack from npm, GitHub, and its tarball", async () => {
     const websiteRoot = tempWebsiteRoot();
     const tarball = await fixtureTarball();
@@ -222,8 +386,102 @@ describe("syncPacks", () => {
     expect(paths).toContain("skill/template.jsonc");
     expect(paths).toContain("README.md");
     expect(paths.every((path) => path !== "package.json")).toBe(true);
+    expect(pack.evaluation).toBeUndefined();
 
     rmSync(websiteRoot, { recursive: true, force: true });
+  });
+
+  it("ingests a valid self-reported eval report with provenance", async () => {
+    const websiteRoot = tempWebsiteRoot();
+    const tarball = await fixtureTarball({
+      packConfig: packWithEvaluation(),
+      report: VALID_EVAL_REPORT,
+    });
+    const result = await syncPacks({
+      websiteRoot,
+      manifest: MANIFEST,
+      fetch: fakeFetch(tarball),
+      now: () => FIXED_NOW,
+    });
+
+    expect(result.snapshot.packs[0]?.evaluation).toEqual({
+      source: "self-reported",
+      reportPath: "eval/report.json",
+      runId: "2026-09-11T10-00-00-a3b1",
+      runDate: "2026-09-11T10:00:00.000Z",
+      atlante: "0.3.1",
+      host: "opencode",
+      model: "test/model",
+      modelVersion: "model-x",
+      config: {
+        trials: 2,
+        timeoutMs: 300000,
+        maxSessions: 10,
+        maxTokens: 200000,
+      },
+      scenarios: {
+        "scope-discipline": { passRate: 1, description: "Stays in scope." },
+        "policy-invariant": { passRate: 0.5 },
+      },
+      sourceUrl: "https://github.com/acme/test-pack/tree/v1.0.0/eval",
+    });
+
+    rmSync(websiteRoot, { recursive: true, force: true });
+  });
+
+  it("omits optional evaluation when the declared report is missing", async () => {
+    const websiteRoot = tempWebsiteRoot();
+    const tarball = await fixtureTarball({
+      packConfig: packWithEvaluation(),
+    });
+    const result = await syncPacks({
+      websiteRoot,
+      manifest: MANIFEST,
+      fetch: fakeFetch(tarball),
+      now: () => FIXED_NOW,
+    });
+
+    expect(result.snapshot.packs[0]?.evaluation).toBeUndefined();
+    rmSync(websiteRoot, { recursive: true, force: true });
+  });
+
+  it("fails closed for malformed or unsafe reports without rejecting the pack", async () => {
+    for (const [packConfig, report] of [
+      [
+        packWithEvaluation(),
+        { ...VALID_EVAL_REPORT, scenarios: { broken: { passRate: 2 } } },
+      ],
+      [packWithEvaluation(), { ...VALID_EVAL_REPORT, meta: undefined }],
+      [
+        packWithEvaluation(),
+        {
+          ...VALID_EVAL_REPORT,
+          meta: {
+            ...VALID_EVAL_REPORT.meta,
+            config: { ...VALID_EVAL_REPORT.meta.config, trials: 0 },
+          },
+        },
+      ],
+      [packWithEvaluation("../report.json"), VALID_EVAL_REPORT],
+      [packWithEvaluation("eval\\report.json"), VALID_EVAL_REPORT],
+      [packWithEvaluation("C:/report.json"), VALID_EVAL_REPORT],
+      [
+        packWithEvaluation(),
+        { ...VALID_EVAL_REPORT, runId: "2026-02-31T10-00-00-a3b1" },
+      ],
+    ] as const) {
+      const websiteRoot = tempWebsiteRoot();
+      const tarball = await fixtureTarball({ packConfig, report });
+      const result = await syncPacks({
+        websiteRoot,
+        manifest: MANIFEST,
+        fetch: fakeFetch(tarball),
+        now: () => FIXED_NOW,
+      });
+
+      expect(result.snapshot.packs[0]?.evaluation).toBeUndefined();
+      rmSync(websiteRoot, { recursive: true, force: true });
+    }
   });
 
   it("falls back to the previous snapshot when live data fails verification", async () => {

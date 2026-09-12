@@ -278,8 +278,8 @@ npx atlante eval [path] --keep
 - `path` is a project directory or an explicit `atlante.jsonc`/`atlante.json`
   file. It defaults to the current directory.
 - `--scenario <name>` runs only the named scenario; repeat the flag to select
-  several. Scenario names come from the documents matched by the `eval`
-  section's `scenarios` glob.
+  several. Scenario names come from the documents matched by the local
+  `scenarios` glob and from explicitly included pack suites.
 - `--trials <n>` overrides the configured number of trials for this run.
 - `--json` prints the report JSON to stdout instead of the human summary.
   Progress lines still stream to stderr in this mode, so stdout stays pure

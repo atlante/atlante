@@ -25,34 +25,9 @@ const packs = snapshot.packs;
           Packs are collections of presets, templates, skills, and agents for
           your harness.
         </p>
-        <div class="command-row">
-          <div class="command-box">
-            <code
-              ><span class="command-prompt" aria-hidden="true">$ </span
-              >npx atlante@latest init --pack @atlante/pack</code
-            >
-            <button
-              class="command-copy"
-              type="button"
-              aria-label="Copy the pack installation command"
-              data-copy-text="npx atlante@latest init --pack @atlante/pack"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.5"
-                aria-hidden="true"
-              >
-                <rect x="4" y="4" width="12" height="12" rx="2"></rect>
-                <rect x="8" y="8" width="12" height="12" rx="2"></rect>
-              </svg>
-            </button>
-          </div>
-        </div>
         <p class="command-sub">
-          or <a href="https://docs.atlante.sh/guides/authoring-packs"
-            >author a pack</a
+          <a href="https://docs.atlante.sh/guides/authoring-packs"
+            >Author a pack</a
           >
         </p>
       </div>
@@ -110,7 +85,6 @@ const packs = snapshot.packs;
         <span class="column-label">Presets</span>
         <span class="column-label">Downloads</span>
         <span class="column-label">Stars</span>
-        <span></span>
       </div>
       <ol class="pack-list" id="pack-list">
         {packs.map((pack, index) => (
@@ -161,7 +135,6 @@ const packs = snapshot.packs;
               <span class="metric-value">{formatCount(pack.metrics.stars)}</span>
               <span class="metric-label-mobile"> stars</span>
             </div>
-            <span class="row-arrow" aria-hidden="true">→</span>
           </li>
         ))}
       </ol>

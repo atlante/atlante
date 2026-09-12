@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import {
   cpSync,
+  existsSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -126,5 +127,18 @@ describe("first-party pack integration", () => {
       expect(
         readFileSync(join(root, ...file.path.split("/")), "utf8").length,
       ).toBeGreaterThan(0);
+  });
+
+  test("does not execute or materialize the pack eval suite during a build", () => {
+    const root = firstPartyProject();
+
+    const built = buildProject(
+      root,
+      {},
+      { materializers: [openCodeMaterializer] },
+    );
+
+    expect(built.diagnostics).toEqual([]);
+    expect(existsSync(join(root, ".atlante", "eval"))).toBe(false);
   });
 });

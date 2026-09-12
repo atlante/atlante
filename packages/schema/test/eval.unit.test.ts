@@ -4,6 +4,7 @@ import {
   EVAL_BUDGET_DEFAULTS,
   EVAL_SCENARIO_SCHEMA_URI,
   evalConfigSchema,
+  evalPackConfigSchema,
   evalScenarioJsonSchema,
   evalScenarioSchema,
   SCHEMA_URI,
@@ -37,6 +38,19 @@ describe("evalConfigSchema", () => {
   test("accepts a minimal config section", () => {
     const result = evalConfigSchema.safeParse(validConfig);
     expect(result.success).toBe(true);
+  });
+
+  test("accepts a project config that opts into pack scenarios without a local glob", () => {
+    const result = evalConfigSchema.safeParse({
+      host: "opencode",
+      include: ["@acme/review-pack"],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  test("rejects a config without local scenarios or pack includes", () => {
+    const result = evalConfigSchema.safeParse({ host: "opencode" });
+    expect(result.success).toBe(false);
   });
 
   test("rejects an unknown host", () => {
@@ -106,6 +120,26 @@ describe("evalConfigSchema", () => {
         checks: [{ type: "command", run: ["bun", "test"], timeoutMs }],
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("evalPackConfigSchema", () => {
+  test("accepts pack suite metadata without project execution settings", () => {
+    const result = evalPackConfigSchema.safeParse({
+      scenarios: "eval/scenarios/*.eval.json",
+      fixtures: "eval/fixtures",
+      report: "eval/report.json",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  test("rejects unsafe pack metadata paths", () => {
+    const result = evalPackConfigSchema.safeParse({
+      scenarios: "eval/scenarios/*.eval.json",
+      fixtures: "../fixtures",
+      report: ".git/report.json",
+    });
+    expect(result.success).toBe(false);
   });
 });
 

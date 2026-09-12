@@ -99,6 +99,30 @@ describe("document JSON Schema", () => {
     });
   });
 
+  test("publishes pack eval metadata and unique pack includes", () => {
+    const properties = buildDocumentJsonSchema().properties as Record<
+      string,
+      unknown
+    >;
+    const evalSchema = properties.eval as {
+      anyOf: Array<{
+        properties?: Record<string, Record<string, unknown>>;
+      }>;
+    };
+
+    expect(
+      evalSchema.anyOf.some(
+        (entry) =>
+          entry.properties?.fixtures !== undefined &&
+          entry.properties?.report !== undefined,
+      ),
+    ).toBe(true);
+    for (const entry of evalSchema.anyOf) {
+      const include = entry.properties?.include;
+      if (include !== undefined) expect(include.uniqueItems).toBe(true);
+    }
+  });
+
   test("the committed file matches the generated output", () => {
     expect(documentJsonSchema).toEqual(buildDocumentJsonSchema());
   });

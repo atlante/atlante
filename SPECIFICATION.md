@@ -745,22 +745,50 @@ runtime.
 ### Contract
 
 The document MAY declare an `eval` section. It MUST match the eval schema: a
-`host` field admitting only `"opencode"` in version 0.1, a `scenarios` glob
-relative to the project root, an optional `model` passed through to the host
-run, and an optional `budget` of `trials`, `timeoutMs`, `maxSessions`, and
-`maxTokens`. Absent budget fields MUST inherit the defaults of 3 trials,
+`host` field admitting only `"opencode"` in version 0.1, an optional
+`scenarios` glob relative to the project root, an optional `model` passed
+through to the host run, and an optional `budget` of `trials`, `timeoutMs`,
+`maxSessions`, and `maxTokens`. Absent budget fields MUST inherit the defaults
+of 3 trials,
 600000 ms per run, 15 sessions, and 400000 tokens, with at most 50 trials per
 run, and a run MUST stop when its budget is exhausted. A trial whose host
 emits no usage events MUST be reported as budget-unmonitored: token spend
 cannot be enforced and only the trial timeout bounds it.
 
+The project `eval` section MAY also declare a non-empty `include` array of
+package or selected package-preset locators. The project MUST declare either a
+local `scenarios` glob or `include`. An included package or preset MUST be
+selected through the project's resource graph and MUST expose pack eval
+metadata; an include that is not selected or has no suite MUST fail before a
+host run. A package is not included merely because it is installed, and a
+selected package is not executed merely because it is inherited. The
+`--scenario` filter MAY narrow the resulting local and included suites, but
+MUST NOT opt a pack suite in.
+
+A resource pack MAY expose eval metadata in its root preset document. Pack eval
+metadata has a `scenarios` glob relative to the pack root and MAY provide
+`fixtures`, `report`, and `source` paths. `fixtures` and `report` resolve
+relative to the pack root, while `source` optionally locates the pack's eval
+sources relative to its repository root so published reports can be deep-linked
+at the release tag. Its optional
+`host` value is compatibility metadata, not project execution policy. Pack eval
+metadata is not inherited into the effective project document. Scenario
+documents discovered from a pack retain the pack root as their fixture root;
+project-local scenarios retain the project root as their fixture root. Resource
+resolution and build MUST only read this metadata and MUST NOT execute pack
+setup commands, checks, or scenarios.
+
 Eval scenarios are versioned documents in their own namespace, identified by
 the eval-scenario schema URI
 (`https://atlante.sh/schema/v0.1/eval-scenario.json`). A scenario MUST declare
-version `0.1`, a slug `name` unique across the suite, one `task` consisting of
+version `0.1`, a slug `name` unique across the suite, an optional
+`description`, one `task` consisting of
 a sandbox-relative `fixture`, an optional `setup` argv, an optional driving
 `agent`, and a `prompt`, an optional scenario `budget.timeoutMs` override, and
-at least one `check`.
+at least one `check`. For a project-local scenario, `task.fixture` is relative
+to the project root. For a pack scenario, it is relative to the package root.
+After the fixture is copied, check paths and diff allowlists are relative to
+the sandbox root in both cases.
 
 Checks MUST be deterministic and zero-LLM, graded against sandbox state:
 
@@ -780,6 +808,18 @@ MUST fail before any host run or model call. Atlante MUST NOT perform LLM
 inference or execute agents itself; scenario execution is delegated to the
 declared host runner in a disposable sandbox, and run reports are local
 artifacts under the project's `.atlante/eval` directory.
+
+### Reports
+
+Every run produces a local report under the project's `.atlante/eval` directory
+unless a custom output directory is supplied. A pack MAY publish a report at
+the path declared by its root preset's `eval.report` metadata. A consumer such
+as the pack explorer MAY ingest that report only after validating the declared
+relative path, run identifier, provenance fields, and per-scenario pass rates.
+The resulting data MUST be labeled self-reported evaluation and MUST NOT be
+presented as Atlante certification or as an independent security or quality
+verdict. A missing or malformed optional pack report MUST leave the pack
+usable and MUST NOT produce an evaluation claim.
 
 ### Examples
 
@@ -827,13 +867,18 @@ artifacts under the project's `.atlante/eval` directory.
 Duplicate scenario names MUST fail at discovery. An unsupported eval host MUST
 fail with a stable diagnostic instead of being ignored. A scenario-level
 timeout override replaces the configured budget timeout for that scenario.
-Check regular expressions MUST compile before any model call.
+Check regular expressions MUST compile before any model call. An unsafe or
+malformed pack report MUST be ignored or rejected at the consuming boundary,
+and MUST NOT be interpreted as trusted provenance.
 
 ### Rationale
 
 Declarative scenarios and deterministic checks turn the harness into testable
 output while execution stays host-owned behind a narrow runner seam: Atlante
-validates and grades, the declared host runs.
+validates and grades, the declared host runs. Pack-owned suites make those
+scenarios reusable without weakening opt-in or fixture containment. A published
+report adds provenance for inspection, not certification; setup and check
+commands remain executable tool-level policy inside the delegated run.
 
 ## 13. MCP Context Interface
 

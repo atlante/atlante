@@ -165,7 +165,13 @@ export async function runEval(input: RunEvalInput): Promise<RunReport> {
           sessions += 1;
         },
       });
-      report.scenarios[scenario.scenario.name] = execution.result;
+      const result = execution.result;
+      // The report stays self-describing: published pass rates carry the
+      // scenario's own description instead of relying on pack-local docs.
+      if (scenario.scenario.description !== undefined) {
+        result.description = scenario.scenario.description;
+      }
+      report.scenarios[scenario.scenario.name] = result;
       if (execution.model && !hostIdentityRecorded) {
         report.meta.model = execution.model;
         report.meta.modelVersion = execution.modelVersion ?? "unknown";

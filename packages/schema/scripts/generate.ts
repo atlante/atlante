@@ -64,6 +64,7 @@ export function buildDocumentJsonSchema(): Record<string, unknown> {
   documentProperties.values = valuesSchema;
   documentProperties.agents = bindingProperties;
   documentProperties.skills = bindingProperties;
+  markEvalIncludesUnique(documentProperties.eval);
   generated.required = ["$schema"];
 
   return {
@@ -72,6 +73,26 @@ export function buildDocumentJsonSchema(): Record<string, unknown> {
     title: "Atlante configuration document",
     ...generated,
   };
+}
+
+/** JSON Schema cannot derive uniqueness from Zod's semantic refinement. */
+function markEvalIncludesUnique(schema: unknown): void {
+  if (Array.isArray(schema)) {
+    for (const entry of schema) markEvalIncludesUnique(entry);
+    return;
+  }
+  if (typeof schema !== "object" || schema === null) return;
+  const record = schema as Record<string, unknown>;
+  const properties = record.properties;
+  if (typeof properties === "object" && properties !== null) {
+    const propertyMap = properties as Record<string, unknown>;
+    const include = propertyMap.include;
+    if (typeof include === "object" && include !== null)
+      (include as Record<string, unknown>).uniqueItems = true;
+  }
+  for (const key of ["anyOf", "allOf", "oneOf"]) {
+    markEvalIncludesUnique(record[key]);
+  }
 }
 
 function buildEvalScenarioJsonSchema(): Record<string, unknown> {

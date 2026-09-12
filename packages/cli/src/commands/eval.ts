@@ -20,13 +20,25 @@ import {
   runExitCode,
   verifyNativeOutputs,
 } from "@atlante/eval";
-import type { EvalConfig } from "@atlante/schema";
-import { EVAL_MAX_TRIALS } from "@atlante/schema";
 import {
+  loadPresetFacet,
+  parseResourceLocator,
+  type ResolvedResourcePackage,
+  ResourceResolutionError,
+} from "@atlante/resources";
+import {
+  EVAL_MAX_TRIALS,
+  type EvalConfig,
+  evalPackConfigSchema,
+} from "@atlante/schema";
+import {
+  type Diagnostic,
   type DiscoveredEvalScenario,
   discoverEvalScenarios,
+  type EvalScenarioOrigin,
   error,
   hasErrors,
+  warning,
 } from "@atlante/validator";
 import packageJson from "../../package.json" with { type: "json" };
 import { firstPartyProjectContext } from "../first-party-pack.js";
@@ -202,18 +214,59 @@ function prepareEval(
   const trialsOverride = parseTrialsOverride(options.trials);
   if (trialsOverride === null) return 2;
 
-  const discovery = discoverEvalScenarios(
-    loaded.projectRoot,
-    evalConfig.scenarios,
+  const localDiscovery = evalConfig.scenarios
+    ? discoverEvalScenarios(loaded.projectRoot, evalConfig.scenarios)
+    : { scenarios: [], diagnostics: [] };
+  const packDiscovery = discoverPackSuites(
+    loaded.resources?.packagePacks ?? [],
   );
-  printDiagnostics(discovery.diagnostics);
-  if (hasErrors(discovery.diagnostics)) return 2;
+  const discoveryDiagnostics = [
+    ...localDiscovery.diagnostics,
+    ...packDiscovery.diagnostics,
+    ...duplicateScenarioDiagnostics([
+      ...localDiscovery.scenarios,
+      ...packDiscovery.scenarios,
+    ]),
+  ];
+  printDiagnostics(discoveryDiagnostics);
+  if (hasErrors(discoveryDiagnostics)) return 2;
 
-  const scenarios = filterScenarios(
-    discovery.scenarios,
-    options.scenario ?? [],
+  const allScenarios = [
+    ...localDiscovery.scenarios,
+    ...packDiscovery.scenarios,
+  ];
+  const includeDiagnostics = validatePackIncludes(
+    evalConfig.include ?? [],
+    loaded.resources?.packagePacks ?? [],
+    packDiscovery.scenarios,
   );
+  printDiagnostics(includeDiagnostics);
+  if (hasErrors(includeDiagnostics)) return 2;
+
+  const scenarios = filterScenarios(allScenarios, options.scenario ?? []);
   if (scenarios === null) return 2;
+
+  const included = scenarios.filter((scenario) => {
+    if (scenario.origin.kind === "project") return true;
+    const selected = isPackIncluded(
+      scenario,
+      evalConfig.include ?? [],
+      loaded.resources?.packagePacks ?? [],
+    );
+    if (!selected) {
+      printDiagnostics([
+        warning(
+          "pack-scenario-not-included",
+          `pack scenario "${scenario.scenario.name}" was discovered but not executed; add ${scenario.origin.packageName} to eval.include`,
+          {
+            source: `${scenario.origin.packageName}@${scenario.origin.packageVersion}/${scenario.source}`,
+            expected: "explicit pack inclusion before execution",
+          },
+        ),
+      ]);
+    }
+    return selected;
+  });
 
   try {
     verifyNativeOutputs(loaded.projectRoot);
@@ -236,9 +289,211 @@ function prepareEval(
     projectRoot: loaded.projectRoot,
     source: loaded.configPath ?? target,
     evalConfig,
-    scenarios,
+    scenarios: included,
     trialsOverride,
   };
+}
+
+type PackScenarioDiscovery = {
+  scenarios: DiscoveredEvalScenario[];
+  diagnostics: Diagnostic[];
+};
+
+/** Reads suite metadata from selected package roots without resolving it into the project. */
+function discoverPackSuites(
+  packages: readonly ResolvedResourcePackage[],
+): PackScenarioDiscovery {
+  const scenarios: DiscoveredEvalScenario[] = [];
+  const diagnostics: Diagnostic[] = [];
+  for (const selected of packages) {
+    const identity = selected.pack.package;
+    if (!identity) continue;
+
+    let rawEval: unknown;
+    try {
+      rawEval = loadPresetFacet(
+        selected.pack,
+        "./",
+        identity.lexicalManifestPath,
+      ).facet.document.eval;
+    } catch (cause) {
+      // Packages can provide only a template or instance and therefore have no
+      // root preset. Such packages do not have pack-level eval metadata.
+      if (
+        cause instanceof ResourceResolutionError &&
+        cause.failure.code === "missing-target"
+      )
+        continue;
+      diagnostics.push(
+        error(
+          "pack-eval-unreadable",
+          `could not read eval metadata from ${identity.name}@${identity.version}`,
+          {
+            source: `${identity.name}@${identity.version}/atlante.jsonc`,
+            cause: cause instanceof Error ? cause.message : String(cause),
+          },
+        ),
+      );
+      continue;
+    }
+
+    if (rawEval === undefined) continue;
+    const parsed = evalPackConfigSchema.safeParse(rawEval);
+    if (!parsed.success) {
+      diagnostics.push(
+        error(
+          "invalid-pack-eval",
+          `invalid eval metadata in ${identity.name}@${identity.version}`,
+          {
+            source: `${identity.name}@${identity.version}/atlante.jsonc`,
+            cause: parsed.error.issues[0]?.message,
+            expected: "pack eval metadata with a relative scenarios glob",
+          },
+        ),
+      );
+      continue;
+    }
+
+    const origin: EvalScenarioOrigin = {
+      kind: "package",
+      root: selected.pack.root,
+      packageName: identity.name,
+      packageVersion: identity.version,
+      locator: identity.name,
+    };
+    const discovery = discoverEvalScenarios(
+      selected.pack.root,
+      parsed.data.scenarios,
+      { origin },
+    );
+    diagnostics.push(...discovery.diagnostics);
+    scenarios.push(...discovery.scenarios);
+  }
+  return { scenarios, diagnostics };
+}
+
+function scenarioLabel(scenario: DiscoveredEvalScenario): string {
+  return scenario.origin.kind === "package"
+    ? `${scenario.origin.packageName}@${scenario.origin.packageVersion}/${scenario.source}`
+    : scenario.source;
+}
+
+function duplicateScenarioDiagnostics(
+  scenarios: readonly DiscoveredEvalScenario[],
+): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  const seen = new Map<string, DiscoveredEvalScenario>();
+  for (const scenario of scenarios) {
+    const previous = seen.get(scenario.scenario.name);
+    if (previous) {
+      diagnostics.push(
+        error(
+          "duplicate-scenario-name",
+          `scenario name "${scenario.scenario.name}" is declared by both ${scenarioLabel(previous)} and ${scenarioLabel(scenario)}`,
+          {
+            source: scenarioLabel(scenario),
+            expected: "scenario names unique across local and pack suites",
+          },
+        ),
+      );
+      continue;
+    }
+    seen.set(scenario.scenario.name, scenario);
+  }
+  return diagnostics;
+}
+
+function validatePackIncludes(
+  includes: readonly string[],
+  packages: readonly ResolvedResourcePackage[],
+  scenarios: readonly DiscoveredEvalScenario[],
+): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [];
+  for (const include of includes) {
+    let parsed: ReturnType<typeof parseResourceLocator>;
+    try {
+      parsed = parseResourceLocator(include);
+    } catch (cause) {
+      diagnostics.push(
+        error(
+          "invalid-eval-include",
+          `invalid eval.include locator: ${include}`,
+          {
+            expected: "a package or selected package preset locator",
+            cause: cause instanceof Error ? cause.message : String(cause),
+          },
+        ),
+      );
+      continue;
+    }
+    if (parsed.kind !== "package") {
+      diagnostics.push(
+        error(
+          "invalid-eval-include",
+          `invalid eval.include locator: ${include}`,
+          {
+            expected: "a package or selected package preset locator",
+          },
+        ),
+      );
+      continue;
+    }
+    const selected = packages.some(({ pack, locators }) => {
+      if (pack.package?.name !== parsed.packageName) return false;
+      return (
+        parsed.subpath === undefined ||
+        locators.some((locator) => locator === include)
+      );
+    });
+    if (!selected)
+      diagnostics.push(
+        error(
+          "eval-include-not-found",
+          `eval.include locator is not selected by the project: ${include}`,
+          {
+            expected: "a package or preset reached through project resources",
+          },
+        ),
+      );
+    else if (
+      !scenarios.some((scenario) => {
+        if (scenario.origin.kind !== "package") return false;
+        if (scenario.origin.packageName !== parsed.packageName) return false;
+        if (parsed.subpath === undefined) return true;
+        const selectedPack = packages.find(
+          ({ pack }) => pack.root === scenario.origin.root,
+        );
+        return (
+          selectedPack?.locators.some((locator) => locator === include) ?? false
+        );
+      })
+    )
+      diagnostics.push(
+        error(
+          "eval-include-no-suite",
+          `eval.include locator has no pack eval suite: ${include}`,
+          {
+            expected:
+              "a selected package or preset that declares eval metadata",
+          },
+        ),
+      );
+  }
+  return diagnostics;
+}
+
+function isPackIncluded(
+  scenario: DiscoveredEvalScenario,
+  includes: readonly string[],
+  packages: readonly ResolvedResourcePackage[],
+): boolean {
+  if (scenario.origin.kind !== "package") return true;
+  const { packageName, root } = scenario.origin;
+  const selected = packages.find(({ pack }) => pack.root === root);
+  return includes.some((include) => {
+    if (include === packageName) return true;
+    return selected?.locators.some((locator) => locator === include) ?? false;
+  });
 }
 
 function reportRunFailure(source: string, cause: unknown): 3 {

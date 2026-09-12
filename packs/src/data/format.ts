@@ -33,3 +33,7 @@ export function formatSyncTime(iso: string): string {
   }).format(new Date(iso));
   return `${date} at ${time} UTC`;
 }
+
+export function formatPassRate(value: number): string {
+  return `${Math.round(value * 100)}%`;
+}

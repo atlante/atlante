@@ -7,6 +7,9 @@ description: The eval configuration, scenario documents, checks, budgets, and re
 [OpenCode](https://opencode.ai/) in disposable sandboxes. Each trial starts
 with a copy of the scenario fixture and the native agent and skill files,
 then checks the resulting files and command results against explicit assertions.
+Scenario suites can be authored by the project or shipped as opt-in metadata in
+a resource pack. Pack-owned fixtures resolve from the pack root; project-local
+fixtures resolve from the project root.
 
 This reference defines configuration, scenarios, checks, budgets, and reports.
 For a complete setup procedure, see
@@ -24,7 +27,7 @@ A run needs all of the following:
 | Requirement | Provided by |
 | --- | --- |
 | An `eval` section | `atlante.jsonc` |
-| Scenario documents | The files matched by the `scenarios` glob |
+| Scenario documents | The files matched by the local `scenarios` glob and any explicitly included pack suites |
 | Verified native outputs | A prior `atlante build` |
 | OpenCode on `PATH` | The installed `opencode` executable |
 | Stored provider credentials | OpenCode's `auth.json`; shell API-key variables alone are insufficient |
@@ -54,6 +57,7 @@ A run needs all of the following:
 | --- | --- | --- |
 | `host` | `"opencode"` | The host runner; the only admitted value in v0.1 |
 | `scenarios` | string | Glob of scenario documents, relative to the project root |
+| `include` | string[] | Package or selected package-preset locators whose pack suites are allowed to run |
 | `model` | string | Optional model passed through to the host run; omitted uses the host default |
 | `budget` | object | Optional run budget; absent fields inherit the defaults below |
 
@@ -74,6 +78,59 @@ cap. Enforcement aborts after an observed cumulative usage value exceeds the
 threshold, so the final event can overshoot it. A trial whose host emits no
 usage events is reported with `budgetUnmonitored: true`: `maxTokens` cannot be
 enforced for it and only the host-session timeout bounds model spend.
+
+The project must provide either `scenarios` or `include`. `include` is explicit
+permission for suites exposed by packages or selected package presets already
+reached through the project's resource graph. Installed packages that are not
+selected are unavailable to `eval.include`; an include with no pack suite is a
+validation error. The `--scenario` option filters the local and included suites
+after discovery. It does not opt a pack suite in by itself.
+
+### Pack-owned suites
+
+A pack can declare suite metadata in its root preset:
+
+```jsonc title="packages/review-pack/atlante.jsonc"
+{
+  "eval": {
+    "host": "opencode",
+    "scenarios": "eval/scenarios/*.eval.json",
+    "fixtures": "eval/fixtures",
+    "report": "eval/report.json",
+    "source": "packages/review-pack/eval"
+  }
+}
+```
+
+The `scenarios` and optional `fixtures`, `report`, and `source` paths are
+relative to the pack root; `source` is relative to the pack's repository root
+instead. `fixtures` describes the pack's fixture tree; each scenario's
+`task.fixture` is also resolved from that pack root, not from the consuming
+project. Check paths and diff allowlists still resolve from the assembled
+sandbox root. The optional `host` value describes the suite's intended host;
+the consuming project's `host`, model, and budget control the run. The
+optional `source` records where the pack's eval sources live inside its
+repository, so registries can deep-link them at the release tag (`v<version>`)
+next to the published report.
+
+Selecting or extending a pack does not run its suite. A consuming project opts
+in with a package or selected preset locator:
+
+```jsonc title="atlante.jsonc — include a pack suite"
+{
+  "eval": {
+    "host": "opencode",
+    "include": ["@acme/review-pack"]
+  }
+}
+```
+
+Pack metadata is not inherited into the project's effective configuration.
+Resolution, validation, build, and pack synchronization read the metadata but
+do not execute its setup commands, checks, or scenarios. Only an explicit
+`atlante eval` run can delegate an included suite to the host. Treat third-party
+pack fixtures, setup commands, and checks as executable input and review them
+before inclusion.
 
 ## Scenario documents
 
@@ -150,10 +207,11 @@ fails or errors.
 
 ## Path containment
 
-`task.fixture` is relative to the project root, not the scenario document.
-Check paths and allowlist entries are relative to the sandbox root. Absolute
-paths, path traversal, and `.git` or `node_modules` segments are rejected at
-validation.
+For a project-local scenario, `task.fixture` is relative to the project root,
+not the scenario document. For a pack scenario, it is relative to the pack
+root. Check paths and allowlist entries are relative to the sandbox root.
+Absolute paths, path traversal, and `.git` or `node_modules` segments are
+rejected at validation.
 
 Fixtures cannot contain `.git`, `node_modules`, or symlinks. A fixture may
 contain an OpenCode config only at the exact project-relative path that the
@@ -207,6 +265,20 @@ mean duration, and p95 duration exclude them; an all-skipped scenario has a
 zero pass rate. Report diff evidence is capped at 20000 characters, and command
 output evidence keeps the last 2000 characters.
 
+A pack may publish the report from a completed run at the path declared by its
+root preset's `eval.report`. Pack indexes can ingest only a small, validated
+provenance view: the report run date, Atlante version, host, model, model
+version, and each scenario's pass rate. A missing, malformed, unsafe, or
+inconsistent report is ignored rather than displayed. Any displayed result is
+labeled **self-reported evaluation**. It describes the pack author's report;
+it is not an Atlante certification, an independent reproduction, or a security
+verdict. Report text and paths are untrusted input at the consuming boundary.
+
+Setup and command checks retain the tool-level execution boundary described in
+[Sandbox containment](#sandbox-containment). The checks are deterministic once
+their commands run, but the commands themselves can access whatever the host
+tool policy permits.
+
 See [CLI](/reference/cli#atlante-eval) for flags and progress output, and
 [Diagnostics](/reference/diagnostics) for the error envelope.
 
@@ -214,5 +286,5 @@ See [CLI](/reference/cli#atlante-eval) for flags and progress output, and
 | --- | --- |
 | `0` | Every requested trial has verdict `pass` |
 | `1` | At least one trial failed, timed out, exceeded its budget, hit a trial-level infrastructure error, or was skipped by the session cap |
-| `2` | Validation failed: missing or broken configuration or `eval` section, invalid scenario documents, or missing or stale native outputs |
+| `2` | Validation failed: missing or broken configuration or `eval` section, invalid scenario documents or pack selection, or missing or stale native outputs |
 | `3` | A run-level infrastructure error occurred, including an unauthenticated host, an unexpected run failure, or report publication failure |

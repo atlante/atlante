@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { evalConfigSchema } from "./eval.js";
+import { evalConfigSchema, evalPackConfigSchema } from "./eval.js";
 import type { ValuesMap, ValuesMapOverlay } from "./values.js";
 import {
   safeRecord,
@@ -258,7 +258,8 @@ export const atlanteDocumentOverlaySchema = z.strictObject({
   values: valuesMapOverlaySchema.optional(),
   agents: agentsOverlaySchema.optional(),
   skills: skillsOverlaySchema.optional(),
-  eval: evalConfigSchema.optional(),
+  /** Project settings or pack-bundled eval metadata before resolution. */
+  eval: z.union([evalConfigSchema, evalPackConfigSchema]).optional(),
 });
 
 export type AtlanteDocumentOverlay = z.infer<

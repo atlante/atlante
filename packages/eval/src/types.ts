@@ -63,6 +63,8 @@ export type ScenarioResult = {
   passRate: number;
   meanDurationMs: number;
   spread: { durationP95Ms: number };
+  /** Description from the authored scenario document, if it declared one. */
+  description?: string;
 };
 
 export type RunMeta = {

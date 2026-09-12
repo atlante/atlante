@@ -19,11 +19,31 @@ function isJsoncFilename(filename: string): boolean {
   );
 }
 
-/** One validated scenario document paired with its project-relative source. */
+export type EvalScenarioOrigin =
+  | Readonly<{
+      readonly kind: "project";
+      readonly root: string;
+    }>
+  | Readonly<{
+      readonly kind: "package";
+      readonly root: string;
+      readonly packageName: string;
+      readonly packageVersion: string;
+      /** Package or preset locator that selected this suite. */
+      readonly locator: string;
+    }>;
+
+export type EvalScenarioDiscoveryOptions = Readonly<{
+  readonly origin?: EvalScenarioOrigin;
+}>;
+
+/** One validated scenario document paired with its base-relative source. */
 export type DiscoveredEvalScenario = {
   scenario: EvalScenario;
-  /** Project-relative, forward-slash separated source path. */
+  /** Base-root-relative, forward-slash separated source path. */
   source: string;
+  /** Root used for fixture paths and source discovery. */
+  origin: EvalScenarioOrigin;
 };
 
 export type EvalScenarioDiscovery = {
@@ -161,8 +181,12 @@ function pathTraversesSymlink(root: string, absolute: string): boolean {
 export function discoverEvalScenarios(
   projectRoot: string,
   globPattern: string,
+  options: EvalScenarioDiscoveryOptions = {},
 ): EvalScenarioDiscovery {
   const root = resolve(projectRoot);
+  const origin: EvalScenarioOrigin = options.origin
+    ? { ...options.origin, root }
+    : { kind: "project", root };
   const normalizedPattern = globPattern.replaceAll(sep, "/");
   const diagnostics: Diagnostic[] = [];
   if (
@@ -277,7 +301,7 @@ export function discoverEvalScenarios(
       continue;
     }
 
-    scenarios.push({ scenario, source: match });
+    scenarios.push({ scenario, source: match, origin });
   }
 
   scenarios.sort((left, right) =>

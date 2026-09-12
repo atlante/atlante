@@ -117,6 +117,7 @@ export type {
   ResolvedResourceBinding,
   ResolvedResourceDocument,
   ResolvedResourceInstance,
+  ResolvedResourcePackage,
   ResolvedTemplate,
   ResolvedTemplateSlot,
   ResolveInstanceRequest,
