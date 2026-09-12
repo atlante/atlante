@@ -366,7 +366,8 @@ function readPackEvaluation(
   const runDate = reportRunDate(runId);
   if (!runDate) return undefined;
 
-  const scenarios: Record<string, { passRate: number }> = {};
+  const scenarios: Record<string, { passRate: number; description?: string }> =
+    {};
   for (const [name, value] of Object.entries(rawScenarios)) {
     const scenario = recordValue(value);
     const passRate = scenario?.passRate;
@@ -378,7 +379,13 @@ function readPackEvaluation(
       passRate > 1
     )
       return undefined;
-    scenarios[name] = { passRate };
+    const description = scenario?.description;
+    scenarios[name] = {
+      passRate,
+      ...(typeof description === "string" && description.length > 0
+        ? { description }
+        : {}),
+    };
   }
   if (Object.keys(scenarios).length === 0) return undefined;
 

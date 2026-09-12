@@ -120,21 +120,11 @@
     text-wrap: pretty;
   }
 
-  .command-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-3);
-    margin-block-start: var(--space-8);
-    width: fit-content;
-    max-width: 100%;
-  }
-
   .hero-sub {
     margin-block-start: var(--space-8);
   }
 
-  /* Quiet caption under the install command: the author-a-pack guide stays
+  /* Quiet caption under the hero copy: the author-a-pack guide stays
      reachable without competing with the hero's single action. */
   .hero-copy .command-sub {
     margin: var(--space-2) 0 0;
@@ -307,6 +297,7 @@
     grid-template-columns: 56px minmax(0, 1fr) 120px 110px 110px;
     column-gap: var(--space-6);
     align-items: center;
+    padding-inline: var(--space-6);
   }
 
   .pack-table-header {
@@ -574,13 +565,6 @@
     letter-spacing: -0.015em;
   }
 
-  .evaluation-disclaimer {
-    max-width: 72ch;
-    margin: 0;
-    color: var(--ds-muted);
-    font: var(--text-small) / 1.5 var(--font-body);
-  }
-
   .evaluation-metadata {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -632,6 +616,18 @@
     font-size: var(--text-small);
   }
 
+  .evaluation-item-main {
+    display: grid;
+    gap: var(--space-1);
+    min-width: 0;
+  }
+
+  .evaluation-description {
+    margin: 0;
+    color: var(--ds-muted);
+    font: var(--text-small) / 1.45 var(--font-body);
+  }
+
   .evaluation-item strong {
     font: 650 var(--text-body) / 1 var(--font-mono);
   }
@@ -662,6 +658,7 @@
   .content-tab-bar {
     display: flex;
     gap: 0;
+    width: fit-content;
     margin-block-end: var(--space-6);
     border-block-end: 2px solid var(--ds-border-subtle);
   }
@@ -1048,10 +1045,6 @@
     .catalog-hero.js-reveal:not(.is-visible) .hero-copy > * {
       opacity: 0;
       translate: 0 var(--space-4);
-    }
-
-    .catalog-hero.js-reveal .command-row {
-      transition-delay: 0.08s;
     }
   }
 

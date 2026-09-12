@@ -40,8 +40,8 @@ const VALID_EVAL_REPORT = {
     modelVersion: "model-x",
   },
   scenarios: {
-    "scope-discipline": { passRate: 1 },
-    "policy-invariant": { passRate: 0.5 },
+    "scope-discipline": { passRate: 1, description: "Stays in scope." },
+    "policy-invariant": { passRate: 0.5, description: 42 },
   },
 };
 
@@ -407,7 +407,7 @@ describe("syncPacks", () => {
       model: "test/model",
       modelVersion: "model-x",
       scenarios: {
-        "scope-discipline": { passRate: 1 },
+        "scope-discipline": { passRate: 1, description: "Stays in scope." },
         "policy-invariant": { passRate: 0.5 },
       },
     });

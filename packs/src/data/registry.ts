@@ -27,6 +27,7 @@ export type RegistryFile = {
 
 export type RegistryEvaluationScenario = {
   passRate: number;
+  description?: string;
 };
 
 export type RegistryEvaluation = {

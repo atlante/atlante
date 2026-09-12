@@ -110,7 +110,7 @@ export function installPanel(): void {
   if (commandText) {
     const pack = commandText.dataset.package ?? "";
     const commands = new Map<string, string>([
-      ["init", `npx atlante@latest init --pack ${pack}`],
+      ["init", `npx atlante init --pack ${pack}`],
       ["install", `npx atlante pack install ${pack}`],
     ]);
     const tabs = [

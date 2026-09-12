@@ -120,7 +120,7 @@ const bindingSummary = (binding: { agents: number; skills: number }): string => 
           <code
             ><span class="command-prompt" aria-hidden="true">$ </span
             ><span id="command-text" data-package={pack.name}
-              >npx atlante@latest init --pack {pack.name}</span
+              >npx atlante init --pack {pack.name}</span
             ></code
           >
           <button
@@ -128,7 +128,7 @@ const bindingSummary = (binding: { agents: number; skills: number }): string => 
             type="button"
             aria-label="Copy installation command"
             data-install-copy
-            data-copy-text={`npx atlante@latest init --pack ${pack.name}`}
+            data-copy-text={`npx atlante init --pack ${pack.name}`}
           >
             <svg
               viewBox="0 0 24 24"
@@ -152,10 +152,6 @@ const bindingSummary = (binding: { agents: number; skills: number }): string => 
             </h2>
             <span class="badge evaluation">Self-reported</span>
           </div>
-          <p class="evaluation-disclaimer">
-            This result was published by the pack author from <code>{evaluation.reportPath}</code>;
-            it is not an Atlante certification.
-          </p>
           <dl class="evaluation-metadata">
             {evaluation.model !== "unknown" && (
               <div class="evaluation-metadata-item">
@@ -177,7 +173,14 @@ const bindingSummary = (binding: { agents: number; skills: number }): string => 
             <ul class="evaluation-list">
               {evaluationScenarios.map(([name, scenario]) => (
                 <li class="evaluation-item">
-                  <code>{name}</code>
+                  <div class="evaluation-item-main">
+                    <code>{name}</code>
+                    {scenario.description && (
+                      <p class="evaluation-description">
+                        {scenario.description}
+                      </p>
+                    )}
+                  </div>
                   <strong
                     class={scenario.passRate === 1 ? "rate-pass" : "rate-partial"}
                   >{formatPassRate(scenario.passRate)}</strong>
