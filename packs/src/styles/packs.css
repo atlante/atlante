@@ -131,11 +131,11 @@
 
   /* Quiet caption under the install command: the author-a-pack guide stays
      reachable without competing with the hero's single action. */
-  .command-sub {
+  .hero-copy .command-sub {
     margin: var(--space-2) 0 0;
     color: var(--ds-muted);
     font-family: var(--font-ui);
-    font-size: var(--text-meta);
+    font-size: var(--text-small);
     line-height: 1.6;
   }
 
