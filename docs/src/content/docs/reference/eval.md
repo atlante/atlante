@@ -96,17 +96,22 @@ A pack can declare suite metadata in its root preset:
     "host": "opencode",
     "scenarios": "eval/scenarios/*.eval.json",
     "fixtures": "eval/fixtures",
-    "report": "eval/report.json"
+    "report": "eval/report.json",
+    "source": "packages/review-pack/eval"
   }
 }
 ```
 
-The `scenarios` and optional `fixtures` and `report` paths are relative to the
-pack root. `fixtures` describes the pack's fixture tree; each scenario's
+The `scenarios` and optional `fixtures`, `report`, and `source` paths are
+relative to the pack root; `source` is relative to the pack's repository root
+instead. `fixtures` describes the pack's fixture tree; each scenario's
 `task.fixture` is also resolved from that pack root, not from the consuming
 project. Check paths and diff allowlists still resolve from the assembled
 sandbox root. The optional `host` value describes the suite's intended host;
-the consuming project's `host`, model, and budget control the run.
+the consuming project's `host`, model, and budget control the run. The
+optional `source` records where the pack's eval sources live inside its
+repository, so registries can deep-link them at the release tag (`v<version>`)
+next to the published report.
 
 Selecting or extending a pack does not run its suite. A consuming project opts
 in with a package or selected preset locator:

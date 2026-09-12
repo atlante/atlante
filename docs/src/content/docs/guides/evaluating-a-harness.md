@@ -147,13 +147,8 @@ reviewer rather than relying on the host's default agent.
 
 ### Include a pack-owned suite
 
-Evaluation scenarios can also ship with a resource pack. A pack's root preset
-declares its scenario glob and optional fixture-tree and report paths. Those
-paths are relative to the pack root, so a scenario such as
-`eval/scenarios/review.eval.json` can use `eval/fixtures` from that same pack
-without copying the fixture into the consuming project.
-
-Select the pack suite explicitly in the project's `eval` section:
+Evaluation scenarios can also ship with a resource pack. The pack's root
+preset declares the suite, and your project opts in explicitly:
 
 ```jsonc title="atlante.jsonc — include a pack suite"
 {
@@ -164,17 +159,11 @@ Select the pack suite explicitly in the project's `eval` section:
 }
 ```
 
-The package or selected preset must already be reached through the project's
-resource graph. Installing or extending a pack does not run its suite, and
-`--scenario` only narrows suites that were already included. Atlante discovers
-pack scenarios and validates their metadata during evaluation, but does not
-run pack setup commands or checks during resolution, validation, build, or pack
-synchronization.
-
-Treat a third-party pack's fixtures, setup commands, and checks as executable
-input. The sandbox boundary is tool-level policy rather than operating-system
-isolation; the host shell may retain ordinary access to the network and
-machine. Review the pack contents before adding it to `eval.include`.
+Installing or extending a pack never runs its suite, and `--scenario` only
+narrows suites that are already included. Pack fixtures, setup commands, and
+checks are executable input, so review them before adding a pack to
+`eval.include`. [Pack-owned suites](/reference/eval#pack-owned-suites) defines
+the resolution and containment rules that apply.
 
 Build the current harness before evaluating it:
 
@@ -235,11 +224,8 @@ The [Eval reference](/reference/eval#reports-and-exit-status) describes the
 report format and exit statuses.
 
 When a pack publishes a completed report at its declared `eval.report` path,
-the pack explorer may show its Atlante version, model, model version, run date,
-and per-scenario pass rates. The indexed provenance also records the report's
-host. This is labeled **self-reported evaluation**. It is provenance supplied
-by the pack author, not Atlante certification or an independent security or
-quality verdict. Missing or malformed reports are not displayed.
+the pack explorer can display it as
+[self-reported evaluation](/reference/eval#reports-and-exit-status).
 
 ## Compare a harness change
 

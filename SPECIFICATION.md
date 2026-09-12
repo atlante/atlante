@@ -767,8 +767,11 @@ MUST NOT opt a pack suite in.
 
 A resource pack MAY expose eval metadata in its root preset document. Pack eval
 metadata has a `scenarios` glob relative to the pack root and MAY provide
-`fixtures` and `report` paths relative to that same root. Its optional `host`
-value is compatibility metadata, not project execution policy. Pack eval
+`fixtures`, `report`, and `source` paths. `fixtures` and `report` resolve
+relative to the pack root, while `source` optionally locates the pack's eval
+sources relative to its repository root so published reports can be deep-linked
+at the release tag. Its optional
+`host` value is compatibility metadata, not project execution policy. Pack eval
 metadata is not inherited into the effective project document. Scenario
 documents discovered from a pack retain the pack root as their fixture root;
 project-local scenarios retain the project root as their fixture root. Resource
@@ -778,7 +781,8 @@ setup commands, checks, or scenarios.
 Eval scenarios are versioned documents in their own namespace, identified by
 the eval-scenario schema URI
 (`https://atlante.sh/schema/v0.1/eval-scenario.json`). A scenario MUST declare
-version `0.1`, a slug `name` unique across the suite, one `task` consisting of
+version `0.1`, a slug `name` unique across the suite, an optional
+`description`, one `task` consisting of
 a sandbox-relative `fixture`, an optional `setup` argv, an optional driving
 `agent`, and a `prompt`, an optional scenario `budget.timeoutMs` override, and
 at least one `check`. For a project-local scenario, `task.fixture` is relative
