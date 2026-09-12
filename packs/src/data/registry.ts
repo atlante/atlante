@@ -25,6 +25,22 @@ export type RegistryFile = {
   content: string | null;
 };
 
+export type RegistryEvaluationScenario = {
+  passRate: number;
+};
+
+export type RegistryEvaluation = {
+  source: "self-reported";
+  reportPath: string;
+  runId: string;
+  runDate: string;
+  atlante: string;
+  host: string;
+  model: string;
+  modelVersion: string;
+  scenarios: Record<string, RegistryEvaluationScenario>;
+};
+
 export type RegistryPack = {
   name: string;
   official: boolean;
@@ -39,6 +55,7 @@ export type RegistryPack = {
   presets: RegistryPreset[];
   readmeHtml: string;
   files: RegistryFile[];
+  evaluation?: RegistryEvaluation;
 };
 
 export type RegistrySnapshot = {

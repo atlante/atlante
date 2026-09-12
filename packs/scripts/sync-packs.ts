@@ -187,6 +187,7 @@ function parseJsonc<T>(source: string): T {
 type PresetDocument = {
   agents?: Record<string, unknown>;
   skills?: Record<string, unknown>;
+  eval?: unknown;
 };
 
 /**
@@ -220,7 +221,125 @@ type ExtractedPack = {
     default: boolean;
     bindings: { agents: number; skills: number };
   }>;
+  evaluation?: RegistryPack["evaluation"];
 };
+
+type RecordValue = Record<string, unknown>;
+
+function recordValue(value: unknown): RecordValue | undefined {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as RecordValue)
+    : undefined;
+}
+
+function isSafePackPath(path: string): boolean {
+  if (
+    path.length === 0 ||
+    path.includes("\0") ||
+    path.includes("\\") ||
+    path.startsWith("/") ||
+    /^[A-Za-z]:/.test(path)
+  )
+    return false;
+  return path
+    .split("/")
+    .every(
+      (segment) =>
+        segment.length > 0 &&
+        segment !== ".." &&
+        segment !== ".git" &&
+        segment !== "node_modules",
+    );
+}
+
+function nonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0;
+}
+
+function reportRunDate(runId: string): string | undefined {
+  const match =
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})-(\d{2})-[0-9a-f]{4}$/.exec(runId);
+  if (!match) return undefined;
+  const parts = match.slice(1, 7).map(Number);
+  const [year, month, day, hour, minute, second] = parts;
+  const timestamp = Date.UTC(year, month - 1, day, hour, minute, second);
+  const date = new Date(timestamp);
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day ||
+    date.getUTCHours() !== hour ||
+    date.getUTCMinutes() !== minute ||
+    date.getUTCSeconds() !== second
+  )
+    return undefined;
+  return date.toISOString();
+}
+
+/** Keeps the registry contract small and ignores unverifiable pack reports. */
+function readPackEvaluation(
+  metadata: unknown,
+  reportPath: string,
+  extractDir: string,
+  packRootPrefix: string,
+): RegistryPack["evaluation"] {
+  if (!isSafePackPath(reportPath)) return undefined;
+  let report: unknown;
+  try {
+    report = JSON.parse(
+      readFileSync(join(extractDir, packRootPrefix, reportPath), "utf8"),
+    ) as unknown;
+  } catch {
+    return undefined;
+  }
+
+  const metadataRecord = recordValue(metadata);
+  const reportRecord = recordValue(report);
+  const meta = recordValue(reportRecord?.meta);
+  const rawScenarios = recordValue(reportRecord?.scenarios);
+  const runId = reportRecord?.runId;
+  if (
+    metadataRecord?.report !== reportPath ||
+    !nonEmptyString(runId) ||
+    !meta ||
+    !nonEmptyString(meta.atlante) ||
+    !nonEmptyString(meta.host) ||
+    !nonEmptyString(meta.model) ||
+    !nonEmptyString(meta.modelVersion) ||
+    !rawScenarios
+  )
+    return undefined;
+  const runDate = reportRunDate(runId);
+  if (!runDate) return undefined;
+
+  const scenarios: Record<string, { passRate: number }> = {};
+  for (const [name, value] of Object.entries(rawScenarios)) {
+    const scenario = recordValue(value);
+    const passRate = scenario?.passRate;
+    if (
+      name.length === 0 ||
+      typeof passRate !== "number" ||
+      !Number.isFinite(passRate) ||
+      passRate < 0 ||
+      passRate > 1
+    )
+      return undefined;
+    scenarios[name] = { passRate };
+  }
+  if (Object.keys(scenarios).length === 0) return undefined;
+
+  return {
+    source: "self-reported",
+    reportPath,
+    runId,
+    runDate,
+    atlante: meta.atlante,
+    host: meta.host,
+    model: meta.model,
+    modelVersion: meta.modelVersion,
+    scenarios,
+  };
+}
 
 /**
  * Extracts the pack tree from the npm tarball: preset discovery (every
@@ -274,6 +393,11 @@ function extractTarball(tarball: Buffer, packageName: string): ExtractedPack {
       }
     }
 
+    const rootPreset = presetDirs.get("");
+    const rootDocument = rootPreset
+      ? parseJsonc<PresetDocument>(readFileSync(rootPreset.path, "utf8"))
+      : undefined;
+
     const presets = [...presetDirs.entries()]
       .map(([dir, { path }]) => {
         const doc = parseJsonc<PresetDocument>(readFileSync(path, "utf8"));
@@ -319,7 +443,24 @@ function extractTarball(tarball: Buffer, packageName: string): ExtractedPack {
       );
     }
 
-    return { files, presets };
+    const evaluationMetadata = recordValue(rootDocument?.eval);
+    const evaluationReportPath = evaluationMetadata?.report;
+    const evaluation =
+      nonEmptyString(evaluationReportPath) &&
+      isSafePackPath(evaluationReportPath)
+        ? readPackEvaluation(
+            evaluationMetadata,
+            evaluationReportPath,
+            extractDir,
+            packRootPrefix,
+          )
+        : undefined;
+
+    return {
+      files,
+      presets,
+      ...(evaluation ? { evaluation } : {}),
+    };
   } finally {
     rmSync(workDir, { recursive: true, force: true });
   }
@@ -499,6 +640,7 @@ export async function syncPacks(
             )
           : "",
         files: extracted.files,
+        ...(extracted.evaluation ? { evaluation: extracted.evaluation } : {}),
       };
     } catch {
       const fallback = previousByName.get(packageName);

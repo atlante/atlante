@@ -49,6 +49,11 @@ describe.skipIf(process.env.ATLANTE_BUILT_OUTPUT_TESTS !== "1")(
       expect(html).toContain("https://github.com/atlante/atlante");
     });
 
+    it("keeps the evaluation band absent when the snapshot has no report", () => {
+      const html = read("dist/@atlante/pack.html");
+      expect(html).not.toContain("Self-reported evaluation");
+    });
+
     it("publishes the branded 404 output with recovery links", () => {
       const html = read("dist/404.html");
       expect(html).toContain("This star is off the map");

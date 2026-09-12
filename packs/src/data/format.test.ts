@@ -1,5 +1,10 @@
 import { describe, expect, it } from "bun:test";
-import { formatCount, formatDate, formatSyncTime } from "./format";
+import {
+  formatCount,
+  formatDate,
+  formatPassRate,
+  formatSyncTime,
+} from "./format";
 
 describe("formatCount", () => {
   it("formats large counts in k", () => {
@@ -28,5 +33,13 @@ describe("formatSyncTime", () => {
     expect(formatSyncTime("2026-09-10T14:32:00.000Z")).toBe(
       "Sep 10, 2026 at 14:32 UTC",
     );
+  });
+});
+
+describe("formatPassRate", () => {
+  it("formats evaluated scenario rates as whole percentages", () => {
+    expect(formatPassRate(1)).toBe("100%");
+    expect(formatPassRate(0.5)).toBe("50%");
+    expect(formatPassRate(1 / 3)).toBe("33%");
   });
 });

@@ -3,8 +3,13 @@ import "../styles/packs.css";
 import BaseLayout from "../layouts/BaseLayout.astro";
 import SiteNav from "../components/SiteNav.astro";
 import SiteFooter from "../components/SiteFooter.astro";
-import type { RegistryFile } from "../data/registry";
-import { formatCount, formatDate, formatSyncTime } from "../data/format";
+import type { RegistryFile, RegistryPack } from "../data/registry";
+import {
+  formatCount,
+  formatDate,
+  formatPassRate,
+  formatSyncTime,
+} from "../data/format";
 import { encodeJsonForScript } from "../data/json";
 import { highlightFile } from "../lib/highlight";
 import snapshot from "../data/registry-snapshot.json";
@@ -17,7 +22,7 @@ export function getStaticPaths() {
 }
 
 interface Props {
-  pack: (typeof snapshot.packs)[number];
+  pack: RegistryPack;
 }
 
 const { pack } = Astro.props;
@@ -27,6 +32,10 @@ const { pack } = Astro.props;
 const readmeHtml = pack.readmeHtml;
 const files: RegistryFile[] = pack.files;
 const selectedFile = files.find((file) => file.path !== "README.md") ?? files[0];
+const evaluation = pack.evaluation;
+const evaluationScenarios = evaluation
+  ? Object.entries(evaluation.scenarios)
+  : [];
 const filesPayload = encodeJsonForScript(
   files.map((file) => ({ path: file.path, content: file.content })),
 );
@@ -134,6 +143,53 @@ const bindingSummary = (binding: { agents: number; skills: number }): string => 
           </button>
         </div>
       </section>
+
+      {evaluation && (
+        <section class="evaluation-panel" aria-labelledby="evaluation-title">
+          <div class="evaluation-header">
+            <div>
+              <span class="section-label">Evaluated</span>
+              <h2 class="evaluation-title" id="evaluation-title">
+                Self-reported evaluation
+              </h2>
+            </div>
+            <span class="badge evaluation">Self-reported</span>
+          </div>
+          <p class="evaluation-disclaimer">
+            This result was published by the pack author from <code>{evaluation.reportPath}</code>;
+            it is not an Atlante certification.
+          </p>
+          <dl class="evaluation-metadata">
+            <div class="evaluation-metadata-item">
+              <dt class="meta-label">Model</dt>
+              <dd><code>{evaluation.model}</code></dd>
+            </div>
+            <div class="evaluation-metadata-item">
+              <dt class="meta-label">Model version</dt>
+              <dd><code>{evaluation.modelVersion}</code></dd>
+            </div>
+            <div class="evaluation-metadata-item">
+              <dt class="meta-label">Atlante</dt>
+              <dd><code>{evaluation.atlante}</code></dd>
+            </div>
+            <div class="evaluation-metadata-item">
+              <dt class="meta-label">Run date</dt>
+              <dd>{formatDate(evaluation.runDate)}</dd>
+            </div>
+          </dl>
+          <div class="evaluation-scenarios">
+            <span class="section-label">Scenario pass rates</span>
+            <ul class="evaluation-list">
+              {evaluationScenarios.map(([name, scenario]) => (
+                <li class="evaluation-item">
+                  <code>{name}</code>
+                  <strong>{formatPassRate(scenario.passRate)}</strong>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+      )}
 
       <div class="detail-grid">
         <div class="detail-main">
