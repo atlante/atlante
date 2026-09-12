@@ -79,3 +79,8 @@ CLI and is not installed by `pack install`.
 Command flags, exit codes, diagnostics, and configuration details live in the
 [CLI reference](https://docs.atlante.sh/reference/cli). The MCP tools and
 transport contract live in the [MCP reference](https://docs.atlante.sh/reference/mcp).
+
+## Community
+
+Join the [Atlante Discord](https://discord.com/invite/W5EcwZvx7) to discuss the
+project and ask questions.

@@ -125,6 +125,33 @@
     max-width: 100%;
   }
 
+  .hero-sub {
+    margin-block-start: var(--space-8);
+  }
+
+  /* Quiet caption under the install command: the author-a-pack guide stays
+     reachable without competing with the hero's single action. */
+  .hero-copy .command-sub {
+    margin: var(--space-2) 0 0;
+    color: var(--ds-muted);
+    font-family: var(--font-ui);
+    font-size: var(--text-small);
+    line-height: 1.6;
+  }
+
+  .command-sub a {
+    color: var(--ds-fg);
+    text-decoration: underline;
+    text-decoration-color: var(--ds-border-subtle);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.25em;
+  }
+
+  .command-sub a:hover,
+  .command-sub a:focus-visible {
+    text-decoration-color: var(--ds-fg);
+  }
+
   /* Command boxes share the landing site's skin: a light bordered strip
      with foreground ink, not a dark code surface. */
   .command-box {
