@@ -18,7 +18,7 @@ describe("packs deployment contract", () => {
     const vercel = JSON.parse(read("packs/vercel.json")) as {
       buildCommand: string;
       installCommand: string;
-      ignoreCommand: string;
+      ignoreCommand?: string;
       cleanUrls: boolean;
       trailingSlash: boolean;
     };
@@ -43,9 +43,9 @@ describe("packs deployment contract", () => {
     expect(vercel.installCommand).toBe(
       "npm install --workspaces=false --no-package-lock --no-audit --no-fund",
     );
-    expect(vercel.ignoreCommand).toBe(
-      'if [ "$VERCEL_ENV" != "production" ]; then exit 1; fi; if printf \'%s\\n\' "$VERCEL_GIT_COMMIT_MESSAGE" | head -n 1 | grep -Eq \'^release: v[0-9]+\\.[0-9]+\\.[0-9]+$\'; then exit 1; fi; exit 0',
-    );
+    // Production deploys are not gated: Vercel deploys every push to the
+    // production branch, so no ignored-build step may be configured.
+    expect(vercel.ignoreCommand).toBeUndefined();
     expect(vercel.cleanUrls).toBe(true);
     expect(vercel.trailingSlash).toBe(false);
 

@@ -1,5 +1,4 @@
 import { describe, expect, it } from "bun:test";
-import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -18,7 +17,7 @@ describe("website deployment contract", () => {
     const websiteIgnore = read("website/.gitignore");
     const vercel = JSON.parse(read("website/vercel.json")) as {
       buildCommand: string;
-      ignoreCommand: string;
+      ignoreCommand?: string;
       installCommand: string;
       cleanUrls: boolean;
       trailingSlash: boolean;
@@ -47,9 +46,9 @@ describe("website deployment contract", () => {
     );
     expect(websiteIgnore).toContain("public/schema/");
     expect(vercel.buildCommand).toBe("bun run build");
-    expect(vercel.ignoreCommand).toBe(
-      'if [ "$VERCEL_ENV" != "production" ]; then exit 1; fi; if printf \'%s\\n\' "$VERCEL_GIT_COMMIT_MESSAGE" | head -n 1 | grep -Eq \'^release: v[0-9]+\\.[0-9]+\\.[0-9]+$\'; then exit 1; fi; exit 0',
-    );
+    // Production deploys are not gated: Vercel deploys every push to the
+    // production branch, so no ignored-build step may be configured.
+    expect(vercel.ignoreCommand).toBeUndefined();
     expect(vercel.installCommand).toBe(
       "npm install --workspaces=false --no-package-lock --no-audit --no-fund",
     );
@@ -117,20 +116,5 @@ describe("website deployment contract", () => {
     ]) {
       expect(normalizedReadme).not.toContain(stale);
     }
-  });
-
-  it("matches only the commit subject for production release gating", () => {
-    const { ignoreCommand } = JSON.parse(read("website/vercel.json")) as {
-      ignoreCommand: string;
-    };
-    const result = spawnSync("sh", ["-c", ignoreCommand], {
-      env: {
-        ...process.env,
-        VERCEL_ENV: "production",
-        VERCEL_GIT_COMMIT_MESSAGE: "chore: update docs\n\nrelease: v1.2.3",
-      },
-    });
-
-    expect(result.status).toBe(0);
   });
 });

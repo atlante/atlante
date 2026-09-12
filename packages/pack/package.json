@@ -21,6 +21,20 @@
     "url": "https://github.com/atlante/atlante.git",
     "directory": "packages/pack"
   },
+  "homepage": "https://packs.atlante.sh/@atlante/pack",
+  "bugs": {
+    "url": "https://github.com/atlante/atlante/issues"
+  },
+  "keywords": [
+    "atlante",
+    "ai-agents",
+    "coding-agents",
+    "agent-harness",
+    "agent-skills",
+    "opencode",
+    "prompt-templates",
+    "workflow"
+  ],
   "engines": {
     "node": ">=22"
   },
