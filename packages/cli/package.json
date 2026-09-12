@@ -21,6 +21,20 @@
     "url": "https://github.com/atlante/atlante.git",
     "directory": "packages/cli"
   },
+  "homepage": "https://atlante.sh",
+  "bugs": {
+    "url": "https://github.com/atlante/atlante/issues"
+  },
+  "keywords": [
+    "ai-agents",
+    "coding-agents",
+    "agent-harness",
+    "agent-skills",
+    "opencode",
+    "mcp",
+    "developer-tools",
+    "prompt-engineering"
+  ],
   "engines": {
     "node": ">=22"
   },
