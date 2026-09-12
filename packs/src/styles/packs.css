@@ -129,6 +129,31 @@
     margin-block-start: var(--space-8);
   }
 
+  /* Secondary hero action paired with the install command: same skin as the
+     command box, but an interactive button rather than a copyable strip. */
+  .hero-cta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--control-min);
+    padding: var(--space-1) var(--space-4);
+    border: 1px solid rgb(160 160 160 / 0.5);
+    border-radius: 4px;
+    background: color-mix(in oklab, var(--ds-bg) 96%, var(--ds-fg));
+    color: var(--ds-fg);
+    font-family: var(--font-ui);
+    font-size: var(--text-small);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .hero-cta:hover,
+  .hero-cta:focus-visible {
+    border-color: var(--ds-fg);
+  }
+
   /* Command boxes share the landing site's skin: a light bordered strip
      with foreground ink, not a dark code surface. */
   .command-box {
