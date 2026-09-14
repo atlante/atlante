@@ -890,6 +890,49 @@ sleep 30`,
     expect(trial.error).toContain("boom");
   });
 
+  test("surfaces a safe structured host error when stderr is empty", async () => {
+    const stub = writeStub(
+      tempDir("eval-stub-structured-error-"),
+      `printf '%s\\n' '{"type":"error","error":{"name":"APIError","data":{"message":"Authentication Failed","statusCode":401,"responseBody":"secret-response-body","responseHeaders":{"authorization":"secret-header"}}}}'; exit 1`,
+    );
+    const runner = makeRunner({ binaryPath: stub });
+    const trial = await runner.runTrial({
+      sandbox: sandboxFor(
+        tempDir("eval-sandbox-structured-error-"),
+        tempDir("eval-state-structured-error-"),
+      ),
+      prompt: "p",
+      timeoutMs: 10_000,
+      maxTokens: 400_000,
+    });
+    expect(trial.outcome).toBe("infra-error");
+    expect(trial.error).toContain("APIError");
+    expect(trial.error).toContain("authentication failed");
+    expect(trial.error).toContain("status 401");
+    expect(trial.error).not.toContain("secret-response-body");
+    expect(trial.error).not.toContain("secret-header");
+  });
+
+  test("falls back to stderr when a structured host error has no safe summary", async () => {
+    const stub = writeStub(
+      tempDir("eval-stub-empty-structured-error-"),
+      `printf '%s\\n' '{"type":"error","error":"SYNTHETIC_SECRET"}'; echo stderr-diagnostic >&2; exit 1`,
+    );
+    const runner = makeRunner({ binaryPath: stub });
+    const trial = await runner.runTrial({
+      sandbox: sandboxFor(
+        tempDir("eval-sandbox-empty-structured-error-"),
+        tempDir("eval-state-empty-structured-error-"),
+      ),
+      prompt: "p",
+      timeoutMs: 10_000,
+      maxTokens: 400_000,
+    });
+    expect(trial.outcome).toBe("infra-error");
+    expect(trial.error).toContain("stderr-diagnostic");
+    expect(trial.error).not.toContain("SYNTHETIC_SECRET");
+  });
+
   test("isolates XDG dirs, injects auth, and runs from the sandbox cwd", async () => {
     const state = tempDir("eval-state-env-");
     mkdirSync(join(state, "data", "opencode"), { recursive: true });
