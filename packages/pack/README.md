@@ -39,8 +39,11 @@ installation, so it does not require a separate `@atlante/pack` installation.
 Install the pack when a project-authored configuration references it directly:
 
 ```bash
-npm install --save-dev @atlante/pack
+npx atlante pack install @atlante/pack
 ```
+
+The command validates the pack and delegates the installation to your
+project's package manager.
 
 Then extend the preset and select a reusable template in `atlante.jsonc`:
 
@@ -77,7 +80,10 @@ Then extend the preset and select a reusable template in `atlante.jsonc`:
 
 `extends` selects a preset. `$template` selects a template, whose input
 schema defines the remaining fields for that agent or skill. Local
-configuration takes precedence over the inherited preset.
+configuration takes precedence over the inherited preset. The
+[customize your harness](https://docs.atlante.sh/guides/building-a-harness)
+guide walks through a complete project-specific agent and skill on top of
+the preset.
 
 ## Workflow
 
@@ -120,6 +126,10 @@ read-when guidance. Both templates support ordered `markdown`,
 `instructions`, `responsibilities`, `gotchas`, `workflow`, and `invariants`
 sections. Responsibilities name owned outcomes, instructions describe
 ordered actions, and invariants carry binding guarantees and approval gates.
+The [templates](https://docs.atlante.sh/concepts/templates) concept explains
+how templates compose, and the
+[template syntax](https://docs.atlante.sh/reference/template-syntax)
+reference covers the interpolation you can use when authoring your own.
 
 ## Harness stewardship
 
@@ -136,10 +146,12 @@ explicit developer approval and run as their own delivery cycle.
 
 ## Evaluation suite
 
-The first-party pack publishes a small evaluation suite under `eval/`, including
-scenario documents, their fixtures, and a self-reported run report. A project
-that extends the pack does not run this suite automatically. Opt in from the
-project configuration:
+The first-party pack publishes an evaluation suite under `eval/`, including
+scenario documents, their fixtures, and a self-reported run report. The
+suite is a starting point: its three scenarios cover the agent binding and
+the workflow's policy boundaries, and individual skills have no dedicated
+scenarios yet. A project that extends the pack does not run this suite
+automatically. Opt in from the project configuration:
 
 ```jsonc
 {
@@ -190,17 +202,19 @@ including nested lists, block quotes, fenced code, links, images, tables, task
 items, hard breaks, and strikethrough. Parser-only fields such as `position`
 and plugin-specific `data` are not part of the contract. The contract is
 strict: unsupported syntax is rejected rather than emitted through a raw
-fallback.
-
-## Static pack
-
-This is a static pack with `atlante.format: 1`; it has no runtime
-JavaScript entry point. Atlante loads only the selected template or instance
-and its transitive dependencies. It does not scan installed packages or install
-dependencies, so direct project references must be declared and installed by
-the project's package manager.
+fallback. The template is also the import contract:
+[`atlante import`](https://docs.atlante.sh/reference/cli) converts an
+existing host agent or skill from a Markdown file into a local pack,
+emitting the markdown nodes this template accepts.
 
 ## Community
 
-Join the [Atlante Discord](https://discord.com/invite/W5EcwZvx7) to discuss the
-project and ask questions.
+Join the [Atlante Discord](https://discord.com/invite/W5EcwZvx7) to discuss
+this pack, or a pack you are thinking of building. The
+[author a pack](https://docs.atlante.sh/guides/authoring-packs) guide shows
+how a pack is put together. Contributions follow
+[CONTRIBUTING.md](https://github.com/atlante/atlante/blob/main/CONTRIBUTING.md).
+
+## License
+
+[MIT](https://github.com/atlante/atlante/blob/main/packages/pack/LICENSE).
