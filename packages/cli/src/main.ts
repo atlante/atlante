@@ -81,16 +81,26 @@ export function createProgram(): Command {
     )
     .option("--force", "overwrite an existing Atlante config")
     .option("--no-mcp", "skip OpenCode MCP server registration")
+    .option(
+      "--opencode-version <version>",
+      "select the OpenCode dialect when host detection is unavailable",
+    )
     .description("scaffold an Atlante configuration")
     .action(
       async (
         path: string,
-        options: { pack?: string; force?: boolean; mcp?: boolean },
+        options: {
+          pack?: string;
+          force?: boolean;
+          mcp?: boolean;
+          opencodeVersion?: string;
+        },
       ) => {
         process.exitCode = await runInit(path, {
           pack: options.pack,
           force: options.force,
           noMcp: options.mcp === false,
+          opencodeVersion: options.opencodeVersion,
         });
       },
     );
