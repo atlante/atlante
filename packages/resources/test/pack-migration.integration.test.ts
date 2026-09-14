@@ -44,7 +44,7 @@ const firstPartyValues = {
 const expectedPackFiles = [
   "agent/template.jsonc",
   "agent/template.md",
-  "architect/instance.jsonc",
+  "atlante/instance.jsonc",
   "artifact/template.jsonc",
   "artifact/template.md",
   "atlante.jsonc",
@@ -83,7 +83,7 @@ const expectedPackFiles = [
   "workflow/instance.jsonc",
   "workflow/template.jsonc",
   "workflow/template.md",
-  "test/architect.unit.test.ts",
+  "test/atlante.unit.test.ts",
   "test/brainstorm.unit.test.ts",
   "test/build.unit.test.ts",
   "test/harness.unit.test.ts",
@@ -198,7 +198,7 @@ describe("first-party package resolution", () => {
     ).facet;
     const instance = loadInstanceFacet(
       projectPack,
-      "@atlante/pack/architect",
+      "@atlante/pack/atlante",
       fixture.configPath,
     ).facet;
 
@@ -221,7 +221,7 @@ describe("first-party package resolution", () => {
       path: String(instance.origin.path),
     }).toEqual({
       kind: "package",
-      path: `@atlante/pack@${packVersion}/architect/instance.jsonc`,
+      path: `@atlante/pack@${packVersion}/atlante/instance.jsonc`,
     });
   });
 
@@ -234,7 +234,7 @@ describe("first-party package resolution", () => {
       bindingCollections: atlanteBindingCollections,
     });
 
-    expect(Object.keys(document.bindings.agents)).toEqual(["architect"]);
+    expect(Object.keys(document.bindings.agents)).toEqual(["atlante"]);
     expect(Object.keys(document.bindings.skills).sort()).toEqual([
       "brainstorm",
       "build",
@@ -243,10 +243,10 @@ describe("first-party package resolution", () => {
       "review",
     ]);
     const descriptionOrigin =
-      document.provenance["/agents/architect/description"];
+      document.provenance["/agents/atlante/description"];
     expect(descriptionOrigin?.kind).toBe("package");
     expect(String(descriptionOrigin?.path)).toBe(
-      `@atlante/pack@${packVersion}/architect/instance.jsonc`,
+      `@atlante/pack@${packVersion}/atlante/instance.jsonc`,
     );
   });
 
@@ -318,20 +318,20 @@ describe("first-party package resolution", () => {
     );
   });
 
-  test("preserves the first-party architect rendered prompt bytes", () => {
+  test("preserves the first-party atlante rendered prompt bytes", () => {
     const fixture = firstPartyProject({ extends: "@atlante/pack" });
     const projectPack = createProjectResourcePack(fixture.root);
-    const architect = resolveResourceInstance(
+    const atlante = resolveResourceInstance(
       projectPack,
-      "@atlante/pack/architect",
+      "@atlante/pack/atlante",
       fixture.configPath,
     );
-    expect(String(architect.effectiveTemplate.locator)).toBe(
+    expect(String(atlante.effectiveTemplate.locator)).toBe(
       "@atlante/pack/agent",
     );
     const rendered = renderResolvedTemplate({
-      template: architect.effectiveTemplate,
-      input: interpolateValues(architect.input, firstPartyValues),
+      template: atlante.effectiveTemplate,
+      input: interpolateValues(atlante.input, firstPartyValues),
     });
 
     expect(rendered).toContain("You are the lead engineer for Atlante.");

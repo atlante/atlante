@@ -47,7 +47,7 @@ const REQUIRED_FILES: Record<(typeof PACKAGES)[number], string[]> = {
     "atlante.jsonc",
     "agent/template.jsonc",
     "agent/template.md",
-    "architect/instance.jsonc",
+    "atlante/instance.jsonc",
   ],
   cli: ["dist/bin/atlante.js"],
 };
