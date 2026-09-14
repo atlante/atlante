@@ -67,20 +67,23 @@ try {
     join(project, "opencode.jsonc"),
   ).json()) as {
     mcp?: {
-      atlante?: { type?: string; command?: unknown; enabled?: boolean };
+      servers?: {
+        atlante?: { type?: string; command?: unknown; disabled?: boolean };
+      };
     };
   };
+  // No host binary is on PATH in this sandbox, so init defaults to V2.
   assert(
-    openCodeConfig.mcp?.atlante?.type === "local",
+    openCodeConfig.mcp?.servers?.atlante?.type === "local",
     "init did not register a local Atlante MCP server",
   );
   assert(
-    JSON.stringify(openCodeConfig.mcp?.atlante?.command) ===
+    JSON.stringify(openCodeConfig.mcp?.servers?.atlante?.command) ===
       JSON.stringify(["npx", "--yes", `atlante@${pkg.version}`, "mcp"]),
     "init did not register the version-pinned Atlante MCP command",
   );
   assert(
-    openCodeConfig.mcp?.atlante?.enabled === true,
+    openCodeConfig.mcp?.servers?.atlante?.disabled === false,
     "init did not enable the Atlante MCP server",
   );
 

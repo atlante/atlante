@@ -48,6 +48,8 @@ jobs:
       # disk with no runtime plugin, so the unit suite cannot catch a build
       # that materializes nothing. Boot the real OpenCode CLI against a
       # project built by the CLI and assert the native architect agent and
-      # skills are discovered with host-owned config merged.
+      # skills are discovered with host-owned config merged — once per
+      # pinned dialect (V1 1.18.29, V2 2.0.3), using each dialect's own
+      # discovery commands and config shapes.
       - name: OpenCode host smoke
         run: bun scripts/opencode-smoke.ts
