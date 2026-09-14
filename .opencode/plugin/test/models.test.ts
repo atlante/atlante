@@ -30,13 +30,13 @@ type TestConfig = { agent: Record<string, Record<string, unknown>> };
 
 const baseConfig = (): TestConfig => ({
   agent: {
-    architect: { mode: "primary" },
+    atlante: { mode: "primary" },
     general: { model: "opencode/default-general" },
     explore: { model: "opencode/default-explore" },
   },
 });
 
-test("generates an architect-only Z.ai model override", async () => {
+test("generates an atlante-only Z.ai model override", async () => {
   const directory = await createProject();
   const hooks = await loadPlugin(directory);
 
@@ -45,14 +45,14 @@ test("generates an architect-only Z.ai model override", async () => {
       await readFile(join(directory, ".opencode/models.json"), "utf8"),
     ),
   ).toEqual({
-    architect: { model: MODEL, reasoningEffort: "high" },
+    atlante: { model: MODEL, reasoningEffort: "high" },
   });
 
   const config = baseConfig();
   await hooks.config?.(config as never);
 
   expect(config.agent).toEqual({
-    architect: {
+    atlante: {
       mode: "primary",
       model: MODEL,
       variant: "high",
@@ -90,13 +90,13 @@ test("still applies explicitly configured sub-agent overrides", async () => {
   });
 });
 
-test("preserves an explicitly configured architect override", async () => {
+test("preserves an explicitly configured atlante override", async () => {
   const directory = await createProject();
   await mkdir(join(directory, ".opencode"));
   await writeFile(
     join(directory, ".opencode", "models.json"),
     JSON.stringify({
-      architect: { model: MODEL, reasoningEffort: "max" },
+      atlante: { model: MODEL, reasoningEffort: "max" },
     }),
   );
 
@@ -104,7 +104,7 @@ test("preserves an explicitly configured architect override", async () => {
   const config = baseConfig();
   await hooks.config?.(config as never);
 
-  expect(config.agent.architect).toEqual({
+  expect(config.agent.atlante).toEqual({
     mode: "primary",
     model: MODEL,
     variant: "max",

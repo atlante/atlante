@@ -1,7 +1,7 @@
 # OpenCode model and reasoning effort overrides
 
 Local plugin that lets the ignored `.opencode/models.json` file set the `model`
-and `reasoningEffort` for the `architect`, `general`, and `explore` roles at
+and `reasoningEffort` for the `atlante`, `general`, and `explore` roles at
 startup.
 
 ## Configuration order
@@ -17,14 +17,14 @@ repository plugin can override administrator-managed policy.
 
 ## File format
 
-The file is strict JSON, not JSONC. It accepts only the `architect`, `general`,
+The file is strict JSON, not JSONC. It accepts only the `atlante`, `general`,
 and `explore` keys. Each role value is a strict object that may specify
 `model`, `reasoningEffort`, or both; the legacy string-only role value is
 rejected:
 
 ```json
 {
-  "architect": {
+  "atlante": {
     "model": "zai-coding-plan/glm-5.3-flash",
     "reasoningEffort": "high"
   }
@@ -50,7 +50,7 @@ entries when you want them:
 ## Behavior
 
 - **Generated defaults**: if the file is missing, the plugin creates it with the
-  exact starter above — `zai-coding-plan/glm-5.3-flash` for `architect`, with
+  exact starter above — `zai-coding-plan/glm-5.3-flash` for `atlante`, with
   `reasoningEffort` `high` — and applies it for the current startup. The
   `general` and `explore` entries are intentionally omitted so OpenCode's
   default sub-agents remain in control until explicitly configured.

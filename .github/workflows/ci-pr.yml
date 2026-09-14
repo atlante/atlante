@@ -47,7 +47,7 @@ jobs:
       # The OpenCode host discovers native agent/skill files straight from
       # disk with no runtime plugin, so the unit suite cannot catch a build
       # that materializes nothing. Boot the real OpenCode CLI against a
-      # project built by the CLI and assert the native architect agent and
+      # project built by the CLI and assert the native atlante agent and
       # skills are discovered with host-owned config merged.
       - name: OpenCode host smoke
         run: bun scripts/opencode-smoke.ts

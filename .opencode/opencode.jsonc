@@ -1,6 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "default_agent": "architect",
+  "default_agent": "atlante",
 
   "mcp": {
     "fallow": {
@@ -15,7 +15,7 @@
   },
 
   "agent": {
-    "architect": {
+    "atlante": {
       "mode": "primary",
       "permission": {
         "*": "allow",
