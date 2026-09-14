@@ -36,7 +36,7 @@
     "prompt-engineering"
   ],
   "engines": {
-    "node": ">=22"
+    "node": ">=22.5"
   },
   "publishConfig": {
     "access": "public"

@@ -9,6 +9,7 @@ import {
   test,
 } from "bun:test";
 import {
+  chmodSync,
   cpSync,
   existsSync,
   mkdirSync,
@@ -728,6 +729,43 @@ describe("runEvalCommand", () => {
       errorSpy.mockRestore();
       if (previous === undefined) delete process.env.XDG_DATA_HOME;
       else process.env.XDG_DATA_HOME = previous;
+    }
+  });
+
+  test("exits 3 when a V1 host has database-only auth state", async () => {
+    const project = builtProject();
+    const binDir = tempDir();
+    const binary = join(binDir, "opencode");
+    writeFileSync(
+      binary,
+      "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then printf '%s\\n' 'opencode v1.18.29'; exit 0; fi\nexit 1\n",
+    );
+    chmodSync(binary, 0o755);
+    const dataHome = tempDir();
+    mkdirSync(join(dataHome, "opencode"), { recursive: true });
+    writeFileSync(join(dataHome, "opencode", "opencode.db"), "database-only\n");
+    const previousPath = process.env.PATH;
+    const previousDataHome = process.env.XDG_DATA_HOME;
+    process.env.PATH = `${binDir}:${previousPath ?? ""}`;
+    process.env.XDG_DATA_HOME = dataHome;
+    const errors: string[] = [];
+    const errorSpy = spyOn(console, "error").mockImplementation(
+      (...parts: unknown[]) => {
+        errors.push(parts.join(" "));
+      },
+    );
+    try {
+      const exit = await runEvalCommand(project, {}, undefined);
+      expect(exit).toBe(3);
+      expect(errors.join("\n")).toContain("eval-host-unauthenticated");
+      expect(errors.join("\n")).toContain("auth.json");
+      expect(errors.join("\n")).not.toContain("opencode.db");
+    } finally {
+      errorSpy.mockRestore();
+      if (previousPath === undefined) delete process.env.PATH;
+      else process.env.PATH = previousPath;
+      if (previousDataHome === undefined) delete process.env.XDG_DATA_HOME;
+      else process.env.XDG_DATA_HOME = previousDataHome;
     }
   });
 

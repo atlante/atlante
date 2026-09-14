@@ -22,7 +22,7 @@
     "directory": "packages/eval"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22.5"
   },
   "private": true,
   "exports": {

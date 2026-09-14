@@ -8,11 +8,11 @@ import {
 import { basename, dirname, join, resolve } from "node:path";
 import { loadProject, type ProjectContext } from "@atlante/builder";
 import {
-  checkOpenCodeAuth,
   createOpenCodeRunner,
   type EvalProgress,
   EvalRunError,
   type HostRunner,
+  type OpenCodeHostRunner,
   type RunReport,
   reserveRunId,
   resolveBudget,
@@ -20,6 +20,7 @@ import {
   runExitCode,
   verifyNativeOutputs,
 } from "@atlante/eval";
+import { OpenCodeVersionError } from "@atlante/opencode/dialect";
 import {
   loadPresetFacet,
   parseResourceLocator,
@@ -75,26 +76,55 @@ export async function runEvalCommand(
   const prepared = prepareEval(target, options, context);
   if (typeof prepared === "number") return prepared;
 
-  const host =
-    runner ?? createOpenCodeRunner({ projectRoot: prepared.projectRoot });
+  let host: HostRunner;
+  let opencodeHost: OpenCodeHostRunner | undefined;
+  try {
+    if (runner === undefined) {
+      opencodeHost = createOpenCodeRunner({
+        projectRoot: prepared.projectRoot,
+      });
+      host = opencodeHost;
+    } else {
+      host = runner;
+    }
+  } catch (cause) {
+    const versionError =
+      cause instanceof OpenCodeVersionError ? cause : undefined;
+    printDiagnostics([
+      error(
+        versionError?.code === "unsupported-version"
+          ? "eval-host-unsupported-version"
+          : "eval-host-unavailable",
+        versionError?.message ??
+          `could not prepare the OpenCode host: ${cause instanceof Error ? cause.message : String(cause)}`,
+        {
+          expected: "OpenCode V1 >=1.18.29 <2.0.0 or V2 >=2.0.0 <3.0.0",
+          next: "install a supported OpenCode version and re-run `atlante eval`",
+        },
+      ),
+    ]);
+    return 3;
+  }
   // The default runner needs stored credentials; without them every trial
   // would fail individually. Missing auth is run-preventing infrastructure.
-  if (runner === undefined) {
-    const auth = checkOpenCodeAuth();
-    if (!auth.authenticated) {
-      printDiagnostics([
-        error(
-          "eval-host-unauthenticated",
-          `opencode authentication not found at ${auth.path}`,
-          {
-            source: diagnosticPath(auth.path),
-            expected: "host credentials stored by OpenCode",
-            next: "run `opencode` and sign in once, then re-run this command",
-          },
-        ),
-      ]);
-      return 3;
-    }
+  if (opencodeHost !== undefined && !opencodeHost.auth.authenticated) {
+    const auth = opencodeHost.auth;
+    const authSource =
+      opencodeHost.dialect === "v2"
+        ? `${auth.path} or ${auth.databasePath}`
+        : auth.path;
+    printDiagnostics([
+      error(
+        "eval-host-unauthenticated",
+        `opencode authentication not found at ${authSource}`,
+        {
+          source: diagnosticPath(auth.path),
+          expected: "host credentials stored by OpenCode",
+          next: "run `opencode` and sign in once, then re-run this command",
+        },
+      ),
+    ]);
+    return 3;
   }
   let report: RunReport;
   const progressLine = createProgressRenderer();

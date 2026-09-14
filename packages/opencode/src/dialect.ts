@@ -74,6 +74,7 @@ const DIALECT_DESCRIPTORS: Readonly<
 const defaultVersionProbe: OpenCodeVersionProbe = (binaryPath) =>
   execFileSync(binaryPath, ["--version"], {
     encoding: "utf8",
+    env: process.env,
     stdio: ["ignore", "pipe", "pipe"],
   });
 
@@ -158,8 +159,7 @@ export function resolveOpenCodeDialect(
 ): OpenCodeDialect {
   if (
     version.major === 1 &&
-    (version.minor > 18 ||
-      (version.minor === 18 && version.patch >= 29))
+    (version.minor > 18 || (version.minor === 18 && version.patch >= 29))
   ) {
     return "v1";
   }
