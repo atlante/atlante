@@ -1,18 +1,32 @@
 # `@atlante/pack`
 
-Atlante's first-party static pack gives a project a useful default agent and
-skills for deliberate AI-assisted work. It provides the `atlante` agent, the
-four delivery-phase skills `brainstorm`, `plan`, `build`, and `review`, the
-additional non-phase `harness` stewardship skill, and reusable templates and
-instances for composing your own agents, skills, workflows, and supporting
-prompt content.
+Atlante's first-party static pack is, first of all, a set of templates:
+generic agent, skill, workflow, and content templates that you compose into
+your own agents, skills, and instances through `$template` selections in
+`atlante.jsonc`. On top of those templates, the pack ships a default preset
+so a new project starts from a working harness: the `atlante` agent, the four
+delivery-phase skills `brainstorm`, `plan`, `build`, and `review`, and the
+`harness` stewardship skill.
+
+## Preset design
+
+The preset is minimal on purpose. Current models follow instructions closely
+but stall on unclear or conflicting guidance, so provider guidance favors
+flexible harnesses with few, precise, outcome-focused instructions and
+expects scaffolding to shrink as capabilities improve. See [OpenAI's
+prompting best practices](https://developers.openai.com/api/docs/guides/latest-model#prompting-best-practices)
+and the curated [harness-engineering resource list](https://github.com/ai-boost/awesome-harness-engineering)
+for the full picture. The pack follows that shape: each section carries one
+concern, invariants state only binding guarantees, and the atlante selects
+the phases and skills a task actually needs instead of running a fixed
+pipeline.
 
 ## Default usage
 
 Initialize a project with the first-party pack:
 
 ```bash
-npx atlante@latest init
+npx atlante init
 ```
 
 The CLI selects the default preset from `@atlante/pack` and writes
@@ -95,33 +109,29 @@ Useful public locators include:
 | Phase skill instances | `@atlante/pack/brainstorm`, `@atlante/pack/plan`, `@atlante/pack/build`, `@atlante/pack/review` |
 | Stewardship skill instance | `@atlante/pack/harness` |
 | Agent and skill templates | `@atlante/pack/agent`, `@atlante/pack/skill` |
-| Supporting templates | `@atlante/pack/workflow`, `@atlante/pack/markdown`, `@atlante/pack/artifact`, `@atlante/pack/gotchas`, `@atlante/pack/instructions`, `@atlante/pack/responsibilities`, `@atlante/pack/invariants`, `@atlante/pack/references` |
+| Workflow and content templates | `@atlante/pack/workflow`, `@atlante/pack/markdown`, `@atlante/pack/artifact` |
+| Section templates | `@atlante/pack/gotchas`, `@atlante/pack/instructions`, `@atlante/pack/responsibilities`, `@atlante/pack/invariants`, `@atlante/pack/references` |
 
-The default preset exposes exactly one agent binding, `atlante`, and five
-public skill bindings: the four delivery-phase skills `brainstorm`, `plan`,
-`build`, and `review`, plus the non-phase `harness` stewardship skill. The
-workflow instance's phases reference the four phase skills, and the atlante
-selects the phases and skills that materially improve the result. The skill
-bindings are locator-only, so each skill instance owns its description. The
-agent template requires `identity` and `mission`; both agent and skill templates
-support ordered `markdown`, `instructions`, `responsibilities`, `gotchas`,
-`workflow`, and `invariants` sections. The skill template also supports
-`references` sections, which render named entries with their locations and
-optional read-when guidance.
-Responsibilities name owned outcomes, while instructions describe ordered
-actions and invariants carry binding guarantees and approval gates.
+The preset's skill bindings are locator-only, so each skill instance owns its
+description. The agent template renders an optional identity and mission with
+ordered sections; the skill template additionally supports `references`
+sections, which render named entries with their locations and optional
+read-when guidance. Both templates support ordered `markdown`,
+`instructions`, `responsibilities`, `gotchas`, `workflow`, and `invariants`
+sections. Responsibilities name owned outcomes, instructions describe
+ordered actions, and invariants carry binding guarantees and approval gates.
 
 ## Harness stewardship
 
 `@atlante/pack/harness` is not a workflow phase. It carries the conditional
 operational guidance for initializing, configuring, validating, building,
-troubleshooting, and improving an Atlante harness, and the atlante prompt
-routes harness-touching work to it alongside the active phase skills — it
-supplements them rather than replacing them. The skill keeps permanent policy
-(concepts, resource selection, the source-versus-generated boundary, and the
-separately approved harness-improvement cycle) authoritative and treats
-command-level mechanics as provisional, so deterministic tools can absorb the
-mechanics later without changing the policy. Harness changes always require
+troubleshooting, and improving an Atlante harness. The atlante prompt routes
+harness-touching work to it alongside the active phase skills; it supplements
+them rather than replacing them. The skill keeps permanent policy
+authoritative: concepts, resource selection, the source-versus-generated
+boundary, and the separately approved harness-improvement cycle.
+Command-level mechanics are provisional, so deterministic tools can absorb
+them later without changing the policy. Harness changes always require
 explicit developer approval and run as their own delivery cycle.
 
 ## Evaluation suite
@@ -153,7 +163,7 @@ certification or an independent security or quality verdict. Fixtures, setup
 commands, and checks remain executable tool-level policy and should be reviewed
 before running a pack suite.
 
-## Pack behavior
+## Markdown template
 
 The `@atlante/pack/markdown` template accepts an ordered array of canonical,
 type-discriminated Markdown nodes. For example:
@@ -178,9 +188,11 @@ type-discriminated Markdown nodes. For example:
 The AST supports the selected CommonMark and GFM block and inline nodes,
 including nested lists, block quotes, fenced code, links, images, tables, task
 items, hard breaks, and strikethrough. Parser-only fields such as `position`
-and plugin-specific `data` are not part of the contract. The v0.2.x contract is
-breaking; unsupported syntax is rejected rather than emitted through a raw
+and plugin-specific `data` are not part of the contract. The contract is
+strict: unsupported syntax is rejected rather than emitted through a raw
 fallback.
+
+## Static pack
 
 This is a static pack with `atlante.format: 1`; it has no runtime
 JavaScript entry point. Atlante loads only the selected template or instance
