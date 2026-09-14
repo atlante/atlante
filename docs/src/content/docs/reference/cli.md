@@ -14,8 +14,8 @@ npx atlante --help
 npx atlante --version
 ```
 
-For a one-off invocation, use `npx atlante@latest`. This requests the latest
-release rather than the version installed in your project.
+For a one-off invocation, `npx atlante` runs without a project-local
+installation: npx fetches the package into its cache on first use.
 
 ## Output
 

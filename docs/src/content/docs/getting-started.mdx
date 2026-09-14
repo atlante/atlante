@@ -19,21 +19,21 @@ Create the configuration and run the first build:
   <TabItem label="npm">
 
 ```sh
-npx atlante@latest init
+npx atlante init
 ```
 
   </TabItem>
   <TabItem label="pnpm">
 
 ```sh
-pnpm dlx atlante@latest init
+pnpm dlx atlante init
 ```
 
   </TabItem>
   <TabItem label="bun">
 
 ```sh
-bunx atlante@latest init
+bunx atlante init
 ```
 
   </TabItem>
@@ -51,7 +51,7 @@ By default, `init` also registers the read-only Atlante MCP server in the
 OpenCode configuration for this project. It selects the first existing file in
 this order: `.opencode/opencode.jsonc`, `.opencode/opencode.json`,
 `opencode.jsonc`, and `opencode.json`; when none exists, it creates root
-`opencode.jsonc`. Use `npx atlante@latest init --no-mcp` when you want to skip
+`opencode.jsonc`. Use `npx atlante init --no-mcp` when you want to skip
 that registration. See the [MCP reference](/reference/mcp) for the server
 contract.
 
