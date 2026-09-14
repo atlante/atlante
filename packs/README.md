@@ -3,17 +3,19 @@
 The [Atlante pack explorer](https://packs.atlante.sh): a static catalog for
 discovering and inspecting Atlante packs published as npm packages.
 
-The site is fully static. A build-time synchronization step reads the curated
-manifest, verifies each pack against npm and the pack format, and writes the
-snapshot the Astro build consumes; the committed snapshot is the fallback when
-the network fetch fails and is never edited by hand.
+The site is fully static. The Astro build consumes the committed registry
+snapshot. The explicit synchronization step reads the curated manifest,
+verifies each pack against npm and the pack format, and refreshes that snapshot
+for deployment; it falls back to the previous snapshot when a live fetch fails
+and is never edited by hand.
 
 ## Commands
 
 ```sh
-bun run --cwd packs dev    # dev server on port 4323
-bun run --cwd packs build  # sync brand assets, sync the registry, build Astro
-bun run --cwd packs check  # build, then run the workspace test suite
+bun run --cwd packs dev          # dev server on port 4323
+bun run --cwd packs build        # sync brand assets, build from the snapshot
+bun run --cwd packs check        # build, then run the workspace test suite
+bun run --cwd packs sync:packs   # refresh the snapshot from npm and GitHub
 ```
 
 The catalog lives at the subdomain root: `/` lists the packs and
@@ -54,11 +56,12 @@ unauthenticated requests.
 
 The site deploys natively through Vercel's git integration: the `packs` Vercel
 project uses `packs` as its Root Directory, installs dependencies from the
-repository root, and runs the workspace build — which includes the registry
-synchronization — on every build. Production deploys run on every push to the
-production branch and pull requests get preview deployments; no ignored-build
-step is configured.
+repository root, and explicitly refreshes the registry before running the
+workspace build on every deployment. Production deploys run on every push to
+the production branch and pull requests get preview deployments; no
+ignored-build step is configured.
 
-The snapshot is regenerated on every build, so deployed metrics reflect the
-latest release's `sync:packs` run; the committed snapshot keeps local builds
-and failed network fetches reproducible.
+The committed snapshot keeps local builds and checks reproducible. Deployed
+metrics reflect the latest successful refresh performed by the deployment
+command, with the previous snapshot retained when live data cannot be
+verified.

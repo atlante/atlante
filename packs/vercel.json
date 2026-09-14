@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "bun run build",
+  "buildCommand": "bun run sync:packs && bun run build",
   "installCommand": "npm install --workspaces=false --no-package-lock --no-audit --no-fund",
   "cleanUrls": true,
   "trailingSlash": false

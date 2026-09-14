@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "bun run sync:brand && astro dev --port 4323",
     "dev:local": "bun scripts/dev-local.ts",
-    "build": "bun run sync:brand && bun run sync:packs && astro build",
+    "build": "bun run sync:brand && astro build",
     "check": "bun run build && ATLANTE_BUILT_OUTPUT_TESTS=1 bun test scripts src/data",
     "preview": "astro preview",
     "sync:brand": "bun scripts/sync-brand.ts",
