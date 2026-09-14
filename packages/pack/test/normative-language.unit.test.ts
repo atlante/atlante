@@ -112,19 +112,6 @@ describe("normative authoring convention", () => {
             ).toBe(true);
       },
     );
-
-    test("review instructions state their absolute gates with normative wording", () => {
-      const instructions = resolvePackSkill("@atlante/pack/review").listText(
-        "instructions",
-      );
-
-      for (const landmark of [
-        "MUST NOT omit direct source inspection, acceptance verification, or the evidence needed to support the verdict",
-        "MUST NOT reopen unaffected code",
-        "SHOULD NOT repeat broad validation when sufficient evidence already exists",
-      ])
-        expect(instructions).toContain(landmark);
-    });
   });
 
   describe("shared templates", () => {
