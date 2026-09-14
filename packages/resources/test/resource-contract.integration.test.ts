@@ -143,12 +143,12 @@ describe("resource contract", () => {
     };
     const instance: InstanceFacet = {
       kind: "instance",
-      locator: trusted<ResourceLocator>("@atlante/pack/architect"),
+      locator: trusted<ResourceLocator>("@atlante/pack/atlante"),
       origin: trusted<ResourceOrigin>({
         kind: "package",
-        path: "@atlante/pack@0.1.6/architect/instance.jsonc",
+        path: "@atlante/pack@0.1.6/atlante/instance.jsonc",
       }),
-      input: { identity: "You are an architect." },
+      input: { identity: "You are an atlante." },
     };
     const preset: Preset = {
       kind: "preset",

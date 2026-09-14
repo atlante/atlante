@@ -38,7 +38,7 @@ including the files that define templates and instances.
 
 `@atlante/pack` includes:
 
-- An `architect` agent that selects the phase skills relevant to a task while
+- An `atlante` agent that selects the phase skills relevant to a task while
   preserving their order.
 - Four phase skills: `brainstorm`, `plan`, `build`, and `review`.
 - A `harness` skill for initializing, configuring, validating, and improving

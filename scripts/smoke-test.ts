@@ -126,10 +126,7 @@ try {
     .filter((file) => file.kind === "agent")
     .map((file) => file.id)
     .sort();
-  assert(
-    agentIds.join(",") === "architect",
-    `unexpected agent ids: ${agentIds}`,
-  );
+  assert(agentIds.join(",") === "atlante", `unexpected agent ids: ${agentIds}`);
   const skillIds = manifest.files
     .filter((file) => file.kind === "skill")
     .map((file) => file.id)
@@ -149,9 +146,9 @@ try {
 
   assert(
     await Bun.file(
-      join(ROOT, "resources", "architect", "instance.jsonc"),
+      join(ROOT, "resources", "atlante", "instance.jsonc"),
     ).exists(),
-    "tracked local architect resource is missing",
+    "tracked local atlante resource is missing",
   );
 
   await Bun.$`node ${CLI} validate ${ROOT}`.cwd(ROOT);
@@ -177,8 +174,8 @@ try {
     rootManifest.files
       .filter((file) => file.kind === "agent")
       .map((file) => file.id)
-      .join(",") === "architect",
-    "root architect ID changed",
+      .join(",") === "atlante",
+    "root atlante ID changed",
   );
   assert(
     rootManifest.files
@@ -189,8 +186,8 @@ try {
     "root skill IDs changed",
   );
   assert(
-    await Bun.file(join(ROOT, ".opencode", "agents", "architect.md")).exists(),
-    "root native architect file is missing",
+    await Bun.file(join(ROOT, ".opencode", "agents", "atlante.md")).exists(),
+    "root native atlante file is missing",
   );
   assert(
     await Bun.file(
@@ -205,7 +202,7 @@ try {
     rootContents.some((content) =>
       content.includes("You are the lead engineer for Atlante."),
     ),
-    "root architect content changed",
+    "root atlante content changed",
   );
 
   // A broken configuration must fail loudly rather than exit 0.

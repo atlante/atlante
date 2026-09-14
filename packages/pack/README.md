@@ -1,7 +1,7 @@
 # `@atlante/pack`
 
 Atlante's first-party static pack gives a project a useful default agent and
-skills for deliberate AI-assisted work. It provides the `architect` agent, the
+skills for deliberate AI-assisted work. It provides the `atlante` agent, the
 four delivery-phase skills `brainstorm`, `plan`, `build`, and `review`, the
 additional non-phase `harness` stewardship skill, and reusable templates and
 instances for composing your own agents, skills, workflows, and supporting
@@ -39,7 +39,7 @@ Then extend the preset and select a reusable template in `atlante.jsonc`:
   },
   "agents": {
     // A project-specific agent: the preset already provides the
-    // general-purpose architect, so add the roles your project needs.
+    // general-purpose atlante, so add the roles your project needs.
     "migration-writer": {
       "$template": "@atlante/pack/agent",
       "description": "Writes and reviews schema migrations for {{values.project}}.",
@@ -74,7 +74,7 @@ artifact `output`. It renders the phases in configured order but does not
 execute or enforce them.
 
 The concrete instance defines `Brainstorm`, `Plan`, `Build`, and `Review`. The
-architect decides which phases materially improve the result, preserves the
+atlante decides which phases materially improve the result, preserves the
 order among the selected phases, and treats the phases and skills as guidance.
 `Plan` and `Review` have persistent artifact paths rooted at
 `{{values.workflow-root}}`; the preset default is `.atlante/workflows`, and
@@ -91,16 +91,16 @@ Useful public locators include:
 | Category | Locators |
 | --- | --- |
 | Default preset | `@atlante/pack` |
-| Agent instance | `@atlante/pack/architect` |
+| Agent instance | `@atlante/pack/atlante` |
 | Phase skill instances | `@atlante/pack/brainstorm`, `@atlante/pack/plan`, `@atlante/pack/build`, `@atlante/pack/review` |
 | Stewardship skill instance | `@atlante/pack/harness` |
 | Agent and skill templates | `@atlante/pack/agent`, `@atlante/pack/skill` |
 | Supporting templates | `@atlante/pack/workflow`, `@atlante/pack/markdown`, `@atlante/pack/artifact`, `@atlante/pack/gotchas`, `@atlante/pack/instructions`, `@atlante/pack/responsibilities`, `@atlante/pack/invariants`, `@atlante/pack/references` |
 
-The default preset exposes exactly one agent binding, `architect`, and five
+The default preset exposes exactly one agent binding, `atlante`, and five
 public skill bindings: the four delivery-phase skills `brainstorm`, `plan`,
 `build`, and `review`, plus the non-phase `harness` stewardship skill. The
-workflow instance's phases reference the four phase skills, and the architect
+workflow instance's phases reference the four phase skills, and the atlante
 selects the phases and skills that materially improve the result. The skill
 bindings are locator-only, so each skill instance owns its description. The
 agent template requires `identity` and `mission`; both agent and skill templates
@@ -115,7 +115,7 @@ actions and invariants carry binding guarantees and approval gates.
 
 `@atlante/pack/harness` is not a workflow phase. It carries the conditional
 operational guidance for initializing, configuring, validating, building,
-troubleshooting, and improving an Atlante harness, and the architect prompt
+troubleshooting, and improving an Atlante harness, and the atlante prompt
 routes harness-touching work to it alongside the active phase skills — it
 supplements them rather than replacing them. The skill keeps permanent policy
 (concepts, resource selection, the source-versus-generated boundary, and the

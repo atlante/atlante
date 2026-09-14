@@ -162,7 +162,7 @@ describe("resolveWatchFiles", () => {
       join(dir, "atlante.jsonc"),
       `{
         "$schema": "${SCHEMA_URI}",
-         "agents": { "architect": { "$instance": "@atlante/pack/architect", "description": "Architect" } }
+         "agents": { "atlante": { "$instance": "@atlante/pack/atlante", "description": "Atlante" } }
       }`,
     );
 
@@ -175,7 +175,7 @@ describe("resolveWatchFiles", () => {
           "node_modules",
           "@atlante",
           "pack",
-          "architect",
+          "atlante",
           "instance.jsonc",
         ),
       ),

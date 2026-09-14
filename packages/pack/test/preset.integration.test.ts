@@ -95,10 +95,10 @@ function renderWorkflowTemplate(workflow: Record<string, unknown>): string {
 describe("first-party preset surface", () => {
   afterEach(cleanupPackResourceFixtures);
 
-  test("keeps exactly one architect agent, the four phase skills, and the non-phase harness skill in authored order", () => {
+  test("keeps exactly one atlante agent, the four phase skills, and the non-phase harness skill in authored order", () => {
     const { document } = firstPartyPreset();
 
-    expect(Object.keys(document.agents)).toEqual(["architect"]);
+    expect(Object.keys(document.agents)).toEqual(["atlante"]);
     expect(Object.keys(document.skills)).toEqual([...expectedSkillOrder]);
   });
 

@@ -72,7 +72,7 @@ describe("first-party package resources as user configurations", () => {
     expect(loaded.document?.eval).toBeUndefined();
   });
 
-  test("the first-party preset prepares one architect agent, the four phase skills, and the harness skill", () => {
+  test("the first-party preset prepares one atlante agent, the four phase skills, and the harness skill", () => {
     const dir = projectRoot();
     writeFileSync(
       join(dir, "atlante.jsonc"),
@@ -89,7 +89,7 @@ describe("first-party package resources as user configurations", () => {
 
     expect(prepared.diagnostics).toEqual([]);
     expect(prepared.agents.map(({ hostAgentId }) => hostAgentId)).toEqual([
-      "architect",
+      "atlante",
     ]);
     expect(prepared.skills.map(({ skillId }) => skillId).sort()).toEqual([
       "brainstorm",
@@ -144,7 +144,7 @@ describe("first-party package resources as user configurations", () => {
     expect(built.diagnostics).toEqual([]);
 
     const agent = readFileSync(
-      join(dir, ".opencode", "agents", "architect.md"),
+      join(dir, ".opencode", "agents", "atlante.md"),
       "utf8",
     );
     expect(agent).toContain("## Workflow");
@@ -175,7 +175,7 @@ describe("first-party package resources as user configurations", () => {
     ) as { files: Array<{ kind: string; id: string }> };
     expect(
       manifest.files.filter(({ kind }) => kind === "agent").map(({ id }) => id),
-    ).toEqual(["architect"]);
+    ).toEqual(["atlante"]);
     expect(
       manifest.files
         .filter(({ kind }) => kind === "skill")

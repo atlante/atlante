@@ -477,7 +477,7 @@ describe("resource resolution", () => {
       local: "true",
       replaced: "root",
     });
-    expect(result.normalized.agents).toHaveProperty("architect");
+    expect(result.normalized.agents).toHaveProperty("atlante");
     expect(result.normalized.agents).toHaveProperty("local");
     expect(result.graph.nodes.map(({ kind }) => kind)).toContain("preset");
     expect(result.provenance["/values/inherited"]?.path as string).toBe(
@@ -487,8 +487,8 @@ describe("resource resolution", () => {
       "atlante.jsonc",
     );
     expect(
-      result.provenance["/agents/architect/description"]?.path as string,
-    ).toBe(`@atlante/pack@${firstPartyPackVersion}/architect/instance.jsonc`);
+      result.provenance["/agents/atlante/description"]?.path as string,
+    ).toBe(`@atlante/pack@${firstPartyPackVersion}/atlante/instance.jsonc`);
   });
 
   test("merges ordered preset layers left-to-right with winning provenance", () => {

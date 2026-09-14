@@ -13,7 +13,7 @@ import {
   packResourceFixture,
 } from "./selection-fixture.js";
 
-const locator = "@atlante/pack/architect";
+const locator = "@atlante/pack/atlante";
 
 const approved = {
   description:
@@ -32,7 +32,7 @@ const approved = {
   phases: ["Brainstorm", "Plan", "Build", "Review"],
 } as const;
 
-interface ResolvedArchitect {
+interface ResolvedAtlante {
   readonly input: JsonObject;
   readonly templateLocator: string;
   readonly sectionKinds: readonly string[];
@@ -40,7 +40,7 @@ interface ResolvedArchitect {
   renderedOutput(): string;
 }
 
-function resolveArchitect(): ResolvedArchitect {
+function resolveAtlante(): ResolvedAtlante {
   const { root, config } = packResourceFixture();
   const resolved = resolveResourceInstance(
     createProjectResourcePack(root),
@@ -77,7 +77,7 @@ function resolvedWorkflowInput(): JsonObject {
   ).input as JsonObject;
 }
 
-describe("architect agent instance", () => {
+describe("atlante agent instance", () => {
   afterEach(cleanupPackResourceFixtures);
 
   // Full transitive resolution and validation can approach bun's 5s default
@@ -107,40 +107,40 @@ describe("architect agent instance", () => {
   });
 
   test("renders through the agent template with the control-plane sections", () => {
-    const architect = resolveArchitect();
+    const atlante = resolveAtlante();
 
-    expect(architect.templateLocator).toBe("@atlante/pack/agent");
-    const output = architect.renderedOutput();
+    expect(atlante.templateLocator).toBe("@atlante/pack/agent");
+    const output = atlante.renderedOutput();
     for (const heading of ["## Invariants", "## Instructions", "## Workflow"])
       expect(output, heading).toContain(heading);
   });
 
   test("keeps the approved description, identity, and mission verbatim", () => {
-    const architect = resolveArchitect();
+    const atlante = resolveAtlante();
 
-    expect(architect.input.description).toBe(approved.description);
-    expect(architect.input.identity).toBe(approved.identity);
-    expect(architect.input.mission).toBe(approved.mission);
+    expect(atlante.input.description).toBe(approved.description);
+    expect(atlante.input.identity).toBe(approved.identity);
+    expect(atlante.input.mission).toBe(approved.mission);
   });
 
   test("has no responsibilities property or rendered Responsibilities section", () => {
-    const architect = resolveArchitect();
+    const atlante = resolveAtlante();
 
-    expect(architect.input.responsibilities).toBeUndefined();
-    expect(architect.renderedOutput()).not.toContain("## Responsibilities");
+    expect(atlante.input.responsibilities).toBeUndefined();
+    expect(atlante.renderedOutput()).not.toContain("## Responsibilities");
   });
 
   test("owns exactly the six approved invariants in order", () => {
-    const architect = resolveArchitect();
-    const sections = (architect.input.sections ?? []) as readonly JsonObject[];
+    const atlante = resolveAtlante();
+    const sections = (atlante.input.sections ?? []) as readonly JsonObject[];
 
     expect(sections[0]?.invariants).toEqual(approved.invariants);
   });
 
   test("keeps the sections ordered as invariants, instructions, workflow", () => {
-    const architect = resolveArchitect();
+    const atlante = resolveAtlante();
 
-    expect(architect.sectionKinds).toEqual([
+    expect(atlante.sectionKinds).toEqual([
       "invariants",
       "instructions",
       "workflow",
@@ -148,19 +148,19 @@ describe("architect agent instance", () => {
   });
 
   test("resolves the nested workflow instance with ordered phases", () => {
-    const architect = resolveArchitect();
+    const atlante = resolveAtlante();
 
-    expect(architect.workflow).toEqual(resolvedWorkflowInput());
+    expect(atlante.workflow).toEqual(resolvedWorkflowInput());
     expect(
-      (architect.workflow.phases as readonly JsonObject[] | undefined)?.map(
+      (atlante.workflow.phases as readonly JsonObject[] | undefined)?.map(
         (phase) => phase.name,
       ),
     ).toEqual([...approved.phases]);
   });
 
   test("renders Brainstorm, Plan, Build, and Review in order", () => {
-    const architect = resolveArchitect();
-    const output = architect.renderedOutput();
+    const atlante = resolveAtlante();
+    const output = atlante.renderedOutput();
     const markers = approved.phases.map(
       (name, index) => `### ${index + 1}. ${name}`,
     );

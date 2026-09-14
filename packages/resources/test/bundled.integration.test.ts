@@ -61,7 +61,7 @@ afterEach(() => {
     rmSync(root, { recursive: true, force: true });
 });
 
-const approvedArchitect = {
+const approvedAtlante = {
   description:
     "General-purpose Atlante agent for planning, implementing, and reviewing software changes.",
   mission:
@@ -80,8 +80,7 @@ const approvedArchitect = {
     "Before asking a clarifying question or approval, complete authorized read-only work needed to make the decision concrete and reviewable; ask only when the answer could materially change the outcome, authorization is missing, or an explicit project invariant requires approval.",
     "When independent work can be safely parallelized and collaboration tools are available, delegate it; keep dependent work sequential and reconcile delegated results before acting.",
     "Choose only the workflow phases and skills that materially improve the result; omitted phases require no classification, placeholder, or artifact, but implementation is not complete until it has an independent review or a stated reason for omitting one.",
-    "Run selected workflow phases in their listed order and scale their depth to the work's complexity, risk, uncertainty, and available evidence while preserving any required output.",
-    "Reassess the remaining workflow phases when new material evidence changes the work.",
+    "Run selected workflow phases in their listed order and scale their depth to the work's complexity, risk, uncertainty, and available evidence while preserving any required output; reassess the remaining workflow phases when new material evidence changes the work.",
     "When current work touches Atlante initialization, source configuration, resources, artifacts, validation, materialization, host integration, or harness improvement, load the `harness` skill alongside the active phase skills; it supplements them rather than replacing them, and an accepted harness improvement runs as its own delivery cycle.",
     "State the main point early. Use clear, concise prose, active voice, and plain language. Use lists only when they improve scanning, and match the developer's requested format.",
   ],
@@ -98,7 +97,7 @@ describe("first-party package resources", () => {
     ).facet;
     const instance = loadInstanceFacet(
       pack,
-      "@atlante/pack/architect",
+      "@atlante/pack/atlante",
       config,
     ).facet;
 
@@ -121,9 +120,9 @@ describe("first-party package resources", () => {
       path: String(instance.origin.path),
     }).toEqual({
       kind: "package",
-      path: `@atlante/pack@${packVersion}/architect/instance.jsonc`,
+      path: `@atlante/pack@${packVersion}/atlante/instance.jsonc`,
     });
-    expect(preset.document.agents).toHaveProperty("architect");
+    expect(preset.document.agents).toHaveProperty("atlante");
   });
 
   test("resolves first-party self-references and preserves package graph output", () => {
@@ -136,7 +135,7 @@ describe("first-party package resources", () => {
     });
     const instance = resolveResourceInstance(
       pack,
-      "@atlante/pack/architect",
+      "@atlante/pack/atlante",
       config,
     );
     const template = resolveResourceTemplate(
@@ -145,7 +144,7 @@ describe("first-party package resources", () => {
       config,
     );
 
-    expect(Object.keys(document.bindings.agents)).toEqual(["architect"]);
+    expect(Object.keys(document.bindings.agents)).toEqual(["atlante"]);
     expect(Object.keys(document.bindings.skills).sort()).toEqual([
       "brainstorm",
       "build",
@@ -162,11 +161,11 @@ describe("first-party package resources", () => {
     });
   });
 
-  test("renders the first-party architect prompt payload with the approved sections", () => {
+  test("renders the first-party atlante prompt payload with the approved sections", () => {
     const { root, config } = fixture();
     const instance = resolveResourceInstance(
       createProjectResourcePack(root),
-      "@atlante/pack/architect",
+      "@atlante/pack/atlante",
       config,
     );
     const output = renderResolvedTemplate({
@@ -174,36 +173,36 @@ describe("first-party package resources", () => {
       input: interpolateValues(instance.input, firstPartyValues),
     });
 
-    expect(instance.input.description).toBe(approvedArchitect.description);
+    expect(instance.input.description).toBe(approvedAtlante.description);
     expect(output).toContain(
-      `# Identity\n\nYou are the lead engineer for Atlante.\n\n# Mission\n\n${approvedArchitect.mission}`,
+      `# Identity\n\nYou are the lead engineer for Atlante.\n\n# Mission\n\n${approvedAtlante.mission}`,
     );
-    for (const invariant of approvedArchitect.invariants)
+    for (const invariant of approvedAtlante.invariants)
       expect(output).toContain(`- ${invariant}`);
-    for (const [index, instruction] of approvedArchitect.instructions.entries())
+    for (const [index, instruction] of approvedAtlante.instructions.entries())
       expect(output).toContain(`${index + 1}. ${instruction}`);
     expect(output).not.toContain("## Communication");
     expect(output).toContain("## Workflow");
   });
 
-  test("keeps the bundled architect content on invariant, instruction, and workflow sections", () => {
+  test("keeps the bundled atlante content on invariant, instruction, and workflow sections", () => {
     const { root, config } = fixture();
     const pack = createProjectResourcePack(root);
-    const architect = resolveResourceInstance(
+    const atlante = resolveResourceInstance(
       pack,
-      "@atlante/pack/architect",
+      "@atlante/pack/atlante",
       config,
     );
 
-    expect(architect.input.sections).toEqual([
-      { invariants: approvedArchitect.invariants },
-      { instructions: approvedArchitect.instructions },
+    expect(atlante.input.sections).toEqual([
+      { invariants: approvedAtlante.invariants },
+      { instructions: approvedAtlante.instructions },
       expect.objectContaining({ workflow: expect.any(Object) }),
     ]);
 
     const output = renderResolvedTemplate({
-      template: architect.effectiveTemplate,
-      input: interpolateValues(architect.input, firstPartyValues),
+      template: atlante.effectiveTemplate,
+      input: interpolateValues(atlante.input, firstPartyValues),
     });
     expect(output).toContain("## Invariants");
   });

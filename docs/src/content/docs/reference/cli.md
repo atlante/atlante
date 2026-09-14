@@ -238,7 +238,7 @@ agent and skill paths, for each host. It does not list ownership-manifest
 publication. The final line reports the resolved project path:
 
 ```text
-wrote opencode: .opencode/agents/architect.md
+wrote opencode: .opencode/agents/atlante.md
 removed opencode: .opencode/skills/obsolete/SKILL.md
 built /Users/example/project
 ```

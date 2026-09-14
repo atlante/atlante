@@ -81,7 +81,7 @@ const warningDiagnostic = {
 const materializations = [
   {
     host: "opencode",
-    writtenPaths: [".opencode/agents/architect.md"],
+    writtenPaths: [".opencode/agents/atlante.md"],
     removedPaths: [".opencode/skills/old/SKILL.md"],
   },
 ];
@@ -135,7 +135,7 @@ describe("reportBuildResult styling", () => {
     }
     expect(wrote).toBe(true);
     expect(lines).toEqual([
-      "\x1b[32mwrote\x1b[0m opencode: \x1b[90m.opencode/agents/architect.md\x1b[0m",
+      "\x1b[32mwrote\x1b[0m opencode: \x1b[90m.opencode/agents/atlante.md\x1b[0m",
       "\x1b[32mremoved\x1b[0m opencode: \x1b[90m.opencode/skills/old/SKILL.md\x1b[0m",
     ]);
   });
@@ -152,7 +152,7 @@ describe("reportBuildResult styling", () => {
     }
     expect(wrote).toBe(true);
     expect(lines).toEqual([
-      "wrote opencode: .opencode/agents/architect.md",
+      "wrote opencode: .opencode/agents/atlante.md",
       "removed opencode: .opencode/skills/old/SKILL.md",
     ]);
   });

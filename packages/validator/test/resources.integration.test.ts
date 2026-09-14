@@ -2660,7 +2660,7 @@ describe("resource-backed document validation", () => {
     });
     const builtinResult = load(builtin.configPath);
     expect(builtinResult.diagnostics).toEqual([]);
-    expect(builtinResult.document?.agents).toHaveProperty("architect");
+    expect(builtinResult.document?.agents).toHaveProperty("atlante");
     expect(
       builtinResult.resources?.graph.nodes.some(
         ({ kind }) => kind === "preset",

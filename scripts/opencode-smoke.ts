@@ -35,7 +35,7 @@ const OPENCODE_PACKAGE_VERSION =
   process.env.OPENCODE_PACKAGE_VERSION ?? DEFAULT_OPENCODE_PACKAGE_VERSION;
 const PACK_PACKAGE = join(ROOT, "packages", "pack");
 const CLI = join(ROOT, "packages", "cli", "dist", "bin", "atlante.js");
-const AGENT_ID = "architect";
+const AGENT_ID = "atlante";
 const SKILL_IDS = ["brainstorm", "build", "harness", "plan", "review"];
 const MANIFEST_PATH = ".atlante/opencode-native.json";
 
@@ -243,7 +243,7 @@ try {
     );
   }
 
-  // Host discovery: the host must list the architect agent. Because the
+  // Host discovery: the host must list the atlante agent. Because the
   // host-owned config also names the agent, id presence alone cannot prove
   // native discovery; the native-file signature is asserted below via the
   // merged prompt and description, so a build that silently writes no
