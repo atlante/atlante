@@ -44,7 +44,7 @@ that the harness behaves as intended, `npx atlante eval` runs scenarios in a
 sandbox and grades deterministic checks.
 
 > [!NOTE]
-> Requires [Node.js](https://nodejs.org) 22 or newer.
+> Requires [Node.js](https://nodejs.org) 22.5 or newer.
 
 The [getting started guide](https://docs.atlante.sh/getting-started) walks
 through the first build, and the

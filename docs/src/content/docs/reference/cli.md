@@ -4,7 +4,7 @@ description: Command reference for init, Markdown import, pack management, valid
 ---
 
 The `atlante` package provides the `atlante` command and requires
-[Node.js](https://nodejs.org/) 22 or later. It includes the first-party
+[Node.js](https://nodejs.org/) 22.5 or later. It includes the first-party
 `@atlante/pack`, so the default preset needs no separate pack installation.
 
 Examples use a [project-local installation](/getting-started#use-a-project-local-cli):

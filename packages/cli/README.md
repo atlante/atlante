@@ -2,7 +2,7 @@
 
 Command-line interface for [Atlante](https://github.com/atlante/atlante): the
 configuration layer for your coding-agent harness. Requires
-[Node.js](https://nodejs.org) 22 or later.
+[Node.js](https://nodejs.org) 22.5 or later.
 
 ## Usage
 
