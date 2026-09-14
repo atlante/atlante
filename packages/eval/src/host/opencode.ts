@@ -375,7 +375,9 @@ export function createEvalPermissionPolicy(
       [descriptor.subagentAction]: "allow",
       skill: "allow",
       lsp: "allow",
-      question: "allow",
+      // Eval runs are non-interactive; an unanswered question suspends the
+      // V2 session and makes the host report a shutdown instead of a verdict.
+      question: "deny",
       todowrite: "allow",
       doom_loop: "allow",
       webfetch: "deny",
@@ -398,7 +400,9 @@ export function createEvalPermissionPolicy(
     { action: "grep", resource: "*", effect: "allow" },
     { action: descriptor.subagentAction, resource: "*", effect: "allow" },
     { action: "skill", resource: "*", effect: "allow" },
-    { action: "question", resource: "*", effect: "allow" },
+    // Eval runs are non-interactive; do not leave a host session waiting for
+    // an answer that the runner cannot provide.
+    { action: "question", resource: "*", effect: "deny" },
     { action: descriptor.shellAction, resource: "*", effect: "allow" },
     { action: "webfetch", resource: "*", effect: "deny" },
     { action: "websearch", resource: "*", effect: "deny" },

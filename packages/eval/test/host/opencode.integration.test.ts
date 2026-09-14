@@ -386,6 +386,7 @@ exit 1`,
       expect(written.permissions).toEqual(
         expect.arrayContaining([
           { action: "edit", resource: "*", effect: "allow" },
+          { action: "question", resource: "*", effect: "deny" },
           { action: "webfetch", resource: "*", effect: "deny" },
           { action: "shell", resource: "rm -rf *", effect: "deny" },
         ]),
@@ -425,6 +426,7 @@ exit 1`,
     // Forced denials are always present.
     expect(written.agent.build.permission.webfetch).toBe("deny");
     expect(written.agent.build.permission.external_directory).toBe("deny");
+    expect(written.agent.build.permission.question).toBe("deny");
     expect(written.agent.build.permission.bash["rm -rf *"]).toBe("deny");
     expect(written.agent.build.permission.bash["*"]).toBe("allow");
     expect(written.agent.build.permission.read["*.env"]).toBe("deny");
@@ -1095,6 +1097,7 @@ describe("createEvalPermissionPolicy", () => {
       "*.env.example": "allow",
     });
     expect(policy.task).toBe("allow");
+    expect(policy.question).toBe("deny");
     expect(policy.webfetch).toBe("deny");
     expect(policy.websearch).toBe("deny");
     expect(policy.external_directory).toBe("deny");
@@ -1116,6 +1119,7 @@ describe("createEvalPermissionPolicy", () => {
         { action: "edit", resource: "*", effect: "allow" },
         { action: "read", resource: "*.env", effect: "deny" },
         { action: "subagent", resource: "*", effect: "allow" },
+        { action: "question", resource: "*", effect: "deny" },
         { action: "shell", resource: "*", effect: "allow" },
         { action: "webfetch", resource: "*", effect: "deny" },
         { action: "websearch", resource: "*", effect: "deny" },
@@ -1125,6 +1129,9 @@ describe("createEvalPermissionPolicy", () => {
         { action: "shell", resource: "sudo *", effect: "deny" },
       ]),
     );
+    expect(policy.filter((rule) => rule.action === "question")).toEqual([
+      { action: "question", resource: "*", effect: "deny" },
+    ]);
     expect(policy.some((rule) => rule.action === "bash")).toBe(false);
     expect(policy.some((rule) => rule.action === "task")).toBe(false);
   });
