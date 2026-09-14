@@ -27,7 +27,8 @@ describe("review skill instance", () => {
       "MUST NOT intentionally modify reviewed source, configuration, or tests, and MUST NOT correct findings yourself",
       "MUST NOT trust summaries or reported validation without reconciling them against the actual change and primary evidence",
       "MUST NOT report a finding without exact evidence, impact, and a required correction",
-      "MUST NOT present supplied validation as independently verified, claim that an unperformed check passed",
+      "MUST NOT present supplied validation as independently verified, claim that an unperformed check passed, or return `PASS` when evidence required to substantiate acceptance is missing",
+      "Any unresolved critical or important finding or failed required check MUST make the verdict `BLOCKED`",
     ])
       expect(invariants).toContain(marker);
   });
