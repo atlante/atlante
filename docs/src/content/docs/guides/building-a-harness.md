@@ -25,13 +25,22 @@ existing file in this order: `.opencode/opencode.jsonc`,
 `.opencode/opencode.json`, `opencode.jsonc`, and `opencode.json`. When none
 exists, it creates root `opencode.jsonc`.
 
-The registration invokes the CLI over stdio:
+The registration invokes the CLI over stdio, in the native shape of the
+detected dialect (`mcp.servers.atlante` with `"disabled": false` for V2,
+`mcp.atlante` with `"enabled": true` for V1 — see
+[MCP registration](/reference/mcp#opencode-registration)):
 
 ```json
 {
-  "type": "local",
-  "command": ["npx", "--yes", "atlante@<version>", "mcp"],
-  "enabled": true
+  "mcp": {
+    "servers": {
+      "atlante": {
+        "type": "local",
+        "command": ["npx", "--yes", "atlante@<version>", "mcp"],
+        "disabled": false
+      }
+    }
+  }
 }
 ```
 

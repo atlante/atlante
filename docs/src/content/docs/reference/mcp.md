@@ -35,32 +35,44 @@ in the command registered by `atlante init`.
 ## OpenCode registration
 
 By default, `atlante init` registers the local server in the OpenCode
-configuration for the initialized directory. It examines existing files in this
-order:
+configuration for the initialized directory. It first detects the installed
+host dialect with one `opencode --version` probe: OpenCode V1 (`>=1.18.29
+<2.0.0`) and V2 (`>=2.0.0 <3.0.0`) are supported, and any other version fails with a
+diagnostic. When the binary is unavailable, `init` defaults to V2;
+`--opencode-version <version>` selects the dialect explicitly.
+
+It then examines existing files in this order:
 
 1. `.opencode/opencode.jsonc`
 2. `.opencode/opencode.json`
 3. `opencode.jsonc`
 4. `opencode.json`
 
-The first existing file is the registration target. Every existing candidate is
-parsed before initialization continues; malformed files and conflicting
-`mcp.atlante` entries fail closed. When no candidate exists, `init` creates the
-root `opencode.jsonc` file. Use `--no-mcp` to skip registration.
+The first existing file is the registration target. Every existing candidate
+is parsed before initialization continues; malformed files and conflicting
+managed entries for the selected dialect fail closed. A legacy entry of the
+other dialect is left untouched — migrating or removing it is the host's own
+compatibility behavior. When no candidate exists, `init` creates the root
+`opencode.jsonc` file. Use `--no-mcp` to skip registration.
 
-The managed entry is version-pinned to the CLI package:
+The managed entry is version-pinned to the CLI package and uses the native
+shape of the selected dialect. V2 registers `mcp.servers.atlante`:
 
 ```json
 {
   "mcp": {
-    "atlante": {
-      "type": "local",
-      "command": ["npx", "--yes", "atlante@<version>", "mcp"],
-      "enabled": true
+    "servers": {
+      "atlante": {
+        "type": "local",
+        "command": ["npx", "--yes", "atlante@<version>", "mcp"],
+        "disabled": false
+      }
     }
   }
 }
 ```
+
+V1 registers the equivalent entry at `mcp.atlante` with `"enabled": true`.
 
 Registration preserves unrelated settings and JSONC comments, is idempotent,
 and participates in `init`'s rollback transaction. See the [CLI reference](/reference/cli#atlante-init)

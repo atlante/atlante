@@ -755,6 +755,20 @@ run, and a run MUST stop when its budget is exhausted. A trial whose host
 emits no usage events MUST be reported as budget-unmonitored: token spend
 cannot be enforced and only the trial timeout bounds it.
 
+The OpenCode runner MUST resolve the host dialect once per run by probing
+`opencode --version`. Version 0.1 supports OpenCode V1 (`>=1.18.29 <2.0.0`)
+and V2 (`>=2.0.0 <3.0.0`); any other version MUST fail with a stable diagnostic. The
+runner MUST author a fresh, dialect-native sandbox configuration and MUST NOT
+merge or read project OpenCode settings for model, agents, permissions,
+provider, server, MCP, plugins, commands, or arbitrary fields. The sandbox
+configuration carries only the containment policy, the policy applied to the
+selected and native agents, and the host default agent. Provider access is
+the host's own stored authentication plus the `model` passed through with
+`--model`; V2 adds `--standalone` to the invocation, runs from the sandbox
+working directory, and receives a copy of the credential and migration-journal
+tables of its SQLite database, while V1 receives `auth.json`; session history
+MUST NOT be copied in either dialect.
+
 The project `eval` section MAY also declare a non-empty `include` array of
 package or selected package-preset locators. The project MUST declare either a
 local `scenarios` glob or `include`. An included package or preset MUST be
@@ -927,8 +941,13 @@ arguments.
 
 By default, `atlante init` MUST register the server in the OpenCode
 configuration for its target directory. With `--no-mcp`, init MUST skip this
-host-file mutation. When registration is enabled, init MUST examine existing
-OpenCode configuration files in this order:
+host-file mutation. Init MUST resolve the installed host dialect with one
+`--version` probe of the `opencode` binary; when the binary is unavailable,
+init MUST default to V2 unless `--opencode-version` selects a supported
+version explicitly. Version 0.1 supports OpenCode V1 (`>=1.18.29 <2.0.0`) and
+V2 (`>=2.0.0 <3.0.0`); any other version MUST fail with a stable diagnostic. When
+registration is enabled, init MUST examine existing OpenCode configuration
+files in this order:
 
 ```text
 .opencode/opencode.jsonc
@@ -939,27 +958,36 @@ opencode.json
 
 The first existing file MUST be the registration target. Init MUST parse every
 existing candidate before writing, and MUST fail closed on malformed candidates
-or a conflicting `mcp.atlante` entry in any candidate. When no candidate exists,
-init MUST create root `opencode.jsonc`. The managed `mcp.atlante` entry MUST be
-a local server whose command is `npx --yes atlante@<package-version> mcp` and
-MUST be enabled. Registration MUST preserve unrelated settings and comments, be
-idempotent, and participate in init's rollback transaction.
+or a conflicting managed entry for the selected dialect in any candidate. A
+legacy entry of the other dialect MUST be preserved untouched. When no
+candidate exists, init MUST create root `opencode.jsonc`. The managed entry
+MUST be a local server whose command is `npx --yes atlante@<package-version>
+mcp`, registered as `mcp.servers.atlante` with `disabled: false` for V2 or
+`mcp.atlante` with `enabled: true` for V1. Registration MUST preserve
+unrelated settings and comments, be idempotent, and participate in init's
+rollback transaction.
 
 ### Examples
 
-An OpenCode configuration can delegate context discovery to the installed CLI:
+An OpenCode configuration can delegate context discovery to the installed CLI.
+The V2 registration target is `mcp.servers.atlante`:
 
 ```json
 {
   "mcp": {
-    "atlante": {
-      "type": "local",
-      "command": ["npx", "--yes", "atlante@0.2.0", "mcp"],
-      "enabled": true
+    "servers": {
+      "atlante": {
+        "type": "local",
+        "command": ["npx", "--yes", "atlante@0.2.0", "mcp"],
+        "disabled": false
+      }
     }
   }
 }
 ```
+
+A V1 host registers the equivalent entry at `mcp.atlante` with
+`"enabled": true` instead.
 
 An agent can call `search_docs` for a topic, pass the returned document and
 section identifier to `read_doc`, and use `get_schema` for exact field shape.
@@ -968,11 +996,12 @@ project.
 
 ### Edge cases
 
-An invalid OpenCode configuration or conflicting `mcp.atlante` entry MUST stop
-initialization before the new Atlante configuration is committed. A failed
-later initialization stage MUST restore the previous host configuration. A
-missing or invalid catalog or schema bundle MUST be reported as unavailable;
-the server MUST NOT fetch a replacement.
+An invalid OpenCode configuration or conflicting managed entry for the
+selected dialect MUST stop initialization before the new Atlante
+configuration is committed. A failed later initialization stage MUST restore
+the previous host configuration. A missing or invalid catalog or schema
+bundle MUST be reported as unavailable; the server MUST NOT fetch a
+replacement.
 
 ### Rationale
 

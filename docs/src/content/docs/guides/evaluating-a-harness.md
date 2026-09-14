@@ -17,9 +17,11 @@ You need:
   [project-local CLI](/getting-started#use-a-project-local-cli).
 - A `reviewer` agent, such as the one in
   [Customize your harness](/guides/building-a-harness).
-- [OpenCode](https://opencode.ai/docs/) installed and available as `opencode`
-  in your terminal, with stored provider credentials. You can select a model
-  explicitly or use the host default.
+- [OpenCode](https://opencode.ai/v2/docs/) installed and available as `opencode`
+  in your terminal, with stored provider credentials. Versions `>=1.18.29 <2.0.0`
+  and `>=2.0.0 <3.0.0` are supported. The trial sandbox has no global OpenCode
+  configuration, so set `model` in the `eval` section when the host default is
+  not a provider you are authenticated with.
 - Git available in your terminal so Atlante can establish each trial's
   starting filesystem state.
 
@@ -218,7 +220,9 @@ The failure determines what to inspect next:
 - **Host startup failure or timeout:** The trial did not complete normally, so
   the result does not show that the review instructions are wrong. Inspect the
   recorded error, host setup, and applicable budgets before changing the
-  harness.
+  harness. A model-unavailable error at session start means the trial model
+  did not route: check `eval.model` against a provider the host is
+  authenticated with.
 
 The [Eval reference](/reference/eval#reports-and-exit-status) describes the
 report format and exit statuses.

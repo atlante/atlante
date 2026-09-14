@@ -32,12 +32,14 @@ and build the initial native files.
 npx atlante init [path]
 npx atlante init [path] --pack <pack-locator>
 npx atlante init [path] --pack <pack>/<preset>
+npx atlante init [path] --opencode-version <version>
 npx atlante init [path] --force
 npx atlante init [path] --no-mcp
 ```
 
 - `path` is a project directory and defaults to the current directory.
 - `--pack <locator>` selects a package pack instead of the bundled default `@atlante/pack`. An optional subpath names a preset, such as `@acme/review-pack/strict`. Local filesystem paths are not accepted by this option.
+- `--opencode-version <version>` registers against an explicit OpenCode version, such as `1.18.29` for an offline V1 project. Without it, `init` detects the installed host with one `--version` probe and defaults to V2 when no binary is available. Supported ranges are V1 (`>=1.18.29 <2.0.0`) and V2 (`>=2.0.0 <3.0.0`).
 - `--force` overwrites an existing `atlante.jsonc` and removes the alternate `atlante.json`.
 - `--no-mcp` skips registration of the local Atlante MCP server in the OpenCode configuration.
 
@@ -45,14 +47,17 @@ npx atlante init [path] --no-mcp
 `.gitignore` contains `.opencode/agents/`, `.opencode/skills/`, and
 `.atlante/` without reordering existing content, then runs a build. By default,
 it also registers the version-pinned local MCP server in the target directory's
-OpenCode configuration. It selects the first existing file in this order:
-`.opencode/opencode.jsonc`, `.opencode/opencode.json`, `opencode.jsonc`, and
-`opencode.json`. When none exists, it creates root `opencode.jsonc`. All existing
-candidates are parsed before initialization continues; unrelated settings and
-JSONC comments remain in place. A conflicting `mcp.atlante` entry fails closed
-instead of being replaced. Use `--no-mcp` when the host configuration must
-remain unchanged. See [MCP](/reference/mcp#opencode-registration) for the
-managed entry and server contract.
+OpenCode configuration, in the native shape of the selected dialect
+(`mcp.servers.atlante` for V2, `mcp.atlante` for V1). It selects the first
+existing file in this order: `.opencode/opencode.jsonc`, `.opencode/opencode.json`,
+`opencode.jsonc`, and `opencode.json`. When none exists, it creates root
+`opencode.jsonc`. All existing candidates are parsed before initialization
+continues; unrelated settings and JSONC comments remain in place. A conflicting
+managed entry for the selected dialect fails closed instead of being replaced,
+while a legacy entry of the other dialect is left untouched. Use `--no-mcp`
+when the host configuration must remain unchanged. See
+[MCP](/reference/mcp#opencode-registration) for the managed entry and server
+contract.
 
 ### Pack installation
 
