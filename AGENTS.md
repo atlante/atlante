@@ -70,11 +70,15 @@ Bun is the package manager and the build/release/smoke/packaging/test runtime.
 During implementation, use Fallow for codebase analysis and lightweight
 feedback, and run the lane command matching the area you touch
 (`quick:check`, `core:check`, `docs:check`, `website:check`, `packs:check`)
-for fast iteration. Reserve `bun run full:check` as the heavyweight final verification
-before declaring work ready. The OpenCode host smoke inside `core:check`
-(`bun scripts/opencode-smoke.ts`) is load-bearing:
-unit tests cover the materializer against synthetic fixtures, so the smoke is
-the only automated check of the real pack → build → materialize → host
+for fast iteration. The lanes are additive: `full:check` is exactly
+`core:check` plus the three site lanes, so once `core:check` has passed,
+verify the remaining lanes individually instead of re-running it. Reserve
+`bun run full:check` for work with no lane coverage yet or release-level
+verification. The OpenCode host smoke inside `core:check`
+(`bun scripts/opencode-smoke.ts`) is load-bearing — it downloads both pinned
+hosts (V1 and V2) and is the slowest part of the lane — and unit tests cover
+the materializer against synthetic fixtures, so the smoke is the only
+automated check of the real pack → build → materialize → host
 discovery flow (pinned OpenCode in a sandbox) and must never be downgraded to
 a manual step.
 
