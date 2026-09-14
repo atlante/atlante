@@ -2,9 +2,9 @@ import { expect, test } from "bun:test";
 import {
   createOpenCodeMcpServer,
   detectOpenCode,
+  OpenCodeVersionError,
   openCodeDialectDescriptor,
   openCodeMcpPath,
-  OpenCodeVersionError,
   parseOpenCodeVersion,
   resolveOpenCodeDialect,
 } from "../src/dialect.js";
@@ -30,9 +30,9 @@ test.each([
 test.each(["1.18.28", "3.0.0", "0.9.0"])(
   "rejects unsupported version %s",
   (version) => {
-    expect(() =>
-      resolveOpenCodeDialect(parseOpenCodeVersion(version)),
-    ).toThrow(OpenCodeVersionError);
+    expect(() => resolveOpenCodeDialect(parseOpenCodeVersion(version))).toThrow(
+      OpenCodeVersionError,
+    );
   },
 );
 
@@ -62,16 +62,7 @@ test.each([
   ],
 ] as const)(
   "exposes the %s dialect field and path mapping",
-  (
-    dialect,
-    agentsKey,
-    permissionsKey,
-    shellAction,
-    subagentAction,
-    mcpServersPath,
-    mcpEnabledKey,
-    mcpEnabledValue,
-  ) => {
+  (dialect, agentsKey, permissionsKey, shellAction, subagentAction, mcpServersPath, mcpEnabledKey, mcpEnabledValue) => {
     expect(openCodeDialectDescriptor(dialect)).toEqual({
       agentsKey,
       permissionsKey,
