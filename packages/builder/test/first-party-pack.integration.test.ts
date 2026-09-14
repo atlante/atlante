@@ -75,7 +75,7 @@ describe("first-party pack integration", () => {
         left.localeCompare(right),
       ),
     ).toEqual([
-      ".opencode/agents/architect.md",
+      ".opencode/agents/atlante.md",
       ".opencode/skills/brainstorm/SKILL.md",
       ".opencode/skills/build/SKILL.md",
       ".opencode/skills/harness/SKILL.md",
@@ -85,7 +85,7 @@ describe("first-party pack integration", () => {
     expect(built.materializations[0]?.removedPaths).toEqual([]);
 
     const agent = readFileSync(
-      join(root, ".opencode", "agents", "architect.md"),
+      join(root, ".opencode", "agents", "atlante.md"),
       "utf8",
     );
     expect(agent).toContain("You are the lead engineer");
@@ -116,7 +116,7 @@ describe("first-party pack integration", () => {
     expect(manifest.version).toBe(1);
     expect(
       manifest.files.filter(({ kind }) => kind === "agent").map(({ id }) => id),
-    ).toEqual(["architect"]);
+    ).toEqual(["atlante"]);
     expect(
       manifest.files
         .filter(({ kind }) => kind === "skill")

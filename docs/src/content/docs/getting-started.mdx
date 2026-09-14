@@ -19,21 +19,21 @@ Create the configuration and run the first build:
   <TabItem label="npm">
 
 ```sh
-npx atlante@latest init
+npx atlante init
 ```
 
   </TabItem>
   <TabItem label="pnpm">
 
 ```sh
-pnpm dlx atlante@latest init
+pnpm dlx atlante init
 ```
 
   </TabItem>
   <TabItem label="bun">
 
 ```sh
-bunx atlante@latest init
+bunx atlante init
 ```
 
   </TabItem>
@@ -41,7 +41,7 @@ bunx atlante@latest init
 
 <Aside title="The first-party pack">
 The CLI bundles the `@atlante/pack` preset, so the first build needs no separate
-pack installation. It provides the `architect` agent; the `brainstorm`, `plan`,
+pack installation. It provides the `atlante` agent; the `brainstorm`, `plan`,
 `build`, and `review` skills; and the `harness` skill for maintaining the
 harness itself. Explore the [first-party pack](/concepts/resources#the-first-party-pack)
 to understand these defaults and the reusable content it includes.
@@ -51,7 +51,7 @@ By default, `init` also registers the read-only Atlante MCP server in the
 OpenCode configuration for this project. It selects the first existing file in
 this order: `.opencode/opencode.jsonc`, `.opencode/opencode.json`,
 `opencode.jsonc`, and `opencode.json`; when none exists, it creates root
-`opencode.jsonc`. Use `npx atlante@latest init --no-mcp` when you want to skip
+`opencode.jsonc`. Use `npx atlante init --no-mcp` when you want to skip
 that registration. See the [MCP reference](/reference/mcp) for the server
 contract.
 
@@ -82,7 +82,7 @@ my-project/
 ├── .opencode/
 │   ├── opencode.jsonc             # selected host config when nested (or .json)
 │   ├── agents/
-│   │   └── architect.md
+│   │   └── atlante.md
 │   └── skills/
 │       ├── brainstorm/SKILL.md
 │       ├── plan/SKILL.md
@@ -102,7 +102,7 @@ The files have different roles:
   OpenCode configuration exists. If an OpenCode configuration already exists,
   `init` updates the first file in its precedence order; the Atlante MCP entry
   for the detected host dialect is managed there alongside host settings.
-- `.opencode/agents/architect.md` and the skill files are native output. Open
+- `.opencode/agents/atlante.md` and the skill files are native output. Open
   the agent file to inspect what the build produced, but make changes in the
   source configuration or its resources.
 - `.atlante/opencode-native.json` is the ownership manifest. It tells later
@@ -121,7 +121,7 @@ recovered after an edit.
 ## Open the harness in OpenCode
 
 Start OpenCode from the project root, where `init` created `.opencode/`, or
-restart an existing session so it discovers the new files. The `architect`
+restart an existing session so it discovers the new files. The `atlante`
 agent should now be available.
 
 You can also inspect the agent list from the terminal:
@@ -130,8 +130,8 @@ You can also inspect the agent list from the terminal:
 opencode agent list
 ```
 
-Look for `architect` in the list. If it is missing, confirm that
-the project root contains `.opencode/agents/architect.md`, then restart OpenCode.
+Look for `atlante` in the list. If it is missing, confirm that
+the project root contains `.opencode/agents/atlante.md`, then restart OpenCode.
 Choose a model and configure permissions through
 [OpenCode's configuration](https://opencode.ai/docs/config/). These settings
 remain in OpenCode's own files when Atlante rebuilds the harness.

@@ -86,10 +86,9 @@ the explorer without contacting npm or GitHub:
 bun run --cwd packs dev:local -- ../packages/pack
 ```
 
-CI mirrors this split: pull requests run `quick:check` plus the full
-`full:check` gate (the required `check` status, including the OpenCode host
-smoke), and pushes to `main` run one lane workflow per changed area
-(`ci-core`, `ci-docs`, `ci-website`, `ci-packs`).
+CI runs one gate everywhere: `ci.yml` executes the full `full:check` (the
+required `check` status, including the CLI and OpenCode host smokes) on
+every pull request and on every push to `main`.
 
 Tests run on `bun:test` and live next to the code they test:
 

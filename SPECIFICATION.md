@@ -435,7 +435,7 @@ dedicated orchestrator field.
 ```jsonc
 {
   "agents": {
-    "architect": "@atlante/pack/architect",
+    "atlante": "@atlante/pack/atlante",
     "reviewer": {
       "description": "Reviews the project.",
       "$template": "@atlante/pack/agent",

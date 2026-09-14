@@ -28,7 +28,7 @@ npx atlante init
 
 `init` writes an `atlante.jsonc` that extends the bundled first-party preset,
 builds the native files OpenCode discovers, and registers the read-only Atlante
-MCP server. Restart OpenCode and the `architect` agent is available, with the
+MCP server. Restart OpenCode and the `atlante` agent is available, with the
 default brainstorm, plan, build, and review skills, and `harness` for
 maintaining the harness itself.
 

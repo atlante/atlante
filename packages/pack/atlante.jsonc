@@ -12,8 +12,8 @@
     "source": "packages/pack/eval"
   },
   "agents": {
-    "architect": {
-      "$instance": "@atlante/pack/architect"
+    "atlante": {
+      "$instance": "@atlante/pack/atlante"
     }
   },
   "skills": {

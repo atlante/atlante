@@ -44,10 +44,10 @@ const DEFAULT_HOST_PINS = [
 ] as const;
 const PACK_PACKAGE = join(ROOT, "packages", "pack");
 const CLI = join(ROOT, "packages", "cli", "dist", "bin", "atlante.js");
-const AGENT_ID = "architect";
+const AGENT_ID = "atlante";
 // The V2 host-owned config defines this extra agent so the smoke can prove
 // config-defined agent resolution separately from native-file resolution
-// (the native file is the only source of the `architect` agent id on V2).
+// (the native file is the only source of the `atlante` agent id on V2).
 const CONFIG_AGENT_ID = "cfgprobe";
 const SKILL_IDS = ["brainstorm", "build", "harness", "plan", "review"];
 const MANIFEST_PATH = ".atlante/opencode-native.json";

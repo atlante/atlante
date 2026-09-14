@@ -13,7 +13,7 @@ export type StubPackOptions = {
 
 /**
  * Minimal valid Atlante pack installed in a fixture's node_modules. Mirrors
- * the first-party pack's binding names (`architect` agent, `plan` skill) with
+ * the first-party pack's binding names (`atlante` agent, `plan` skill) with
  * tiny templates, so fixture builds exercise the same resolution, binding,
  * and materialization pipeline at a fraction of the per-build cost of the
  * ~12-binding real pack.
@@ -37,7 +37,7 @@ function stubPackFiles(name: string): Readonly<Record<string, string>> {
     "atlante.jsonc": `${JSON.stringify({
       $schema: SCHEMA_URI,
       values: { project: "{{sys.cwd.basename}}" },
-      agents: { architect: { $instance: ref("architect") } },
+      agents: { atlante: { $instance: ref("atlante") } },
       skills: { plan: { $instance: ref("plan") } },
     })}\n`,
     "agent/template.jsonc": `${JSON.stringify({
@@ -65,10 +65,10 @@ function stubPackFiles(name: string): Readonly<Record<string, string>> {
       additionalProperties: false,
     })}\n`,
     "skill/template.md": "# {{title}}\n\n## Overview\n\n{{overview}}\n",
-    "architect/instance.jsonc": `${JSON.stringify({
+    "atlante/instance.jsonc": `${JSON.stringify({
       $template: ref("agent"),
-      description: "Stub architect agent for fixtures.",
-      identity: "You are the architect for {{values.project}}.",
+      description: "Stub atlante agent for fixtures.",
+      identity: "You are the atlante for {{values.project}}.",
       mission: "Keep the fixture small and verified.",
     })}\n`,
     "plan/instance.jsonc": `${JSON.stringify({

@@ -293,7 +293,7 @@ describe("runInit", () => {
     expect(existsSync(join(dir, "resources"))).toBe(false);
     expect(existsSync(join(dir, "templates"))).toBe(false);
     expect(existsSync(join(dir, "presets"))).toBe(false);
-    expect(existsSync(join(dir, ".opencode", "agents", "architect.md"))).toBe(
+    expect(existsSync(join(dir, ".opencode", "agents", "atlante.md"))).toBe(
       true,
     );
     expect(existsSync(join(dir, ".atlante", "opencode-native.json"))).toBe(
@@ -1422,7 +1422,7 @@ describe("runInit", () => {
     expect(readFileSync(join(dir, ".gitignore"), "utf8")).toBe(
       ".opencode/agents/\n.opencode/skills/\n.atlante/\n",
     );
-    expect(existsSync(join(dir, ".opencode", "agents", "architect.md"))).toBe(
+    expect(existsSync(join(dir, ".opencode", "agents", "atlante.md"))).toBe(
       true,
     );
     expect(

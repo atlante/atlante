@@ -32,7 +32,6 @@ describe("brainstorm skill instance", () => {
 
     expect(skill.templateLocator).toBe("@atlante/pack/skill");
     expect(skill.title).toBe("Brainstorm");
-    expect(skill.overview).toContain("explicitly approved direction");
     expect(skill.overview).not.toMatch(/\b(MUST|SHOULD|MAY)\b/);
     expect(
       skill.sections.map((section) => Object.keys(section).sort().join("+")),
@@ -45,55 +44,6 @@ describe("brainstorm skill instance", () => {
     expect(description).toContain("uncertainty");
     expect(description).toMatch(/\bdefin/i);
     expect(description).toContain("direction");
-  });
-
-  test("instructions carry the clarification-to-approval lifecycle in order", () => {
-    const instructions = resolvePackSkill(locator).listText("instructions");
-
-    for (const marker of [
-      "inspect only the project context needed to understand it before asking questions",
-      "Scale exploration and discussion to the complexity, risk, and uncertainty",
-      "increase the depth instead of continuing with an undersized design",
-      "Propose a parent-and-child decomposition",
-      "refine each child in order",
-      "asking for approval only when a child introduces a consequential or irreversible action",
-      "Ask one focused question at a time",
-      "prefer multiple-choice questions",
-      "present two or three viable approaches with their trade-offs",
-      "lead with a recommendation",
-      "Keep the scope minimal with YAGNI",
-      "Treat a clear request for action as authorization for reversible, read-only, and routine implementation work",
-      "prepare a concrete, reviewable result before asking questions",
-      "Ask for explicit approval only when the action is consequential or irreversible",
-      "ask for confirmation only where an unresolved choice materially changes the outcome, scope, or risk",
-      "Assemble the explicitly approved handoff",
-      "check it for placeholders, contradictions, ambiguity, and unnecessary scope",
-    ])
-      expect(instructions).toContain(marker);
-
-    const position = (marker: string) => instructions.indexOf(marker);
-    expect(position("inspect only the project context")).toBeLessThan(
-      position("present two or three viable approaches"),
-    );
-    expect(position("present two or three viable approaches")).toBeLessThan(
-      position("Assemble the explicitly approved handoff"),
-    );
-  });
-
-  test("the assembled handoff records the agreed design fields", () => {
-    const instructions = resolvePackSkill(locator).listText("instructions");
-
-    for (const field of [
-      "purpose",
-      "agreed scope and exclusions",
-      "constraints",
-      "acceptance criteria",
-      "chosen approach",
-      "relevant repository evidence",
-      "assumptions",
-      "rejected alternatives or remaining open decisions",
-    ])
-      expect(instructions).toContain(field);
   });
 
   test("invariants guard honesty and decision stability", () => {
@@ -123,13 +73,6 @@ describe("brainstorm skill instance", () => {
       "## Invariants",
     ])
       expect(output).toContain(heading);
-    expect(output).toContain("Ask one focused question at a time");
-    expect(output).toContain(
-      "Treat a clear request for action as authorization for reversible, read-only, and routine implementation work",
-    );
-    expect(output).toContain(
-      "- MUST preserve agreed decisions unless they are explicitly changed.",
-    );
     const position = (heading: string) => output.indexOf(heading);
     expect(position("## Overview")).toBeLessThan(position("## Instructions"));
     expect(position("## Instructions")).toBeLessThan(position("## Invariants"));

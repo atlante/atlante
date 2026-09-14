@@ -272,7 +272,7 @@ test("CLI resolves first-party package resource facets", async () => {
     "$schema": "${SCHEMA_URI}",
     "values": { "project": "demo", "workflow-root": ".atlante/workflows" },
     "agents": {
-      "architect": { "$instance": "@atlante/pack/architect", "description": "Architect" },
+      "atlante": { "$instance": "@atlante/pack/atlante", "description": "Atlante" },
       "agent": { "$template": "@atlante/pack/agent", "description": "Agent", "identity": "Identity", "mission": "Mission" }
     },
     "skills": {

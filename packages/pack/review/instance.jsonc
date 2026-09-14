@@ -7,18 +7,15 @@
     {
       "instructions": [
         "Read the complete review request, defined scope and acceptance criteria, applicable project instructions, supplied change boundary, and available validation evidence before forming conclusions.",
-        "Establish the actual reviewed boundary from source control and the working tree, identifying changed files, included uncommitted work, excluded unrelated changes, and generated outputs.",
-        "Inspect the actual source, diff, and tests yourself; use summaries only for orientation and verify every material claim against primary evidence.",
+        "Establish the actual reviewed boundary from source control and the working tree — changed files, included uncommitted work, excluded unrelated changes, generated outputs — and inspect the source, diff, and tests yourself; use summaries only for orientation and verify every material claim against primary evidence.",
         "Scale investigation depth to the complexity, risk, and uncertainty of the change, but MUST NOT omit direct source inspection, acceptance verification, or the evidence needed to support the verdict.",
         "For a focused task review, inspect the changed behavior and its immediate integration boundary; for a whole-change review, inspect the complete change set and cross-task interactions. Inspect outside that boundary only to evaluate a concrete risk you can name, and record both the risk and what you inspected.",
         "Assess acceptance compliance explicitly: identify anything missing, extra, misunderstood, or unverifiable, and distinguish implementation defects from ambiguity or defects in the requirements themselves.",
-        "For a correction re-review, verify each prior finding against the correction boundary and inspect that boundary for newly introduced breakage; MUST NOT reopen unaffected code, and report unrelated observations as non-blocking and out of scope.",
-        "Review correctness, acceptance compliance, regressions, compatibility, security, maintainability, and test quality; distinguish introduced defects from pre-existing or out-of-scope observations.",
+        "Review correctness, regressions, compatibility, security, maintainability, and test quality; distinguish introduced defects from pre-existing or out-of-scope observations.",
+        "For a correction re-review, verify each prior finding against the correction boundary and inspect that boundary for newly introduced breakage, returning an `ADDRESSED` or `NOT ADDRESSED` verdict with evidence for each prior finding; MUST NOT reopen unaffected code, and report unrelated observations as non-blocking and out of scope.",
         "Evaluate supplied validation evidence for completeness and consistency before running commands. Run only the focused checks needed to verify acceptance, investigate a concrete doubt, or close an evidence gap; SHOULD NOT repeat broad validation when sufficient evidence already exists. Report supplied evidence separately from checks run directly, including their results and limitations.",
         "Record each finding as `critical`, `important`, or `minor` with an exact location, evidence, impact, and required correction; omit speculative concerns and optional style preferences.",
-        "Return a report containing the reviewed boundary, acceptance assessment, commands and results, findings grouped by severity, pre-existing or out-of-scope observations, limitations, and a `PASS` or `BLOCKED` verdict.",
-        "For a correction re-review, include an `ADDRESSED` or `NOT ADDRESSED` verdict with evidence for each prior finding.",
-        "Before returning the report, check that every finding is supported by evidence, severities match impact, required corrections are actionable, and the verdict agrees with the findings and check results."
+        "Return a report containing the reviewed boundary, acceptance assessment, commands and results, findings grouped by severity, pre-existing or out-of-scope observations, limitations, and a `PASS` or `BLOCKED` verdict. Before returning it, check that every finding is supported by evidence, severities match impact, required corrections are actionable, and the verdict agrees with the findings and check results."
       ]
     },
     {

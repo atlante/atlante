@@ -97,4 +97,5 @@ update CONTRIBUTING.md. Agent-specific rules:
    - Write for a developer reader: explain, don't steer. No agent-handoff or self-justifying phrasing ("Your next step can be small:", "This binding intentionally omits ..."), and no invariant damping: a constraint is stated once where it belongs and linked elsewhere, never repeated per page.
    - The does-not boundary statement lives in one place, the docs introduction; every other page links to it.
    - Keep RFC-style normative language (MUST/SHOULD) out of documentation prose; it belongs to SPECIFICATION.md and to agent instructions like this file.
+   - When a change alters behavior that developer-facing prose describes, update that prose in the same cycle.
 5. Visual design in `website/` and `docs/` — including layout, spacing, typography, styling, responsive behavior, theme presentation, and scroll affordances — MUST be validated manually in a browser. Do not add automated tests that assert those details in source, CSS, or rendered HTML; retain automated coverage for functional behavior and build, link, deployment, and schema contracts.

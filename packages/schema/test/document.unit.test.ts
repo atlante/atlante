@@ -418,7 +418,7 @@ describe("atlanteDocumentOverlaySchema", () => {
   test("accepts a string binding as $instance shorthand for agents and skills", () => {
     const result = atlanteDocumentOverlaySchema.safeParse({
       $schema: SCHEMA_URI,
-      agents: { architect: "./resources/architect" },
+      agents: { atlante: "./resources/atlante" },
       skills: { testing: "@atlante/pack/skill" },
     });
 
@@ -430,7 +430,7 @@ describe("atlanteDocumentOverlaySchema", () => {
       $schema: SCHEMA_URI,
       agents: {
         reviewer: {
-          $instance: "./resources/architect",
+          $instance: "./resources/atlante",
           values: { scope: "review" },
           mission: "Review the change.",
         },
@@ -508,12 +508,12 @@ describe("atlanteDocumentOverlaySchema", () => {
   test("allows unresolved descriptions in authored sources but requires them canonically", () => {
     const authored = atlanteDocumentOverlaySchema.safeParse({
       $schema: SCHEMA_URI,
-      agents: { architect: "./resources/architect" },
+      agents: { atlante: "./resources/atlante" },
       skills: { testing: { $instance: "./resources/testing" } },
     });
     const canonical = atlanteDocumentSchema.safeParse({
       $schema: SCHEMA_URI,
-      agents: { architect: { identity: "You are an architect." } },
+      agents: { atlante: { identity: "You are an atlante." } },
       skills: { testing: { content: "Run the tests." } },
     });
 
@@ -526,7 +526,7 @@ describe("atlanteDocumentOverlaySchema", () => {
       $schema: SCHEMA_URI,
       agents: {
         reviewer: {
-          $instance: "./resources/architect",
+          $instance: "./resources/atlante",
           $template: "./resources/agent",
         },
       },

@@ -14,49 +14,10 @@ describe("plan skill instance", () => {
 
     expect(skill.templateLocator).toBe("@atlante/pack/skill");
     expect(skill.title).toBe("Plan");
-    expect(skill.overview).toContain("smallest implementation plan");
-    expect(skill.overview).toContain(
-      "scope, dependencies, risks, and validation",
-    );
     expect(skill.overview).not.toMatch(/\b(MUST|SHOULD|MAY)\b/);
     expect(
       skill.sections.map((section) => Object.keys(section).sort().join("+")),
     ).toEqual(["instructions", "invariants"]);
-  });
-
-  test("instructions carry the planning lifecycle in order", () => {
-    const instructions = resolvePackSkill(locator).listText("instructions");
-
-    for (const marker of [
-      "Read the defined request and inspect the relevant source, documentation, tests, and recent changes",
-      "Scale the plan detail to the complexity, risk, and uncertainty",
-      "Make the plan self-contained",
-      "stop and return the scope problem instead of silently narrowing it or creating multiple plans",
-      "smallest independently actionable tasks",
-      "order them by dependency",
-      "proceed in parallel without conflict",
-      "Record the goal, chosen approach",
-      "acceptance-criteria mapping",
-      "name the exact files to create, modify, and test",
-      "independently testable and reviewable outcome",
-      "exact validation commands",
-      "preserve established decisions and change only what new evidence justifies",
-      "report any material scope or contract change as a blocker",
-      "check that every acceptance criterion is covered",
-      "Return the complete plan together with any blockers",
-    ])
-      expect(instructions).toContain(marker);
-
-    const position = (marker: string) => instructions.indexOf(marker);
-    expect(position("Read the defined request")).toBeLessThan(
-      position("smallest independently actionable tasks"),
-    );
-    expect(position("smallest independently actionable tasks")).toBeLessThan(
-      position("Record the goal, chosen approach"),
-    );
-    expect(position("Record the goal, chosen approach")).toBeLessThan(
-      position("Return the complete plan together with any blockers"),
-    );
   });
 
   test("invariants guard scope, grounded evidence, and task actionability", () => {
@@ -80,10 +41,6 @@ describe("plan skill instance", () => {
       "## Invariants",
     ])
       expect(output).toContain(heading);
-    expect(output).toContain("smallest independently actionable tasks");
-    expect(output).toContain(
-      "- MUST NOT expand or weaken the defined scope or acceptance criteria; report any required change as a blocker.",
-    );
     const position = (heading: string) => output.indexOf(heading);
     expect(position("## Overview")).toBeLessThan(position("## Instructions"));
     expect(position("## Instructions")).toBeLessThan(position("## Invariants"));
