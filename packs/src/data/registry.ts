@@ -28,6 +28,12 @@ export type RegistryFile = {
 export type RegistryEvaluationScenario = {
   passRate: number;
   description?: string;
+  /** Mean duration across executed trials, when the report includes trials. */
+  meanDurationMs?: number;
+  /** Mean token usage across executed trials, when reported by the host. */
+  meanTokens?: number;
+  /** Mean provider-reported cost across executed trials, when available. */
+  meanCost?: number;
 };
 
 export type RegistryEvaluation = {

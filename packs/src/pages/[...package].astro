@@ -7,6 +7,9 @@ import type { RegistryFile, RegistryPack } from "../data/registry";
 import {
   formatCount,
   formatDate,
+  formatEvaluationCost,
+  formatEvaluationDuration,
+  formatEvaluationTokens,
   formatPassRate,
   formatSyncTime,
 } from "../data/format";
@@ -190,7 +193,7 @@ const bindingSummary = (binding: { agents: number; skills: number }): string => 
             </dl>
           </div>
           <div class="evaluation-scenarios">
-            <span class="section-label">Scenario pass rates</span>
+            <span class="section-label">Scenario results · mean per trial</span>
             <ul class="evaluation-list">
               {evaluationScenarios.map(([name, scenario]) => (
                 <li class="evaluation-item">
@@ -201,6 +204,26 @@ const bindingSummary = (binding: { agents: number; skills: number }): string => 
                         {scenario.description}
                       </p>
                     )}
+                    <dl class="evaluation-item-metrics">
+                      <div class="evaluation-item-metric">
+                        <dt class="meta-label">Duration</dt>
+                        <dd>
+                          {formatEvaluationDuration(scenario.meanDurationMs ?? null)}
+                        </dd>
+                      </div>
+                      <div class="evaluation-item-metric">
+                        <dt class="meta-label">Tokens</dt>
+                        <dd>
+                          {formatEvaluationTokens(scenario.meanTokens ?? null)}
+                        </dd>
+                      </div>
+                      <div class="evaluation-item-metric">
+                        <dt class="meta-label">Cost</dt>
+                        <dd>
+                          {formatEvaluationCost(scenario.meanCost ?? null)}
+                        </dd>
+                      </div>
+                    </dl>
                   </div>
                   <strong
                     class={scenario.passRate === 1 ? "rate-pass" : "rate-partial"}

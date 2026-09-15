@@ -46,8 +46,22 @@ const VALID_EVAL_REPORT = {
     },
   },
   scenarios: {
-    "scope-discipline": { passRate: 1, description: "Stays in scope." },
-    "policy-invariant": { passRate: 0.5, description: 42 },
+    "scope-discipline": {
+      passRate: 1,
+      description: "Stays in scope.",
+      trials: [
+        { i: 0, verdict: "pass", durationMs: 1000, tokens: 100, cost: 0 },
+        { i: 1, verdict: "pass", durationMs: 2000, tokens: 300, cost: 0 },
+      ],
+    },
+    "policy-invariant": {
+      passRate: 0.5,
+      description: 42,
+      trials: [
+        { i: 0, verdict: "fail", durationMs: 3000, tokens: 200 },
+        { i: 1, verdict: "skipped-budget", durationMs: 0 },
+      ],
+    },
   },
 };
 
@@ -441,12 +455,53 @@ describe("syncPacks", () => {
         maxTokens: 200000,
       },
       scenarios: {
-        "scope-discipline": { passRate: 1, description: "Stays in scope." },
-        "policy-invariant": { passRate: 0.5 },
+        "scope-discipline": {
+          passRate: 1,
+          description: "Stays in scope.",
+          meanDurationMs: 1500,
+          meanTokens: 200,
+          meanCost: 0,
+        },
+        "policy-invariant": {
+          passRate: 0.5,
+          meanDurationMs: 3000,
+          meanTokens: 200,
+        },
       },
       sourceUrl: "https://github.com/acme/test-pack/tree/v1.0.0/eval",
     });
 
+    rmSync(websiteRoot, { recursive: true, force: true });
+  });
+
+  it("keeps older eval reports when usage metrics are unavailable", async () => {
+    const websiteRoot = tempWebsiteRoot();
+    const legacyReport = {
+      ...VALID_EVAL_REPORT,
+      scenarios: {
+        "legacy-scenario": {
+          passRate: 1,
+          description: "Reports without trial usage remain valid.",
+        },
+      },
+    };
+    const tarball = await fixtureTarball({
+      packConfig: packWithEvaluation(),
+      report: legacyReport,
+    });
+    const result = await syncPacks({
+      websiteRoot,
+      manifest: MANIFEST,
+      fetch: fakeFetch(tarball),
+      now: () => FIXED_NOW,
+    });
+
+    expect(result.snapshot.packs[0]?.evaluation?.scenarios).toEqual({
+      "legacy-scenario": {
+        passRate: 1,
+        description: "Reports without trial usage remain valid.",
+      },
+    });
     rmSync(websiteRoot, { recursive: true, force: true });
   });
 
