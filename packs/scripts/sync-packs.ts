@@ -222,6 +222,8 @@ function isPreviewCandidate(path: string): boolean {
 
 type ExtractedPack = {
   files: RegistryFile[];
+  /** Full README content for the overview, independent of file preview caps. */
+  readmeContent?: string;
   presets: Array<{
     name: string;
     default: boolean;
@@ -515,6 +517,9 @@ function extractTarball(tarball: Buffer, packageName: string): ExtractedPack {
           content: content.length > MAX_PREVIEW_CHARS ? null : content,
         };
       });
+    const readmePath = packFiles.includes("README.md")
+      ? join(extractDir, packRootPrefix, "README.md")
+      : undefined;
 
     if (presets.length === 0) {
       throw new Error(
@@ -541,6 +546,9 @@ function extractTarball(tarball: Buffer, packageName: string): ExtractedPack {
 
     return {
       files,
+      ...(readmePath
+        ? { readmeContent: readFileSync(readmePath, "utf8") }
+        : {}),
       presets,
       ...(evaluation ? { evaluation } : {}),
       ...(nonEmptyString(evaluationSource) && isSafePackPath(evaluationSource)
@@ -697,7 +705,6 @@ export async function syncPacks(
         tarball = Buffer.from(await tarballResponse.arrayBuffer());
       }
       const extracted = extractTarball(tarball, packageName);
-      const readme = extracted.files.find((file) => file.path === "README.md");
 
       // The eval source link pins the release tag (v<version>), so the
       // published self-reported results stay inspectable at that version.
@@ -739,9 +746,9 @@ export async function syncPacks(
             ? packageName
             : `${packageName}/${preset.name}`,
         })),
-        readmeHtml: readme?.content
+        readmeHtml: extracted.readmeContent
           ? sanitizeHtml(
-              marked.parse(readme.content) as string,
+              marked.parse(extracted.readmeContent) as string,
               README_SANITIZER_OPTIONS,
             )
           : "",

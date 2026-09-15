@@ -115,6 +115,7 @@ async function fixtureTarball(
     includePreset?: boolean;
     packConfig?: string;
     report?: unknown;
+    readme?: string;
   } = {},
 ): Promise<Buffer> {
   const source = mkdtempSync(join(tmpdir(), "atlante-packs-src-"));
@@ -140,7 +141,7 @@ async function fixtureTarball(
   if (options.includePreset !== false) {
     writeFile("review/atlante.jsonc", REVIEW_JSONC);
   }
-  writeFile("README.md", README);
+  writeFile("README.md", options.readme ?? README);
   for (const [path, content] of Object.entries(TEMPLATES)) {
     writeFile(path, content);
   }
@@ -387,6 +388,26 @@ describe("syncPacks", () => {
     expect(paths).toContain("README.md");
     expect(paths.every((path) => path !== "package.json")).toBe(true);
     expect(pack.evaluation).toBeUndefined();
+
+    rmSync(websiteRoot, { recursive: true, force: true });
+  });
+
+  it("renders an oversized README while capping file previews", async () => {
+    const websiteRoot = tempWebsiteRoot();
+    const largeReadme = `# Large README\n\n${"content ".repeat(1200)}`;
+    const tarball = await fixtureTarball({ readme: largeReadme });
+    const result = await syncPacks({
+      websiteRoot,
+      manifest: MANIFEST,
+      fetch: fakeFetch(tarball),
+      now: () => FIXED_NOW,
+    });
+
+    const pack = result.snapshot.packs[0];
+    expect(pack?.readmeHtml).toContain("<h1>Large README</h1>");
+    expect(pack?.files.find((file) => file.path === "README.md")?.content).toBe(
+      null,
+    );
 
     rmSync(websiteRoot, { recursive: true, force: true });
   });
