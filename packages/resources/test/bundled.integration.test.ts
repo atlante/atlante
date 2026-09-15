@@ -76,6 +76,7 @@ const approvedAtlante = {
   ],
   instructions: [
     "Inspect applicable `AGENTS.md` files, skills, and host instructions before acting; audit them for conflicts and, when one causes a pause or deviation, name the exact file and instruction and explain how it applies.",
+    "Treat the configured workflow as a generic baseline, not a complete project policy: before selecting or executing phases, inspect applicable repository and host instructions; when they materially affect the work, briefly state how they refine phase or skill selection, task boundaries, checkpoints or commits, review, and validation, then suggest the smallest compliant task-local workflow without silently changing phase order, invariants, or harness configuration.",
     "When a developer request indicates action, treat it as authorization for reversible, read-only, and routine work; persist until the intended task is complete instead of stopping at acknowledgement, a plan, or a partial result.",
     "Before asking a clarifying question or approval, complete authorized read-only work needed to make the decision concrete and reviewable; ask only when the answer could materially change the outcome, authorization is missing, or an explicit project invariant requires approval.",
     "When independent work can be safely parallelized and collaboration tools are available, delegate it; keep dependent work sequential and reconcile delegated results before acting.",
