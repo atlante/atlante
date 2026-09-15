@@ -16,6 +16,7 @@ import * as tar from "tar";
 import {
   loadRegistryManifest,
   loadRegistrySnapshot,
+  type RegistryEvaluationScenario,
   type RegistryFile,
   type RegistryManifest,
   type RegistryPack,
@@ -318,6 +319,42 @@ function positiveNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value > 0;
 }
 
+function nonNegativeNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+function meanTrialMetric(
+  scenario: RecordValue,
+  key: "durationMs" | "tokens" | "cost",
+): number | undefined {
+  if (!Array.isArray(scenario.trials) || scenario.trials.length === 0) {
+    return undefined;
+  }
+  const rawValues = scenario.trials
+    .map(recordValue)
+    .filter((trial) => trial?.verdict !== "skipped-budget")
+    .map((trial) => trial?.[key]);
+  const values = rawValues.filter((value): value is number =>
+    nonNegativeNumber(value),
+  );
+  if (values.length === 0 || values.length !== rawValues.length)
+    return undefined;
+  const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+  return key === "cost" ? mean : Math.round(mean);
+}
+
+function reportMetric(
+  scenario: RecordValue,
+  summaryKey: "meanDurationMs" | "meanTokens" | "meanCost",
+  trialKey: "durationMs" | "tokens" | "cost",
+): number | undefined {
+  const summaryValue = scenario[summaryKey];
+  if (nonNegativeNumber(summaryValue)) {
+    return trialKey === "cost" ? summaryValue : Math.round(summaryValue);
+  }
+  return meanTrialMetric(scenario, trialKey);
+}
+
 function reportRunDate(runId: string): string | undefined {
   const match =
     /^(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})-(\d{2})-[0-9a-f]{4}$/.exec(runId);
@@ -380,8 +417,7 @@ function readPackEvaluation(
   const runDate = reportRunDate(runId);
   if (!runDate) return undefined;
 
-  const scenarios: Record<string, { passRate: number; description?: string }> =
-    {};
+  const scenarios: Record<string, RegistryEvaluationScenario> = {};
   for (const [name, value] of Object.entries(rawScenarios)) {
     const scenario = recordValue(value);
     const passRate = scenario?.passRate;
@@ -394,11 +430,23 @@ function readPackEvaluation(
     )
       return undefined;
     const description = scenario?.description;
+    const meanDurationMs = scenario
+      ? reportMetric(scenario, "meanDurationMs", "durationMs")
+      : undefined;
+    const meanTokens = scenario
+      ? reportMetric(scenario, "meanTokens", "tokens")
+      : undefined;
+    const meanCost = scenario
+      ? reportMetric(scenario, "meanCost", "cost")
+      : undefined;
     scenarios[name] = {
       passRate,
       ...(typeof description === "string" && description.length > 0
         ? { description }
         : {}),
+      ...(meanDurationMs !== undefined ? { meanDurationMs } : {}),
+      ...(meanTokens !== undefined ? { meanTokens } : {}),
+      ...(meanCost !== undefined ? { meanCost } : {}),
     };
   }
   if (Object.keys(scenarios).length === 0) return undefined;

@@ -2,6 +2,9 @@ import { describe, expect, it } from "bun:test";
 import {
   formatCount,
   formatDate,
+  formatEvaluationCost,
+  formatEvaluationDuration,
+  formatEvaluationTokens,
   formatPassRate,
   formatSyncTime,
 } from "./format";
@@ -41,5 +44,21 @@ describe("formatPassRate", () => {
     expect(formatPassRate(1)).toBe("100%");
     expect(formatPassRate(0.5)).toBe("50%");
     expect(formatPassRate(1 / 3)).toBe("33%");
+  });
+});
+
+describe("evaluation formatters", () => {
+  it("formats mean durations and token counts for scenario results", () => {
+    expect(formatEvaluationDuration(850)).toBe("850ms");
+    expect(formatEvaluationDuration(69_830)).toBe("69.8s");
+    expect(formatEvaluationTokens(45_409)).toBe("45.4k");
+    expect(formatEvaluationTokens(null)).toBe("Not reported");
+  });
+
+  it("uses a neutral label when the provider reports no price", () => {
+    expect(formatEvaluationCost(0)).toBe("N/A");
+    expect(formatEvaluationCost(0.001)).toBe("$0.0010");
+    expect(formatEvaluationCost(1.2)).toBe("$1.20");
+    expect(formatEvaluationCost(null)).toBe("Not reported");
   });
 });
