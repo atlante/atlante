@@ -198,7 +198,12 @@ const bindingSummary = (binding: { agents: number; skills: number }): string => 
               {evaluationScenarios.map(([name, scenario]) => (
                 <li class="evaluation-item">
                   <div class="evaluation-item-main">
-                    <code>{name}</code>
+                    <div class="evaluation-item-header">
+                      <code>{name}</code>
+                      <strong
+                        class={scenario.passRate === 1 ? "rate-pass" : "rate-partial"}
+                      >{formatPassRate(scenario.passRate)}</strong>
+                    </div>
                     {scenario.description && (
                       <p class="evaluation-description">
                         {scenario.description}
@@ -225,9 +230,6 @@ const bindingSummary = (binding: { agents: number; skills: number }): string => 
                       </div>
                     </dl>
                   </div>
-                  <strong
-                    class={scenario.passRate === 1 ? "rate-pass" : "rate-partial"}
-                  >{formatPassRate(scenario.passRate)}</strong>
                 </li>
               ))}
             </ul>

@@ -630,10 +630,7 @@
   }
 
   .evaluation-item {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: var(--space-4);
+    display: block;
     padding: var(--space-3) var(--space-4);
     border: var(--line);
     border-radius: 4px;
@@ -650,6 +647,13 @@
     display: grid;
     gap: var(--space-3);
     min-width: 0;
+  }
+
+  .evaluation-item-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-4);
   }
 
   .evaluation-description {

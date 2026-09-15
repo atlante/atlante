@@ -55,8 +55,8 @@ describe("evaluation formatters", () => {
     expect(formatEvaluationTokens(null)).toBe("Not reported");
   });
 
-  it("distinguishes included, reported, and unavailable costs", () => {
-    expect(formatEvaluationCost(0)).toBe("Included");
+  it("uses a neutral label when the provider reports no price", () => {
+    expect(formatEvaluationCost(0)).toBe("N/A");
     expect(formatEvaluationCost(0.001)).toBe("$0.0010");
     expect(formatEvaluationCost(1.2)).toBe("$1.20");
     expect(formatEvaluationCost(null)).toBe("Not reported");

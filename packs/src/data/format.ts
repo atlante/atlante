@@ -52,6 +52,6 @@ export function formatEvaluationTokens(value: number | null): string {
 
 export function formatEvaluationCost(value: number | null): string {
   if (value === null) return "Not reported";
-  if (value === 0) return "Included";
+  if (value === 0) return "N/A";
   return `$${value.toFixed(value < 0.01 ? 4 : 2)}`;
 }
