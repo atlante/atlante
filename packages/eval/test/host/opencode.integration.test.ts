@@ -386,6 +386,7 @@ exit 1`,
       expect(written.permissions).toEqual(
         expect.arrayContaining([
           { action: "edit", resource: "*", effect: "allow" },
+          { action: "question", resource: "*", effect: "deny" },
           { action: "webfetch", resource: "*", effect: "deny" },
           { action: "shell", resource: "rm -rf *", effect: "deny" },
         ]),
@@ -425,6 +426,7 @@ exit 1`,
     // Forced denials are always present.
     expect(written.agent.build.permission.webfetch).toBe("deny");
     expect(written.agent.build.permission.external_directory).toBe("deny");
+    expect(written.agent.build.permission.question).toBe("deny");
     expect(written.agent.build.permission.bash["rm -rf *"]).toBe("deny");
     expect(written.agent.build.permission.bash["*"]).toBe("allow");
     expect(written.agent.build.permission.read["*.env"]).toBe("deny");
@@ -890,6 +892,49 @@ sleep 30`,
     expect(trial.error).toContain("boom");
   });
 
+  test("surfaces a safe structured host error when stderr is empty", async () => {
+    const stub = writeStub(
+      tempDir("eval-stub-structured-error-"),
+      `printf '%s\\n' '{"type":"error","error":{"name":"APIError","data":{"message":"Authentication Failed","statusCode":401,"responseBody":"secret-response-body","responseHeaders":{"authorization":"secret-header"}}}}'; exit 1`,
+    );
+    const runner = makeRunner({ binaryPath: stub });
+    const trial = await runner.runTrial({
+      sandbox: sandboxFor(
+        tempDir("eval-sandbox-structured-error-"),
+        tempDir("eval-state-structured-error-"),
+      ),
+      prompt: "p",
+      timeoutMs: 10_000,
+      maxTokens: 400_000,
+    });
+    expect(trial.outcome).toBe("infra-error");
+    expect(trial.error).toContain("APIError");
+    expect(trial.error).toContain("authentication failed");
+    expect(trial.error).toContain("status 401");
+    expect(trial.error).not.toContain("secret-response-body");
+    expect(trial.error).not.toContain("secret-header");
+  });
+
+  test("falls back to stderr when a structured host error has no safe summary", async () => {
+    const stub = writeStub(
+      tempDir("eval-stub-empty-structured-error-"),
+      `printf '%s\\n' '{"type":"error","error":"SYNTHETIC_SECRET"}'; echo stderr-diagnostic >&2; exit 1`,
+    );
+    const runner = makeRunner({ binaryPath: stub });
+    const trial = await runner.runTrial({
+      sandbox: sandboxFor(
+        tempDir("eval-sandbox-empty-structured-error-"),
+        tempDir("eval-state-empty-structured-error-"),
+      ),
+      prompt: "p",
+      timeoutMs: 10_000,
+      maxTokens: 400_000,
+    });
+    expect(trial.outcome).toBe("infra-error");
+    expect(trial.error).toContain("stderr-diagnostic");
+    expect(trial.error).not.toContain("SYNTHETIC_SECRET");
+  });
+
   test("isolates XDG dirs, injects auth, and runs from the sandbox cwd", async () => {
     const state = tempDir("eval-state-env-");
     mkdirSync(join(state, "data", "opencode"), { recursive: true });
@@ -1052,6 +1097,7 @@ describe("createEvalPermissionPolicy", () => {
       "*.env.example": "allow",
     });
     expect(policy.task).toBe("allow");
+    expect(policy.question).toBe("deny");
     expect(policy.webfetch).toBe("deny");
     expect(policy.websearch).toBe("deny");
     expect(policy.external_directory).toBe("deny");
@@ -1073,6 +1119,7 @@ describe("createEvalPermissionPolicy", () => {
         { action: "edit", resource: "*", effect: "allow" },
         { action: "read", resource: "*.env", effect: "deny" },
         { action: "subagent", resource: "*", effect: "allow" },
+        { action: "question", resource: "*", effect: "deny" },
         { action: "shell", resource: "*", effect: "allow" },
         { action: "webfetch", resource: "*", effect: "deny" },
         { action: "websearch", resource: "*", effect: "deny" },
@@ -1082,6 +1129,9 @@ describe("createEvalPermissionPolicy", () => {
         { action: "shell", resource: "sudo *", effect: "deny" },
       ]),
     );
+    expect(policy.filter((rule) => rule.action === "question")).toEqual([
+      { action: "question", resource: "*", effect: "deny" },
+    ]);
     expect(policy.some((rule) => rule.action === "bash")).toBe(false);
     expect(policy.some((rule) => rule.action === "task")).toBe(false);
   });

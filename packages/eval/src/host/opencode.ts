@@ -375,7 +375,9 @@ export function createEvalPermissionPolicy(
       [descriptor.subagentAction]: "allow",
       skill: "allow",
       lsp: "allow",
-      question: "allow",
+      // Eval runs are non-interactive; an unanswered question suspends the
+      // V2 session and makes the host report a shutdown instead of a verdict.
+      question: "deny",
       todowrite: "allow",
       doom_loop: "allow",
       webfetch: "deny",
@@ -398,7 +400,9 @@ export function createEvalPermissionPolicy(
     { action: "grep", resource: "*", effect: "allow" },
     { action: descriptor.subagentAction, resource: "*", effect: "allow" },
     { action: "skill", resource: "*", effect: "allow" },
-    { action: "question", resource: "*", effect: "allow" },
+    // Eval runs are non-interactive; do not leave a host session waiting for
+    // an answer that the runner cannot provide.
+    { action: "question", resource: "*", effect: "deny" },
     { action: descriptor.shellAction, resource: "*", effect: "allow" },
     { action: "webfetch", resource: "*", effect: "deny" },
     { action: "websearch", resource: "*", effect: "deny" },
@@ -668,6 +672,7 @@ function spawnHost(
     let latestNonStepCost: number | undefined;
     let model: string | undefined;
     let modelVersion: string | undefined;
+    let hostError: string | undefined;
     let stderrText = "";
     let graceTimer: NodeJS.Timeout | undefined;
 
@@ -728,6 +733,9 @@ function spawnHost(
         return;
       }
       if (!isObject(event)) return;
+
+      const eventError = extractHostError(event);
+      if (eventError !== undefined) hostError = eventError;
 
       // Budget enforcement is in-flight: compare the latest cumulative count.
       // Real 1.18.x streams nest usage inside the event's `part` object; the
@@ -790,13 +798,86 @@ function spawnHost(
       if (exit !== 0) {
         finish(
           "infra-error",
-          `opencode run exited ${exit}: ${tail(stderrText.trim()) || "no stderr output"}`,
+          `opencode run exited ${exit}: ${hostError ?? (tail(stderrText.trim()) || "no stderr output")}`,
         );
         return;
       }
       finish("completed");
     });
   });
+}
+
+const SAFE_ERROR_NAMES = new Set([
+  "APIError",
+  "AuthenticationError",
+  "Error",
+  "NetworkError",
+  "TimeoutError",
+]);
+
+const HTTP_ERROR_REASONS = new Map<number, string>([
+  [400, "bad request"],
+  [401, "authentication failed"],
+  [403, "permission denied"],
+  [404, "not found"],
+  [408, "request timed out"],
+  [429, "rate limited"],
+  [500, "host service error"],
+  [502, "host service error"],
+  [503, "host service unavailable"],
+  [504, "host service timed out"],
+]);
+
+/** Extracts only bounded, allowlisted summary fields from a host error event. */
+function extractHostError(event: Record<string, unknown>): string | undefined {
+  if (event.type !== "error" || !isObject(event.error)) return undefined;
+  const value = event.error;
+  const data = isObject(value.data) ? value.data : undefined;
+  const name = safeErrorName(value.name);
+  const statusCode = errorStatusCode(value, data);
+  const reason = errorReason(statusCode);
+  const summary = [
+    name,
+    reason,
+    statusCode === undefined ? undefined : `status ${statusCode}`,
+  ].filter((part): part is string => part !== undefined);
+  return summary.length > 0 ? boundedErrorText(summary.join(": ")) : undefined;
+}
+
+function safeErrorName(value: unknown): string | undefined {
+  const name = stringValue(value);
+  return name !== undefined && SAFE_ERROR_NAMES.has(name) ? name : undefined;
+}
+
+function isHttpStatusCode(value: unknown): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= 100 &&
+    value <= 599
+  );
+}
+
+function errorStatusCode(
+  value: Record<string, unknown>,
+  data: Record<string, unknown> | undefined,
+): number | undefined {
+  if (isHttpStatusCode(value.statusCode)) return value.statusCode;
+  return data !== undefined && isHttpStatusCode(data.statusCode)
+    ? data.statusCode
+    : undefined;
+}
+
+function errorReason(statusCode: number | undefined): string | undefined {
+  return statusCode === undefined
+    ? undefined
+    : (HTTP_ERROR_REASONS.get(statusCode) ?? "host request failed");
+}
+
+function boundedErrorText(value: string): string {
+  return value.length > ERROR_OUTPUT_LIMIT
+    ? `${value.slice(0, ERROR_OUTPUT_LIMIT)}… truncated`
+    : value;
 }
 
 /**
