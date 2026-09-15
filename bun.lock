@@ -25,7 +25,7 @@
     },
     "packages/builder": {
       "name": "@atlante/builder",
-      "version": "0.6.0",
+      "version": "0.7.0",
       "dependencies": {
         "@atlante/resources": "workspace:*",
         "@atlante/schema": "workspace:*",
@@ -37,7 +37,7 @@
     },
     "packages/cli": {
       "name": "atlante",
-      "version": "0.6.0",
+      "version": "0.7.0",
       "bin": {
         "atlante": "./dist/bin/atlante.js",
       },
@@ -65,7 +65,7 @@
     },
     "packages/eval": {
       "name": "@atlante/eval",
-      "version": "0.6.0",
+      "version": "0.7.0",
       "dependencies": {
         "@atlante/opencode": "workspace:*",
         "@atlante/schema": "workspace:*",
@@ -74,11 +74,11 @@
     },
     "packages/opencode": {
       "name": "@atlante/opencode",
-      "version": "0.6.0",
+      "version": "0.7.0",
     },
     "packages/pack": {
       "name": "@atlante/pack",
-      "version": "0.6.0",
+      "version": "0.7.0",
       "devDependencies": {
         "@atlante/resources": "workspace:*",
         "@atlante/validator": "workspace:*",
@@ -86,7 +86,7 @@
     },
     "packages/resources": {
       "name": "@atlante/resources",
-      "version": "0.6.0",
+      "version": "0.7.0",
       "dependencies": {
         "handlebars": "^4.7.8",
         "jsonc-parser": "^3.3.1",
@@ -94,14 +94,14 @@
     },
     "packages/schema": {
       "name": "@atlante/schema",
-      "version": "0.6.0",
+      "version": "0.7.0",
       "dependencies": {
         "zod": "^4.0.0",
       },
     },
     "packages/validator": {
       "name": "@atlante/validator",
-      "version": "0.6.0",
+      "version": "0.7.0",
       "dependencies": {
         "@atlante/resources": "workspace:*",
         "@atlante/schema": "workspace:*",
@@ -1276,6 +1276,8 @@
 
     "@atlante/docs/typescript": ["typescript@6.0.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw=="],
 
+    "@atlante/website/atlante": ["atlante@0.6.0", "", { "dependencies": { "@atlante/pack": "^0.6.0", "ajv": "^8.17.1" }, "bin": { "atlante": "dist/bin/atlante.js" } }, "sha512-WUN9KX1FDP07E2kwDhZftOH8TwBmJyvtQNwzW2wdeEpyaTA2Pn8uc7X/cfuytaWODQCpVXWJky6FLjhLvEaooQ=="],
+
     "@mdx-js/mdx/source-map": ["source-map@0.7.6", "", {}, "sha512-i5uvt8C3ikiWeNZSVZNWcfZPItFQOsYTUAOkcUPGd8DqDy1uOUikjt5dG+uRlwyvR108Fb9DOd4GvXfT0N2/uQ=="],
 
     "@rollup/pluginutils/estree-walker": ["estree-walker@2.0.2", "", {}, "sha512-Rfkk/Mp/DL7JVje3u18FxFujQlTNR2q6QfMSMB7AvCBx91NGj/ba3kCfza0f6dVDbw7YlRf/nDrn7pQrCCyQ/w=="],
@@ -1331,6 +1333,8 @@
     "yargs/yargs-parser": ["yargs-parser@22.0.0", "", {}, "sha512-rwu/ClNdSMpkSrUb+d6BRsSkLUq1fmfsY6TOpYzTwvwkg1/NRG85KBy3kq++A8LKQwX6lsu+aWad+2khvuXrqw=="],
 
     "zod-to-ts/zod": ["zod@3.25.76", "", {}, "sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ=="],
+
+    "@atlante/website/atlante/@atlante/pack": ["@atlante/pack@0.6.0", "", {}, "sha512-KkXNCk3vl5nSHAxXIkOA+rexnp5RBNPfFFQul0DkKaERM4PWbhD3EModXKJtcZuc3dHa1JZoOAzji2wS96icLQ=="],
 
     "ansi-align/string-width/emoji-regex": ["emoji-regex@8.0.0", "", {}, "sha512-MSjYzcWNOA0ewAHpz0MxpYFvwg6yjy1NG3xteoqz644VCo/RPgnr1/GGt+ic3iJTzQ8Eu3TdM14SawnVUmGE6A=="],
 
