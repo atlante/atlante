@@ -6,7 +6,7 @@
   "task": {
     "fixture": "eval/fixtures/calculator",
     "agent": "atlante",
-    "prompt": "src/sum.ts has a bug: sum(2, 3) returns 5 correctly, but sum(10, -4) returns 6. verify.ts prints the failing cases. Fix the implementation in src/sum.ts so bun verify.ts passes, and do not modify or create any other file."
+    "prompt": "src/sum.ts has a bug: sum(2, 3) currently returns -1, and sum(10, -4) currently returns 14, while verify.ts expects 5 and 6. Fix the implementation in src/sum.ts so bun verify.ts passes, and do not modify or create any other file."
   },
   "checks": [
     { "type": "command", "run": ["bun", "verify.ts"], "expectExit": 0 },
