@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { execFileSync } from "node:child_process";
 import {
   chmodSync,
   cpSync,
@@ -10,13 +11,16 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { materializeOpenCode } from "@atlante/opencode";
+import type { OpenCodeRunnerOptions } from "../../src/index.js";
 import {
+  checkOpenCodeAuth,
+  createEvalPermissionPolicy,
   createOpenCodeRunner,
   extractModelIdentifiers,
-  mergePermissionBaseline,
   normalizeTokens,
+  sqliteRuntimeArguments,
 } from "../../src/index.js";
 
 const fixtureProject = join(import.meta.dir, "..", "fixtures", "project");
@@ -71,8 +75,329 @@ function sandboxFor(sandboxProject: string, state: string) {
   };
 }
 
+function makeRunner(options: Partial<OpenCodeRunnerOptions> = {}) {
+  return createOpenCodeRunner({
+    projectRoot,
+    authPath: authFile,
+    versionProbe: () => "opencode v1.18.29\n",
+    ...options,
+  });
+}
+
+const WRITE_V2_AUTH_DATABASE = `
+import { DatabaseSync } from "node:sqlite";
+
+const [path] = process.argv.slice(1);
+if (!path) throw new Error("missing database path");
+const database = new DatabaseSync(path);
+database.exec(
+  "CREATE TABLE history (id TEXT PRIMARY KEY, secret TEXT NOT NULL);" +
+    "CREATE TABLE credential (" +
+    "id TEXT PRIMARY KEY, integration_id TEXT, label TEXT NOT NULL, " +
+    "value TEXT NOT NULL, connector_id TEXT, method_id TEXT, active INTEGER, " +
+    "time_created INTEGER NOT NULL, time_updated INTEGER NOT NULL);" +
+    'CREATE TABLE migration (id TEXT PRIMARY KEY, hash TEXT NOT NULL, applied INTEGER NOT NULL);' +
+    'CREATE TABLE __drizzle_migrations (id INTEGER PRIMARY KEY, hash TEXT NOT NULL, created_at INTEGER NOT NULL);',
+);
+database
+  .prepare("INSERT INTO history (id, secret) VALUES (?, ?)")
+  .run("history-1", "must-not-leak");
+database
+  .prepare(
+    "INSERT INTO credential (id, integration_id, label, value, active, time_created, time_updated) VALUES (?, ?, ?, ?, ?, ?, ?)",
+  )
+  .run(
+    "credential-1",
+    "openai",
+    "default",
+    JSON.stringify({ type: "key", key: "test-key" }),
+    1,
+    1,
+    1,
+  );
+database
+  .prepare("INSERT INTO migration (id, hash, applied) VALUES (?, ?, ?)")
+  .run("0001", "migration-hash-0001", 1);
+database
+  .prepare(
+    "INSERT INTO __drizzle_migrations (id, hash, created_at) VALUES (?, ?, ?)",
+  )
+  .run(1, "drizzle-hash-0001", 1700000000000);
+database.close();
+`;
+
+const WRITE_LEGACY_V2_AUTH_DATABASE = `
+import { DatabaseSync } from "node:sqlite";
+
+const [path] = process.argv.slice(1);
+if (!path) throw new Error("missing database path");
+const database = new DatabaseSync(path);
+// A pre-migration V2 database: credential state plus only the legacy named
+// drizzle journal, which the host replays into its new migration table.
+database.exec(
+  "CREATE TABLE credential (" +
+    "id TEXT PRIMARY KEY, integration_id TEXT, label TEXT NOT NULL, " +
+    "value TEXT NOT NULL, connector_id TEXT, method_id TEXT, active INTEGER, " +
+    "time_created INTEGER NOT NULL, time_updated INTEGER NOT NULL);" +
+    'CREATE TABLE __drizzle_migrations (id INTEGER PRIMARY KEY, tag TEXT NOT NULL, "when" INTEGER NOT NULL);',
+);
+database
+  .prepare(
+    "INSERT INTO credential (id, integration_id, label, value, active, time_created, time_updated) VALUES (?, ?, ?, ?, ?, ?, ?)",
+  )
+  .run(
+    "credential-1",
+    "openai",
+    "default",
+    JSON.stringify({ type: "key", key: "test-key" }),
+    1,
+    1,
+    1,
+  );
+database
+  .prepare('INSERT INTO __drizzle_migrations (id, tag, "when") VALUES (?, ?, ?)')
+  .run(1, "0001_legacy_migration", 1700000000);
+database.close();
+`;
+
+const READ_SQLITE_ROWS = `
+import { DatabaseSync } from "node:sqlite";
+
+const [path, query] = process.argv.slice(1);
+if (!path || !query) throw new Error("missing database query");
+const database = new DatabaseSync(path, { readOnly: true });
+console.log(JSON.stringify(database.prepare(query).all()));
+database.close();
+`;
+
+function writeV2AuthDatabase(path: string): void {
+  execFileSync(
+    "node",
+    ["--input-type=module", "-e", WRITE_V2_AUTH_DATABASE, path],
+    { stdio: "ignore" },
+  );
+}
+
+function writeLegacyV2AuthDatabase(path: string): void {
+  execFileSync(
+    "node",
+    ["--input-type=module", "-e", WRITE_LEGACY_V2_AUTH_DATABASE, path],
+    { stdio: "ignore" },
+  );
+}
+
+function readSqliteRows(path: string, query: string): unknown[] {
+  return JSON.parse(
+    execFileSync(
+      "node",
+      ["--input-type=module", "-e", READ_SQLITE_ROWS, path, query],
+      { encoding: "utf8" },
+    ),
+  ) as unknown[];
+}
+
 describe("prepareHostIntegration", () => {
-  test("merges native agents and the permission baseline", () => {
+  test("recognizes a V2 database as an authentication source", () => {
+    const dataHome = tempDir("eval-host-v2-auth-data-");
+    mkdirSync(join(dataHome, "opencode"), { recursive: true });
+    writeFileSync(join(dataHome, "opencode", "opencode.db"), "SQLite format 3");
+    const previous = process.env.XDG_DATA_HOME;
+    process.env.XDG_DATA_HOME = dataHome;
+    try {
+      expect(checkOpenCodeAuth().authenticated).toBe(true);
+    } finally {
+      if (previous === undefined) delete process.env.XDG_DATA_HOME;
+      else process.env.XDG_DATA_HOME = previous;
+    }
+  });
+
+  test("copies V2 credentials without copying unrelated database data", () => {
+    const source = join(tempDir("eval-host-v2-auth-source-"), "opencode.db");
+    writeV2AuthDatabase(source);
+    const config = join(projectRoot, "opencode.json");
+    writeFileSync(config, "{}\n");
+    const previousPath = process.env.PATH;
+    delete process.env.PATH;
+    try {
+      const host = createOpenCodeRunner({
+        projectRoot,
+        authPath: join(tempDir("eval-host-v2-no-legacy-auth-"), "auth.json"),
+        authDatabasePath: source,
+        versionProbe: () => "opencode v2.0.3\n",
+      });
+      const state = tempDir("eval-state-v2-auth-copy-");
+      const project = tempDir("eval-sandbox-v2-auth-copy-");
+      host.prepareHostIntegration(sandboxFor(project, state), {});
+      if (previousPath === undefined) delete process.env.PATH;
+      else process.env.PATH = previousPath;
+
+      const target = join(state, "data", "opencode", "opencode.db");
+      expect(
+        readSqliteRows(target, "SELECT integration_id, value FROM credential"),
+      ).toEqual([
+        { integration_id: "openai", value: '{"type":"key","key":"test-key"}' },
+      ]);
+      expect(readSqliteRows(target, "SELECT secret FROM history")).toEqual([]);
+    } finally {
+      if (previousPath === undefined) delete process.env.PATH;
+      else process.env.PATH = previousPath;
+      rmSync(config, { force: true });
+    }
+  });
+
+  test("preserves the migration journal the V2 host reads", () => {
+    const source = join(tempDir("eval-host-v2-journal-"), "opencode.db");
+    writeV2AuthDatabase(source);
+    const host = createOpenCodeRunner({
+      projectRoot,
+      authPath: join(tempDir("eval-host-v2-no-legacy-auth-"), "auth.json"),
+      authDatabasePath: source,
+      versionProbe: () => "opencode v2.0.3\n",
+    });
+    const state = tempDir("eval-state-v2-journal-");
+    const project = tempDir("eval-sandbox-v2-journal-");
+    host.prepareHostIntegration(sandboxFor(project, state), {});
+
+    const target = join(state, "data", "opencode", "opencode.db");
+    expect(readSqliteRows(target, "SELECT hash FROM migration")).toEqual([
+      { hash: "migration-hash-0001" },
+    ]);
+    expect(
+      readSqliteRows(target, "SELECT hash FROM __drizzle_migrations"),
+    ).toEqual([{ hash: "drizzle-hash-0001" }]);
+  });
+
+  test("preserves a legacy named journal when no migration table exists", () => {
+    const source = join(tempDir("eval-host-v2-legacy-journal-"), "opencode.db");
+    writeLegacyV2AuthDatabase(source);
+    const host = createOpenCodeRunner({
+      projectRoot,
+      authPath: join(tempDir("eval-host-v2-no-legacy-auth-"), "auth.json"),
+      authDatabasePath: source,
+      versionProbe: () => "opencode v2.0.3\n",
+    });
+    const state = tempDir("eval-state-v2-legacy-journal-");
+    const project = tempDir("eval-sandbox-v2-legacy-journal-");
+    host.prepareHostIntegration(sandboxFor(project, state), {});
+
+    const target = join(state, "data", "opencode", "opencode.db");
+    expect(
+      readSqliteRows(target, "SELECT tag FROM __drizzle_migrations"),
+    ).toEqual([{ tag: "0001_legacy_migration" }]);
+    expect(
+      readSqliteRows(target, "SELECT integration_id FROM credential"),
+    ).toEqual([{ integration_id: "openai" }]);
+  });
+
+  test("resolves a relative OPENCODE_DB override for V2 auth", () => {
+    const dataHome = tempDir("eval-host-v2-auth-override-");
+    const source = join(dataHome, "opencode", "profiles", "custom.db");
+    mkdirSync(dirname(source), { recursive: true });
+    writeV2AuthDatabase(source);
+
+    const host = createOpenCodeRunner({
+      projectRoot,
+      authPath: join(tempDir("eval-host-v2-no-legacy-auth-"), "auth.json"),
+      baseEnv: {
+        PATH: process.env.PATH,
+        XDG_DATA_HOME: dataHome,
+        OPENCODE_DB: "profiles/custom.db",
+      },
+      versionProbe: () => "opencode v2.0.3\n",
+    });
+    const state = tempDir("eval-state-v2-auth-override-");
+    const project = tempDir("eval-sandbox-v2-auth-override-");
+    host.prepareHostIntegration(sandboxFor(project, state), {});
+
+    expect(
+      readSqliteRows(
+        join(state, "data", "opencode", "opencode.db"),
+        "SELECT integration_id FROM credential",
+      ),
+    ).toEqual([{ integration_id: "openai" }]);
+  });
+
+  test("resolves the channel-specific V2 database path from the host", () => {
+    const source = join(
+      tempDir("eval-host-v2-channel-auth-"),
+      "opencode-preview.db",
+    );
+    writeV2AuthDatabase(source);
+    const stub = writeStub(
+      tempDir("eval-stub-v2-channel-path-"),
+      `if [ "$1" = "debug" ] && [ "$2" = "paths" ] && [ "$3" = "db" ]; then printf '%s\\n' '${source}'; exit 0; fi
+exit 1`,
+    );
+
+    const host = createOpenCodeRunner({
+      projectRoot,
+      binaryPath: stub,
+      authPath: join(tempDir("eval-host-v2-no-legacy-auth-"), "auth.json"),
+      baseEnv: { PATH: process.env.PATH },
+      versionProbe: () => "opencode v2.0.3\n",
+    });
+    const state = tempDir("eval-state-v2-channel-auth-");
+    const project = tempDir("eval-sandbox-v2-channel-auth-");
+    host.prepareHostIntegration(sandboxFor(project, state), {});
+
+    expect(
+      readSqliteRows(
+        join(state, "data", "opencode", "opencode.db"),
+        "SELECT integration_id FROM credential",
+      ),
+    ).toEqual([{ integration_id: "openai" }]);
+  });
+
+  test("writes an autonomous V2 config instead of inheriting project settings", () => {
+    const config = join(projectRoot, "opencode.json");
+    writeFileSync(
+      config,
+      JSON.stringify({
+        model: "project-model",
+        plugin: ["project-plugin"],
+        providers: { project: { package: "project-provider" } },
+        mcp: { projectTool: { type: "local", command: ["bad-tool"] } },
+        permissions: [{ action: "edit", resource: "*", effect: "deny" }],
+      }),
+    );
+    try {
+      const host = createOpenCodeRunner({
+        projectRoot,
+        authPath: authFile,
+        versionProbe: () => "opencode v2.0.3\n",
+      });
+      const project = tempDir("eval-sandbox-v2-config-");
+      const state = tempDir("eval-state-v2-config-");
+      host.prepareHostIntegration(sandboxFor(project, state), {
+        agent: "reviewer",
+      });
+
+      const written = JSON.parse(
+        readFileSync(join(project, "opencode.json"), "utf8"),
+      );
+      expect(written).toMatchObject({
+        $schema: "https://opencode.ai/config.json",
+        default_agent: "build",
+      });
+      expect(written.model).toBeUndefined();
+      expect(written.plugin).toBeUndefined();
+      expect(written.providers).toBeUndefined();
+      expect(written.mcp).toBeUndefined();
+      expect(written.permissions).toEqual(
+        expect.arrayContaining([
+          { action: "edit", resource: "*", effect: "allow" },
+          { action: "webfetch", resource: "*", effect: "deny" },
+          { action: "shell", resource: "rm -rf *", effect: "deny" },
+        ]),
+      );
+      expect(written.agents.build.permissions).toEqual(written.permissions);
+      expect(written.agents.reviewer.permissions).toEqual(written.permissions);
+    } finally {
+      rmSync(config, { force: true });
+    }
+  });
+
+  test("writes native agents and an isolated V1 permission policy", () => {
     writeFileSync(
       join(projectRoot, "opencode.json"),
       JSON.stringify({
@@ -82,29 +407,30 @@ describe("prepareHostIntegration", () => {
         },
       }),
     );
-    const runner = createOpenCodeRunner({ projectRoot, authPath: authFile });
+    const host = makeRunner();
     const project = tempDir("eval-sandbox-pi-");
     const state = tempDir("eval-sandbox-state-");
     for (const sub of ["config", "data", "cache"])
       mkdirSync(join(state, sub), { recursive: true });
     const sandbox = sandboxFor(project, state);
-    runner.prepareHostIntegration(sandbox, { agent: "build" });
+    host.prepareHostIntegration(sandbox, { agent: "build" });
 
     const written = JSON.parse(
       readFileSync(join(project, "opencode.json"), "utf8"),
     );
     expect(written.$schema).toBe("https://opencode.ai/config.json");
     expect(written.plugin).toBeUndefined();
-    // The agent's own policy survives unless it is a forced containment key.
-    expect(written.agent.build.permission.edit).toBe("deny");
+    // Project permission settings are not inherited by eval.
+    expect(written.agent.build.permission.edit).toBe("allow");
     // Forced denials are always present.
     expect(written.agent.build.permission.webfetch).toBe("deny");
     expect(written.agent.build.permission.external_directory).toBe("deny");
     expect(written.agent.build.permission.bash["rm -rf *"]).toBe("deny");
     expect(written.agent.build.permission.bash["*"]).toBe("allow");
+    expect(written.agent.build.permission.read["*.env"]).toBe("deny");
     expect(
       Object.keys(written.agent.build.permission.bash).slice(0, 3),
-    ).toEqual(["rm -rf *", "rm -fr *", "sudo *"]);
+    ).toEqual(["*", "rm -rf *", "rm -fr *"]);
     // The native agent and the default agent both get blocks.
     expect(written.agent.build).toBeDefined();
     // Auth injected into the redirected data dir.
@@ -133,12 +459,9 @@ describe("prepareHostIntegration", () => {
         }),
       );
       try {
-        const runner = createOpenCodeRunner({
-          projectRoot,
-          authPath: authFile,
-        });
+        const host = makeRunner();
         const project = tempDir(`eval-sandbox-nested-${filename}-`);
-        runner.prepareHostIntegration(
+        host.prepareHostIntegration(
           sandboxFor(project, tempDir(`eval-state-nested-${filename}-`)),
           {},
         );
@@ -146,10 +469,11 @@ describe("prepareHostIntegration", () => {
         const written = JSON.parse(
           readFileSync(join(project, ".opencode", filename), "utf8"),
         );
-        expect(written.model).toBe("nested-model");
-        expect(written.small_model).toBe("root-small-model");
-        expect(written.agent.nested.description).toBe("Nested agent");
-        expect(written.agent.root.description).toBe("Root agent");
+        expect(written.model).toBeUndefined();
+        expect(written.small_model).toBeUndefined();
+        expect(written.agent.nested).toBeUndefined();
+        expect(written.agent.root).toBeUndefined();
+        expect(written.agent.build).toBeDefined();
         expect(existsSync(join(project, "opencode.json"))).toBe(false);
       } finally {
         rmSync(nestedConfig, { force: true });
@@ -174,12 +498,9 @@ describe("prepareHostIntegration", () => {
       }),
     );
     try {
-      const runner = createOpenCodeRunner({
-        projectRoot,
-        authPath: authFile,
-      });
+      const host = makeRunner();
       const project = tempDir("eval-sandbox-no-mcp-");
-      runner.prepareHostIntegration(
+      host.prepareHostIntegration(
         sandboxFor(project, tempDir("eval-state-no-mcp-")),
         {},
       );
@@ -196,12 +517,9 @@ describe("prepareHostIntegration", () => {
     const config = join(projectRoot, "opencode.json");
     writeFileSync(config, JSON.stringify({}));
     try {
-      const runner = createOpenCodeRunner({
-        projectRoot,
-        authPath: authFile,
-      });
+      const host = makeRunner();
       const project = tempDir("eval-sandbox-proto-agent-");
-      runner.prepareHostIntegration(
+      host.prepareHostIntegration(
         sandboxFor(project, tempDir("eval-state-proto-agent-")),
         {
           agent: "__proto__",
@@ -222,31 +540,39 @@ describe("prepareHostIntegration", () => {
 
   test("fails closed when native outputs are unavailable", () => {
     const emptyRoot = tempDir("eval-host-empty-");
-    const runner = createOpenCodeRunner({
+    const host = createOpenCodeRunner({
       projectRoot: emptyRoot,
       authPath: authFile,
+      versionProbe: () => "opencode v1.18.29\n",
     });
     const project = tempDir("eval-sandbox-nopi-");
     expect(() =>
-      runner.prepareHostIntegration(
+      host.prepareHostIntegration(
         sandboxFor(project, tempDir("eval-sandbox-nost-")),
         {},
       ),
     ).toThrow(/ownership manifest is missing/);
   });
 
+  test("fails closed when the host version is unsupported", () => {
+    expect(() =>
+      createOpenCodeRunner({
+        projectRoot,
+        authPath: authFile,
+        versionProbe: () => "opencode v3.0.0\n",
+      }),
+    ).toThrow(/unsupported OpenCode version/);
+  });
+
   test("rejects a fixture-provided opencode.jsonc that would shadow the generated config", () => {
     const config = join(projectRoot, "opencode.json");
     writeFileSync(config, JSON.stringify({}));
     try {
-      const runner = createOpenCodeRunner({
-        projectRoot,
-        authPath: authFile,
-      });
+      const host = makeRunner();
       const project = tempDir("eval-sandbox-jsonc-");
       writeFileSync(join(project, "opencode.jsonc"), "{}\n");
       expect(() =>
-        runner.prepareHostIntegration(
+        host.prepareHostIntegration(
           sandboxFor(project, tempDir("eval-state-jsonc-")),
           {},
         ),
@@ -262,16 +588,13 @@ describe("prepareHostIntegration", () => {
       const config = join(projectRoot, "opencode.json");
       writeFileSync(config, JSON.stringify({}));
       try {
-        const runner = createOpenCodeRunner({
-          projectRoot,
-          authPath: authFile,
-        });
+        const host = makeRunner();
         const project = tempDir(`eval-sandbox-nested-config-${filename}-`);
         const nestedDirectory = join(project, ".opencode");
         mkdirSync(nestedDirectory, { recursive: true });
         writeFileSync(join(nestedDirectory, filename), "{}\n");
         expect(() =>
-          runner.prepareHostIntegration(
+          host.prepareHostIntegration(
             sandboxFor(
               project,
               tempDir(`eval-state-nested-config-${filename}-`),
@@ -291,10 +614,7 @@ describe("prepareHostIntegration", () => {
     mkdirSync(nestedDirectory, { recursive: true });
     writeFileSync(nestedConfig, '{ "model": "nested-model" }');
     try {
-      const runner = createOpenCodeRunner({
-        projectRoot,
-        authPath: authFile,
-      });
+      const host = makeRunner();
       const project = tempDir("eval-sandbox-shadowing-root-config-");
       writeFileSync(
         join(project, "opencode.json"),
@@ -308,7 +628,7 @@ describe("prepareHostIntegration", () => {
         }),
       );
       expect(() =>
-        runner.prepareHostIntegration(
+        host.prepareHostIntegration(
           sandboxFor(project, tempDir("eval-state-shadowing-root-config-")),
           {},
         ),
@@ -324,13 +644,12 @@ describe("prepareHostIntegration", () => {
     const config = join(projectRoot, "opencode.json");
     writeFileSync(config, JSON.stringify({}));
     try {
-      const runner = createOpenCodeRunner({
-        projectRoot,
+      const host = makeRunner({
         authPath: join(tempDir("eval-host-noauth-"), "auth.json"),
       });
       const project = tempDir("eval-sandbox-noauth-");
       expect(() =>
-        runner.prepareHostIntegration(
+        host.prepareHostIntegration(
           sandboxFor(project, tempDir("eval-sandbox-noauth-state-")),
           {},
         ),
@@ -340,29 +659,27 @@ describe("prepareHostIntegration", () => {
     }
   });
 
-  test("fails closed when the host configuration is malformed", () => {
+  test("ignores malformed project OpenCode configuration", () => {
     const config = join(projectRoot, "opencode.jsonc");
     writeFileSync(config, '{"agent":\n');
     try {
-      const runner = createOpenCodeRunner({
-        projectRoot,
-        authPath: authFile,
-      });
-      expect(() =>
-        runner.prepareHostIntegration(
-          sandboxFor(
-            tempDir("eval-sandbox-malformed-"),
-            tempDir("eval-state-malformed-"),
-          ),
-          {},
-        ),
-      ).toThrow(/malformed/);
+      const host = makeRunner();
+      const project = tempDir("eval-sandbox-malformed-");
+      host.prepareHostIntegration(
+        sandboxFor(project, tempDir("eval-state-malformed-")),
+        {},
+      );
+      const written = JSON.parse(
+        readFileSync(join(project, "opencode.jsonc"), "utf8"),
+      );
+      expect(written.default_agent).toBe("build");
+      expect(written.agent.build).toBeDefined();
     } finally {
       rmSync(config, { force: true });
     }
   });
 
-  test("accepts JSONC comments in an existing opencode.json", () => {
+  test("does not inherit JSONC project settings", () => {
     const config = join(projectRoot, "opencode.json");
     writeFileSync(
       config,
@@ -375,25 +692,23 @@ describe("prepareHostIntegration", () => {
 `,
     );
     try {
-      const runner = createOpenCodeRunner({
-        projectRoot,
-        authPath: authFile,
-      });
+      const host = makeRunner();
       const project = tempDir("eval-sandbox-jsonc-host-");
-      runner.prepareHostIntegration(
+      host.prepareHostIntegration(
         sandboxFor(project, tempDir("eval-state-jsonc-host-")),
         {},
       );
       const written = JSON.parse(
         readFileSync(join(project, "opencode.json"), "utf8"),
       );
-      expect(written.agent.jsonc.permission.edit).toBe("deny");
+      expect(written.agent.jsonc).toBeUndefined();
+      expect(written.agent.build).toBeDefined();
     } finally {
       rmSync(config, { force: true });
     }
   });
 
-  test("merges the configured default agent into the baseline", () => {
+  test("uses the explicit build default instead of a project default agent", () => {
     const config = join(projectRoot, "opencode.json");
     writeFileSync(
       config,
@@ -403,18 +718,16 @@ describe("prepareHostIntegration", () => {
       }),
     );
     try {
-      const runner = createOpenCodeRunner({
-        projectRoot,
-        authPath: authFile,
-      });
+      const host = makeRunner();
       const project = tempDir("eval-sandbox-default-agent-");
       const state = tempDir("eval-state-default-agent-");
-      runner.prepareHostIntegration(sandboxFor(project, state), {});
+      host.prepareHostIntegration(sandboxFor(project, state), {});
       const written = JSON.parse(
         readFileSync(join(project, "opencode.json"), "utf8"),
       );
-      expect(written.agent.custom.permission.read).toBe("deny");
-      expect(written.agent.custom.permission.webfetch).toBe("deny");
+      expect(written.default_agent).toBe("build");
+      expect(written.agent.custom).toBeUndefined();
+      expect(written.agent.build.permission.edit).toBe("allow");
     } finally {
       rmSync(config, { force: true });
     }
@@ -423,18 +736,13 @@ describe("prepareHostIntegration", () => {
 
 describe("runTrial", () => {
   test("parses the event stream for usage and model identifiers", async () => {
-    // First two events mirror the real 1.18.x stream (usage nested in `part`
-    // with a precomputed total); the third keeps the top-level shape as the
-    // defensive fallback for other host versions.
+    // The stream reports one usage object for each processing step. The
+    // runner must aggregate both steps rather than retain only the last one.
     const stub = writeStub(
       tempDir("eval-stub-happy-"),
-      `printf '%s\\n' '{"type":"session","info":{"providerID":"acme","modelID":"model-x"}}' '{"type":"session","info":{"providerID":"other","modelID":"model-y"}}' '{"type":"step_finish","part":{"type":"step-finish","tokens":{"total":350,"input":300,"output":40,"reasoning":10,"cache":{"read":0,"write":0}},"cost":0.01}}' '{"type":"step_finish","tokens":440,"cost":0.02}'`,
+      `printf '%s\\n' '{"type":"session","info":{"providerID":"acme","modelID":"model-x"}}' '{"type":"step_finish","part":{"type":"step-finish","tokens":{"input":300,"output":40,"reasoning":10,"cache":{"read":0,"write":0}},"cost":0.01}}' '{"type":"step_finish","part":{"type":"step-finish","tokens":{"input":90,"output":30,"reasoning":10,"cache":{"read":0,"write":0}},"cost":0.02}}'`,
     );
-    const runner = createOpenCodeRunner({
-      projectRoot,
-      binaryPath: stub,
-      authPath: authFile,
-    });
+    const runner = makeRunner({ binaryPath: stub });
     const project = tempDir("eval-sandbox-happy-");
     const trial = await runner.runTrial({
       sandbox: sandboxFor(project, tempDir("eval-state-happy-")),
@@ -443,12 +751,84 @@ describe("runTrial", () => {
       maxTokens: 100_000,
     });
     expect(trial.outcome).toBe("completed");
-    expect(trial.tokens).toBe(440);
-    expect(trial.cost).toBe(0.02);
+    expect(trial.tokens).toBe(480);
+    expect(trial.cost).toBe(0.03);
     expect(trial.model).toBe("acme/model-x");
     expect(trial.modelVersion).toBe("model-x");
     // Usage events were seen, so the budget was monitored.
     expect(trial.budgetUnmonitored).toBeUndefined();
+  });
+
+  test("uses the V2 standalone invocation and probes the host once", async () => {
+    const project = tempDir("eval-sandbox-v2-run-");
+    const state = tempDir("eval-state-v2-run-");
+    const capture = join(project, "captured-argv.txt");
+    const databaseCapture = join(project, "captured-database-path.txt");
+    const stub = writeStub(
+      tempDir("eval-stub-v2-run-"),
+      `printenv OPENCODE_DB > '${databaseCapture}'
+pwd > '${capture}'
+for arg do printf '%s\\n' "$arg" >> '${capture}'; done
+printf '%s\\n' '{"type":"step_finish","tokens":{"input":10,"output":20},"cost":0.03}'`,
+    );
+    let probes = 0;
+    const runner = makeRunner({
+      binaryPath: stub,
+      versionProbe: () => {
+        probes += 1;
+        return "opencode v2.0.3\n";
+      },
+    });
+    const trial = await runner.runTrial({
+      sandbox: sandboxFor(project, state),
+      prompt: "Say hi.",
+      model: "acme-v2/model-z",
+      timeoutMs: 10_000,
+      maxTokens: 100_000,
+    });
+
+    expect(probes).toBe(1);
+    expect(trial.outcome).toBe("completed");
+    expect(trial.tokens).toBe(30);
+    expect(trial.cost).toBe(0.03);
+    expect(trial.model).toBe("acme-v2/model-z");
+    expect(trial.modelVersion).toBe("model-z");
+    expect(readFileSync(capture, "utf8")).toContain("--standalone");
+    expect(readFileSync(capture, "utf8")).not.toContain("--dir");
+    expect(readFileSync(capture, "utf8")).toContain("--agent");
+    expect(readFileSync(capture, "utf8")).toContain("build");
+    expect(readFileSync(capture, "utf8")).toContain("acme-v2/model-z");
+    expect(readFileSync(capture, "utf8")).toContain("Say hi.");
+    expect(readFileSync(databaseCapture, "utf8").trim()).toBe(
+      join(state, "data", "opencode", "opencode.db"),
+    );
+  });
+
+  test("does not pass a host OPENCODE_DB override to V1 trials", async () => {
+    const project = tempDir("eval-sandbox-v1-db-env-");
+    const capture = join(project, "captured-database-path.txt");
+    const hostDatabase = join(tempDir("eval-host-v1-db-"), "opencode.db");
+    const stub = writeStub(
+      tempDir("eval-stub-v1-db-env-"),
+      `printenv OPENCODE_DB > '${capture}' || true
+printf '%s\\n' '{"type":"step_finish","tokens":{"input":1,"output":1},"cost":0}'`,
+    );
+    const runner = makeRunner({
+      binaryPath: stub,
+      baseEnv: {
+        PATH: process.env.PATH ?? "",
+        OPENCODE_DB: hostDatabase,
+      },
+    });
+    const trial = await runner.runTrial({
+      sandbox: sandboxFor(project, tempDir("eval-state-v1-db-env-")),
+      prompt: "Say hi.",
+      timeoutMs: 10_000,
+      maxTokens: 100_000,
+    });
+
+    expect(trial.outcome).toBe("completed");
+    expect(readFileSync(capture, "utf8").trim()).toBe("");
   });
 
   // Both abort tests spawn real processes whose kill path includes a 5s
@@ -460,11 +840,7 @@ describe("runTrial", () => {
       `printf '%s\\n' '{"type":"step_finish","tokens":900000,"cost":1.5}' >&1
 sleep 30`,
     );
-    const runner = createOpenCodeRunner({
-      projectRoot,
-      binaryPath: stub,
-      authPath: authFile,
-    });
+    const runner = makeRunner({ binaryPath: stub });
     const started = Date.now();
     const trial = await runner.runTrial({
       sandbox: sandboxFor(
@@ -485,11 +861,7 @@ sleep 30`,
 
   test("aborts past the timeout", async () => {
     const stub = writeStub(tempDir("eval-stub-slow-"), `sleep 30`);
-    const runner = createOpenCodeRunner({
-      projectRoot,
-      binaryPath: stub,
-      authPath: authFile,
-    });
+    const runner = makeRunner({ binaryPath: stub });
     const trial = await runner.runTrial({
       sandbox: sandboxFor(
         tempDir("eval-sandbox-slow-"),
@@ -504,11 +876,7 @@ sleep 30`,
 
   test("non-zero exit is an infra error with stderr evidence", async () => {
     const stub = writeStub(tempDir("eval-stub-fail-"), `echo boom >&2; exit 3`);
-    const runner = createOpenCodeRunner({
-      projectRoot,
-      binaryPath: stub,
-      authPath: authFile,
-    });
+    const runner = makeRunner({ binaryPath: stub });
     const trial = await runner.runTrial({
       sandbox: sandboxFor(
         tempDir("eval-sandbox-fail-"),
@@ -522,7 +890,7 @@ sleep 30`,
     expect(trial.error).toContain("boom");
   });
 
-  test("isolates XDG dirs, injects auth, and targets the sandbox via --dir", async () => {
+  test("isolates XDG dirs, injects auth, and runs from the sandbox cwd", async () => {
     const state = tempDir("eval-state-env-");
     mkdirSync(join(state, "data", "opencode"), { recursive: true });
     writeFileSync(join(state, "data", "opencode", "auth.json"), "{}");
@@ -531,8 +899,10 @@ sleep 30`,
     const stub = writeStub(
       tempDir("eval-stub-env-"),
       `printenv XDG_CONFIG_HOME > '${capture}'
-printenv XDG_DATA_HOME >> '${capture}'
+    printenv XDG_DATA_HOME >> '${capture}'
 printenv XDG_CACHE_HOME >> '${capture}'
+printenv XDG_STATE_HOME >> '${capture}'
+printenv HOME >> '${capture}'
 printenv PATH >> '${capture}'
 printenv EVAL_SECRET_MARKER >> '${capture}' || true
 printenv HTTPS_PROXY >> '${capture}' || true
@@ -542,10 +912,8 @@ for arg do printf '%s\\n' "$arg" >> '${capture}'; done
 test -f "$XDG_DATA_HOME/opencode/auth.json" || exit 9
 exit 0`,
     );
-    const runner = createOpenCodeRunner({
-      projectRoot,
+    const runner = makeRunner({
       binaryPath: stub,
-      authPath: authFile,
       // PATH and NO_PROXY are on the allowlist verbatim; other host
       // variables must stay with the host or arrive sanitized only.
       baseEnv: {
@@ -570,6 +938,10 @@ exit 0`,
     expect(captured).toContain(join(state, "config"));
     expect(captured).toContain(join(state, "data"));
     expect(captured).toContain(join(state, "cache"));
+    expect(captured).toContain(state);
+    const capturedLines = captured.split("\n");
+    expect(capturedLines[4]).toBe(join(state, "home"));
+    expect(capturedLines[4]).not.toBe(process.env.HOME);
     // Allowlisted vars reach the child; everything else stays with the host.
     const firstPathDir = (process.env.PATH ?? "").split(":")[0] ?? "";
     expect(firstPathDir).not.toBe("");
@@ -582,19 +954,16 @@ exit 0`,
     expect(captured).toContain("localhost,127.0.0.1,.internal.example.com");
     // The scheme-less proxy value is dropped entirely, credentials included.
     expect(captured).not.toContain("proxy.example.test");
-    // The host is pointed at the sandbox via --dir and receives the prompt.
-    expect(captured).toContain("--dir");
-    expect(captured).toContain(project);
+    // The child cwd points at the sandbox; it is not passed as a
+    // V1-incompatible command-line flag.
+    expect(captured).not.toContain("--dir");
+    expect(captured).not.toContain("--standalone");
     expect(captured).toContain("the prompt");
   });
 
   test("flags budget-unmonitored when the host emits no usage events", async () => {
     const stub = writeStub(tempDir("eval-stub-silent-"), `echo done`);
-    const runner = createOpenCodeRunner({
-      projectRoot,
-      binaryPath: stub,
-      authPath: authFile,
-    });
+    const runner = makeRunner({ binaryPath: stub });
     const trial = await runner.runTrial({
       sandbox: sandboxFor(
         tempDir("eval-sandbox-silent-"),
@@ -629,62 +998,91 @@ describe("event helpers", () => {
     expect(
       extractModelIdentifiers({ message: { providerID: "p", modelID: "m" } }),
     ).toEqual({ provider: "p", model: "m" });
+    expect(
+      extractModelIdentifiers({
+        type: "session.updated",
+        properties: {
+          info: {
+            model: { providerID: "nested-provider", id: "nested-model" },
+          },
+        },
+      }),
+    ).toEqual({ provider: "nested-provider", model: "nested-model" });
     expect(extractModelIdentifiers({ type: "step_finish" })).toBeUndefined();
   });
 });
 
-describe("mergePermissionBaseline", () => {
-  test("keeps agent policy except forced containment denials", () => {
-    const merged = mergePermissionBaseline({
-      edit: "ask",
-      bash: { "git push *": "deny" },
+describe("SQLite runtime compatibility", () => {
+  test("selects the Node SQLite flag for supported experimental releases", () => {
+    expect(sqliteRuntimeArguments("22.4.0")).toEqual({
+      supported: false,
+      args: [],
     });
-    expect(merged.edit).toBe("ask");
-    expect(merged.webfetch).toBe("deny");
-    expect(merged.websearch).toBe("deny");
-    expect(merged.external_directory).toBe("deny");
-    for (const permission of [
-      "read",
-      "glob",
-      "grep",
-      "list",
-      "task",
-      "skill",
-      "lsp",
-      "question",
-      "todowrite",
-      "doom_loop",
-    ]) {
-      expect(merged[permission]).toBe("allow");
-    }
-    expect(merged.bash).toEqual({
+    expect(sqliteRuntimeArguments("22.12.0")).toEqual({
+      supported: true,
+      args: ["--experimental-sqlite"],
+    });
+    expect(sqliteRuntimeArguments("22.13.0")).toEqual({
+      supported: true,
+      args: [],
+    });
+    expect(sqliteRuntimeArguments("23.3.0")).toEqual({
+      supported: true,
+      args: ["--experimental-sqlite"],
+    });
+    expect(sqliteRuntimeArguments("23.4.0")).toEqual({
+      supported: true,
+      args: [],
+    });
+    expect(sqliteRuntimeArguments("24.0.0")).toEqual({
+      supported: true,
+      args: [],
+    });
+  });
+});
+
+describe("createEvalPermissionPolicy", () => {
+  test("creates the current containment policy in V1 shape", () => {
+    const policy = createEvalPermissionPolicy("v1") as Record<string, unknown>;
+    expect(policy.edit).toBe("allow");
+    expect(policy.read).toEqual({
       "*": "allow",
-      "git push *": "deny",
+      "*.env": "deny",
+      "*.env.*": "deny",
+      "*.env.example": "allow",
+    });
+    expect(policy.task).toBe("allow");
+    expect(policy.webfetch).toBe("deny");
+    expect(policy.websearch).toBe("deny");
+    expect(policy.external_directory).toBe("deny");
+    expect(policy.bash).toEqual({
+      "*": "allow",
       "rm -rf *": "deny",
       "rm -fr *": "deny",
       "sudo *": "deny",
     });
   });
 
-  test("preserves scalar Bash policies while adding forced denials", () => {
-    expect(mergePermissionBaseline({ bash: "deny" }).bash).toEqual({
-      "*": "deny",
-      "rm -rf *": "deny",
-      "rm -fr *": "deny",
-      "sudo *": "deny",
-    });
-  });
-
-  test("preserves restrictive scalar permissions while adding denials", () => {
-    const merged = mergePermissionBaseline("deny");
-    expect(merged.read).toBe("deny");
-    expect(merged.edit).toBe("deny");
-    expect(Object.keys(merged).filter((key) => /^\d+$/.test(key))).toEqual([]);
-    expect(merged.bash).toEqual({
-      "rm -rf *": "deny",
-      "rm -fr *": "deny",
-      "sudo *": "deny",
-      "*": "deny",
-    });
+  test("creates the current containment policy in V2 shape", () => {
+    const policy = createEvalPermissionPolicy("v2") as Record<
+      string,
+      unknown
+    >[];
+    expect(policy).toEqual(
+      expect.arrayContaining([
+        { action: "edit", resource: "*", effect: "allow" },
+        { action: "read", resource: "*.env", effect: "deny" },
+        { action: "subagent", resource: "*", effect: "allow" },
+        { action: "shell", resource: "*", effect: "allow" },
+        { action: "webfetch", resource: "*", effect: "deny" },
+        { action: "websearch", resource: "*", effect: "deny" },
+        { action: "external_directory", resource: "*", effect: "deny" },
+        { action: "shell", resource: "rm -rf *", effect: "deny" },
+        { action: "shell", resource: "rm -fr *", effect: "deny" },
+        { action: "shell", resource: "sudo *", effect: "deny" },
+      ]),
+    );
+    expect(policy.some((rule) => rule.action === "bash")).toBe(false);
+    expect(policy.some((rule) => rule.action === "task")).toBe(false);
   });
 });

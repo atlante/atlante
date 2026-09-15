@@ -1,6 +1,11 @@
 import { join } from "node:path";
 import { openCodeConfigPaths } from "@atlante/opencode/config";
 import {
+  createOpenCodeMcpServer,
+  type OpenCodeDialect,
+  openCodeMcpPath,
+} from "@atlante/opencode/dialect";
+import {
   applyEdits,
   modify,
   type ParseError,
@@ -11,12 +16,12 @@ import packageJson from "../../package.json" with { type: "json" };
 import { formatInitError } from "./init-error.js";
 
 const ATLANTE_MCP_SERVER_ID = "atlante" as const;
-
-const ATLANTE_MCP_SERVER = {
-  type: "local",
-  command: ["npx", "--yes", `atlante@${packageJson.version}`, "mcp"],
-  enabled: true,
-} as const;
+const ATLANTE_MCP_COMMAND = [
+  "npx",
+  "--yes",
+  `atlante@${packageJson.version}`,
+  "mcp",
+] as const;
 
 export type OpenCodeMcpFileSystem = Readonly<{
   existsSync: (path: string) => boolean;
@@ -74,48 +79,79 @@ function positiveSafeInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
 }
 
-function isOAuthConfig(value: unknown): boolean {
+function isOAuthConfig(value: unknown, dialect: OpenCodeDialect): boolean {
   if (value === false) return true;
   if (!isObject(value)) return false;
+  const callbackField = dialect === "v1" ? "callbackPort" : "callback_port";
+  const stringFields =
+    dialect === "v1"
+      ? ["clientId", "clientSecret", "scope", "redirectUri"]
+      : ["client_id", "client_secret", "scope", "redirect_uri"];
+  if (!onlyAllowedKeys(value, [...stringFields, callbackField])) return false;
+  if (!optionalStringFields(value, stringFields)) return false;
   if (
-    !onlyAllowedKeys(value, [
-      "clientId",
-      "clientSecret",
-      "scope",
-      "callbackPort",
-      "redirectUri",
-    ])
+    value[callbackField] !== undefined &&
+    (!positiveSafeInteger(value[callbackField]) || value[callbackField] > 65535)
   )
     return false;
-  if (
-    !optionalStringFields(value, [
-      "clientId",
-      "clientSecret",
-      "scope",
-      "redirectUri",
-    ])
-  )
-    return false;
-  return (
-    value.callbackPort === undefined ||
-    (positiveSafeInteger(value.callbackPort) && value.callbackPort <= 65535)
-  );
+  return true;
+}
+
+function timeoutError(
+  value: unknown,
+  dialect: OpenCodeDialect,
+): string | undefined {
+  if (dialect === "v1") {
+    if (value !== undefined && !positiveSafeInteger(value))
+      return 'the "timeout" field must be a positive safe integer';
+    return undefined;
+  }
+  if (!isObject(value))
+    return 'the "timeout" field must be a positive safe integer or an object of positive safe integers';
+  if (!onlyAllowedKeys(value, ["startup", "catalog", "execution"]))
+    return 'the "timeout" object contains an unknown field';
+  for (const field of ["startup", "catalog", "execution"]) {
+    if (value[field] !== undefined && !positiveSafeInteger(value[field]))
+      return `the "timeout.${field}" field must be a positive safe integer`;
+  }
+  return undefined;
+}
+
+function protocolError(value: unknown): string | undefined {
+  return value === undefined ||
+    value === "legacy" ||
+    value === "auto" ||
+    value === "2026-07-28"
+    ? undefined
+    : 'the "protocol" field must be "legacy", "auto", or "2026-07-28"';
 }
 
 function commonMcpEntryError(
   value: Record<string, unknown>,
+  dialect: OpenCodeDialect,
 ): string | undefined {
-  if (value.enabled !== undefined && typeof value.enabled !== "boolean")
-    return 'the "enabled" field must be a boolean';
-  if (value.timeout !== undefined && !positiveSafeInteger(value.timeout))
-    return 'the "timeout" field must be a positive safe integer';
+  if (dialect === "v1") {
+    if (value.enabled !== undefined && typeof value.enabled !== "boolean")
+      return 'the "enabled" field must be a boolean';
+    if (value.timeout !== undefined)
+      return timeoutError(value.timeout, dialect);
+    return undefined;
+  }
+  if (value.disabled !== undefined && typeof value.disabled !== "boolean")
+    return 'the "disabled" field must be a boolean';
+  if (value.codemode !== undefined && typeof value.codemode !== "boolean")
+    return 'the "codemode" field must be a boolean';
+  const protocolCause = protocolError(value.protocol);
+  if (protocolCause !== undefined) return protocolCause;
+  if (value.timeout !== undefined) return timeoutError(value.timeout, dialect);
   return undefined;
 }
 
 function localMcpEntryError(
   value: Record<string, unknown>,
+  dialect: OpenCodeDialect,
 ): string | undefined {
-  const commonError = commonMcpEntryError(value);
+  const commonError = commonMcpEntryError(value, dialect);
   if (commonError !== undefined) return commonError;
   if (!isStringArray(value.command))
     return 'a local server requires a string "command" array';
@@ -128,40 +164,70 @@ function localMcpEntryError(
 
 function remoteMcpEntryError(
   value: Record<string, unknown>,
+  dialect: OpenCodeDialect,
 ): string | undefined {
-  const commonError = commonMcpEntryError(value);
+  const commonError = commonMcpEntryError(value, dialect);
   if (commonError !== undefined) return commonError;
   if (typeof value.url !== "string")
     return 'a remote server requires a string "url"';
   if (value.headers !== undefined && !isStringMap(value.headers))
     return 'the "headers" field must be an object of strings';
-  if (value.oauth !== undefined && !isOAuthConfig(value.oauth))
+  if (value.oauth !== undefined && !isOAuthConfig(value.oauth, dialect))
     return 'the "oauth" field has an invalid shape';
   return undefined;
 }
 
-function isEnabledOnlyMcpEntry(value: Record<string, unknown>): boolean {
-  return Object.keys(value).length === 1 && Object.hasOwn(value, "enabled");
+function isEnabledOnlyMcpEntry(
+  value: Record<string, unknown>,
+  dialect: OpenCodeDialect,
+): boolean {
+  const key = dialect === "v1" ? "enabled" : "disabled";
+  return Object.keys(value).length === 1 && Object.hasOwn(value, key);
 }
 
 function enabledOnlyMcpEntryError(
   value: Record<string, unknown>,
+  dialect: OpenCodeDialect,
 ): string | undefined {
-  return typeof value.enabled === "boolean"
+  const key = dialect === "v1" ? "enabled" : "disabled";
+  return typeof value[key] === "boolean"
     ? undefined
-    : 'the "enabled" field must be a boolean';
+    : `the "${key}" field must be a boolean`;
 }
 
 function mcpObjectEntryError(
   value: Record<string, unknown>,
+  dialect: OpenCodeDialect,
 ): string | undefined {
   if (value.type !== "local" && value.type !== "remote")
     return 'the "type" field must be "local" or "remote"';
 
   const allowedKeys =
-    value.type === "local"
-      ? ["type", "command", "cwd", "environment", "enabled", "timeout"]
-      : ["type", "url", "enabled", "headers", "oauth", "timeout"];
+    dialect === "v1"
+      ? value.type === "local"
+        ? ["type", "command", "cwd", "environment", "enabled", "timeout"]
+        : ["type", "url", "enabled", "headers", "oauth", "timeout"]
+      : value.type === "local"
+        ? [
+            "type",
+            "command",
+            "cwd",
+            "environment",
+            "disabled",
+            "codemode",
+            "protocol",
+            "timeout",
+          ]
+        : [
+            "type",
+            "url",
+            "disabled",
+            "headers",
+            "oauth",
+            "codemode",
+            "protocol",
+            "timeout",
+          ];
   const unknownKey = Object.keys(value).find(
     (key) => !allowedKeys.includes(key),
   );
@@ -169,22 +235,75 @@ function mcpObjectEntryError(
     return `the "${unknownKey}" field is not valid for a ${value.type} server`;
 
   return value.type === "local"
-    ? localMcpEntryError(value)
-    : remoteMcpEntryError(value);
+    ? localMcpEntryError(value, dialect)
+    : remoteMcpEntryError(value, dialect);
 }
 
-function mcpEntryError(value: unknown): string | undefined {
+function mcpEntryError(
+  value: unknown,
+  dialect: OpenCodeDialect,
+): string | undefined {
   if (!isObject(value)) return "the server entry must be an object";
-  if (isEnabledOnlyMcpEntry(value)) return enabledOnlyMcpEntryError(value);
-  return mcpObjectEntryError(value);
+  if (isEnabledOnlyMcpEntry(value, dialect))
+    return enabledOnlyMcpEntryError(value, dialect);
+  return mcpObjectEntryError(value, dialect);
 }
 
+function firstInvalidMcpServer(
+  servers: Record<string, unknown>,
+): { id: string; cause: string } | undefined {
+  for (const [id, value] of Object.entries(servers)) {
+    const cause = mcpEntryError(value, "v2");
+    if (cause !== undefined) return { id, cause };
+  }
+  return undefined;
+}
+
+/**
+ * Validates the host's `mcp` object under the selected dialect. In V2 the
+ * `servers` map and top-level `timeout` settings are V2 containers, and every
+ * other entry is a preserved legacy V1 server. In V1 those names are ordinary
+ * server names, so entries are read as V1 servers first and a V2 map or
+ * settings block from the other dialect remains preservable.
+ */
 function firstInvalidMcpEntry(
   mcp: Record<string, unknown> | undefined,
+  dialect: OpenCodeDialect,
 ): { id: string; cause: string } | undefined {
   for (const [id, value] of Object.entries(mcp ?? {})) {
-    const cause = mcpEntryError(value);
-    if (cause !== undefined) return { id, cause };
+    if (dialect === "v2") {
+      if (id === "servers") {
+        if (!isObject(value))
+          return {
+            id,
+            cause: 'the "servers" field must be an object of server entries',
+          };
+        const invalidServer = firstInvalidMcpServer(value);
+        if (invalidServer !== undefined)
+          return {
+            id: `servers.${invalidServer.id}`,
+            cause: invalidServer.cause,
+          };
+        continue;
+      }
+      if (id === "timeout") {
+        const cause = timeoutError(value, "v2");
+        if (cause !== undefined) return { id, cause };
+        continue;
+      }
+      const cause = mcpEntryError(value, "v1");
+      if (cause !== undefined) return { id, cause };
+      continue;
+    }
+
+    const legacyCause = mcpEntryError(value, "v1");
+    if (legacyCause === undefined) continue;
+    if (id === "servers" && isObject(value)) {
+      if (firstInvalidMcpServer(value) === undefined) continue;
+    } else if (id === "timeout" && timeoutError(value, "v2") === undefined) {
+      continue;
+    }
+    return { id, cause: legacyCause };
   }
   return undefined;
 }
@@ -238,23 +357,58 @@ function invalidConfiguration(
 function sameCommand(value: unknown): boolean {
   return (
     Array.isArray(value) &&
-    value.length === ATLANTE_MCP_SERVER.command.length &&
-    value.every((part, index) => part === ATLANTE_MCP_SERVER.command[index])
+    value.length === ATLANTE_MCP_COMMAND.length &&
+    value.every((part, index) => part === ATLANTE_MCP_COMMAND[index])
   );
 }
 
-function isRegisteredMcp(value: unknown): boolean {
+function isRegisteredMcp(value: unknown, dialect: OpenCodeDialect): boolean {
+  const descriptor =
+    dialect === "v1"
+      ? { key: "enabled", value: true, opposite: "disabled" }
+      : { key: "disabled", value: false, opposite: "enabled" };
   return (
     isObject(value) &&
-    value.type === ATLANTE_MCP_SERVER.type &&
+    value.type === "local" &&
     sameCommand(value.command) &&
-    (value.enabled === undefined || value.enabled === true)
+    (value[descriptor.key] === undefined ||
+      value[descriptor.key] === descriptor.value) &&
+    value[descriptor.opposite] === undefined
+  );
+}
+
+function valueAtPath(
+  value: Record<string, unknown>,
+  path: readonly string[],
+): unknown {
+  let current: unknown = value;
+  for (const part of path) {
+    if (!isObject(current)) return undefined;
+    current = current[part];
+  }
+  return current;
+}
+
+function mcpPathLabel(path: readonly string[]): string {
+  return path.join(".");
+}
+
+function conflictingManagedEntry(
+  path: string,
+  mcpPath: readonly string[],
+): { error: string } {
+  const label = mcpPathLabel(mcpPath);
+  return invalidConfiguration(
+    path,
+    `the "${label}" entry conflicts with Atlante's managed server command`,
+    `"${label}" must be a local server using the version-pinned Atlante command`,
   );
 }
 
 function parseConfiguration(
   path: string,
   text: string,
+  dialect: OpenCodeDialect,
 ): { value: Record<string, unknown> } | { error: string } {
   const errors: ParseError[] = [];
   const parsed = parse(text, errors, {
@@ -285,7 +439,7 @@ function parseConfiguration(
   }
 
   const mcp = parsed.mcp as Record<string, unknown> | undefined;
-  const invalidEntry = firstInvalidMcpEntry(mcp);
+  const invalidEntry = firstInvalidMcpEntry(mcp, dialect);
   if (invalidEntry) {
     return invalidConfiguration(
       path,
@@ -294,14 +448,10 @@ function parseConfiguration(
     );
   }
 
-  const existing = mcp?.[ATLANTE_MCP_SERVER_ID];
-  if (existing !== undefined && !isRegisteredMcp(existing)) {
-    return invalidConfiguration(
-      path,
-      `the "mcp.${ATLANTE_MCP_SERVER_ID}" entry conflicts with Atlante's managed server command`,
-      `"mcp.${ATLANTE_MCP_SERVER_ID}" must be a local server using the version-pinned Atlante command`,
-    );
-  }
+  const managedPath = openCodeMcpPath(dialect, ATLANTE_MCP_SERVER_ID);
+  const existing = valueAtPath(parsed, managedPath);
+  if (existing !== undefined && !isRegisteredMcp(existing, dialect))
+    return conflictingManagedEntry(path, managedPath);
   return { value: parsed };
 }
 
@@ -324,7 +474,9 @@ function newConfiguration(): string {
 export function prepareOpenCodeMcp(
   directory: string,
   fileSystem: OpenCodeMcpFileSystem,
+  dialect: OpenCodeDialect = "v2",
 ): OpenCodeMcpPlan | { error: string } {
+  const managedPath = openCodeMcpPath(dialect, ATLANTE_MCP_SERVER_ID);
   const configurations: {
     path: string;
     previous: OpenCodeMcpSnapshot;
@@ -334,7 +486,7 @@ export function prepareOpenCodeMcp(
   for (const path of existingOpenCodeConfigPaths(directory, fileSystem)) {
     const previous = snapshot(path, fileSystem);
     const contents = previous.contents ?? "";
-    const parsedResult = parseConfiguration(path, contents);
+    const parsedResult = parseConfiguration(path, contents, dialect);
     if ("error" in parsedResult) return parsedResult;
     configurations.push({
       path,
@@ -345,11 +497,7 @@ export function prepareOpenCodeMcp(
   }
 
   const target = configurations[0];
-  if (
-    target &&
-    isObject(target.value.mcp) &&
-    target.value.mcp[ATLANTE_MCP_SERVER_ID] !== undefined
-  ) {
+  if (target && valueAtPath(target.value, managedPath) !== undefined) {
     return {
       path: target.path,
       previous: target.previous,
@@ -364,8 +512,8 @@ export function prepareOpenCodeMcp(
   const text = target?.contents ?? newConfiguration();
   const edits = modify(
     text,
-    ["mcp", ATLANTE_MCP_SERVER_ID],
-    ATLANTE_MCP_SERVER,
+    [...managedPath],
+    createOpenCodeMcpServer(dialect, ATLANTE_MCP_COMMAND),
     { formattingOptions: FORMATTING_OPTIONS },
   );
   return {

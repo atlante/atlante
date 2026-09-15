@@ -65,7 +65,10 @@ package contents.
 
 The checks are organized in lanes, and each lane is one npm command, so the
 same command gates a change locally and in CI. Run the lane that matches the
-area you touched; run `full:check` before opening a change that spans areas:
+area you touched. The lanes are additive — `full:check` is exactly
+`core:check` plus the three site lanes — so once `core:check` has passed,
+verify the remaining lanes individually instead of re-running it; reserve
+`full:check` for work with no lane coverage yet or release-level verification:
 
 ```sh
 bun run quick:check    # type:check + lint:check + test:unit; fast inner loop
@@ -99,9 +102,11 @@ Tests run on `bun:test` and live next to the code they test:
   outside these trees.
 
 The OpenCode host smoke inside `core:check` (`bun scripts/opencode-smoke.ts`)
-is load-bearing: unit tests cover the materializer against synthetic fixtures,
-so the smoke is the only automated check of the real pack → build →
-materialize → host discovery flow and must never be downgraded to a manual
+is load-bearing — it downloads both pinned hosts (V1 and V2) and is the
+slowest part of the lane — and unit tests cover the materializer against
+synthetic fixtures, so the smoke is the only automated check of the real
+pack → build → materialize → host discovery flow and must never be downgraded
+to a manual
 step.
 
 ## Architecture constraints

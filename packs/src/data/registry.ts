@@ -101,9 +101,9 @@ function assertSnapshot(value: unknown): RegistrySnapshot {
 }
 
 /**
- * Reads the registry snapshot. sync-packs regenerates it at build time and
- * uses the committed copy as the network fallback; the pack pages consume it
- * as their build-time source. Never edit it directly.
+ * Reads the committed registry snapshot. The explicit sync:packs refresh
+ * replaces it before deployment, while local builds and checks consume it as
+ * their build-time source. Never edit it directly.
  */
 export function loadRegistrySnapshot(websiteRoot: string): RegistrySnapshot {
   const path = join(websiteRoot, SNAPSHOT_PATH);

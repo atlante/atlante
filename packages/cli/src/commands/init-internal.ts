@@ -7,6 +7,14 @@ import {
   type ProjectContext,
 } from "@atlante/builder";
 import { openCodeMaterializer } from "@atlante/opencode";
+import {
+  detectOpenCode,
+  type OpenCodeDialect,
+  OpenCodeVersionError,
+  type OpenCodeVersionProbe,
+  parseOpenCodeVersion,
+  resolveOpenCodeDialect,
+} from "@atlante/opencode/dialect";
 import { SCHEMA_URI } from "@atlante/schema";
 import { hasErrors, validateDocumentText } from "@atlante/validator";
 import {
@@ -45,6 +53,7 @@ export type InitOptions = {
   pack?: string;
   force?: boolean;
   noMcp?: boolean;
+  opencodeVersion?: string;
 };
 
 type InitFileSystem = PackFileSystem;
@@ -62,11 +71,62 @@ export type InitDependencies = Partial<InitFileSystem> & {
   runPackageManager?: PackageManagerRunner;
   isInteractive?: () => boolean;
   prompt?: (query: string) => Promise<string>;
+  opencodeBinary?: string;
+  opencodeVersionProbe?: OpenCodeVersionProbe;
 };
 
 const defaultFileSystem: InitFileSystem = defaultPackFileSystem;
 
 const defaultIsInteractive = (): boolean => Boolean(process.stdin.isTTY);
+const OPENCODE_BINARY = "opencode";
+const SUPPORTED_OPENCODE_VERSIONS = "V1 >=1.18.29 <2.0.0 or V2 >=2.0.0 <3.0.0";
+
+function selectOpenCodeDialect(
+  options: InitOptions,
+  dependencies: Pick<
+    InitDependencies,
+    "opencodeBinary" | "opencodeVersionProbe"
+  >,
+): OpenCodeDialect | { error: string } {
+  try {
+    if (options.opencodeVersion !== undefined)
+      return resolveOpenCodeDialect(
+        parseOpenCodeVersion(options.opencodeVersion),
+      );
+    return detectOpenCode(
+      dependencies.opencodeBinary ?? OPENCODE_BINARY,
+      dependencies.opencodeVersionProbe,
+    ).dialect;
+  } catch (cause) {
+    if (
+      options.opencodeVersion === undefined &&
+      cause instanceof OpenCodeVersionError &&
+      cause.code === "binary-unavailable"
+    )
+      return "v2";
+
+    const versionError =
+      cause instanceof OpenCodeVersionError ? cause : undefined;
+    return {
+      error: formatInitError(
+        versionError?.code === "unsupported-version"
+          ? "unsupported-opencode-version"
+          : "invalid-opencode-version",
+        "could not select an OpenCode configuration dialect",
+        {
+          expected: SUPPORTED_OPENCODE_VERSIONS,
+          next:
+            options.opencodeVersion === undefined
+              ? "install a supported OpenCode version or pass --opencode-version <version>"
+              : "pass a supported semantic version to --opencode-version",
+          cause:
+            versionError?.message ??
+            (cause instanceof Error ? cause.message : String(cause)),
+        },
+      ),
+    };
+  }
+}
 
 async function defaultPrompt(query: string): Promise<string> {
   const readline = createInterface({
@@ -371,6 +431,7 @@ type InitFlow = Readonly<{
   target: string;
   alternate: string;
   gitignore: string;
+  dialect: OpenCodeDialect;
   fileSystem: InitFileSystem;
   context: ProjectContext;
   runPackageManager: PackageManagerRunner;
@@ -451,7 +512,11 @@ function commitConfiguration(
   };
   let mcp: OpenCodeMcpPlan | undefined;
   if (!options.noMcp) {
-    const prepared = prepareOpenCodeMcp(flow.directory, flow.fileSystem);
+    const prepared = prepareOpenCodeMcp(
+      flow.directory,
+      flow.fileSystem,
+      flow.dialect,
+    );
     if ("error" in prepared) return abort(prepared.error);
     mcp = prepared;
   }
@@ -467,6 +532,12 @@ export async function runInitWithDependencies(
   options: InitOptions,
   dependencies: InitDependencies = {},
 ): Promise<number> {
+  const selectedDialect = selectOpenCodeDialect(options, dependencies);
+  if (typeof selectedDialect !== "string") {
+    console.error(selectedDialect.error);
+    return 1;
+  }
+
   const fileSystem: InitFileSystem = {
     ...defaultFileSystem,
     ...dependencies,
@@ -476,6 +547,7 @@ export async function runInitWithDependencies(
     target: join(directory, "atlante.jsonc"),
     alternate: join(directory, "atlante.json"),
     gitignore: join(directory, ".gitignore"),
+    dialect: selectedDialect,
     fileSystem,
     context: dependencies.context ?? {},
     runPackageManager:

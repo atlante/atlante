@@ -13,7 +13,7 @@ test("smoke test exercises the installed static pack and global-style CLI", () =
   expect(smoke).not.toContain('node_modules", "@atlante", "cli"');
   expect(smoke).toContain("node_modules");
   expect(smoke).toContain('Bun.file(join(project, "opencode.jsonc")).exists()');
-  expect(smoke).toContain('mcp?.atlante?.type === "local"');
+  expect(smoke).toContain('mcp?.servers?.atlante?.type === "local"');
   expect(smoke).toContain('"mcp"');
   expect(smoke).toContain("--no-mcp");
   expect(smoke).toContain("opencode-native.json");

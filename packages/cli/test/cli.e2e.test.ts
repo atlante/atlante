@@ -147,6 +147,39 @@ test("the built launcher honors init --no-mcp", () => {
   expect(existsSync(join(dir, "opencode.json"))).toBe(false);
 });
 
+test("the built launcher honors init --opencode-version", () => {
+  const dir = projectWithoutUserPack(`{
+    "$schema": "${SCHEMA_URI}",
+    "extends": "@atlante/pack"
+  }`);
+  rmSync(join(dir, "atlante.jsonc"));
+  const executableDir = join(dir, "path");
+  mkdirSync(executableDir);
+  symlinkSync(nodeExecutable(), join(executableDir, "node"));
+
+  const result = spawnSync(
+    LAUNCHER,
+    ["init", dir, "--opencode-version", "1.18.29"],
+    {
+      cwd: dir,
+      encoding: "utf8",
+      env: { ...process.env, PATH: executableDir },
+    },
+  );
+
+  expect(result.status).toBe(0);
+  const config = JSON.parse(
+    readFileSync(join(dir, "opencode.jsonc"), "utf8"),
+  ) as {
+    mcp?: {
+      atlante?: { enabled?: boolean };
+      servers?: Record<string, unknown>;
+    };
+  };
+  expect(config.mcp?.atlante?.enabled).toBe(true);
+  expect(config.mcp?.servers).toBeUndefined();
+});
+
 test("the built launcher builds a project under Node", () => {
   const dir = project(valid);
   const executableDir = join(dir, "path");
@@ -431,4 +464,14 @@ test("init exposes the --no-mcp opt-out", () => {
   );
 
   expect(init?.options.map((option) => option.long)).toContain("--no-mcp");
+});
+
+test("init exposes the OpenCode version override", () => {
+  const init = createProgram().commands.find(
+    (command) => command.name() === "init",
+  );
+
+  expect(init?.options.map((option) => option.long)).toContain(
+    "--opencode-version",
+  );
 });

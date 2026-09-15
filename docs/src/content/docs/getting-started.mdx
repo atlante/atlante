@@ -7,7 +7,7 @@ import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 
 ## Prerequisites
 
-You need [Node.js](https://nodejs.org/) 22 or later and
+You need [Node.js](https://nodejs.org/) 22.5 or later and
 [OpenCode](https://opencode.ai/docs/). Open a terminal in the project directory
 where you want to keep your harness configuration.
 
@@ -100,8 +100,8 @@ The files have different roles:
   author in version control.
 - `opencode.jsonc` is the default host configuration created by `init` when no
   OpenCode configuration exists. If an OpenCode configuration already exists,
-  `init` updates the first file in its precedence order; the `mcp.atlante` entry
-  is managed there alongside host settings.
+  `init` updates the first file in its precedence order; the Atlante MCP entry
+  for the detected host dialect is managed there alongside host settings.
 - `.opencode/agents/atlante.md` and the skill files are native output. Open
   the agent file to inspect what the build produced, but make changes in the
   source configuration or its resources.

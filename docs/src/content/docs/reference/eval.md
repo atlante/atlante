@@ -30,7 +30,7 @@ A run needs all of the following:
 | Scenario documents | The files matched by the local `scenarios` glob and any explicitly included pack suites |
 | Verified native outputs | A prior `atlante build` |
 | OpenCode on `PATH` | The installed `opencode` executable |
-| Stored provider credentials | OpenCode's `auth.json`; shell API-key variables alone are insufficient |
+| Stored provider credentials | OpenCode's stored authentication — `auth.json`, plus the credentials database on V2 hosts; shell API-key variables alone are insufficient |
 | Git on `PATH` | Used to establish the trial's baseline snapshot |
 | Setup and check executables | Tools invoked by the scenario, such as Bun for `bun test` |
 
@@ -85,6 +85,25 @@ reached through the project's resource graph. Installed packages that are not
 selected are unavailable to `eval.include`; an include with no pack suite is a
 validation error. The `--scenario` option filters the local and included suites
 after discovery. It does not opt a pack suite in by itself.
+
+## Host versions
+
+Eval probes `opencode --version` once per run and supports OpenCode V1
+(`>=1.18.29 <2.0.0`) and V2 (`>=2.0.0 <3.0.0`); any other version fails with a
+diagnostic before any trial. The dialect decides the sandbox configuration's
+field names (V1 `agent`, `permission`, `bash`, and `task`; V2 `agents`,
+`permissions`, `shell`, and `subagent`), the containment-policy shape, and the
+invocation: V2 runs with `--standalone` from the sandbox working directory.
+
+Credentials come from the host's own stored authentication: `auth.json` for
+V1, and for V2 the credential tables of its SQLite database alongside
+`auth.json`. Only credentials and migration bookkeeping are copied; session
+history never reaches the trial sandbox.
+
+The trial's OpenCode configuration is authored fresh for every trial, so
+`eval.model` plus the host's stored authentication is the supported provider
+path. An isolated sandbox has no global OpenCode configuration, which also
+means a V2 host has no default model to fall back to.
 
 ### Pack-owned suites
 
@@ -218,13 +237,14 @@ contain an OpenCode config only at the exact project-relative path that the
 host runner will overwrite; every other supported config path is rejected
 because OpenCode would merge it as an additional layer. For example, a
 fixture root `opencode.json` is rejected when the selected project config is
-`.opencode/opencode.jsonc`. The host runner uses the same configuration
-precedence and recursive project-layer merge as OpenCode, then writes the
-generated host config at the selected project-relative path in the sandbox.
-Project MCP servers are omitted from the eval configuration so a disposable
-fixture cannot launch commands from the project or developer environment. A
-fixture file that collides with a verified native output fails the trial with a
-rename-or-remove diagnostic. Other noncolliding `.opencode` files are copied.
+`.opencode/opencode.jsonc`. The runner authors a fresh dialect-native
+configuration at that selected path in the sandbox and reads nothing from the
+project's OpenCode settings, so project providers, servers, and permissions
+cannot reach the trial. Project MCP servers are omitted from the eval
+configuration so a disposable fixture cannot launch commands from the project
+or developer environment. A fixture file that collides with a verified native
+output fails the trial with a rename-or-remove diagnostic. Other noncolliding
+`.opencode` files are copied.
 
 <a id="containment"></a>
 

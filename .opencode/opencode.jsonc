@@ -3,36 +3,33 @@
   "default_agent": "atlante",
 
   "mcp": {
-    "fallow": {
-      "type": "local",
-      "command": ["npx", "-y", "-p", "fallow", "fallow-mcp"]
-    },
-    "atlante": {
-      "type": "local",
-      "command": ["bun", "run", "cli", "mcp"],
-      "enabled": true
+    "servers": {
+      "fallow": {
+        "type": "local",
+        "command": ["npx", "-y", "-p", "fallow", "fallow-mcp"]
+      },
+      "atlante": {
+        "type": "local",
+        "command": ["bun", "run", "cli", "mcp"],
+        "disabled": false
+      }
     }
   },
 
-  "agent": {
+  "agents": {
     "atlante": {
       "mode": "primary",
-      "permission": {
-        "*": "allow",
-        "external_directory": "ask",
-        "doom_loop": "ask",
-        "read": {
-          "*": "allow",
-          "*.env": "deny",
-          "*.env.*": "deny",
-          "*.env.example": "allow"
-        },
-        "bash": {
-          "*": "allow",
-          "git push*": "ask",
-          "bun publish*": "ask"
-        }
-      }
+      "permissions": [
+        { "action": "*", "resource": "*", "effect": "allow" },
+        { "action": "external_directory", "resource": "*", "effect": "ask" },
+        { "action": "read", "resource": "*", "effect": "allow" },
+        { "action": "read", "resource": "*.env", "effect": "deny" },
+        { "action": "read", "resource": "*.env.*", "effect": "deny" },
+        { "action": "read", "resource": "*.env.example", "effect": "allow" },
+        { "action": "shell", "resource": "*", "effect": "allow" },
+        { "action": "shell", "resource": "git push*", "effect": "ask" },
+        { "action": "shell", "resource": "bun publish*", "effect": "ask" }
+      ]
     }
   }
 }

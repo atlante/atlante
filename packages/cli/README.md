@@ -2,7 +2,7 @@
 
 Command-line interface for [Atlante](https://github.com/atlante/atlante): the
 configuration layer for your coding-agent harness. Requires
-[Node.js](https://nodejs.org) 22 or later.
+[Node.js](https://nodejs.org) 22.5 or later.
 
 ## Usage
 
@@ -43,12 +43,13 @@ atlante init
 `path` defaults to the current directory and may be a configuration file
 (`atlante.jsonc` or `atlante.json`) or a project directory.
 
-`init` adds the generated folders to `.gitignore`, registers `mcp.atlante` in
-the first existing OpenCode configuration under `.opencode/` or the project
-root, and performs a build. When no OpenCode configuration exists, it creates
-root `opencode.jsonc`. Use `--no-mcp` to leave OpenCode configuration
-untouched. Generated outputs may embed rendered values, so they stay local:
-`init` ignores them in git.
+`init` adds the generated folders to `.gitignore`, registers the Atlante MCP
+server in the native shape of the detected OpenCode dialect in the first
+existing OpenCode configuration under `.opencode/` or the project root, and
+performs a build. When no OpenCode configuration exists, it creates root
+`opencode.jsonc`. Use `--no-mcp` to leave OpenCode configuration untouched.
+Generated outputs may embed rendered values, so they stay local: `init`
+ignores them in git.
 
 The MCP server is read-only and offline. Its tools inspect the active project,
 validate it, list resolved resources, search and read the bundled documentation,

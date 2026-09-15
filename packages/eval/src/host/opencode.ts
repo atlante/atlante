@@ -1,16 +1,22 @@
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import {
+  chmodSync,
   copyFileSync,
   existsSync,
   mkdirSync,
-  readFileSync,
+  rmSync,
   writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join, relative } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { readOpenCodeNative } from "@atlante/opencode";
 import { openCodeConfigPaths } from "@atlante/opencode/config";
-import { parseJsonc } from "@atlante/validator";
+import {
+  detectOpenCode,
+  type OpenCodeDialect,
+  type OpenCodeVersionProbe,
+  openCodeDialectDescriptor,
+} from "@atlante/opencode/dialect";
 import type {
   HostRunner,
   RunTrialInput,
@@ -30,72 +36,136 @@ export type OpenCodeRunnerOptions = {
   binaryPath?: string;
   /** Host auth.json location; default is the user data dir. */
   authPath?: string;
+  /** Host V2 database location; default follows OpenCode's resolved path. */
+  authDatabasePath?: string;
   /** Base environment for the spawned host; default is process.env. */
   baseEnv?: NodeJS.ProcessEnv;
+  /** Injectable version probe for tests; defaults to `${binary} --version`. */
+  versionProbe?: OpenCodeVersionProbe;
+  /** Injectable V2 database-path probe; defaults to `debug paths db`. */
+  databasePathProbe?: OpenCodeDatabasePathProbe;
 };
 
-function defaultAuthPath(): string {
-  const dataHome =
-    process.env.XDG_DATA_HOME ?? join(homedir(), ".local", "share");
-  return join(dataHome, "opencode", "auth.json");
+export type OpenCodeDatabasePathProbe = (
+  binaryPath: string,
+  env: NodeJS.ProcessEnv,
+) => string;
+
+export type OpenCodeAuthStatus = Readonly<{
+  path: string;
+  databasePath: string;
+  authenticated: boolean;
+}>;
+
+export type OpenCodeHostRunner = HostRunner &
+  Readonly<{
+    dialect: OpenCodeDialect;
+    auth: OpenCodeAuthStatus;
+  }>;
+
+function defaultDataDirectory(env: NodeJS.ProcessEnv = process.env): string {
+  const dataHome = env.XDG_DATA_HOME ?? join(homedir(), ".local", "share");
+  return join(dataHome, "opencode");
+}
+
+function defaultAuthPath(env: NodeJS.ProcessEnv = process.env): string {
+  return join(defaultDataDirectory(env), "auth.json");
+}
+
+function defaultAuthDatabasePath(env: NodeJS.ProcessEnv = process.env): string {
+  return join(defaultDataDirectory(env), "opencode.db");
+}
+
+const defaultDatabasePathProbe: OpenCodeDatabasePathProbe = (binaryPath, env) =>
+  execFileSync(binaryPath, ["debug", "paths", "db"], {
+    encoding: "utf8",
+    env,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+
+function databasePathOverride(env: NodeJS.ProcessEnv): string | undefined {
+  const configured = env.OPENCODE_DB?.trim();
+  if (!configured) return undefined;
+  if (configured === ":memory:") return configured;
+  return isAbsolute(configured)
+    ? configured
+    : resolve(defaultDataDirectory(env), configured);
+}
+
+function resolveOpenCodeDatabasePath(
+  binaryPath: string,
+  env: NodeJS.ProcessEnv,
+  probe: OpenCodeDatabasePathProbe = defaultDatabasePathProbe,
+): string {
+  const override = databasePathOverride(env);
+  if (override !== undefined) return override;
+  try {
+    const probed = probe(binaryPath, env).trim();
+    if (probed.length > 0 && probed !== ":memory:") {
+      return isAbsolute(probed)
+        ? probed
+        : resolve(defaultDataDirectory(env), probed);
+    }
+  } catch {
+    // Older or test host binaries may not expose `debug paths db`; the stable
+    // V2 default remains a safe fallback when no channel-specific path exists.
+  }
+  return defaultAuthDatabasePath(env);
+}
+
+function isolatedAuthDatabasePath(stateDir: string): string {
+  return join(stateDir, "data", "opencode", "opencode.db");
 }
 
 /**
  * Run-preventing infrastructure preflight: reports whether the host has
- * stored credentials, so a missing auth file fails the run before any trial
+ * stored credentials, so missing auth state fails the run before any trial
  * executes instead of failing every trial individually.
  */
-export function checkOpenCodeAuth(authPath?: string): {
-  path: string;
-  authenticated: boolean;
-} {
-  const path = authPath ?? defaultAuthPath();
-  return { path, authenticated: existsSync(path) };
+export function checkOpenCodeAuth(
+  authPath?: string,
+  authDatabasePath?: string,
+  options: {
+    binaryPath?: string;
+    env?: NodeJS.ProcessEnv;
+    databasePathProbe?: OpenCodeDatabasePathProbe;
+    dialect?: OpenCodeDialect;
+  } = {},
+): OpenCodeAuthStatus {
+  const env = options.env ?? process.env;
+  const path = authPath ?? defaultAuthPath(env);
+  const databasePath =
+    authDatabasePath ??
+    (options.dialect === "v1"
+      ? defaultAuthDatabasePath(env)
+      : resolveOpenCodeDatabasePath(
+          options.binaryPath ?? OPENCODE_BINARY,
+          env,
+          options.databasePathProbe,
+        ));
+  return {
+    path,
+    databasePath,
+    authenticated:
+      existsSync(path) ||
+      (options.dialect !== "v1" && existsSync(databasePath)),
+  };
 }
 
 /**
- * Containment is opencode tool-level policy, NOT OS-level isolation, and it
- * is identical for every compared variant. The forced denials below close the
+ * Containment is OpenCode tool-level policy, NOT OS-level isolation, and it is
+ * identical for every compared variant. The forced denials below close the
  * host's own web/search/external-directory tools and the most destructive
- * bash prefixes, but the bash tool still runs with ordinary user access to
+ * shell prefixes, but the shell tool still runs with ordinary user access to
  * the network and host filesystem. Fixture content is exactly the
  * prompt-injection surface eval grades, so the child environment is
- * allowlisted separately by `pickAllowedEnv`: model-controlled bash can read
- * its own process env, and it must not be able to read the host's secrets.
+ * allowlisted separately by `pickAllowedEnv`.
  */
-const FORCED_DENIALS = Object.freeze({
-  webfetch: "deny",
-  websearch: "deny",
-  external_directory: "deny",
-} as const);
-
-const FORCED_BASH_DENIALS = Object.freeze({
+const FORCED_SHELL_DENIALS = Object.freeze({
   "rm -rf *": "deny",
   "rm -fr *": "deny",
   "sudo *": "deny",
 } as const);
-
-/** Defaults applied when neither the project nor the agent sets a policy. */
-const BASELINE_DEFAULTS = Object.freeze({
-  edit: "allow",
-  read: "allow",
-  glob: "allow",
-  grep: "allow",
-  list: "allow",
-  task: "allow",
-  skill: "allow",
-  lsp: "allow",
-  question: "allow",
-  todowrite: "allow",
-  doom_loop: "allow",
-} as const);
-const PERMISSION_ACTIONS = new Set(["allow", "deny", "ask"]);
-
-const PERMISSION_KEYS = [
-  ...Object.keys(BASELINE_DEFAULTS),
-  ...Object.keys(FORCED_DENIALS),
-  "bash",
-];
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -114,48 +184,6 @@ function setOwnValue(
   });
 }
 
-/**
- * Mirrors OpenCode's project-config merge: objects merge recursively, while
- * arrays and scalar values from the higher-precedence layer replace the lower
- * layer. Own-property writes keep config keys such as `__proto__` inert.
- */
-function mergeConfigLayers(
-  base: Record<string, unknown>,
-  override: Record<string, unknown>,
-): Record<string, unknown> {
-  const merged: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(base)) {
-    setOwnValue(merged, key, value);
-  }
-  for (const [key, value] of Object.entries(override)) {
-    const existing = Object.hasOwn(merged, key) ? merged[key] : undefined;
-    setOwnValue(
-      merged,
-      key,
-      isObject(existing) && isObject(value)
-        ? mergeConfigLayers(existing, value)
-        : value,
-    );
-  }
-  return merged;
-}
-
-type PermissionMap = Record<string, unknown>;
-
-/**
- * Agent-map access restricted to own properties: a native or config agent
- * id like `__proto__` must never read through the prototype or disappear into
- * the prototype setter, or it would silently lose its containment baseline.
- */
-function ownAgentEntry(
-  agents: Record<string, unknown>,
-  name: string,
-): Record<string, unknown> | undefined {
-  if (!Object.hasOwn(agents, name)) return undefined;
-  const value = agents[name];
-  return isObject(value) ? value : undefined;
-}
-
 function setOwnAgentEntry(
   agents: Record<string, unknown>,
   name: string,
@@ -169,84 +197,225 @@ function setOwnAgentEntry(
   });
 }
 
+type V2PermissionRule = Readonly<{
+  action: string;
+  resource: string;
+  effect: "allow" | "deny" | "ask";
+}>;
+
+const V1_READ_POLICY = Object.freeze({
+  "*": "allow",
+  "*.env": "deny",
+  "*.env.*": "deny",
+  "*.env.example": "allow",
+});
+
 /**
- * Merges the permission baseline into one agent's existing block: the agent's
- * own policy wins everywhere except the forced containment denials, which
- * always apply, and the pattern map keeps forced denials on top.
+ * V2 stores credentials in SQLite. The database can contain a large session
+ * history, so the eval state receives its schema, credential rows, and the
+ * migration journal only — never a byte-for-byte copy of the user's
+ * database. The helper runs under the invoking runtime: Bun uses its native
+ * SQLite API, while Node uses the built-in module with the release-specific
+ * experimental flag when required.
  */
-export function mergePermissionBaseline(existing: unknown): PermissionMap {
-  const base = isObject(existing) ? existing : {};
-  const baseBash = isObject(base.bash) ? base.bash : {};
-  const scalarDefault =
-    typeof existing === "string" && PERMISSION_ACTIONS.has(existing)
-      ? existing
-      : "allow";
-  const bashDefault =
-    typeof base.bash === "string" && PERMISSION_ACTIONS.has(base.bash)
-      ? base.bash
-      : typeof baseBash["*"] === "string" &&
-          PERMISSION_ACTIONS.has(baseBash["*"])
-        ? baseBash["*"]
-        : scalarDefault;
-  const customBash = Object.fromEntries(
-    Object.entries(baseBash).filter(
-      ([key]) => key !== "*" && !Object.hasOwn(FORCED_BASH_DENIALS, key),
-    ),
-  );
+const COPY_AUTH_DATABASE_SCRIPT = `
+import { chmodSync } from "node:fs";
+
+const isBun = Boolean(process.versions.bun);
+const sqlite = await import(isBun ? "bun:sqlite" : "node:sqlite");
+const Database = sqlite.Database ?? sqlite.DatabaseSync;
+
+const [sourcePath, targetPath] = process.argv.slice(1);
+if (!sourcePath || !targetPath) throw new Error("missing database paths");
+
+const quote = (value) => '"' + value.replaceAll('"', '""') + '"';
+const source = new Database(
+  sourcePath,
+  isBun ? { readonly: true } : { readOnly: true },
+);
+const target = new Database(targetPath);
+
+try {
+  target.exec("PRAGMA foreign_keys = OFF");
+  const schema = source
+    .prepare(
+      "SELECT type, name, sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' ORDER BY CASE type WHEN 'table' THEN 1 WHEN 'index' THEN 2 WHEN 'trigger' THEN 3 WHEN 'view' THEN 4 ELSE 5 END, name",
+    )
+    .all();
+  for (const entry of schema) target.exec(entry.sql);
+
+  const copyRows = (table, where = "") => {
+    const columns = source
+      .prepare("PRAGMA table_info(" + quote(table) + ")")
+      .all()
+      .map((column) => column.name);
+    if (columns.length === 0) return;
+    const names = columns.map(quote).join(", ");
+    const placeholders = columns.map(() => "?").join(", ");
+    const insert = target.prepare(
+      "INSERT INTO " + quote(table) + " (" + names + ") VALUES (" + placeholders + ")",
+    );
+    for (const row of source
+      .prepare("SELECT " + names + " FROM " + quote(table) + " " + where)
+      .all()) {
+      insert.run(...columns.map((column) => row[column]));
+    }
+  };
+
+  copyRows("migration");
+  // OpenCode seeds its new migration table from the legacy drizzle journal
+  // when that table is empty, so the journal rows must survive the copy or
+  // an already-migrated database would be treated as unmigrated.
+  if (
+    source
+      .prepare(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = '__drizzle_migrations'",
+      )
+      .get()
+  ) {
+    copyRows("__drizzle_migrations");
+  }
+  copyRows("credential");
+  if (
+    source
+      .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'kv'")
+      .get()
+  ) {
+    copyRows("kv", "WHERE key = 'wellknown:sources'");
+  }
+  target.exec("PRAGMA foreign_keys = ON");
+} finally {
+  target.close();
+  source.close();
+}
+chmodSync(targetPath, 0o600);
+`;
+
+/** Returns the Node flags needed by the built-in SQLite module for a release. */
+export function sqliteRuntimeArguments(nodeVersion = process.versions.node): {
+  supported: boolean;
+  args: string[];
+} {
+  const match = nodeVersion.match(/^(\d+)\.(\d+)\./);
+  if (!match) return { supported: false, args: [] };
+  const major = Number(match[1]);
+  const minor = Number(match[2]);
+  if (major < 22 || (major === 22 && minor < 5))
+    return { supported: false, args: [] };
+  const needsFlag = (major === 22 && minor < 13) || (major === 23 && minor < 4);
   return {
-    ...Object.fromEntries(
-      PERMISSION_KEYS.map((permission) => [permission, scalarDefault]),
-    ),
-    ...base,
-    ...FORCED_DENIALS,
-    bash: {
-      ...FORCED_BASH_DENIALS,
-      "*": bashDefault,
-      ...customBash,
-    },
+    supported: true,
+    args: needsFlag ? ["--experimental-sqlite"] : [],
   };
 }
 
-type HostConfig = Readonly<{
-  path: string;
-  value: Record<string, unknown>;
-}>;
-
-function readHostConfig(projectRoot: string): HostConfig {
-  const paths = openCodeConfigPaths(projectRoot).filter(existsSync);
-  const path = paths[0] ?? join(projectRoot, "opencode.json");
-  let value: Record<string, unknown> = {};
-
-  // OpenCode merges every project config layer from low to high precedence;
-  // the highest existing path remains the sandbox's write target.
-  for (const configPath of paths.slice().reverse()) {
-    const filename = relative(projectRoot, configPath).replaceAll("\\", "/");
-    let text: string;
-    try {
-      text = readFileSync(configPath, "utf8");
-    } catch (cause) {
-      throw new Error(
-        `could not read ${filename}: ${cause instanceof Error ? cause.message : String(cause)}`,
-      );
-    }
-    // The existing configuration contract treats JSONC as the serialized
-    // format with strict JSON as a subset (`atlante init` parses both
-    // filenames with comments and trailing commas allowed), so `eval` must
-    // accept the same documents.
-    const parsed = parseJsonc(text, {
-      allowTrailingComma: true,
-      disallowComments: false,
-    });
-    if (parsed.errors.length > 0) {
-      throw new Error(`host configuration ${filename} is malformed`);
-    }
-    if (!isObject(parsed.value)) {
-      throw new Error(`host configuration ${filename} must contain an object`);
-    }
-    value = mergeConfigLayers(value, parsed.value);
+function copyOpenCodeAuthDatabase(
+  sourcePath: string,
+  targetPath: string,
+): void {
+  if (resolve(sourcePath) === resolve(targetPath)) {
+    throw new Error(
+      "the OpenCode auth database source and target are identical",
+    );
+  }
+  if (existsSync(targetPath)) {
+    throw new Error(
+      `the OpenCode auth database target already exists at ${targetPath}`,
+    );
   }
 
-  return { path, value };
+  mkdirSync(dirname(targetPath), { recursive: true });
+  const bun = Boolean(process.versions.bun);
+  const runtime = bun ? undefined : sqliteRuntimeArguments();
+  if (runtime !== undefined && !runtime.supported) {
+    throw new Error(
+      "copying OpenCode V2 authentication requires Node.js 22.5 or newer, or Bun",
+    );
+  }
+  try {
+    execFileSync(
+      process.execPath,
+      [
+        ...(runtime?.args ?? []),
+        ...(bun ? [] : ["--input-type=module"]),
+        "-e",
+        COPY_AUTH_DATABASE_SCRIPT,
+        sourcePath,
+        targetPath,
+      ],
+      { stdio: ["ignore", "ignore", "pipe"] },
+    );
+  } catch (cause) {
+    try {
+      rmSync(targetPath, { force: true });
+    } catch {
+      // Preserve the original copy error; the run root is disposable.
+    }
+    throw new Error(
+      `could not copy OpenCode V2 authentication database from ${sourcePath}: ${
+        cause instanceof Error ? cause.message : String(cause)
+      }`,
+      { cause },
+    );
+  }
+}
+
+/** Builds the same containment intent in the selected OpenCode dialect. */
+export function createEvalPermissionPolicy(
+  dialect: OpenCodeDialect,
+): Record<string, unknown> | V2PermissionRule[] {
+  const descriptor = openCodeDialectDescriptor(dialect);
+  if (dialect === "v1") {
+    return {
+      edit: "allow",
+      read: { ...V1_READ_POLICY },
+      glob: "allow",
+      grep: "allow",
+      list: "allow",
+      [descriptor.subagentAction]: "allow",
+      skill: "allow",
+      lsp: "allow",
+      question: "allow",
+      todowrite: "allow",
+      doom_loop: "allow",
+      webfetch: "deny",
+      websearch: "deny",
+      external_directory: "deny",
+      [descriptor.shellAction]: {
+        "*": "allow",
+        ...FORCED_SHELL_DENIALS,
+      },
+    };
+  }
+
+  return [
+    { action: "edit", resource: "*", effect: "allow" },
+    { action: "read", resource: "*", effect: "allow" },
+    { action: "read", resource: "*.env", effect: "deny" },
+    { action: "read", resource: "*.env.*", effect: "deny" },
+    { action: "read", resource: "*.env.example", effect: "allow" },
+    { action: "glob", resource: "*", effect: "allow" },
+    { action: "grep", resource: "*", effect: "allow" },
+    { action: descriptor.subagentAction, resource: "*", effect: "allow" },
+    { action: "skill", resource: "*", effect: "allow" },
+    { action: "question", resource: "*", effect: "allow" },
+    { action: descriptor.shellAction, resource: "*", effect: "allow" },
+    { action: "webfetch", resource: "*", effect: "deny" },
+    { action: "websearch", resource: "*", effect: "deny" },
+    { action: "external_directory", resource: "*", effect: "deny" },
+    ...Object.entries(FORCED_SHELL_DENIALS).map(([resource, effect]) => ({
+      action: descriptor.shellAction,
+      resource,
+      effect: effect as "deny",
+    })),
+  ];
+}
+
+function selectedHostConfigPath(projectRoot: string): string {
+  return (
+    openCodeConfigPaths(projectRoot).find(existsSync) ??
+    join(projectRoot, "opencode.jsonc")
+  );
 }
 
 /**
@@ -256,29 +425,39 @@ function readHostConfig(projectRoot: string): HostConfig {
  */
 export function createOpenCodeRunner(
   options: OpenCodeRunnerOptions,
-): HostRunner {
+): OpenCodeHostRunner {
   const { projectRoot } = options;
   const binaryPath = options.binaryPath ?? OPENCODE_BINARY;
-  const authPath = options.authPath ?? defaultAuthPath();
   const baseEnv = options.baseEnv ?? process.env;
+  const host = detectOpenCode(binaryPath, options.versionProbe);
+  const authPath = options.authPath ?? defaultAuthPath(baseEnv);
+  const authDatabasePath =
+    options.authDatabasePath ??
+    (host.dialect === "v2"
+      ? resolveOpenCodeDatabasePath(
+          binaryPath,
+          baseEnv,
+          options.databasePathProbe,
+        )
+      : defaultAuthDatabasePath(baseEnv));
+  const auth = checkOpenCodeAuth(authPath, authDatabasePath, {
+    dialect: host.dialect,
+  });
 
   return {
     name: "opencode",
+    dialect: host.dialect,
+    auth,
 
     prepareHostIntegration(sandbox, context) {
       // Verify the source publication before authoring any sandbox host state.
       const nativeAgentIds = readNativeAgentIds(projectRoot);
-      const hostConfig = readHostConfig(projectRoot);
-      const config = hostConfig.value;
-      // Eval runs disposable fixtures and must never launch project-configured
-      // MCP commands from the developer's repository or environment.
-      delete config.mcp;
-      config.$schema = "https://opencode.ai/config.json";
+      const hostConfigPath = selectedHostConfigPath(projectRoot);
 
       // The generated file may replace a fixture file at its exact target,
       // but every other supported config path would remain visible to
       // OpenCode and could reintroduce project or fixture MCP settings.
-      const target = join(sandbox.root, relative(projectRoot, hostConfig.path));
+      const target = join(sandbox.root, relative(projectRoot, hostConfigPath));
       const fixtureConfig = openCodeConfigPaths(sandbox.root)
         .filter((path) => path !== target)
         .find(existsSync);
@@ -289,41 +468,62 @@ export function createOpenCodeRunner(
       }
 
       // Auth injection: credentials stay with the host; the sandbox data dir
-      // is where the redirected XDG_DATA_HOME will look for them.
+      // is where the redirected XDG_DATA_HOME will look for them. V2 moved
+      // active credentials into SQLite, so copy only its auth tables rather
+      // than exposing the user's session history to the trial.
       const authTarget = join(
         sandbox.stateDir,
         "data",
         "opencode",
         "auth.json",
       );
+      const authDatabaseTarget = isolatedAuthDatabasePath(sandbox.stateDir);
+      let hasAuth = false;
       if (existsSync(authPath)) {
         mkdirSync(dirname(authTarget), { recursive: true });
         copyFileSync(authPath, authTarget);
-      } else {
-        throw new Error(
-          `opencode authentication not found at ${authPath}; authenticate the host once before running eval`,
-        );
+        chmodSync(authTarget, 0o600);
+        hasAuth = true;
       }
 
-      const agents = isObject(config.agent) ? config.agent : {};
+      let hasAuthDatabase = false;
+      if (host.dialect === "v2" && existsSync(authDatabasePath)) {
+        copyOpenCodeAuthDatabase(authDatabasePath, authDatabaseTarget);
+        hasAuthDatabase = true;
+      }
+
+      if (!hasAuth && !hasAuthDatabase) {
+        const source =
+          host.dialect === "v2"
+            ? `${authPath} or ${authDatabasePath}`
+            : authPath;
+        throw new Error(
+          `opencode authentication not found at ${source}; authenticate the host once before running eval`,
+        );
+      } else {
+        // The database copy creates this directory itself. Keep the explicit
+        // mkdir for auth.json-only V2 installs, where OpenCode performs its
+        // own legacy migration on startup.
+        mkdirSync(dirname(authTarget), { recursive: true });
+      }
+
+      const descriptor = openCodeDialectDescriptor(host.dialect);
+      const policy = createEvalPermissionPolicy(host.dialect);
       const agentNames = new Set<string>(["build"]);
       if (context.agent) agentNames.add(context.agent);
-      if (typeof config.default_agent === "string")
-        agentNames.add(config.default_agent);
-      for (const name of Object.keys(agents)) agentNames.add(name);
       for (const agent of nativeAgentIds) agentNames.add(agent);
+      const agents: Record<string, unknown> = {};
       for (const name of agentNames) {
-        const existing = ownAgentEntry(agents, name);
         setOwnAgentEntry(agents, name, {
-          ...existing,
-          permission: mergePermissionBaseline(existing?.permission),
+          [descriptor.permissionsKey]: createEvalPermissionPolicy(host.dialect),
         });
       }
-      config.agent = agents;
-
-      // Safety net for agents without an explicit block; agent-level rules
-      // still take precedence where they exist.
-      config.permission = mergePermissionBaseline(config.permission);
+      const config: Record<string, unknown> = {
+        $schema: "https://opencode.ai/config.json",
+        default_agent: "build",
+      };
+      setOwnValue(config, descriptor.permissionsKey, policy);
+      setOwnValue(config, descriptor.agentsKey, agents);
 
       mkdirSync(sandbox.root, { recursive: true });
       // Host integration is authoritative: this generated config intentionally
@@ -336,11 +536,11 @@ export function createOpenCodeRunner(
       const argv = [
         binaryPath,
         "run",
-        "--dir",
-        input.sandbox.root,
+        ...(host.dialect === "v2" ? ["--standalone"] : []),
         "--format",
         "json",
-        ...(input.agent ? ["--agent", input.agent] : []),
+        "--agent",
+        input.agent ?? "build",
         ...(input.model ? ["--model", input.model] : []),
         input.prompt,
       ];
@@ -349,10 +549,24 @@ export function createOpenCodeRunner(
       // whose env the model can read through its bash tool.
       const env: NodeJS.ProcessEnv = {
         ...pickAllowedEnv(baseEnv),
+        HOME: join(input.sandbox.stateDir, "home"),
         XDG_CONFIG_HOME: join(input.sandbox.stateDir, "config"),
         XDG_DATA_HOME: join(input.sandbox.stateDir, "data"),
         XDG_CACHE_HOME: join(input.sandbox.stateDir, "cache"),
+        XDG_STATE_HOME: join(input.sandbox.stateDir, "state"),
+        ...(host.dialect === "v2"
+          ? { OPENCODE_DB: isolatedAuthDatabasePath(input.sandbox.stateDir) }
+          : {}),
       };
+      for (const directory of [
+        env.HOME,
+        env.XDG_CONFIG_HOME,
+        env.XDG_DATA_HOME,
+        env.XDG_CACHE_HOME,
+        env.XDG_STATE_HOME,
+      ]) {
+        if (directory !== undefined) mkdirSync(directory, { recursive: true });
+      }
 
       const startedAt = Date.now();
       const result = await spawnHost(argv, {
@@ -366,9 +580,14 @@ export function createOpenCodeRunner(
       const trial: TrialRun = { outcome: result.outcome, durationMs };
       if (result.tokens !== undefined) trial.tokens = result.tokens;
       if (result.cost !== undefined) trial.cost = result.cost;
-      if (result.model !== undefined) trial.model = result.model;
-      if (result.modelVersion !== undefined)
-        trial.modelVersion = result.modelVersion;
+      const model = result.model ?? input.model;
+      if (model !== undefined) trial.model = model;
+      const modelVersion =
+        result.modelVersion ??
+        (input.model !== undefined
+          ? modelVersionFromReference(input.model)
+          : undefined);
+      if (modelVersion !== undefined) trial.modelVersion = modelVersion;
       if (result.error !== undefined) trial.error = result.error;
       // Fail-open guard: the maxTokens budget only binds when the stream
       // carries usage events. A host that stopped emitting them would
@@ -406,9 +625,9 @@ function tail(text: string): string {
 }
 
 /**
- * Spawns the host and consumes its NDJSON event stream. Cumulative usage is
- * taken from the latest usage-bearing event; aborting on timeout or
- * maxTokens kills the whole process group (TERM → grace → KILL).
+ * Spawns the host and consumes its NDJSON event stream. Usage from each
+ * processing step is accumulated; aborting on timeout or maxTokens kills the
+ * whole process group (TERM → grace → KILL).
  */
 function spawnHost(
   argv: readonly string[],
@@ -440,7 +659,13 @@ function spawnHost(
     let settled = false;
     let aborted: "timeout" | "budget-exceeded" | null = null;
     let tokens: number | undefined;
+    let stepTokens = 0;
+    let stepUsageSeen = false;
+    let latestNonStepTokens: number | undefined;
     let cost: number | undefined;
+    let stepCost = 0;
+    let stepCostSeen = false;
+    let latestNonStepCost: number | undefined;
     let model: string | undefined;
     let modelVersion: string | undefined;
     let stderrText = "";
@@ -511,15 +736,34 @@ function spawnHost(
       const eventTokens =
         (part ? normalizeTokens(part.tokens) : undefined) ??
         normalizeTokens(event.tokens);
-      if (eventTokens !== undefined) tokens = eventTokens;
-      // Cost is taken as the latest cumulative value: real 1.18.x streams
-      // report per-session cumulative cost on step_finish. A host version
-      // emitting per-message cost would under-count reported spend — the
-      // same trust assumption as the token total above.
+      const isStepFinish =
+        event.type === "step_finish" || event.type === "step-finish";
+      if (eventTokens !== undefined) {
+        if (isStepFinish) {
+          stepTokens += eventTokens;
+          stepUsageSeen = true;
+          tokens = stepTokens;
+        } else if (!stepUsageSeen) {
+          latestNonStepTokens = eventTokens;
+          tokens = latestNonStepTokens;
+        }
+      }
+      // V1 and V2 report one cost for each processing step. Aggregate those
+      // values; non-step usage objects are treated as already cumulative and
+      // remain a defensive fallback for other host versions.
       const eventCost =
         (part && typeof part.cost === "number" ? part.cost : undefined) ??
         (typeof event.cost === "number" ? event.cost : undefined);
-      if (eventCost !== undefined) cost = eventCost;
+      if (eventCost !== undefined) {
+        if (isStepFinish) {
+          stepCost += eventCost;
+          stepCostSeen = true;
+          cost = stepCost;
+        } else if (!stepCostSeen) {
+          latestNonStepCost = eventCost;
+          cost = latestNonStepCost;
+        }
+      }
 
       const identifiers = extractModelIdentifiers(event);
       if (model === undefined && identifiers?.provider && identifiers?.model) {
@@ -533,6 +777,8 @@ function spawnHost(
     };
 
     child.on("close", (exit) => {
+      const trailingLine = lineBuffer.trim();
+      if (trailingLine.length > 0) consumeEvent(trailingLine);
       if (aborted === "timeout") {
         finish("timeout", `trial exceeded ${options.timeoutMs}ms`);
         return;
@@ -585,21 +831,84 @@ export function normalizeTokens(tokens: unknown): number | undefined {
   return seen ? sum : undefined;
 }
 
+const MODEL_CONTAINER_KEYS = new Set(["model", "modelInfo", "modelRef"]);
+
+function modelReference(
+  value: string,
+): { provider: string; model: string } | undefined {
+  const separator = value.indexOf("/");
+  if (separator <= 0 || separator === value.length - 1) return undefined;
+  return {
+    provider: value.slice(0, separator),
+    model: value.slice(separator + 1),
+  };
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
 /** Extracts provider/model identifiers from a session or message event. */
 export function extractModelIdentifiers(
   event: Record<string, unknown>,
 ): { provider?: string; model?: string } | undefined {
-  const scopes: Record<string, unknown>[] = [event];
-  for (const key of ["info", "message", "part", "data", "properties"]) {
-    const nested = event[key];
-    if (isObject(nested)) scopes.push(nested);
-  }
-  for (const scope of scopes) {
-    const provider = scope.providerID ?? scope.providerId;
-    const model = scope.modelID ?? scope.modelId;
-    if (typeof provider === "string" && typeof model === "string") {
-      return { provider, model };
+  const visited = new Set<object>();
+
+  const visit = (
+    value: unknown,
+    key?: string,
+  ): { provider: string; model: string } | undefined => {
+    if (typeof value === "string") {
+      return MODEL_CONTAINER_KEYS.has(key ?? "")
+        ? modelReference(value)
+        : undefined;
     }
-  }
+    if (typeof value !== "object" || value === null) return undefined;
+    if (visited.has(value)) return undefined;
+    visited.add(value);
+
+    if (isObject(value)) {
+      const provider =
+        stringValue(value.providerID) ?? stringValue(value.providerId);
+      const model = stringValue(value.modelID) ?? stringValue(value.modelId);
+      if (provider && model) return { provider, model };
+      if (provider && typeof value.model === "string") {
+        const reference = modelReference(value.model);
+        return {
+          provider: reference?.provider ?? provider,
+          model: reference?.model ?? value.model,
+        };
+      }
+      if (provider && MODEL_CONTAINER_KEYS.has(key ?? "")) {
+        const id = stringValue(value.id);
+        if (id) return { provider, model: id };
+      }
+    }
+
+    const children = Array.isArray(value)
+      ? value.map((child, index) => [String(index), child] as const)
+      : Object.entries(value);
+    // Model containers are the most precise shape and should win over an
+    // unrelated nested session/message id when both are present.
+    for (const [childKey, child] of children) {
+      if (!MODEL_CONTAINER_KEYS.has(childKey)) continue;
+      const result = visit(child, childKey);
+      if (result) return result;
+    }
+    for (const [childKey, child] of children) {
+      if (MODEL_CONTAINER_KEYS.has(childKey)) continue;
+      const result = visit(child, childKey);
+      if (result) return result;
+    }
+    return undefined;
+  };
+
+  const result = visit(event);
+  if (result) return result;
   return undefined;
+}
+
+function modelVersionFromReference(reference: string): string {
+  const model = reference.split("/").slice(1).join("/") || reference;
+  return model.split("#", 1)[0] ?? model;
 }

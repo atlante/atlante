@@ -42,6 +42,7 @@ test("the workspace manifest resolves its entry from src", () => {
   expect(manifest.exports).toEqual({
     ".": "./src/index.ts",
     "./config": "./src/config.ts",
+    "./dialect": "./src/dialect.ts",
   });
   expect(existsSync(join(packageRoot, "src", "index.ts"))).toBe(true);
 });
