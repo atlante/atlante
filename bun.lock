@@ -25,7 +25,7 @@
     },
     "packages/builder": {
       "name": "@atlante/builder",
-      "version": "0.5.0",
+      "version": "0.6.0",
       "dependencies": {
         "@atlante/resources": "workspace:*",
         "@atlante/schema": "workspace:*",
@@ -37,7 +37,7 @@
     },
     "packages/cli": {
       "name": "atlante",
-      "version": "0.5.0",
+      "version": "0.6.0",
       "bin": {
         "atlante": "./dist/bin/atlante.js",
       },
@@ -65,7 +65,7 @@
     },
     "packages/eval": {
       "name": "@atlante/eval",
-      "version": "0.5.0",
+      "version": "0.6.0",
       "dependencies": {
         "@atlante/opencode": "workspace:*",
         "@atlante/schema": "workspace:*",
@@ -74,11 +74,11 @@
     },
     "packages/opencode": {
       "name": "@atlante/opencode",
-      "version": "0.5.0",
+      "version": "0.6.0",
     },
     "packages/pack": {
       "name": "@atlante/pack",
-      "version": "0.5.0",
+      "version": "0.6.0",
       "devDependencies": {
         "@atlante/resources": "workspace:*",
         "@atlante/validator": "workspace:*",
@@ -86,7 +86,7 @@
     },
     "packages/resources": {
       "name": "@atlante/resources",
-      "version": "0.5.0",
+      "version": "0.6.0",
       "dependencies": {
         "handlebars": "^4.7.8",
         "jsonc-parser": "^3.3.1",
@@ -94,14 +94,14 @@
     },
     "packages/schema": {
       "name": "@atlante/schema",
-      "version": "0.5.0",
+      "version": "0.6.0",
       "dependencies": {
         "zod": "^4.0.0",
       },
     },
     "packages/validator": {
       "name": "@atlante/validator",
-      "version": "0.5.0",
+      "version": "0.6.0",
       "dependencies": {
         "@atlante/resources": "workspace:*",
         "@atlante/schema": "workspace:*",
