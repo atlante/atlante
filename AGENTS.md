@@ -29,6 +29,7 @@ Astro pack explorer for [packs.atlante.sh](https://packs.atlante.sh); they stay
 outside the toolchain package graph and are not covered by these constraints.
 
 Schema changes require building and validating (`atlante validate`, `atlante build`). `atlante init` runs the first build automatically; run `atlante build` after later source configuration changes. Tests live next to the code they test: `packages/<workspace>/test/` mirrors `src/`, `scripts/*.test.ts` files sit beside their scripts, and `website`, `packs`, and `docs` own their tests internally. Do not add tests in ad-hoc locations outside these trees.
+Prioritize tests for structural contracts and meaningful observable behavior; exact prose or text in static pack resources warrants an assertion only when it is itself an explicit contract, not merely to match the resource wording.
 
 ### Architecture constraints
 

@@ -96,6 +96,13 @@ execute or enforce them.
 The concrete instance defines `Brainstorm`, `Plan`, `Build`, and `Review`. The
 atlante decides which phases materially improve the result, preserves the
 order among the selected phases, and treats the phases and skills as guidance.
+The `atlante` agent treats this workflow as a generic baseline. It inspects
+applicable repository and host instructions before selecting or executing
+phases. When those instructions materially affect the work, it explains how
+they refine phase or skill selection, task boundaries, checkpoints or commits,
+review, and validation. It suggests the smallest compliant task-local
+workflow without silently changing phase order, invariants, or harness
+configuration.
 `Plan` and `Review` have persistent artifact paths rooted at
 `{{values.workflow-root}}`; the preset default is `.atlante/workflows`, and
 projects may override it. `Brainstorm` and `Build` outputs do not have file
