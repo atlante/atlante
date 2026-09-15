@@ -720,6 +720,21 @@
     font: 400 1rem / 1.65 var(--font-body);
   }
 
+  /* README links need a persistent cue because they are embedded in prose. */
+  .readme a {
+    color: var(--ds-accent);
+    text-decoration: underline;
+    text-decoration-color: currentColor;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+  }
+
+  .readme a:hover,
+  .readme a:focus-visible {
+    text-decoration-color: currentColor;
+    text-decoration-thickness: 2px;
+  }
+
   .readme h1,
   .readme h2,
   .readme h3 {
