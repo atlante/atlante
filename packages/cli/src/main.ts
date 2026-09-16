@@ -91,7 +91,11 @@ export function createProgram(): Command {
       "pack locator to install and extend; use <pack>/<preset> to select a preset explicitly",
     )
     .option("--force", "overwrite an existing Atlante config")
-    .option("--no-mcp", "skip OpenCode MCP server registration")
+    .option("--no-mcp", "skip host MCP server registration")
+    .option(
+      "--hosts <list>",
+      "comma-separated host selection to scaffold (opencode,claude-code); default: opencode",
+    )
     .option(
       "--opencode-version <version>",
       "select the OpenCode dialect when host detection is unavailable",
@@ -104,6 +108,7 @@ export function createProgram(): Command {
           pack?: string;
           force?: boolean;
           mcp?: boolean;
+          hosts?: string;
           opencodeVersion?: string;
         },
       ) => {
@@ -111,6 +116,7 @@ export function createProgram(): Command {
           pack: options.pack,
           force: options.force,
           noMcp: options.mcp === false,
+          hosts: options.hosts,
           opencodeVersion: options.opencodeVersion,
         });
       },

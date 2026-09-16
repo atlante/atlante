@@ -14,6 +14,18 @@ const ATLANTE_SKILLS_GITIGNORE_ENTRY = ".opencode/skills/atlante/";
 const NATIVE_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const MAX_NATIVE_ID_LENGTH = 64;
 const NATIVE_MANIFEST = ".atlante/opencode-native.json";
+/**
+ * Claude-native fixed locations mirror `@atlante/claude-code` defaults.
+ * Document `options` outDirs stay OpenCode-scoped and never select these.
+ */
+const CLAUDE_AGENT_OUTPUT_DIR = ".claude/agents";
+const CLAUDE_SKILL_OUTPUT_DIR = ".claude/skills";
+const CLAUDE_NATIVE_MANIFEST = ".atlante/claude-code-native.json";
+const NATIVE_MANIFESTS = [NATIVE_MANIFEST, CLAUDE_NATIVE_MANIFEST] as const;
+
+function selectedHosts(document: AnyAtlanteDocument): readonly string[] {
+  return document.hosts ?? ["opencode"];
+}
 
 type GitignoreFileSystem = Pick<
   PackFileSystem,
@@ -126,14 +138,55 @@ export function defaultAgentGitignorePath(id: string): string | undefined {
   return nativeId(id) ? `${DEFAULT_AGENT_OUTPUT_DIR}/${id}.md` : undefined;
 }
 
+/** Returns the exact Claude-native agent ignore path for a valid native ID. */
+export function defaultClaudeAgentGitignorePath(
+  id: string,
+): string | undefined {
+  return nativeId(id) ? `${CLAUDE_AGENT_OUTPUT_DIR}/${id}.md` : undefined;
+}
+
+/**
+ * Returns the exact Claude-native skill directory ignore entry for a valid
+ * native ID. Unlike OpenCode skills (blanket-covered under an Atlante-owned
+ * subtree), Claude skills share `.claude/skills/` with user-authored skills,
+ * so each generated skill is ignored individually.
+ */
+export function defaultClaudeSkillGitignorePath(
+  id: string,
+): string | undefined {
+  return nativeId(id) ? `${CLAUDE_SKILL_OUTPUT_DIR}/${id}/` : undefined;
+}
+
 /** Returns exact default agent paths from a canonical document. */
 export function defaultAgentGitignorePaths(
   document: AnyAtlanteDocument,
 ): string[] {
-  if (document.options?.agents?.outDir !== DEFAULT_AGENT_OUTPUT_DIR) return [];
-  return Object.keys(document.agents ?? {})
+  const hosts = selectedHosts(document);
+  const openCodePaths =
+    hosts.includes("opencode") &&
+    document.options?.agents?.outDir === DEFAULT_AGENT_OUTPUT_DIR
+      ? Object.keys(document.agents ?? {})
+          .sort()
+          .map(defaultAgentGitignorePath)
+          .filter((path): path is string => path !== undefined)
+      : [];
+  const claudePaths = hosts.includes("claude-code")
+    ? Object.keys(document.agents ?? {})
+        .sort()
+        .map(defaultClaudeAgentGitignorePath)
+        .filter((path): path is string => path !== undefined)
+    : [];
+  return [...openCodePaths, ...claudePaths];
+}
+
+/** Returns exact Claude-native skill directory entries from a document. */
+export function defaultClaudeSkillGitignorePaths(
+  document: AnyAtlanteDocument,
+): string[] {
+  if (!selectedHosts(document).includes("claude-code")) return [];
+  return Object.keys(document.skills ?? {})
     .sort()
-    .map(defaultAgentGitignorePath)
+    .map(defaultClaudeSkillGitignorePath)
     .filter((path): path is string => path !== undefined);
 }
 
@@ -144,6 +197,17 @@ function isDefaultAgentGitignorePath(path: string): boolean {
   return defaultAgentGitignorePath(id) === path;
 }
 
+function isClaudeAgentGitignorePath(path: string): boolean {
+  const prefix = `${CLAUDE_AGENT_OUTPUT_DIR}/`;
+  if (!path.startsWith(prefix) || !path.endsWith(".md")) return false;
+  const id = path.slice(prefix.length, -3);
+  return defaultClaudeAgentGitignorePath(id) === path;
+}
+
+function isAnyDefaultAgentGitignorePath(path: string): boolean {
+  return isDefaultAgentGitignorePath(path) || isClaudeAgentGitignorePath(path);
+}
+
 function isDefaultSkillNativePath(path: string): boolean {
   const prefix = `${DEFAULT_SKILL_OUTPUT_DIR}/`;
   if (!path.startsWith(prefix) || !path.endsWith("/SKILL.md")) return false;
@@ -151,15 +215,29 @@ function isDefaultSkillNativePath(path: string): boolean {
   return nativeId(id);
 }
 
+function isClaudeSkillNativePath(path: string): boolean {
+  const prefix = `${CLAUDE_SKILL_OUTPUT_DIR}/`;
+  if (!path.startsWith(prefix) || !path.endsWith("/SKILL.md")) return false;
+  const id = path.slice(prefix.length, -"/SKILL.md".length);
+  return nativeId(id) && !id.includes("/");
+}
+
+/** Maps an owned Claude skill file path to its directory ignore entry. */
+function claudeSkillDirEntry(path: string): string | undefined {
+  if (!isClaudeSkillNativePath(path)) return undefined;
+  return path.slice(0, -"SKILL.md".length);
+}
+
 function readNativeManifestEntries(
   directory: string,
   fileSystem: GitignoreFileSystem,
+  manifest: string = NATIVE_MANIFEST,
 ): NativeManifestEntry[] {
-  const manifest = join(directory, NATIVE_MANIFEST);
-  if (!fileSystem.existsSync(manifest)) return [];
+  const manifestPath = join(directory, manifest);
+  if (!fileSystem.existsSync(manifestPath)) return [];
   try {
     const parsed: unknown = JSON.parse(
-      fileSystem.readFileSync(manifest, "utf8"),
+      fileSystem.readFileSync(manifestPath, "utf8"),
     );
     if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed))
       return [];
@@ -176,31 +254,38 @@ function readNativeManifestEntries(
 }
 
 /**
- * Reads only safe default agent paths from the ownership manifest. This is
- * bookkeeping for ignore reconciliation, not a replacement for materializer
- * manifest validation.
+ * Reads only safe default agent paths from both hosts' ownership manifests.
+ * This is bookkeeping for ignore reconciliation, not a replacement for
+ * materializer manifest validation.
  */
 export function ownedDefaultAgentGitignorePaths(
   directory: string,
   fileSystem: GitignoreFileSystem = defaultGitignoreFileSystem,
 ): string[] {
   return uniqueEntries(
-    readNativeManifestEntries(directory, fileSystem)
+    NATIVE_MANIFESTS.flatMap((manifest) =>
+      readNativeManifestEntries(directory, fileSystem, manifest),
+    )
       .filter(
         (entry) => entry.kind === "agent" && typeof entry.path === "string",
       )
       .map((entry) => entry.path as string)
-      .filter(isDefaultAgentGitignorePath),
+      .filter(isAnyDefaultAgentGitignorePath),
   );
 }
 
 /** Computes the default ignore policy from a resolved canonical document. */
 function defaultGitignoreEntries(document: AnyAtlanteDocument): string[] {
   const options = document.options;
+  const hosts = selectedHosts(document);
   const result = [ATLANTE_STATE_GITIGNORE_ENTRY];
-  if (options?.skills?.outDir === DEFAULT_SKILL_OUTPUT_DIR)
+  if (
+    hosts.includes("opencode") &&
+    options?.skills?.outDir === DEFAULT_SKILL_OUTPUT_DIR
+  )
     result.push(ATLANTE_SKILLS_GITIGNORE_ENTRY);
   result.push(...defaultAgentGitignorePaths(document));
+  result.push(...defaultClaudeSkillGitignorePaths(document));
   return result;
 }
 
@@ -210,7 +295,9 @@ export function defaultGitignoreEntriesForBuild(
   writtenPaths: readonly string[] = [],
   fileSystem: GitignoreFileSystem = defaultGitignoreFileSystem,
 ): string[] {
-  const entries = readNativeManifestEntries(directory, fileSystem);
+  const entries = NATIVE_MANIFESTS.flatMap((manifest) =>
+    readNativeManifestEntries(directory, fileSystem, manifest),
+  );
   const nativeAgentPaths = entries
     .filter((entry) => entry.kind === "agent" && typeof entry.path === "string")
     .map((entry) => entry.path as string);
@@ -221,16 +308,22 @@ export function defaultGitignoreEntriesForBuild(
   const agentPaths = uniqueEntries(
     nativeAgentPaths
       .concat(fallbackPaths)
-      .filter(isDefaultAgentGitignorePath)
+      .filter(isAnyDefaultAgentGitignorePath)
       .sort(),
   );
-  const hasDefaultSkill = nativeSkillPaths
-    .concat(fallbackPaths)
-    .some(isDefaultSkillNativePath);
+  const skillCandidates = nativeSkillPaths.concat(fallbackPaths);
+  const hasDefaultSkill = skillCandidates.some(isDefaultSkillNativePath);
+  const claudeSkillDirs = uniqueEntries(
+    skillCandidates
+      .map(claudeSkillDirEntry)
+      .filter((entry): entry is string => entry !== undefined)
+      .sort(),
+  );
   return [
     ATLANTE_STATE_GITIGNORE_ENTRY,
     ...(hasDefaultSkill ? [ATLANTE_SKILLS_GITIGNORE_ENTRY] : []),
     ...agentPaths,
+    ...claudeSkillDirs,
   ];
 }
 
