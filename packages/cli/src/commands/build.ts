@@ -19,15 +19,25 @@ export type BuildOutcome = Readonly<{
   readonly resourceWatch?: ResourceWatchContext;
 }>;
 
+export type BuildCommandOptions = Readonly<{
+  /** When true, plan without publishing any files. */
+  dryRun?: boolean;
+}>;
+
 export function runBuildWithContext(
   target: string,
   context: ProjectContext = firstPartyProjectContext(),
+  options?: BuildCommandOptions,
 ): BuildOutcome {
   try {
+    const dryRun = options?.dryRun === true;
     const built = buildProject(target, context, {
       materializers: [openCodeMaterializer],
+      ...(dryRun ? { dryRun: true as const } : {}),
     });
-    if (!reportBuildResult(built))
+    if (
+      !reportBuildResult(built, dryRun ? { dryRun: true as const } : undefined)
+    )
       return { code: 1, resourceWatch: built.resourceWatch };
     const writtenPaths = built.materializations.flatMap(
       ({ writtenPaths }) => writtenPaths,
@@ -38,7 +48,9 @@ export function runBuildWithContext(
     ))
       printDiagnostic(diagnostic);
     const styler = createStyler();
-    console.log(`${styler.success("built")} ${styler.dim(built.projectRoot)}`);
+    console.log(
+      `${styler.success(dryRun ? "would build" : "built")} ${styler.dim(built.projectRoot)}`,
+    );
     return { code: 0, resourceWatch: built.resourceWatch };
   } catch (cause) {
     printDiagnostic({
@@ -53,6 +65,9 @@ export function runBuildWithContext(
   }
 }
 
-export function runBuild(target: string): number {
-  return runBuildWithContext(target).code;
+export function runBuild(
+  target: string,
+  options?: BuildCommandOptions,
+): number {
+  return runBuildWithContext(target, undefined, options).code;
 }

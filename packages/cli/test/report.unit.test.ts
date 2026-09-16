@@ -178,4 +178,42 @@ describe("reportBuildResult styling", () => {
       "\x1b[31merror\x1b[0m [some-code]: boom\nat: atlante.jsonc:1:2\nnext: fix it",
     ]);
   });
+
+  test("labels planned paths as a preview in dryRun", () => {
+    const { lines, restore } = captureConsole("log");
+    let wrote: unknown;
+    try {
+      withPlain(() => {
+        wrote = reportBuildResult(
+          { diagnostics: [], materializations },
+          { dryRun: true },
+        );
+      });
+    } finally {
+      restore();
+    }
+    expect(wrote).toBe(true);
+    expect(lines).toEqual([
+      "would write opencode: .opencode/agents/atlante.md",
+      "would remove opencode: .opencode/skills/old/SKILL.md",
+    ]);
+  });
+
+  test("colors preview verbs on an interactive stream", () => {
+    const { lines, restore } = captureConsole("log");
+    try {
+      withColor(() => {
+        reportBuildResult(
+          { diagnostics: [], materializations },
+          { dryRun: true },
+        );
+      });
+    } finally {
+      restore();
+    }
+    expect(lines).toEqual([
+      "\x1b[32mwould write\x1b[0m opencode: \x1b[90m.opencode/agents/atlante.md\x1b[0m",
+      "\x1b[32mwould remove\x1b[0m opencode: \x1b[90m.opencode/skills/old/SKILL.md\x1b[0m",
+    ]);
+  });
 });

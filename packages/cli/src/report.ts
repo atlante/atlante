@@ -31,17 +31,27 @@ export function printDiagnostics(diagnostics: Diagnostic[]): void {
  * succeeded — the per-host materialized paths. Returns whether the build
  * succeeded, so each command can keep its own failure and success handling.
  */
+export type ReportBuildOptions = Readonly<{
+  /** When true, label planned paths with preview verbs. */
+  dryRun?: boolean;
+}>;
+
 export function reportBuildResult(
   built: Pick<BuildResult, "diagnostics" | "materializations">,
+  options?: ReportBuildOptions,
 ): boolean {
   const styler = createStyler();
   printDiagnostics(built.diagnostics);
   if (hasErrors(built.diagnostics)) return false;
+  const wroteVerb = options?.dryRun === true ? "would write" : "wrote";
+  const removedVerb = options?.dryRun === true ? "would remove" : "removed";
   for (const { host, writtenPaths, removedPaths } of built.materializations) {
     for (const path of writtenPaths)
-      console.log(`${styler.success("wrote")} ${host}: ${styler.dim(path)}`);
+      console.log(`${styler.success(wroteVerb)} ${host}: ${styler.dim(path)}`);
     for (const path of removedPaths)
-      console.log(`${styler.success("removed")} ${host}: ${styler.dim(path)}`);
+      console.log(
+        `${styler.success(removedVerb)} ${host}: ${styler.dim(path)}`,
+      );
   }
   return true;
 }

@@ -486,6 +486,13 @@ test("the build command exposes a --watch option", () => {
   expect(build?.options.map((option) => option.long)).toContain("--watch");
 });
 
+test("the build command exposes a --dry-run option", () => {
+  const build = createProgram().commands.find(
+    (command) => command.name() === "build",
+  );
+  expect(build?.options.map((option) => option.long)).toContain("--dry-run");
+});
+
 test("init pack help describes a pack locator rather than starter", () => {
   const init = createProgram().commands.find(
     (command) => command.name() === "init",
