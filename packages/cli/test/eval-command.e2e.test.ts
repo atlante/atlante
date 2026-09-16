@@ -23,7 +23,11 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { HostRunner, RunTrialInput, TrialRun } from "@atlante/eval";
-import { EVAL_SCENARIO_SCHEMA_URI, SCHEMA_URI } from "@atlante/schema";
+import {
+  EVAL_SCENARIO_SCHEMA_URI,
+  SCHEMA_URI,
+  SCHEMA_URI_V02,
+} from "@atlante/schema";
 import { createProgressStyler, runEvalCommand } from "../src/commands/eval.js";
 import { runBuild } from "../src/main.js";
 import { installStubPack } from "./stub-pack.js";
@@ -95,14 +99,18 @@ function writePackEvalSuite(project: string): void {
 }
 
 /** Authors a full eval-enabled project; native outputs stay unbuilt by default. */
-function evalProject(options: { evalSection?: object } = {}): string {
+function evalProject(
+  options: { evalSection?: object; schemaUri?: string; hosts?: string[] } = {},
+): string {
   const project = writeEvalProject(options);
   created.push(project);
   return project;
 }
 
 /** Same layout as `evalProject`, but outside the per-test cleanup list. */
-function writeEvalProject(options: { evalSection?: object } = {}): string {
+function writeEvalProject(
+  options: { evalSection?: object; schemaUri?: string; hosts?: string[] } = {},
+): string {
   const project = mkdtempSync(join(tmpdir(), "atlante-eval-command-"));
   const evalSection =
     options.evalSection === undefined
@@ -111,9 +119,10 @@ function writeEvalProject(options: { evalSection?: object } = {}): string {
   writeFileSync(
     join(project, "atlante.jsonc"),
     `${JSON.stringify({
-      $schema: SCHEMA_URI,
+      $schema: options.schemaUri ?? SCHEMA_URI,
       extends: "@fixture/pack",
       values: { project: "demo" },
+      ...(options.hosts === undefined ? {} : { hosts: options.hosts }),
       agents: {
         reviewer: {
           description: "Reviews changes.",
@@ -391,6 +400,72 @@ describe("runEvalCommand", () => {
     const project = evalProject();
     const exit = await runEvalCommand(project, {}, undefined, fakeRunner(true));
     expect(exit).toBe(2);
+  });
+
+  test("exits 2 before execution when eval.host is not materialized", async () => {
+    const project = evalProject({
+      schemaUri: SCHEMA_URI_V02,
+      hosts: ["opencode"],
+      evalSection: {
+        host: "claude-code",
+        scenarios: "eval/scenarios/*.eval.json",
+      },
+    });
+    let runnerCalled = false;
+    const runner: HostRunner = {
+      name: "never",
+      prepareHostIntegration() {},
+      async runTrial(): Promise<TrialRun> {
+        runnerCalled = true;
+        throw new Error("must not run");
+      },
+    };
+    const errors: string[] = [];
+    const errorSpy = spyOn(console, "error").mockImplementation(
+      (...parts: unknown[]) => {
+        errors.push(parts.join(" "));
+      },
+    );
+    try {
+      const exit = await runEvalCommand(project, {}, undefined, runner);
+      expect(exit).toBe(2);
+    } finally {
+      errorSpy.mockRestore();
+    }
+    expect(runnerCalled).toBe(false);
+    expect(errors.join("\n")).toContain("eval-host-not-materialized");
+  });
+
+  test("passes the materialization gate when eval.host is selected", async () => {
+    const project = evalProject({
+      schemaUri: SCHEMA_URI_V02,
+      hosts: ["opencode", "claude-code"],
+      evalSection: {
+        host: "claude-code",
+        scenarios: "eval/scenarios/*.eval.json",
+      },
+    });
+    const errors: string[] = [];
+    const errorSpy = spyOn(console, "error").mockImplementation(
+      (...parts: unknown[]) => {
+        errors.push(parts.join(" "));
+      },
+    );
+    try {
+      // Unbuilt outputs still fail, but past the host gate.
+      const exit = await runEvalCommand(
+        project,
+        {},
+        undefined,
+        fakeRunner(true),
+      );
+      expect(exit).toBe(2);
+    } finally {
+      errorSpy.mockRestore();
+    }
+    const output = errors.join("\n");
+    expect(output).not.toContain("eval-host-not-materialized");
+    expect(output).toContain("native-outputs-not-verified");
   });
 
   test("exits 2 for an unknown --scenario filter", async () => {

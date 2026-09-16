@@ -1,4 +1,4 @@
-import type { EvalConfig } from "@atlante/schema";
+import type { AnyEvalConfig } from "@atlante/schema";
 import { EVAL_BUDGET_DEFAULTS } from "@atlante/schema";
 
 /** Extra in-flight budget for scenario `setup` commands. */
@@ -18,7 +18,7 @@ export type ResolvedBudget = {
  * section inherits every default.
  */
 export function resolveBudget(input: {
-  evalConfig: EvalConfig | undefined;
+  evalConfig: AnyEvalConfig | undefined;
   trialsOverride?: number;
 }): ResolvedBudget {
   const authored = input.evalConfig?.budget;

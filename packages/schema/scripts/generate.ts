@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { atlanteDocumentOverlaySchema, SCHEMA_URI } from "../src/document.js";
+import {
+  atlanteDocumentOverlaySchema,
+  atlanteDocumentOverlayV02Schema,
+  SCHEMA_URI,
+  SCHEMA_URI_V02,
+} from "../src/document.js";
 import {
   EVAL_SCENARIO_SCHEMA_URI,
   evalScenarioBaseSchema,
@@ -7,7 +12,25 @@ import {
 import { VALUE_KEY_PATTERN } from "../src/values.js";
 
 export function buildDocumentJsonSchema(): Record<string, unknown> {
-  const generated = z.toJSONSchema(atlanteDocumentOverlaySchema, {
+  return buildDocumentJsonSchemaFrom(atlanteDocumentOverlaySchema, SCHEMA_URI, {
+    const: "opencode",
+  });
+}
+
+export function buildDocumentV02JsonSchema(): Record<string, unknown> {
+  return buildDocumentJsonSchemaFrom(
+    atlanteDocumentOverlayV02Schema,
+    SCHEMA_URI_V02,
+    { enum: ["opencode", "claude-code"] },
+  );
+}
+
+function buildDocumentJsonSchemaFrom(
+  overlaySchema: z.ZodTypeAny,
+  uri: string,
+  hostsItems: Record<string, unknown>,
+): Record<string, unknown> {
+  const generated = z.toJSONSchema(overlaySchema, {
     target: "draft-2020-12",
     io: "input",
   }) as Record<string, unknown>;
@@ -57,7 +80,7 @@ export function buildDocumentJsonSchema(): Record<string, unknown> {
   };
   documentProperties.hosts = {
     type: "array",
-    items: { const: "opencode" },
+    items: hostsItems,
     minItems: 1,
     uniqueItems: true,
   };
@@ -69,7 +92,7 @@ export function buildDocumentJsonSchema(): Record<string, unknown> {
 
   return {
     $schema: "https://json-schema.org/draft/2020-12/schema",
-    $id: SCHEMA_URI,
+    $id: uri,
     title: "Atlante configuration document",
     ...generated,
   };
@@ -124,6 +147,12 @@ if (import.meta.main) {
   const out = new URL("../schema/v0.1/schema.json", import.meta.url);
   await Bun.write(out, serializeDocumentJsonSchema(buildDocumentJsonSchema()));
   console.log(`wrote ${out.pathname}`);
+  const v02Out = new URL("../schema/v0.2/schema.json", import.meta.url);
+  await Bun.write(
+    v02Out,
+    serializeDocumentJsonSchema(buildDocumentV02JsonSchema()),
+  );
+  console.log(`wrote ${v02Out.pathname}`);
   const scenarioOut = new URL(
     "../schema/v0.1/eval-scenario.json",
     import.meta.url,
@@ -135,6 +164,6 @@ if (import.meta.main) {
   console.log(`wrote ${scenarioOut.pathname}`);
   // Regeneration must be reproducible against the committed artifacts: the
   // repo formatter defines the canonical style for the generated JSON.
-  await Bun.$`bunx biome format --write ${out.pathname} ${scenarioOut.pathname}`.quiet();
+  await Bun.$`bunx biome format --write ${out.pathname} ${v02Out.pathname} ${scenarioOut.pathname}`.quiet();
   console.log("formatted generated schemas with biome");
 }

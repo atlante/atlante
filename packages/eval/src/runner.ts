@@ -1,6 +1,6 @@
 import {
+  type AnyEvalConfig,
   EVAL_CHECK_TIMEOUT_DEFAULT_MS,
-  type EvalConfig,
 } from "@atlante/schema";
 import type { DiscoveredEvalScenario } from "@atlante/validator";
 import { runChecks } from "./checks.js";
@@ -89,7 +89,7 @@ export type EvalProgress =
 
 export type RunEvalInput = {
   projectRoot: string;
-  evalConfig: EvalConfig;
+  evalConfig: AnyEvalConfig;
   budget: ResolvedBudget;
   scenarios: readonly DiscoveredEvalScenario[];
   atlanteVersion: string;

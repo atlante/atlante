@@ -10,11 +10,17 @@ import {
   type ResourceWatchRoot,
   resolveResourceDocument,
 } from "@atlante/resources";
-import type { AtlanteDocument, AtlanteDocumentOverlay } from "@atlante/schema";
+import type {
+  AnyAtlanteDocument,
+  AnyAtlanteDocumentOverlay,
+} from "@atlante/schema";
 import {
   atlanteDocumentOverlaySchema,
+  atlanteDocumentOverlayV02Schema,
   atlanteDocumentSchema,
+  atlanteDocumentV02Schema,
   SCHEMA_URI,
+  SCHEMA_URI_V02,
 } from "@atlante/schema";
 import type { Diagnostic, DiagnosticChainEntry } from "./diagnostic.js";
 import {
@@ -191,7 +197,9 @@ function resourceLoadFailure(
 }
 
 function canonicalDiagnostics(
-  parsed: ReturnType<typeof atlanteDocumentSchema.safeParse>,
+  parsed:
+    | ReturnType<typeof atlanteDocumentSchema.safeParse>
+    | ReturnType<typeof atlanteDocumentV02Schema.safeParse>,
   resources: ReturnType<typeof resolveResourceDocument>,
 ): Diagnostic[] {
   if (parsed.success) return [];
@@ -280,7 +288,10 @@ export function validateDocumentText(
   text: string,
   sourcePath: string,
   options: DocumentLoadOptions = {},
-): { document?: AtlanteDocument; diagnostics: Diagnostic[] } {
+): {
+  document?: AnyAtlanteDocument;
+  diagnostics: Diagnostic[];
+} {
   const { raw, diagnostics } = parseConfigSource(text, sourcePath);
   if (raw === undefined) return { diagnostics: sortDiagnostics(diagnostics) };
   const parsed = parseOverlay(raw, sourcePath, text);
@@ -292,6 +303,7 @@ export function validateDocumentText(
     path,
     text,
     { path, projectRoot: dirname(path) },
+    parsed.overlay.$schema,
     parsed.overlay as unknown as JsonObject,
     options.resourceContext,
   );
@@ -310,7 +322,7 @@ export function parseDocumentOverlay(
   text: string,
   sourcePath: string,
 ): {
-  overlay: AtlanteDocumentOverlay | undefined;
+  overlay: AnyAtlanteDocumentOverlay | undefined;
   diagnostics: Diagnostic[];
 } {
   const { raw, diagnostics } = parseConfigSource(text, sourcePath);
@@ -323,15 +335,21 @@ function parseOverlay(
   sourcePath: string,
   text: string,
 ): {
-  overlay: AtlanteDocumentOverlay | undefined;
+  overlay: AnyAtlanteDocumentOverlay | undefined;
   diagnostics: Diagnostic[];
 } {
   const schemaUri = ownPropertyValue(raw, "$schema");
+  const overlaySchema =
+    schemaUri === SCHEMA_URI_V02
+      ? atlanteDocumentOverlayV02Schema
+      : schemaUri === SCHEMA_URI
+        ? atlanteDocumentOverlaySchema
+        : undefined;
   if (
     typeof raw === "object" &&
     raw !== null &&
     !Array.isArray(raw) &&
-    schemaUri !== SCHEMA_URI
+    overlaySchema === undefined
   ) {
     return {
       overlay: undefined,
@@ -339,7 +357,7 @@ function parseOverlay(
     };
   }
 
-  const result = atlanteDocumentOverlaySchema.safeParse(raw);
+  const result = (overlaySchema ?? atlanteDocumentOverlaySchema).safeParse(raw);
   if (!result.success)
     return {
       overlay: undefined,
@@ -352,7 +370,7 @@ function parseOverlay(
 type DocumentLocation = { path: string; projectRoot: string };
 
 export type LoadResult = {
-  document?: AtlanteDocument;
+  document?: AnyAtlanteDocument;
   path?: string;
   projectRoot?: string;
   resources?: ReturnType<typeof resolveResourceDocument>;
@@ -364,10 +382,11 @@ function resolveResourceBackedDocument(
   path: string,
   text: string,
   location: DocumentLocation,
+  schemaUri: string,
   rootDocument?: JsonObject,
   resourceContext?: ResourceResolutionContext,
 ): {
-  document?: AtlanteDocument;
+  document?: AnyAtlanteDocument;
   path: string;
   projectRoot: string;
   resources?: ReturnType<typeof resolveResourceDocument>;
@@ -405,7 +424,11 @@ function resolveResourceBackedDocument(
     };
   }
 
-  const canonical = atlanteDocumentSchema.safeParse(resources.document);
+  const canonicalSchema =
+    schemaUri === SCHEMA_URI_V02
+      ? atlanteDocumentV02Schema
+      : atlanteDocumentSchema;
+  const canonical = canonicalSchema.safeParse(resources.document);
   const diagnostics = [
     ...canonicalDiagnostics(canonical, resources),
     ...validateResolvedDocument(resources),
@@ -492,6 +515,7 @@ export function loadDocument(
     path,
     text,
     location,
+    parsed.overlay.$schema,
     undefined,
     options.resourceContext,
   );

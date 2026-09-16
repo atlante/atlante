@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as resources from "@atlante/resources";
-import { SCHEMA_URI } from "@atlante/schema";
+import { SCHEMA_URI, SCHEMA_URI_V02 } from "@atlante/schema";
 import {
   formatDiagnostic,
   loadDocument,
@@ -446,6 +446,73 @@ describe("validateDocumentText", () => {
           source: "atlante.jsonc",
         }),
       ]);
+    }
+  });
+});
+
+describe("versioned document dispatch (v0.2)", () => {
+  const validV02 = `{
+  "$schema": "${SCHEMA_URI_V02}",
+  "hosts": ["claude-code"],
+  "agents": { "reviewer": { "description": "Agent", "identity": "x", "mission": "y" } }
+}`;
+
+  test("accepts a v0.2 claude-only document", () => {
+    const result = validateWithFirstPartyPack(validV02);
+    expect(result.diagnostics).toEqual([]);
+    expect(result.document?.$schema).toBe(SCHEMA_URI_V02);
+    expect(result.document?.hosts).toEqual(["claude-code"]);
+    expect(result.document?.agents?.reviewer?.identity).toBe("x");
+  });
+
+  test("defaults v0.2 hosts to opencode when absent", () => {
+    const result = validateWithFirstPartyPack(
+      `{ "$schema": "${SCHEMA_URI_V02}" }`,
+    );
+    expect(result.diagnostics).toEqual([]);
+    expect(result.document?.hosts).toEqual(["opencode"]);
+  });
+
+  test("rejects claude-code hosts under the frozen v0.1 contract", () => {
+    const result = validateWithFirstPartyPack(
+      `{ "$schema": "${SCHEMA_URI}", "hosts": ["claude-code"] }`,
+    );
+    expect(result.document).toBeUndefined();
+    expect(result.diagnostics[0]?.code).toBe("invalid-document");
+  });
+
+  test("versions eval host selection with the document", () => {
+    const v01Eval = validateWithFirstPartyPack(
+      `{ "$schema": "${SCHEMA_URI}", "eval": { "host": "claude-code", "scenarios": "eval/*.eval.json" } }`,
+    );
+    expect(v01Eval.document).toBeUndefined();
+    expect(v01Eval.diagnostics[0]?.code).toBe("invalid-document");
+
+    const v02Eval = validateWithFirstPartyPack(
+      `{ "$schema": "${SCHEMA_URI_V02}", "hosts": ["claude-code"], "eval": { "host": "claude-code", "scenarios": "eval/*.eval.json" } }`,
+    );
+    expect(v02Eval.diagnostics).toEqual([]);
+    expect(v02Eval.document?.hosts).toEqual(["claude-code"]);
+  });
+
+  test("parses a v0.2 overlay without resource resolution", () => {
+    const parsed = parseDocumentOverlay(validV02, "atlante.jsonc");
+    expect(parsed.diagnostics).toEqual([]);
+    expect(parsed.overlay?.$schema).toBe(SCHEMA_URI_V02);
+  });
+
+  test("loads a v0.2 file from disk", () => {
+    const dir = mkdtempSync(join(tmpdir(), "atlante-document-v02-"));
+    const path = join(dir, "atlante.jsonc");
+    installFirstPartyPack(dir);
+    writeFileSync(path, validV02);
+    try {
+      const result = loadDocument(path);
+      expect(result.diagnostics).toEqual([]);
+      expect(result.document?.$schema).toBe(SCHEMA_URI_V02);
+      expect(result.document?.hosts).toEqual(["claude-code"]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
     }
   });
 });

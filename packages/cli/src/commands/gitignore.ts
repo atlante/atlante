@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
-  type AtlanteDocument,
+  type AnyAtlanteDocument,
   DEFAULT_AGENT_OUTPUT_DIR,
   DEFAULT_SKILL_OUTPUT_DIR,
 } from "@atlante/schema";
@@ -128,7 +128,7 @@ export function defaultAgentGitignorePath(id: string): string | undefined {
 
 /** Returns exact default agent paths from a canonical document. */
 export function defaultAgentGitignorePaths(
-  document: AtlanteDocument,
+  document: AnyAtlanteDocument,
 ): string[] {
   if (document.options?.agents?.outDir !== DEFAULT_AGENT_OUTPUT_DIR) return [];
   return Object.keys(document.agents ?? {})
@@ -195,7 +195,7 @@ export function ownedDefaultAgentGitignorePaths(
 }
 
 /** Computes the default ignore policy from a resolved canonical document. */
-function defaultGitignoreEntries(document: AtlanteDocument): string[] {
+function defaultGitignoreEntries(document: AnyAtlanteDocument): string[] {
   const options = document.options;
   const result = [ATLANTE_STATE_GITIGNORE_ENTRY];
   if (options?.skills?.outDir === DEFAULT_SKILL_OUTPUT_DIR)
@@ -268,7 +268,7 @@ export function missingGitignoreDiagnostics(
 /** Prepares the init reconciliation for the ownership-scoped policy. */
 export function prepareInitGitignore(
   directory: string,
-  document: AtlanteDocument,
+  document: AnyAtlanteDocument,
   fileSystem: GitignoreFileSystem,
 ): GitignorePlan {
   const required = defaultGitignoreEntries(document);

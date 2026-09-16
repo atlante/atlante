@@ -15,7 +15,7 @@ import {
   parseOpenCodeVersion,
   resolveOpenCodeDialect,
 } from "@atlante/opencode/dialect";
-import { type AtlanteDocument, SCHEMA_URI } from "@atlante/schema";
+import { type AnyAtlanteDocument, SCHEMA_URI } from "@atlante/schema";
 import { hasErrors, validateDocumentText } from "@atlante/validator";
 import {
   FIRST_PARTY_PACKAGE,
@@ -222,7 +222,7 @@ function preflightPreset(
   target: string,
   contents: string,
   context: ProjectContext,
-): AtlanteDocument | undefined {
+): AnyAtlanteDocument | undefined {
   const validated = validateDocumentText(contents, target, {
     resourceContext: context,
   });
@@ -416,7 +416,7 @@ async function prepareConfiguration(
   flow: InitFlow,
   options: InitOptions,
   abort: Abort,
-): Promise<number | { contents: string; document: AtlanteDocument }> {
+): Promise<number | { contents: string; document: AnyAtlanteDocument }> {
   assertRealProjectRoot(flow.directory);
 
   let pack: SelectedPack | undefined;
@@ -469,7 +469,7 @@ async function prepareConfiguration(
 function commitConfiguration(
   flow: InitFlow,
   contents: string,
-  document: AtlanteDocument,
+  document: AnyAtlanteDocument,
   options: InitOptions,
   abort: Abort,
 ): number | { mcp?: OpenCodeMcpPlan } {

@@ -28,9 +28,10 @@ import {
   ResourceResolutionError,
 } from "@atlante/resources";
 import {
+  type AnyEvalConfig,
   EVAL_MAX_TRIALS,
-  type EvalConfig,
   evalPackConfigSchema,
+  evalPackConfigV02Schema,
 } from "@atlante/schema";
 import {
   type Diagnostic,
@@ -205,7 +206,7 @@ function hasUnmonitoredBudget(report: RunReport): boolean {
 type PreparedEval = {
   projectRoot: string;
   source: string;
-  evalConfig: EvalConfig;
+  evalConfig: AnyEvalConfig;
   scenarios: DiscoveredEvalScenario[];
   trialsOverride: number | undefined;
 };
@@ -243,6 +244,24 @@ function prepareEval(
 
   const trialsOverride = parseTrialsOverride(options.trials);
   if (trialsOverride === null) return 2;
+
+  const materializedHosts: readonly string[] = loaded.document.hosts ?? [
+    "opencode",
+  ];
+  if (!materializedHosts.includes(evalConfig.host)) {
+    printDiagnostics([
+      error(
+        "eval-host-not-materialized",
+        `eval.host "${evalConfig.host}" is not among the materialized hosts (${materializedHosts.join(", ")})`,
+        {
+          source: diagnosticPath(loaded.configPath ?? target),
+          expected: "an eval host selected through the document hosts field",
+          next: `add "${evalConfig.host}" to hosts or set eval.host to one of: ${materializedHosts.join(", ")}`,
+        },
+      ),
+    ]);
+    return 2;
+  }
 
   const localDiscovery = evalConfig.scenarios
     ? discoverEvalScenarios(loaded.projectRoot, evalConfig.scenarios)
@@ -368,7 +387,10 @@ function discoverPackSuites(
     }
 
     if (rawEval === undefined) continue;
-    const parsed = evalPackConfigSchema.safeParse(rawEval);
+    const parsedV01 = evalPackConfigSchema.safeParse(rawEval);
+    const parsed = parsedV01.success
+      ? parsedV01
+      : evalPackConfigV02Schema.safeParse(rawEval);
     if (!parsed.success) {
       diagnostics.push(
         error(

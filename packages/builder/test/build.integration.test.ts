@@ -16,7 +16,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { openCodeMaterializer } from "@atlante/opencode";
 import { resourceTemplateSelection } from "@atlante/resources";
-import { SCHEMA_URI } from "@atlante/schema";
+import { SCHEMA_URI, SCHEMA_URI_V02 } from "@atlante/schema";
 import type { Diagnostic } from "@atlante/validator";
 import {
   type BuildResult,
@@ -432,6 +432,103 @@ describe("buildProject", () => {
     );
     expect(result.materializations).toEqual([
       { host: "opencode", writtenPaths: [], removedPaths: [] },
+    ]);
+  });
+
+  test("selects both materializers for a mixed-host v0.2 document", () => {
+    const { root } = project(
+      JSON.stringify({
+        $schema: SCHEMA_URI_V02,
+        hosts: ["opencode", "claude-code"],
+        agents: {
+          reviewer: {
+            description: "reviewer description",
+            identity: "Review the change.",
+            mission: "Do the work.",
+          },
+        },
+      }),
+    );
+    const openCode = fakeMaterializer(
+      { writtenPaths: [".opencode/agents/reviewer.md"] },
+      "opencode",
+    );
+    const claudeCode = fakeMaterializer(
+      { writtenPaths: [".claude/agents/reviewer.md"] },
+      "claude-code",
+    );
+
+    const result = buildProject(
+      root,
+      {},
+      { materializers: [openCode, claudeCode] },
+    );
+
+    expect(result.diagnostics).toEqual([]);
+    expect(openCode.calls).toHaveLength(1);
+    expect(claudeCode.calls).toHaveLength(1);
+    expect(result.materializations).toEqual([
+      {
+        host: "opencode",
+        writtenPaths: [".opencode/agents/reviewer.md"],
+        removedPaths: [],
+      },
+      {
+        host: "claude-code",
+        writtenPaths: [".claude/agents/reviewer.md"],
+        removedPaths: [],
+      },
+    ]);
+  });
+
+  test("aggregates per-host outcomes without cross-host atomicity", () => {
+    const { root } = project(
+      JSON.stringify({
+        $schema: SCHEMA_URI_V02,
+        hosts: ["opencode", "claude-code"],
+        agents: {
+          reviewer: {
+            description: "reviewer description",
+            identity: "Review the change.",
+            mission: "Do the work.",
+          },
+        },
+      }),
+    );
+    const openCode = fakeMaterializer(
+      {
+        diagnostics: injectedFailure(
+          "materialization-collision",
+          "unowned file at .opencode/agents/reviewer.md",
+        ),
+      },
+      "opencode",
+    );
+    const claudeCode = fakeMaterializer(
+      { writtenPaths: [".claude/agents/reviewer.md"] },
+      "claude-code",
+    );
+
+    const result = buildProject(
+      root,
+      {},
+      { materializers: [openCode, claudeCode] },
+    );
+
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        severity: "error",
+        code: "materialization-collision",
+      }),
+    );
+    expect(claudeCode.calls).toHaveLength(1);
+    expect(result.materializations).toEqual([
+      { host: "opencode", writtenPaths: [], removedPaths: [] },
+      {
+        host: "claude-code",
+        writtenPaths: [".claude/agents/reviewer.md"],
+        removedPaths: [],
+      },
     ]);
   });
 

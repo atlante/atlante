@@ -1,8 +1,15 @@
-import { EVAL_SCENARIO_SCHEMA_URI, SCHEMA_URI } from "@atlante/schema";
+import {
+  EVAL_SCENARIO_SCHEMA_URI,
+  SCHEMA_URI,
+  SCHEMA_URI_V02,
+} from "@atlante/schema";
 import evalScenarioSchema from "@atlante/schema/eval-scenario.json" with {
   type: "json",
 };
 import documentSchema from "@atlante/schema/schema.json" with { type: "json" };
+import documentV02Schema from "@atlante/schema/schema.v0.2.json" with {
+  type: "json",
+};
 
 export type SchemaDiagnostic = Readonly<{
   code: "schema-uri-required" | "schema-not-supported";
@@ -25,6 +32,7 @@ export type SchemaLookupResult =
 
 const schemas: Readonly<Record<string, unknown>> = {
   [SCHEMA_URI]: documentSchema,
+  [SCHEMA_URI_V02]: documentV02Schema,
   [EVAL_SCENARIO_SCHEMA_URI]: evalScenarioSchema,
 };
 
