@@ -453,3 +453,67 @@ describe("verifyNativeOutputs", () => {
     }
   });
 });
+
+describe("host-selected native outputs", () => {
+  test("verifies Claude outputs without touching OpenCode state", async () => {
+    const claudeProject = mkdtempSync(join(tmpdir(), "eval-claude-project-"));
+    try {
+      cpSync(fixtureProject, claudeProject, { recursive: true });
+      const { materializeClaudeCode } = await import("@atlante/claude-code");
+      materializeClaudeCode(claudeProject, {
+        agents: [
+          {
+            hostAgentId: "build",
+            description: "Build agent",
+            prompt: "You are a build agent.",
+          },
+        ],
+        skills: [],
+      });
+      const { verifyHostNativeOutputs } = await import("../src/index.js");
+      // OpenCode state is absent, so the legacy verifier fails closed.
+      expect(() => verifyNativeOutputs(claudeProject)).toThrow(
+        NativeOutputsNotVerifiedError,
+      );
+      const native = verifyHostNativeOutputs(claudeProject, "claude-code");
+      expect(native.files.map((file) => file.path)).toEqual([
+        ".claude/agents/build.md",
+      ]);
+
+      const discovered = discoverEvalScenarios(
+        claudeProject,
+        "eval/scenarios/*.eval.json",
+      ).scenarios.at(0);
+      if (!discovered) throw new Error("fixture scenario not discovered");
+      const sandbox = await assembleSandbox(
+        {
+          runRoot,
+          projectRoot: claudeProject,
+          scenario: discovered,
+          trialIndex: 11,
+          budget: resolveBudget({ evalConfig: undefined }),
+          keep: false,
+          host: "claude-code",
+        },
+        () => {},
+      );
+      try {
+        expect(
+          existsSync(join(sandbox.root, ".claude", "agents", "build.md")),
+        ).toBe(true);
+        expect(existsSync(join(sandbox.root, ".opencode"))).toBe(false);
+      } finally {
+        destroySandbox(sandbox);
+      }
+    } finally {
+      rmSync(claudeProject, { recursive: true, force: true });
+    }
+  });
+
+  test("rejects an unsupported eval host before any copy", async () => {
+    const { verifyHostNativeOutputs } = await import("../src/index.js");
+    expect(() => verifyHostNativeOutputs(projectRoot, "cursor")).toThrow(
+      NativeOutputsNotVerifiedError,
+    );
+  });
+});

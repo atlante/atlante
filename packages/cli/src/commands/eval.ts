@@ -8,6 +8,9 @@ import {
 import { basename, dirname, join, resolve } from "node:path";
 import { loadProject, type ProjectContext } from "@atlante/builder";
 import {
+  type ClaudeHostRunner,
+  ClaudeVersionError,
+  createClaudeRunner,
   createOpenCodeRunner,
   type EvalProgress,
   EvalRunError,
@@ -18,7 +21,7 @@ import {
   resolveBudget,
   runEval,
   runExitCode,
-  verifyNativeOutputs,
+  verifyHostNativeOutputs,
 } from "@atlante/eval";
 import { OpenCodeVersionError } from "@atlante/opencode/dialect";
 import {
@@ -79,28 +82,47 @@ export async function runEvalCommand(
 
   let host: HostRunner;
   let opencodeHost: OpenCodeHostRunner | undefined;
+  let claudeHost: ClaudeHostRunner | undefined;
+  let hostLabel = "OpenCode";
   try {
     if (runner === undefined) {
-      opencodeHost = createOpenCodeRunner({
-        projectRoot: prepared.projectRoot,
-      });
-      host = opencodeHost;
+      if (prepared.evalConfig.host === "claude-code") {
+        hostLabel = "Claude Code";
+        claudeHost = createClaudeRunner({
+          projectRoot: prepared.projectRoot,
+        });
+        host = claudeHost;
+      } else {
+        opencodeHost = createOpenCodeRunner({
+          projectRoot: prepared.projectRoot,
+        });
+        host = opencodeHost;
+      }
     } else {
       host = runner;
     }
   } catch (cause) {
     const versionError =
-      cause instanceof OpenCodeVersionError ? cause : undefined;
+      cause instanceof OpenCodeVersionError ||
+      cause instanceof ClaudeVersionError
+        ? cause
+        : undefined;
+    const claudeSelected =
+      hostLabel === "Claude Code" || prepared.evalConfig.host === "claude-code";
     printDiagnostics([
       error(
         versionError?.code === "unsupported-version"
           ? "eval-host-unsupported-version"
           : "eval-host-unavailable",
         versionError?.message ??
-          `could not prepare the OpenCode host: ${cause instanceof Error ? cause.message : String(cause)}`,
+          `could not prepare the ${claudeSelected ? "Claude Code" : "OpenCode"} host: ${cause instanceof Error ? cause.message : String(cause)}`,
         {
-          expected: "OpenCode V1 >=1.18.29 <2.0.0 or V2 >=2.0.0 <3.0.0",
-          next: "install a supported OpenCode version and re-run `atlante eval`",
+          expected: claudeSelected
+            ? "Claude Code >=2.0.0 <3.0.0"
+            : "OpenCode V1 >=1.18.29 <2.0.0 or V2 >=2.0.0 <3.0.0",
+          next: claudeSelected
+            ? "install a supported Claude Code version and re-run `atlante eval`"
+            : "install a supported OpenCode version and re-run `atlante eval`",
         },
       ),
     ]);
@@ -108,6 +130,22 @@ export async function runEvalCommand(
   }
   // The default runner needs stored credentials; without them every trial
   // would fail individually. Missing auth is run-preventing infrastructure.
+  // Injected runners skip the preflight entirely.
+  if (claudeHost !== undefined && !claudeHost.auth.authenticated) {
+    printDiagnostics([
+      error(
+        "eval-host-unauthenticated",
+        "claude-code authentication not found",
+        {
+          source: diagnosticPath(prepared.source),
+          expected:
+            "host credentials (ANTHROPIC_API_KEY, CLAUDE_CODE_OAUTH_TOKEN, or a `claude auth login` session)",
+          next: "set ANTHROPIC_API_KEY, generate a token with `claude setup-token`, or run `claude auth login` once, then re-run this command",
+        },
+      ),
+    ]);
+    return 3;
+  }
   if (opencodeHost !== undefined && !opencodeHost.auth.authenticated) {
     const auth = opencodeHost.auth;
     const authSource =
@@ -142,6 +180,7 @@ export async function runEvalCommand(
       atlanteVersion: packageJson.version,
       ...(options.keep ? { keep: true } : {}),
       runner: host,
+      host: prepared.evalConfig.host,
       // Live progress goes to stderr in both output modes; stdout stays
       // reserved for the summary (or the pure JSON report with `--json`).
       onProgress: (progress) => {
@@ -318,15 +357,18 @@ function prepareEval(
   });
 
   try {
-    verifyNativeOutputs(loaded.projectRoot);
+    verifyHostNativeOutputs(loaded.projectRoot, evalConfig.host);
   } catch (cause) {
+    const claudeSelected = evalConfig.host === "claude-code";
     printDiagnostics([
       error(
         "native-outputs-not-verified",
         cause instanceof Error ? cause.message : String(cause),
         {
           source: diagnosticPath(join(loaded.projectRoot, ".atlante")),
-          expected: "verified native OpenCode outputs",
+          expected: claudeSelected
+            ? "verified native Claude Code outputs"
+            : "verified native OpenCode outputs",
           next: "run `atlante build` and try again",
         },
       ),

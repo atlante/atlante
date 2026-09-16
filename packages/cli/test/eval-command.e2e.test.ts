@@ -171,12 +171,22 @@ async function buildFixtureOutputs(project: string): Promise<void> {
 // each test mutates only its own copy.
 const templateDirs: string[] = [];
 let builtTemplate: string | undefined;
+let builtClaudeTemplate: string | undefined;
 
 /** A cheap copy of the built template project, registered for per-test cleanup. */
 function builtProject(): string {
   if (builtTemplate === undefined) throw new Error("template not built");
   const project = tempDir();
   cpSync(builtTemplate, project, { recursive: true });
+  return project;
+}
+
+/** A cheap copy of the built Claude-only template project. */
+function builtClaudeProject(): string {
+  if (builtClaudeTemplate === undefined)
+    throw new Error("claude template not built");
+  const project = tempDir();
+  cpSync(builtClaudeTemplate, project, { recursive: true });
   return project;
 }
 
@@ -241,6 +251,17 @@ describe("runEvalCommand", () => {
     templateDirs.push(template);
     await buildFixtureOutputs(template);
     builtTemplate = template;
+    const claudeTemplate = writeEvalProject({
+      schemaUri: SCHEMA_URI_V02,
+      hosts: ["claude-code"],
+      evalSection: {
+        host: "claude-code",
+        scenarios: "eval/scenarios/*.eval.json",
+      },
+    });
+    templateDirs.push(claudeTemplate);
+    await buildFixtureOutputs(claudeTemplate);
+    builtClaudeTemplate = claudeTemplate;
   });
   afterAll(() => {
     for (const dir of templateDirs.splice(0))
@@ -466,6 +487,103 @@ describe("runEvalCommand", () => {
     const output = errors.join("\n");
     expect(output).not.toContain("eval-host-not-materialized");
     expect(output).toContain("native-outputs-not-verified");
+  });
+
+  test("verifies Claude native outputs for eval.host claude-code", async () => {
+    // Unbuilt Claude outputs fail before any host spawn, naming the host.
+    const project = evalProject({
+      schemaUri: SCHEMA_URI_V02,
+      hosts: ["claude-code"],
+      evalSection: {
+        host: "claude-code",
+        scenarios: "eval/scenarios/*.eval.json",
+      },
+    });
+    const errors: string[] = [];
+    const errorSpy = spyOn(console, "error").mockImplementation(
+      (...parts: unknown[]) => {
+        errors.push(parts.join(" "));
+      },
+    );
+    try {
+      const exit = await runEvalCommand(
+        project,
+        {},
+        undefined,
+        fakeRunner(true),
+      );
+      expect(exit).toBe(2);
+    } finally {
+      errorSpy.mockRestore();
+    }
+    expect(errors.join("\n")).toContain("Claude Code");
+  });
+
+  test("exits 3 with a diagnostic when the Claude host has no auth", async () => {
+    const project = builtClaudeProject();
+    // Pin a stub host so this test exercises the auth preflight rather
+    // than depending on the machine's Claude installation or login state.
+    // Injected runners skip the preflight entirely.
+    const binDir = tempDir();
+    const binary = join(binDir, "claude");
+    writeFileSync(
+      binary,
+      '#!/bin/sh\nif [ "$1" = "--version" ]; then printf \'%s\\n\' \'2.1.218 (Claude Code)\'; exit 0; fi\nif [ "$1" = "auth" ]; then printf \'%s\\n\' \'{"loggedIn":false}\'; exit 1; fi\nexit 1\n',
+    );
+    chmodSync(binary, 0o755);
+    const previousPath = process.env.PATH;
+    const previousApiKey = process.env.ANTHROPIC_API_KEY;
+    const previousAuthToken = process.env.ANTHROPIC_AUTH_TOKEN;
+    const previousOAuth = process.env.CLAUDE_CODE_OAUTH_TOKEN;
+    const previousBedrock = process.env.CLAUDE_CODE_USE_BEDROCK;
+    const previousVertex = process.env.CLAUDE_CODE_USE_VERTEX;
+    const previousFoundry = process.env.CLAUDE_CODE_USE_FOUNDRY;
+    const previousConfigDir = process.env.CLAUDE_CONFIG_DIR;
+    process.env.PATH = `${binDir}:${previousPath ?? ""}`;
+    delete process.env.ANTHROPIC_API_KEY;
+    delete process.env.ANTHROPIC_AUTH_TOKEN;
+    delete process.env.CLAUDE_CODE_OAUTH_TOKEN;
+    delete process.env.CLAUDE_CODE_USE_BEDROCK;
+    delete process.env.CLAUDE_CODE_USE_VERTEX;
+    delete process.env.CLAUDE_CODE_USE_FOUNDRY;
+    delete process.env.CLAUDE_CONFIG_DIR;
+    const errors: string[] = [];
+    const errorSpy = spyOn(console, "error").mockImplementation(
+      (...parts: unknown[]) => {
+        errors.push(parts.join(" "));
+      },
+    );
+    try {
+      const exit = await runEvalCommand(project, {}, undefined);
+      expect(exit).toBe(3);
+      expect(errors.join("\n")).toContain("eval-host-unauthenticated");
+      expect(errors.join("\n")).toContain("claude setup-token");
+      // No report was published: the run never started.
+      expect(existsSync(join(project, ".atlante", "eval"))).toBe(false);
+    } finally {
+      errorSpy.mockRestore();
+      if (previousPath === undefined) delete process.env.PATH;
+      else process.env.PATH = previousPath;
+      if (previousApiKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+      else process.env.ANTHROPIC_API_KEY = previousApiKey;
+      if (previousAuthToken === undefined)
+        delete process.env.ANTHROPIC_AUTH_TOKEN;
+      else process.env.ANTHROPIC_AUTH_TOKEN = previousAuthToken;
+      if (previousOAuth === undefined)
+        delete process.env.CLAUDE_CODE_OAUTH_TOKEN;
+      else process.env.CLAUDE_CODE_OAUTH_TOKEN = previousOAuth;
+      if (previousBedrock === undefined)
+        delete process.env.CLAUDE_CODE_USE_BEDROCK;
+      else process.env.CLAUDE_CODE_USE_BEDROCK = previousBedrock;
+      if (previousVertex === undefined)
+        delete process.env.CLAUDE_CODE_USE_VERTEX;
+      else process.env.CLAUDE_CODE_USE_VERTEX = previousVertex;
+      if (previousFoundry === undefined)
+        delete process.env.CLAUDE_CODE_USE_FOUNDRY;
+      else process.env.CLAUDE_CODE_USE_FOUNDRY = previousFoundry;
+      if (previousConfigDir === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+      else process.env.CLAUDE_CONFIG_DIR = previousConfigDir;
+    }
   });
 
   test("exits 2 for an unknown --scenario filter", async () => {
