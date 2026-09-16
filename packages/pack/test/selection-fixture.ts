@@ -47,6 +47,19 @@ export function cleanupPackResourceFixtures(): void {
     rmSync(root, { recursive: true, force: true });
 }
 
+export function instanceDescription(locator: string): string {
+  const { root, config } = packResourceFixture();
+  const { input } = resolveResourceInstance(
+    createProjectResourcePack(root),
+    locator,
+    config,
+  );
+  const { description } = input;
+  if (typeof description !== "string")
+    throw new Error(`pack skill ${locator} expects a string description`);
+  return description;
+}
+
 type ListSectionKind =
   | "instructions"
   | "responsibilities"

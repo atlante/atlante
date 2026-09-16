@@ -4,8 +4,6 @@ import evalScenarioSchema from "@atlante/schema/eval-scenario.json" with {
 };
 import documentSchema from "@atlante/schema/schema.json" with { type: "json" };
 
-export { EVAL_SCENARIO_SCHEMA_URI };
-
 export type SchemaDiagnostic = Readonly<{
   code: "schema-uri-required" | "schema-not-supported";
   message: string;

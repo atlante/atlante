@@ -22,7 +22,7 @@ export interface ThemeStorage {
 
 const THEME_STORAGE_KEY = "atlante-theme";
 
-export function getInitialTheme(
+function getInitialTheme(
   storedTheme: string | null,
   prefersDark: boolean,
 ): Theme {

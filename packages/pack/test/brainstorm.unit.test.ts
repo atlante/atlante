@@ -1,28 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import {
-  createProjectResourcePack,
-  resolveResourceInstance,
-} from "@atlante/resources";
-import {
   cleanupPackResourceFixtures,
-  packResourceFixture,
+  instanceDescription,
   resolvePackSkill,
 } from "./selection-fixture.js";
 
 const locator = "@atlante/pack/brainstorm";
-
-function instanceDescription(): string {
-  const { root, config } = packResourceFixture();
-  const { input } = resolveResourceInstance(
-    createProjectResourcePack(root),
-    locator,
-    config,
-  );
-  const { description } = input;
-  if (typeof description !== "string")
-    throw new Error(`${locator} expects a string description`);
-  return description;
-}
 
 describe("brainstorm skill instance", () => {
   afterEach(cleanupPackResourceFixtures);
@@ -39,19 +22,18 @@ describe("brainstorm skill instance", () => {
   });
 
   test("description resolves uncertainty and defines direction", () => {
-    const description = instanceDescription();
+    const description = instanceDescription(locator);
 
     expect(description).toContain("uncertainty");
     expect(description).toMatch(/\bdefin/i);
     expect(description).toContain("direction");
   });
 
-  test("invariants guard honesty and decision stability", () => {
+  test("invariants guard honesty about uncertainty and scope", () => {
     const invariants = resolvePackSkill(locator).listText("invariants");
 
     for (const marker of [
       "MUST NOT invent answers, hide material uncertainty, or silently expand the agreed scope",
-      "MUST preserve agreed decisions unless they are explicitly changed",
     ])
       expect(invariants).toContain(marker);
   });

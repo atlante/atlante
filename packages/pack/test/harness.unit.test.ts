@@ -1,11 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import {
-  createProjectResourcePack,
-  resolveResourceInstance,
-} from "@atlante/resources";
-import {
   cleanupPackResourceFixtures,
-  packResourceFixture,
+  instanceDescription,
   resolvePackSkill,
 } from "./selection-fixture.js";
 
@@ -33,19 +29,6 @@ const mechanicsAreas = [
   "Integrating and troubleshooting the OpenCode adapter",
 ];
 
-function instanceDescription(): string {
-  const { root, config } = packResourceFixture();
-  const { input } = resolveResourceInstance(
-    createProjectResourcePack(root),
-    locator,
-    config,
-  );
-  const { description } = input;
-  if (typeof description !== "string")
-    throw new Error(`${locator} expects a string description`);
-  return description;
-}
-
 describe("harness skill instance", () => {
   afterEach(cleanupPackResourceFixtures);
 
@@ -63,7 +46,7 @@ describe("harness skill instance", () => {
   });
 
   test("description carries the trigger-focused routing verbatim", () => {
-    expect(instanceDescription()).toBe(approvedDescription);
+    expect(instanceDescription(locator)).toBe(approvedDescription);
   });
 
   test("responsibilities carry the permanent-policy and provisional-mechanics tags", () => {
