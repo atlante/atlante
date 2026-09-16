@@ -1,28 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import {
-  createProjectResourcePack,
-  resolveResourceInstance,
-} from "@atlante/resources";
-import {
   cleanupPackResourceFixtures,
-  packResourceFixture,
+  instanceDescription,
   resolvePackSkill,
 } from "./selection-fixture.js";
 
 const locator = "@atlante/pack/build";
-
-function instanceDescription(): string {
-  const { root, config } = packResourceFixture();
-  const { input } = resolveResourceInstance(
-    createProjectResourcePack(root),
-    locator,
-    config,
-  );
-  const { description } = input;
-  if (typeof description !== "string")
-    throw new Error(`${locator} expects a string description`);
-  return description;
-}
 
 describe("build skill instance", () => {
   afterEach(cleanupPackResourceFixtures);
@@ -39,7 +22,7 @@ describe("build skill instance", () => {
   });
 
   test("description frames the work as one defined task", () => {
-    const description = instanceDescription();
+    const description = instanceDescription(locator);
 
     expect(description).toContain("task");
   });

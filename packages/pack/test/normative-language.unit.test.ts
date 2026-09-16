@@ -3,11 +3,11 @@ import {
   createProjectResourcePack,
   loadPresetFacet,
   renderResolvedTemplate,
-  resolveResourceInstance,
   resolveResourceTemplate,
 } from "@atlante/resources";
 import {
   cleanupPackResourceFixtures,
+  instanceDescription,
   packResourceFixture,
   resolvePackSkill,
 } from "./selection-fixture.js";
@@ -52,19 +52,6 @@ function renderPackTemplate(locator: string, input: unknown): string {
     ),
     input,
   });
-}
-
-function instanceDescription(locator: string): string {
-  const { root, config } = packResourceFixture();
-  const resolved = resolveResourceInstance(
-    createProjectResourcePack(root),
-    locator,
-    config,
-  );
-  const { description } = resolved.input;
-  if (typeof description !== "string")
-    throw new Error(`pack skill ${locator} expects a string description`);
-  return description;
 }
 
 describe("normative authoring convention", () => {
