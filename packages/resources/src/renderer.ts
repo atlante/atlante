@@ -5,6 +5,10 @@ import {
   escapeProse,
   fencedCode,
   indentExceptFirst,
+  inlineContinuesLine,
+  inlineLast,
+  inlineLineStart,
+  inlinePrefix,
   inTableCell,
   linePrefix,
   linkDestination,
@@ -300,6 +304,22 @@ export function renderResolvedTemplate(
   );
   handlebars.registerHelper("escapeProse", (value: unknown, options: unknown) =>
     escapeProse(String(value), options as { data?: { gfmTable?: boolean } }),
+  );
+  handlebars.registerHelper(
+    "inlineLineStart",
+    (nodes: unknown, index: unknown, initial: unknown) =>
+      inlineLineStart(nodes, Number(index), Boolean(initial)),
+  );
+  handlebars.registerHelper("inlineLast", (nodes: unknown, index: unknown) =>
+    inlineLast(nodes, Number(index)),
+  );
+  handlebars.registerHelper("inlinePrefix", (nodes: unknown, index: unknown) =>
+    inlinePrefix(nodes, Number(index)),
+  );
+  handlebars.registerHelper(
+    "inlineContinuesLine",
+    (nodes: unknown, index: unknown) =>
+      inlineContinuesLine(nodes, Number(index)),
   );
   handlebars.registerHelper("codeSpan", (value: unknown, options: unknown) =>
     codeSpan(String(value), options as { data?: { gfmTable?: boolean } }),
