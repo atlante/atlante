@@ -46,9 +46,9 @@ import {
 import { printDiagnostics } from "../report.js";
 import { createStyler } from "../style.js";
 
-export const MARKDOWN_TEMPLATE = "@atlante/pack/markdown";
-export const AGENT_TEMPLATE = "@atlante/pack/agent";
-export const SKILL_TEMPLATE = "@atlante/pack/skill";
+const MARKDOWN_TEMPLATE = "@atlante/pack/markdown";
+const AGENT_TEMPLATE = "@atlante/pack/agent";
+const SKILL_TEMPLATE = "@atlante/pack/skill";
 
 export type ImportKind = "agent" | "skill";
 
@@ -1182,7 +1182,7 @@ export type ImportFileSystem = Readonly<{
   rmSync: (path: string, options: { recursive: true; force: true }) => void;
 }>;
 
-export const defaultImportFileSystem: ImportFileSystem = {
+const defaultImportFileSystem: ImportFileSystem = {
   existsSync,
   readFileSync: (path, encoding) => readFileSync(path, encoding),
   mkdtempSync,
@@ -1602,5 +1602,3 @@ export function runImportWithDependencies(
   console.log(`${styler.success("imported")} ${styler.dim(outputDirectory)}`);
   return 0;
 }
-
-export const runImport = runImportWithDependencies;
