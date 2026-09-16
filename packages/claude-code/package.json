@@ -1,0 +1,35 @@
+{
+  "name": "@atlante/claude-code",
+  "version": "0.8.1",
+  "type": "module",
+  "description": "Atlante Claude Code host adapter",
+  "license": "MIT",
+  "contributors": [
+    {
+      "name": "cedoor",
+      "email": "me@cedoor.dev",
+      "url": "https://github.com/cedoor"
+    },
+    {
+      "name": "0xjei",
+      "email": "hello@0xjei.dev",
+      "url": "https://github.com/0xjei"
+    }
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/atlante/atlante.git",
+    "directory": "packages/claude-code"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "private": true,
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

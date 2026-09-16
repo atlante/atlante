@@ -1,0 +1,133 @@
+import {
+  ClaudeCodeMaterializationError,
+  type ClaudeCodeMaterializationErrorCode,
+  materializeClaudeCode,
+  planClaudeCodeMaterialization,
+} from "./native.js";
+
+/**
+ * Mirrors the validator's Diagnostic shape so the published declarations stay
+ * self-contained; outcomes are structurally compatible with builder
+ * diagnostics without importing a private package.
+ */
+export type MaterializationDiagnostic = {
+  severity: "error" | "warning";
+  code: string;
+  message: string;
+  /** Path the condition applies to, when the failure has one. */
+  source?: string;
+  /** One deterministic recovery action, when available. */
+  next?: string;
+  /** Normalized low-level cause, reported last. */
+  cause?: string;
+};
+
+/**
+ * Structural input accepted from the builder's PreparedProject: the adapter
+ * reads only the fields the native materializer owns, so the builder can pass
+ * its richer prepared value without the adapter importing the builder.
+ *
+ * Document `options` outDirs are deliberately absent: they are OpenCode-scoped
+ * and Claude Code discovers agents and skills from the fixed `.claude/`
+ * locations, so the adapter always materializes the Claude-native defaults.
+ */
+export type ClaudeCodeMaterializerPrepared = Readonly<{
+  agents: ReadonlyArray<{
+    hostAgentId: string;
+    description: string;
+    prompt: string;
+  }>;
+  skills: ReadonlyArray<{
+    skillId: string;
+    description: string;
+    content: string;
+  }>;
+}>;
+
+export type HostMaterializationOutcome = Readonly<{
+  diagnostics: readonly MaterializationDiagnostic[];
+  writtenPaths: readonly string[];
+  removedPaths: readonly string[];
+}>;
+
+export const CLAUDE_CODE_HOST_TARGET = "claude-code" as const;
+
+function repairFor(code: ClaudeCodeMaterializationErrorCode): string {
+  switch (code) {
+    case "invalid-id":
+      return "rename the ID in the Atlante source configuration; host materialization never renames IDs";
+    case "collision":
+      return "remove or rename the unowned file at that path, or take ownership by deleting it, then run `atlante build` again";
+    case "drift":
+      return "restore the file to its last generated state (for example by deleting the drifted file), then run `atlante build` again";
+    case "invalid-manifest":
+      return "delete the corrupt ownership manifest to discard Atlante's ownership state, then run `atlante build` again";
+    case "unsafe-path":
+      return "replace any symlink or non-directory in the reported path, then run `atlante build` again";
+    case "filesystem":
+    case "publication-failed":
+      return "fix the reported filesystem condition, then run `atlante build` again; a failed publication preserves the previous generated set";
+    case "invalid-input":
+      return "this is a builder defect: the prepared project violated the materializer contract";
+  }
+}
+
+function diagnosticFor(
+  cause: ClaudeCodeMaterializationError,
+): MaterializationDiagnostic {
+  const location = cause.path ? ` at ${cause.path}` : "";
+  return {
+    severity: "error",
+    code: `materialization-${cause.code}`,
+    message: `Claude Code materialization failed${location}: ${cause.message}`,
+    ...(cause.path ? { source: cause.path } : {}),
+    next: repairFor(cause.code),
+    ...(cause.cause ? { cause: String(cause.cause) } : {}),
+  };
+}
+
+export type ClaudeCodeMaterializeOptions = Readonly<{
+  /** When true, plan without publishing any files. */
+  dryRun?: boolean;
+}>;
+
+/**
+ * The builder-facing Claude Code host materializer. It owns only host-native
+ * publication semantics; source loading, validation, resolution, and rendering
+ * stay in the builder, and the prepared project arrives already rendered.
+ */
+export const claudeCodeMaterializer: {
+  readonly host: typeof CLAUDE_CODE_HOST_TARGET;
+  readonly materialize: (
+    projectRoot: string,
+    prepared: ClaudeCodeMaterializerPrepared,
+    options?: ClaudeCodeMaterializeOptions,
+  ) => HostMaterializationOutcome;
+} = {
+  host: CLAUDE_CODE_HOST_TARGET,
+  materialize(projectRoot, prepared, options): HostMaterializationOutcome {
+    const input = {
+      agents: prepared.agents.map((agent) => ({ ...agent })),
+      skills: prepared.skills.map((skill) => ({ ...skill })),
+    };
+    try {
+      const result =
+        options?.dryRun === true
+          ? planClaudeCodeMaterialization(projectRoot, input)
+          : materializeClaudeCode(projectRoot, input);
+      return {
+        diagnostics: [],
+        writtenPaths: result.writtenPaths,
+        removedPaths: result.removedPaths,
+      };
+    } catch (cause) {
+      if (cause instanceof ClaudeCodeMaterializationError)
+        return {
+          diagnostics: [diagnosticFor(cause)],
+          writtenPaths: [],
+          removedPaths: [],
+        };
+      throw cause;
+    }
+  },
+};
