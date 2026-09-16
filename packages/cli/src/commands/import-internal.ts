@@ -983,9 +983,14 @@ function instanceInput(
   kind: ImportKind,
 ): Record<string, unknown> {
   const sections = [{ markdown: ast }];
+  const hasTopLevelHeading = ast.some(
+    (block) => block.type === "heading" && block.depth === 1,
+  );
   return kind === "skill"
     ? {
-        ...(metadata.title === undefined ? {} : { title: metadata.title }),
+        ...(metadata.title === undefined || hasTopLevelHeading
+          ? {}
+          : { title: metadata.title }),
         ...(metadata.overview === undefined
           ? {}
           : { overview: metadata.overview }),

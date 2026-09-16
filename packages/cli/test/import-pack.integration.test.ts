@@ -12,7 +12,11 @@ import { buildProject, validateProject } from "@atlante/builder";
 import { openCodeMaterializer } from "@atlante/opencode";
 import { SCHEMA_URI } from "@atlante/schema";
 import { hasErrors } from "@atlante/validator";
-import { runImportWithDependencies } from "../src/commands/import-internal.js";
+import {
+  lowerToAtlanteAst,
+  parseMarkdownSource,
+  runImportWithDependencies,
+} from "../src/commands/import-internal.js";
 import {
   firstPartyPackVersion,
   firstPartyProjectContext,
@@ -41,6 +45,24 @@ function runQuiet<T>(run: () => T): T {
 
 function json(path: string): unknown {
   return JSON.parse(readFileSync(path, "utf8")) as unknown;
+}
+
+function generatedBody(source: string): string {
+  const separator = source.indexOf("\n---\n");
+  if (separator < 0)
+    throw new Error("generated native output has no frontmatter");
+  return source.slice(separator + "\n---\n".length);
+}
+
+function nodesOfType(value: unknown, type: string): Record<string, unknown>[] {
+  if (Array.isArray(value))
+    return value.flatMap((item) => nodesOfType(item, type));
+  if (typeof value !== "object" || value === null) return [];
+  const record = value as Record<string, unknown>;
+  return [
+    ...(record.type === type ? [record] : []),
+    ...Object.values(record).flatMap((item) => nodesOfType(item, type)),
+  ];
 }
 
 afterEach(() => {
@@ -109,7 +131,6 @@ bun install
     });
     expect(json(join(firstOutput, firstFiles[2]))).toEqual({
       $template: "@atlante/pack/skill",
-      title: "Example skill",
       overview: "A skill imported from Markdown.",
       sections: [
         {
@@ -187,6 +208,121 @@ Review the diff and report findings.
     expect(
       existsSync(join(root, ".opencode", "agents", "review-agent.md")),
     ).toBe(true);
+  });
+
+  test("preserves imported Markdown through OpenCode materialization", () => {
+    const root = tempDir();
+    const input = join(root, "create-issue.md");
+    const pack = join(root, "imported-pack");
+    const sourceText = [
+      "---",
+      "name: create-issue",
+      "description: Create GitHub issues.",
+      "---",
+      "",
+      "# Create a Nesso GitHub issue",
+      "",
+      "Draft a **fully drafted** issue with js + e2e, a=b~c, and `inline` code.",
+      "",
+      "## 1. Prepare the draft",
+      "",
+      "- preserve the first item",
+      "- preserve the second item",
+      "",
+      "| Name       | Value |",
+      "|:-----------|------:|",
+      "| command    | `js + e2e` |",
+      "",
+      "````bash",
+      "printf 'hello'",
+      "```\ninner",
+      "````",
+    ].join("\n");
+    writeFileSync(input, sourceText);
+
+    expect(
+      runQuiet(() => runImportWithDependencies(input, pack, { kind: "skill" })),
+    ).toBe(0);
+
+    const instance = json(join(pack, "create-issue", "instance.jsonc"));
+    expect(instance).toEqual(
+      expect.objectContaining({
+        $template: "@atlante/pack/skill",
+        sections: expect.any(Array),
+      }),
+    );
+    expect(instance).not.toHaveProperty("title");
+
+    writeFileSync(
+      join(root, "package.json"),
+      '{ "name": "import-consumer", "version": "0.0.0" }\n',
+    );
+    writeFileSync(
+      join(root, "atlante.jsonc"),
+      `${JSON.stringify({ $schema: SCHEMA_URI, extends: "./imported-pack" })}\n`,
+    );
+
+    const context = firstPartyProjectContext();
+    const validated = validateProject(join(root, "atlante.jsonc"), context);
+    expect(hasErrors(validated.diagnostics)).toBe(false);
+    expect(validated.diagnostics).toEqual([]);
+
+    const first = buildProject(join(root, "atlante.jsonc"), context, {
+      materializers: [openCodeMaterializer],
+    });
+    expect(hasErrors(first.diagnostics)).toBe(false);
+    expect(first.diagnostics).toEqual([]);
+    expect(first.materializations[0]?.writtenPaths.length).toBeGreaterThan(0);
+
+    const native = readFileSync(
+      join(root, ".opencode", "skills", "create-issue", "SKILL.md"),
+      "utf8",
+    );
+    const generated = parseMarkdownSource(native, "generated.md");
+    expect(generated.frontmatter).toEqual({
+      name: "create-issue",
+      description: "Create GitHub issues.",
+    });
+    expect(generated.diagnostics).toEqual([]);
+    const body = generatedBody(native);
+    const sourceAst = lowerToAtlanteAst(
+      parseMarkdownSource(sourceText, input).tree,
+      input,
+    );
+    const generatedAst = lowerToAtlanteAst(
+      parseMarkdownSource(body, "generated.md").tree,
+      "generated.md",
+    );
+    expect(sourceAst.diagnostics).toEqual([]);
+    expect(generatedAst.diagnostics).toEqual([]);
+    expect(generatedAst.ast).toEqual(sourceAst.ast);
+    expect(body.match(/^# [^\n]*$/gm) ?? []).toHaveLength(1);
+    expect(body).toContain("**fully drafted** issue with js + e2e, a=b~c");
+    expect(body).toContain("## 1. Prepare the draft");
+    expect(body).toContain("````bash");
+    expect(body).not.toContain("&#32;");
+    expect(body).not.toContain("\\~");
+    expect(body).not.toContain("1\\.");
+    expect(
+      nodesOfType(sourceAst.ast, "code").map(({ value, lang }) => ({
+        value,
+        lang,
+      })),
+    ).toEqual(
+      nodesOfType(generatedAst.ast, "code").map(({ value, lang }) => ({
+        value,
+        lang,
+      })),
+    );
+
+    const second = buildProject(join(root, "atlante.jsonc"), context, {
+      materializers: [openCodeMaterializer],
+    });
+    expect(hasErrors(second.diagnostics)).toBe(false);
+    expect(second.diagnostics).toEqual([]);
+    expect(
+      second.materializations.flatMap(({ writtenPaths }) => writtenPaths),
+    ).toEqual([]);
   });
 
   test.each([
@@ -282,6 +418,9 @@ Review the diff and report findings.
       atlante: { format: 1 },
       dependencies: { "@atlante/pack": firstPartyPackVersion() },
     });
+    expect(json(join(pack, "doc-skill", "instance.jsonc"))).toEqual(
+      expect.objectContaining({ title: "Doc skill" }),
+    );
 
     writeFileSync(
       join(root, "package.json"),
