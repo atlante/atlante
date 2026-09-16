@@ -59,12 +59,31 @@ describe("openCodeMaterializer", () => {
     expect(outcome.diagnostics).toEqual([]);
     expect(outcome.writtenPaths).toEqual([
       ".opencode/agents/reviewer.md",
-      ".opencode/skills/testing/SKILL.md",
+      ".opencode/skills/atlante/testing/SKILL.md",
     ]);
     expect(outcome.removedPaths).toEqual([]);
     expect(existsSync(join(root, ".opencode", "agents", "reviewer.md"))).toBe(
       true,
     );
+  });
+
+  test("passes independent output directories to native materialization", () => {
+    const root = project();
+    const value = {
+      ...prepared(),
+      options: {
+        agents: { outDir: "generated/agents" },
+        skills: { outDir: ".claude/skills" },
+      },
+    };
+
+    const outcome = openCodeMaterializer.materialize(root, value);
+
+    expect(outcome.diagnostics).toEqual([]);
+    expect(outcome.writtenPaths).toEqual([
+      ".claude/skills/testing/SKILL.md",
+      "generated/agents/reviewer.md",
+    ]);
   });
 
   test("is idempotent for unchanged output", () => {
@@ -127,5 +146,20 @@ describe("openCodeMaterializer", () => {
     expect(diagnostic.message).toContain("Bad_Name");
     expect(diagnostic.next).toContain("never renames");
     expect(existsSync(join(root, ".opencode"))).toBe(false);
+  });
+
+  test("gives actionable guidance for an unsafe output directory", () => {
+    const root = project();
+    const outcome = openCodeMaterializer.materialize(root, {
+      ...prepared(),
+      options: {
+        agents: { outDir: "../agents" },
+        skills: { outDir: ".opencode/skills/atlante" },
+      },
+    });
+
+    expect(outcome.diagnostics[0]?.next).toContain(
+      "safe project-relative output directory",
+    );
   });
 });

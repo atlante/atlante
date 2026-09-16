@@ -262,12 +262,18 @@ type RecordedMaterialization = {
 function fakeMaterializer(
   outcome: Partial<MaterializationOutcome> = {},
   host = "opencode",
-): HostMaterializer & { calls: RecordedMaterialization[] } {
+): HostMaterializer & {
+  calls: RecordedMaterialization[];
+  preparedOptions: unknown[];
+} {
   const calls: RecordedMaterialization[] = [];
+  const preparedOptions: unknown[] = [];
   return {
     host,
     calls,
+    preparedOptions,
     materialize(projectRoot, prepared) {
+      preparedOptions.push(prepared.options);
       calls.push({
         projectRoot,
         agents: prepared.agents.map(({ hostAgentId, description, prompt }) => ({
@@ -377,6 +383,33 @@ describe("buildProject", () => {
     expect(materializer.calls).toHaveLength(1);
     expect(result.materializations.map(({ host }) => host)).toEqual([
       "opencode",
+    ]);
+  });
+
+  test("propagates normalized native output options to the materializer", () => {
+    const { root } = project(
+      JSON.stringify({
+        $schema: SCHEMA_URI,
+        options: { agents: { outDir: "generated/agents" } },
+        agents: {
+          reviewer: {
+            description: "Reviews changes.",
+            identity: "Review the change.",
+            mission: "Find defects.",
+          },
+        },
+      }),
+    );
+    const materializer = fakeMaterializer();
+
+    const result = buildProject(root, {}, { materializers: [materializer] });
+
+    expect(result.diagnostics).toEqual([]);
+    expect(materializer.preparedOptions).toEqual([
+      {
+        agents: { outDir: "generated/agents" },
+        skills: { outDir: ".opencode/skills/atlante" },
+      },
     ]);
   });
 

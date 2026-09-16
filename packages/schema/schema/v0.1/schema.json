@@ -49,6 +49,32 @@
         ]
       }
     },
+    "options": {
+      "type": "object",
+      "properties": {
+        "agents": {
+          "type": "object",
+          "properties": {
+            "outDir": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "skills": {
+          "type": "object",
+          "properties": {
+            "outDir": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "agents": {
       "type": "object",
       "propertyNames": {

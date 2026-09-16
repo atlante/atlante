@@ -65,6 +65,19 @@ function preparedWithSkill(
   };
 }
 
+function preparedWithOutputDirectories(
+  agents = "generated/agents",
+  skills = ".claude/skills",
+): OpenCodePreparedProject {
+  return {
+    ...preparedWithSkill(),
+    options: {
+      agents: { outDir: agents },
+      skills: { outDir: skills },
+    },
+  } as OpenCodePreparedProject;
+}
+
 function digest(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
@@ -79,7 +92,7 @@ function nativeBytes(root: string): Array<{ path: string; bytes: Buffer }> {
   const paths = [
     ".atlante/opencode-native.json",
     ".opencode/agents/reviewer.md",
-    ".opencode/skills/testing/SKILL.md",
+    ".opencode/skills/atlante/testing/SKILL.md",
   ];
   return paths
     .filter((path) => existsSync(join(root, ...path.split("/"))))
@@ -117,7 +130,7 @@ describe("materializeOpenCode", () => {
 
     expect(result.writtenPaths).toEqual([
       ".opencode/agents/reviewer.md",
-      ".opencode/skills/testing/SKILL.md",
+      ".opencode/skills/atlante/testing/SKILL.md",
     ]);
     expect(result.removedPaths).toEqual([]);
     expect(
@@ -125,7 +138,7 @@ describe("materializeOpenCode", () => {
     ).toBe(agent);
     expect(
       readFileSync(
-        join(root, ".opencode", "skills", "testing", "SKILL.md"),
+        join(root, ".opencode", "skills", "atlante", "testing", "SKILL.md"),
         "utf8",
       ),
     ).toBe(skill);
@@ -142,7 +155,7 @@ describe("materializeOpenCode", () => {
         {
           kind: "skill",
           id: "testing",
-          path: ".opencode/skills/testing/SKILL.md",
+          path: ".opencode/skills/atlante/testing/SKILL.md",
           sha256: digest(skill),
         },
       ],
@@ -175,7 +188,7 @@ describe("materializeOpenCode", () => {
     expect(native.manifest.format).toBe("atlante-opencode-native");
     expect(native.files.map(({ path }) => path)).toEqual([
       ".opencode/agents/reviewer.md",
-      ".opencode/skills/testing/SKILL.md",
+      ".opencode/skills/atlante/testing/SKILL.md",
     ]);
     expect(new TextDecoder().decode(native.files[0]?.bytes)).toContain(
       "Review the change.",
@@ -236,13 +249,17 @@ describe("materializeOpenCode", () => {
     );
 
     expect(result.writtenPaths).toEqual([".opencode/agents/reviewer.md"]);
-    expect(result.removedPaths).toEqual([".opencode/skills/testing/SKILL.md"]);
+    expect(result.removedPaths).toEqual([
+      ".opencode/skills/atlante/testing/SKILL.md",
+    ]);
     expect(readFileSync(userFile, "utf8")).toBe("user-authored agent\n");
     expect(
       readFileSync(join(root, ".opencode", "agents", "reviewer.md"), "utf8"),
     ).toContain("Updated review.");
     expect(
-      existsSync(join(root, ".opencode", "skills", "testing", "SKILL.md")),
+      existsSync(
+        join(root, ".opencode", "skills", "atlante", "testing", "SKILL.md"),
+      ),
     ).toBe(false);
   });
 
@@ -260,6 +277,104 @@ describe("materializeOpenCode", () => {
     expect(readFileSync(target, "utf8")).toBe("user-authored agent\n");
     expect(existsSync(join(root, ".atlante", "opencode-native.json"))).toBe(
       false,
+    );
+  });
+
+  test("writes independently configured agent and skill directories", () => {
+    const root = project();
+
+    const result = materializeOpenCode(root, preparedWithOutputDirectories());
+
+    expect(result.writtenPaths).toEqual([
+      ".claude/skills/testing/SKILL.md",
+      "generated/agents/reviewer.md",
+    ]);
+    expect(manifestAt(root).files.map(({ path }) => path)).toEqual([
+      ".claude/skills/testing/SKILL.md",
+      "generated/agents/reviewer.md",
+    ]);
+    expect(
+      readFileSync(
+        join(root, ".claude", "skills", "testing", "SKILL.md"),
+        "utf8",
+      ),
+    ).toContain("Run the tests.");
+    expect(
+      readFileSync(join(root, "generated", "agents", "reviewer.md"), "utf8"),
+    ).toContain("Review the change.");
+  });
+
+  test("rejects unsafe configured output directories before mutation", () => {
+    for (const outDir of [
+      "/tmp/agents",
+      "../agents",
+      "./agents",
+      "agents\\nested",
+      "agents//nested",
+      "C:/agents",
+      "C:agents",
+    ]) {
+      const root = project();
+
+      try {
+        materializeOpenCode(
+          root,
+          preparedWithOutputDirectories(outDir, ".claude/skills"),
+        );
+        throw new Error(`expected unsafe output directory to fail: ${outDir}`);
+      } catch (cause) {
+        expect(cause).toBeInstanceOf(OpenCodeMaterializationError);
+        if (cause instanceof OpenCodeMaterializationError) {
+          expect(cause.code).toBe("unsafe-path");
+          expect(cause.path).toBe(outDir);
+        }
+      }
+      expect(existsSync(join(root, ".atlante"))).toBe(false);
+    }
+  });
+
+  test("accepts the previous skill path while moving stale output to the new default", () => {
+    const root = project();
+    materializeOpenCode(
+      root,
+      preparedWithOutputDirectories(".opencode/agents", ".opencode/skills"),
+    );
+
+    const result = materializeOpenCode(root, preparedWithSkill());
+
+    expect(result.writtenPaths).toEqual([
+      ".opencode/skills/atlante/testing/SKILL.md",
+    ]);
+    expect(result.removedPaths).toEqual([".opencode/skills/testing/SKILL.md"]);
+    expect(
+      existsSync(join(root, ".opencode", "skills", "testing", "SKILL.md")),
+    ).toBe(false);
+    expect(
+      existsSync(
+        join(root, ".opencode", "skills", "atlante", "testing", "SKILL.md"),
+      ),
+    ).toBe(true);
+  });
+
+  test("rejects a manifest path that is not a safe kind-and-ID path", () => {
+    const root = project();
+    materializeOpenCode(root, prepared());
+    const manifest = manifestAt(root);
+    const entry = manifest.files[0];
+    if (!entry) throw new Error("manifest entry missing");
+    const invalid = {
+      ...manifest,
+      files: [{ ...entry, path: "generated/reviewer.txt" }],
+    };
+    writeFileSync(
+      join(root, ".atlante", "opencode-native.json"),
+      `${JSON.stringify(invalid)}\n`,
+    );
+
+    expectMaterializationError(
+      () => readOpenCodeNative(root),
+      "unsafe-path",
+      "generated/reviewer.txt",
     );
   });
 
@@ -281,7 +396,14 @@ describe("materializeOpenCode", () => {
   test("refuses drifted stale files instead of deleting them", () => {
     const root = project();
     materializeOpenCode(root, preparedWithSkill());
-    const stale = join(root, ".opencode", "skills", "testing", "SKILL.md");
+    const stale = join(
+      root,
+      ".opencode",
+      "skills",
+      "atlante",
+      "testing",
+      "SKILL.md",
+    );
     writeFileSync(stale, "manually changed skill\n");
     const before = nativeBytes(root);
 
@@ -343,6 +465,26 @@ describe("materializeOpenCode", () => {
         entry.startsWith(".opencode-native.stage-"),
       ),
     ).toEqual([]);
+  });
+
+  test("removes newly created directories after a first publication failure", () => {
+    const root = project();
+    let publicationCount = 0;
+
+    expect(() =>
+      materializeOpenCode(root, preparedWithOutputDirectories(), {
+        fault: (operation) => {
+          if (operation === "publish-file") {
+            publicationCount += 1;
+            if (publicationCount === 2)
+              throw new Error("injected first-publication failure");
+          }
+        },
+      }),
+    ).toThrow("injected first-publication failure");
+
+    expect(publicationCount).toBe(2);
+    expect(readdirSync(root)).toEqual([]);
   });
 
   test("exposes a typed publication error for filesystem failures", () => {

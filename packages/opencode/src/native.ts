@@ -9,6 +9,7 @@ import {
   openSync,
   readFileSync,
   renameSync,
+  rmdirSync,
   rmSync,
   type Stats,
   writeFileSync,
@@ -21,6 +22,8 @@ const MANIFEST_PATH = ".atlante/opencode-native.json";
 const MAX_ID_LENGTH = 64;
 const NATIVE_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/;
+const DEFAULT_AGENT_OUTPUT_DIR = ".opencode/agents";
+const DEFAULT_SKILL_OUTPUT_DIR = ".opencode/skills/atlante";
 
 export type OpenCodePreparedAgent = Readonly<{
   hostAgentId: string;
@@ -34,6 +37,15 @@ export type OpenCodePreparedSkill = Readonly<{
   content: string;
 }>;
 
+export type OpenCodeOutputDirectory = Readonly<{
+  outDir: string;
+}>;
+
+export type OpenCodeOutputOptions = Readonly<{
+  agents: OpenCodeOutputDirectory;
+  skills: OpenCodeOutputDirectory;
+}>;
+
 /**
  * Structural input accepted from the builder's PreparedProject.
  *
@@ -42,6 +54,8 @@ export type OpenCodePreparedSkill = Readonly<{
  * materializer remains independent from source loading and resolution.
  */
 export type OpenCodePreparedProject = Readonly<{
+  /** Normalized output directories; omitted for backwards-compatible defaults. */
+  options?: OpenCodeOutputOptions;
   agents: readonly OpenCodePreparedAgent[];
   skills: readonly OpenCodePreparedSkill[];
 }>;
@@ -124,6 +138,7 @@ export class OpenCodeMaterializationError extends Error {
 }
 
 type ValidatedPreparedProject = {
+  options: OpenCodeOutputOptions;
   agents: OpenCodePreparedAgent[];
   skills: OpenCodePreparedSkill[];
 };
@@ -352,13 +367,19 @@ function validatePreparedProject(value: unknown): ValidatedPreparedProject {
     validatePreparedSkill,
     (skill) => skill.skillId,
   );
-  return { agents, skills };
+  return { options: validateOutputOptions(value.options), agents, skills };
 }
 
-function nativePath(kind: OpenCodeOwnedFile["kind"], id: string): string {
+function nativePath(
+  kind: OpenCodeOwnedFile["kind"],
+  id: string,
+  options: OpenCodeOutputOptions,
+): string {
+  const outputDirectory =
+    kind === "agent" ? options.agents.outDir : options.skills.outDir;
   return kind === "agent"
-    ? `.opencode/agents/${id}.md`
-    : `.opencode/skills/${id}/SKILL.md`;
+    ? `${outputDirectory}/${id}.md`
+    : `${outputDirectory}/${id}/SKILL.md`;
 }
 
 function isSafeRelativePath(path: string): boolean {
@@ -366,12 +387,58 @@ function isSafeRelativePath(path: string): boolean {
     path.length === 0 ||
     path.startsWith("/") ||
     path.includes("\\") ||
-    path.includes("\0")
+    path.includes("\0") ||
+    /^[A-Za-z]:/.test(path)
   )
     return false;
   return path
     .split("/")
     .every((part) => part.length > 0 && part !== "." && part !== "..");
+}
+
+function validateOutputDirectory(
+  value: unknown,
+  subject: string,
+  defaultValue: string,
+): OpenCodeOutputDirectory {
+  if (value === undefined) return { outDir: defaultValue };
+  if (!isRecord(value)) throw invalidInput(`${subject} must be an object`);
+  for (const key of Object.keys(value)) {
+    if (key !== "outDir")
+      throw invalidInput(`${subject} contains unsupported field: ${key}`);
+  }
+  if (value.outDir === undefined) return { outDir: defaultValue };
+  if (typeof value.outDir !== "string" || value.outDir.length === 0)
+    throw invalidInput(`${subject}.outDir must be a non-empty string`);
+  if (!isSafeRelativePath(value.outDir))
+    throw unsafePath(`${subject}.outDir is unsafe`, value.outDir);
+  return { outDir: value.outDir };
+}
+
+function validateOutputOptions(value: unknown): OpenCodeOutputOptions {
+  if (value === undefined)
+    return {
+      agents: { outDir: DEFAULT_AGENT_OUTPUT_DIR },
+      skills: { outDir: DEFAULT_SKILL_OUTPUT_DIR },
+    };
+  if (!isRecord(value))
+    throw invalidInput("prepared options must be an object");
+  for (const key of Object.keys(value)) {
+    if (key !== "agents" && key !== "skills")
+      throw invalidInput(`prepared options contains unsupported field: ${key}`);
+  }
+  return {
+    agents: validateOutputDirectory(
+      value.agents,
+      "prepared options.agents",
+      DEFAULT_AGENT_OUTPUT_DIR,
+    ),
+    skills: validateOutputDirectory(
+      value.skills,
+      "prepared options.skills",
+      DEFAULT_SKILL_OUTPUT_DIR,
+    ),
+  };
 }
 
 function absolutePath(root: string, relativePath: string): string {
@@ -489,7 +556,11 @@ function desiredFiles(
   const files: DesiredFile[] = [
     ...prepared.agents.map((agent) => {
       const bytes = renderAgent(agent);
-      const relativePath = nativePath("agent", agent.hostAgentId);
+      const relativePath = nativePath(
+        "agent",
+        agent.hostAgentId,
+        prepared.options,
+      );
       return {
         entry: {
           kind: "agent" as const,
@@ -504,7 +575,7 @@ function desiredFiles(
     }),
     ...prepared.skills.map((skill) => {
       const bytes = renderSkill(skill);
-      const relativePath = nativePath("skill", skill.skillId);
+      const relativePath = nativePath("skill", skill.skillId, prepared.options);
       return {
         entry: {
           kind: "skill" as const,
@@ -564,10 +635,17 @@ function manifestEntryPath(
     throw unsafePath(`files[${index}].path is unsafe`, String(value.path));
   if (paths.has(value.path))
     throw invalidManifest(`duplicate native path: ${value.path}`);
-  const expectedPath = nativePath(identity.kind, identity.id);
-  if (value.path !== expectedPath)
+  const segments = value.path.split("/");
+  const filename = segments[segments.length - 1];
+  const matchesNativeShape =
+    identity.kind === "agent"
+      ? segments.length >= 2 && filename === `${identity.id}.md`
+      : segments.length >= 3 &&
+        segments[segments.length - 2] === identity.id &&
+        filename === "SKILL.md";
+  if (!matchesNativeShape)
     throw unsafePath(
-      `manifest files[${index}].path does not match its native kind and ID`,
+      `manifest files[${index}].path does not match its safe native kind and ID shape`,
       value.path,
     );
   paths.add(value.path);
@@ -808,7 +886,7 @@ function cleanupDirectories(
   for (const path of [...state.createdDirectories].reverse()) {
     try {
       trigger(dependencies, "cleanup-directory", path);
-      rmSync(path);
+      rmdirSync(path);
     } catch (cause) {
       if (!missing(cause)) throw cause;
     }

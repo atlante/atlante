@@ -11,6 +11,8 @@ export type {
   OpenCodeMaterializationErrorCode,
   OpenCodeNativeFile,
   OpenCodeNativeProject,
+  OpenCodeOutputDirectory,
+  OpenCodeOutputOptions,
   OpenCodeOwnedFile,
   OpenCodeOwnershipManifest,
   OpenCodePreparedAgent,
