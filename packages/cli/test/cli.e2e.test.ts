@@ -409,6 +409,51 @@ describe("runBuild", () => {
     );
     expect(errors.join("\n")).toContain("missing-value");
   });
+
+  test("reports missing default ignore coverage without changing .gitignore", async () => {
+    const dir = project(valid);
+    const errors: string[] = [];
+    const original = console.error;
+    console.error = (...args: unknown[]) => errors.push(args.join(" "));
+    try {
+      expect(await runBuild(dir)).toBe(0);
+      expect(await runBuild(dir)).toBe(0);
+    } finally {
+      console.error = original;
+    }
+
+    expect(errors.join("\n")).toContain("missing-gitignore");
+    expect(errors.join("\n")).toContain(".opencode/agents/reviewer.md");
+    expect(existsSync(join(dir, ".gitignore"))).toBe(false);
+  });
+
+  test("does not diagnose custom output directories", async () => {
+    const dir = project(`{
+      "$schema": "${SCHEMA_URI}",
+      "options": {
+        "agents": { "outDir": "generated/agents" }
+      },
+      "agents": {
+        "reviewer": {
+          "description": "Reviews changes.",
+          "identity": "You review.",
+          "mission": "Find defects."
+        }
+      },
+    }`);
+    writeFileSync(join(dir, ".gitignore"), ".atlante/\n");
+    const errors: string[] = [];
+    const original = console.error;
+    console.error = (...args: unknown[]) => errors.push(args.join(" "));
+    try {
+      expect(await runBuild(dir)).toBe(0);
+    } finally {
+      console.error = original;
+    }
+
+    expect(errors.join("\n")).not.toContain("missing-gitignore");
+    expect(readFileSync(join(dir, ".gitignore"), "utf8")).toBe(".atlante/\n");
+  });
 });
 
 test("registers validate, build, mcp, init, import, pack, and eval, but not resolve", () => {

@@ -15,7 +15,7 @@ import {
   parseOpenCodeVersion,
   resolveOpenCodeDialect,
 } from "@atlante/opencode/dialect";
-import { SCHEMA_URI } from "@atlante/schema";
+import { type AtlanteDocument, SCHEMA_URI } from "@atlante/schema";
 import { hasErrors, validateDocumentText } from "@atlante/validator";
 import {
   FIRST_PARTY_PACKAGE,
@@ -23,6 +23,7 @@ import {
 } from "../first-party-pack.js";
 import { printDiagnostics, reportBuildResult } from "../report.js";
 import { createStyler } from "../style.js";
+import { type GitignorePlan, prepareInitGitignore } from "./gitignore.js";
 import { formatInitError } from "./init-error.js";
 import { type OpenCodeMcpPlan, prepareOpenCodeMcp } from "./opencode-mcp.js";
 import {
@@ -140,19 +141,6 @@ async function defaultPrompt(query: string): Promise<string> {
   }
 }
 
-/** The ignore policy init enforces for generated native outputs and state. */
-const GITIGNORE_ENTRIES: readonly string[] = [
-  ".opencode/agents/",
-  ".opencode/skills/",
-  ".atlante/",
-];
-
-type GitignorePlan = {
-  previous: Snapshot;
-  contents: string;
-  write: boolean;
-};
-
 function bareConfig(preset: string, firstParty = true): string {
   const comment = firstParty
     ? `// Extend the first-party package preset. You can override any value or agent
@@ -166,30 +154,6 @@ function bareConfig(preset: string, firstParty = true): string {
   "extends": ${JSON.stringify(preset)},
 }
 `;
-}
-
-/**
- * Prepares the ignore-policy edit: `.gitignore` at the project root ends up
- * with exactly the generated-output entries. Existing content is never
- * reordered or duplicated; missing entries are appended after a single blank
- * line, and a missing or empty file is created with exactly the entries.
- */
-function prepareGitignore(
-  directory: string,
-  fileSystem: InitFileSystem,
-): GitignorePlan {
-  const path = join(directory, ".gitignore");
-  const previous = snapshot(path, fileSystem);
-  const contents = previous.exists ? (previous.contents ?? "") : "";
-  const present = new Set(contents.split(/\r?\n/).map((line) => line.trim()));
-  const missing = GITIGNORE_ENTRIES.filter((entry) => !present.has(entry));
-  if (missing.length === 0) return { previous, contents, write: false };
-
-  const base =
-    contents.length === 0
-      ? ""
-      : `${contents.endsWith("\n") ? contents : `${contents}\n`}\n`;
-  return { previous, contents: `${base}${missing.join("\n")}\n`, write: true };
 }
 
 function mutationErrorMessage(message: string, cause: unknown): string {
@@ -258,13 +222,14 @@ function preflightPreset(
   target: string,
   contents: string,
   context: ProjectContext,
-): boolean {
+): AtlanteDocument | undefined {
   const validated = validateDocumentText(contents, target, {
     resourceContext: context,
   });
-  if (!hasErrors(validated.diagnostics)) return true;
+  if (!hasErrors(validated.diagnostics) && validated.document)
+    return validated.document;
   printDiagnostics(validated.diagnostics);
-  return false;
+  return undefined;
 }
 
 function buildAndReport(
@@ -451,7 +416,7 @@ async function prepareConfiguration(
   flow: InitFlow,
   options: InitOptions,
   abort: Abort,
-): Promise<number | { contents: string }> {
+): Promise<number | { contents: string; document: AtlanteDocument }> {
   assertRealProjectRoot(flow.directory);
 
   let pack: SelectedPack | undefined;
@@ -491,8 +456,9 @@ async function prepareConfiguration(
   }
 
   const contents = bareConfig(presetLocator, !pack);
-  if (!preflightPreset(flow.target, contents, flow.context)) return abort();
-  return { contents };
+  const document = preflightPreset(flow.target, contents, flow.context);
+  if (!document) return abort();
+  return { contents, document };
 }
 
 /**
@@ -503,6 +469,7 @@ async function prepareConfiguration(
 function commitConfiguration(
   flow: InitFlow,
   contents: string,
+  document: AtlanteDocument,
   options: InitOptions,
   abort: Abort,
 ): number | { mcp?: OpenCodeMcpPlan } {
@@ -520,7 +487,11 @@ function commitConfiguration(
     if ("error" in prepared) return abort(prepared.error);
     mcp = prepared;
   }
-  const gitignore = prepareGitignore(flow.directory, flow.fileSystem);
+  const gitignore = prepareInitGitignore(
+    flow.directory,
+    document,
+    flow.fileSystem,
+  );
 
   const committed = commitInitFiles(flow, contents, before, mcp, gitignore);
   if (committed.error) return abort(committed.error);
@@ -569,6 +540,7 @@ export async function runInitWithDependencies(
     const committed = commitConfiguration(
       flow,
       prepared.contents,
+      prepared.document,
       options,
       abort,
     );

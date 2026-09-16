@@ -162,7 +162,7 @@ describe("first-party package resources as user configurations", () => {
     };
     for (const [skillId, title] of Object.entries(titleLandmarks)) {
       const content = readFileSync(
-        join(dir, ".opencode", "skills", skillId, "SKILL.md"),
+        join(dir, ".opencode", "skills", "atlante", skillId, "SKILL.md"),
         "utf8",
       );
       expect(content.length, skillId).toBeGreaterThan(0);

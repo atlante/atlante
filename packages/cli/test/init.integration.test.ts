@@ -306,7 +306,7 @@ describe("runInit", () => {
     expect(opencode.model).toBe("anthropic/claude-sonnet-5");
     expect(opencode.plugin).toBeUndefined();
     expect(readFileSync(join(dir, ".gitignore"), "utf8")).toBe(
-      ".opencode/agents/\n.opencode/skills/\n.atlante/\n",
+      ".atlante/\n.opencode/skills/atlante/\n.opencode/agents/atlante.md\n",
     );
   });
 
@@ -1420,13 +1420,15 @@ describe("runInit", () => {
     const dir = tempDir();
     await runInit(dir, {});
     expect(readFileSync(join(dir, ".gitignore"), "utf8")).toBe(
-      ".opencode/agents/\n.opencode/skills/\n.atlante/\n",
+      ".atlante/\n.opencode/skills/atlante/\n.opencode/agents/atlante.md\n",
     );
     expect(existsSync(join(dir, ".opencode", "agents", "atlante.md"))).toBe(
       true,
     );
     expect(
-      existsSync(join(dir, ".opencode", "skills", "plan", "SKILL.md")),
+      existsSync(
+        join(dir, ".opencode", "skills", "atlante", "plan", "SKILL.md"),
+      ),
     ).toBe(true);
     expect(existsSync(join(dir, ".atlante", "opencode-native.json"))).toBe(
       true,
@@ -1629,12 +1631,13 @@ describe("runInit", () => {
   test("appends only missing .gitignore entries without touching existing content", async () => {
     const dir = tempDir();
     const gitignore = join(dir, ".gitignore");
-    const original = "# Generated outputs\nnode_modules/\n.opencode/agents/\n";
+    const original =
+      "# Generated outputs\nnode_modules/\n.opencode/agents/\n.opencode/skills/\n";
     writeFileSync(gitignore, original);
 
     expect(await runInitWithDependencies(dir, {}, {})).toBe(0);
     expect(readFileSync(gitignore, "utf8")).toBe(
-      `${original}\n.opencode/skills/\n.atlante/\n`,
+      "# Generated outputs\nnode_modules/\n.opencode/agents/\n.opencode/skills/\n\n.atlante/\n.opencode/skills/atlante/\n.opencode/agents/atlante.md\n",
     );
 
     // A second init run is idempotent: nothing is rewritten or duplicated.
@@ -1643,15 +1646,23 @@ describe("runInit", () => {
     expect(readFileSync(gitignore, "utf8")).toBe(afterFirst);
   });
 
-  test("leaves a .gitignore that already has every policy entry untouched", async () => {
+  test("keeps hand-written OpenCode files visible and out of the policy", async () => {
     const dir = tempDir();
-    const gitignore = join(dir, ".gitignore");
-    const original =
-      ".opencode/agents/\n.opencode/skills/\n.atlante/\n# keep\n";
-    writeFileSync(gitignore, original);
+    const agents = join(dir, ".opencode", "agents");
+    const skills = join(dir, ".opencode", "skills");
+    mkdirSync(agents, { recursive: true });
+    mkdirSync(skills, { recursive: true });
+    mkdirSync(join(skills, "handwritten"), { recursive: true });
+    writeFileSync(join(agents, "handwritten.md"), "user agent\n");
+    writeFileSync(join(skills, "handwritten", "SKILL.md"), "user skill\n");
 
     expect(await runInitWithDependencies(dir, {}, {})).toBe(0);
-    expect(readFileSync(gitignore, "utf8")).toBe(original);
+
+    const gitignore = readFileSync(join(dir, ".gitignore"), "utf8");
+    expect(gitignore).not.toContain(".opencode/agents/\n");
+    expect(gitignore).not.toContain(".opencode/skills/\n");
+    expect(existsSync(join(agents, "handwritten.md"))).toBe(true);
+    expect(existsSync(join(skills, "handwritten", "SKILL.md"))).toBe(true);
   });
 
   test("turns target write failures into an exit code", async () => {
@@ -1671,6 +1682,35 @@ describe("runInit", () => {
     expect(result.result).toBe(1);
     expect(result.errors.join("\n")).toContain("injected target write failure");
     expect(existsSync(target)).toBe(false);
+  });
+
+  test("restores .gitignore after a partial ignore write failure", async () => {
+    const dir = tempDir();
+    const gitignore = join(dir, ".gitignore");
+    const originalGitignore = "# keep this rule\n";
+    writeFileSync(gitignore, originalGitignore);
+    let failed = false;
+    const dependencies: InitDependencies = {
+      writeFileSync: (path, contents) => {
+        if (path === gitignore && !failed) {
+          failed = true;
+          writeFileSync(path, "partially written ignore\n");
+          throw new Error("injected gitignore write failure");
+        }
+        writeFileSync(path, contents);
+      },
+    };
+
+    const result = await captureErrors(() =>
+      runInitWithDependencies(dir, {}, dependencies),
+    );
+
+    expect(result.result).toBe(1);
+    expect(result.errors.join("\n")).toContain(
+      "injected gitignore write failure",
+    );
+    expect(readFileSync(gitignore, "utf8")).toBe(originalGitignore);
+    expect(existsSync(join(dir, "atlante.jsonc"))).toBe(false);
   });
 
   test("restores a preexisting target after a partial forced write failure", async () => {

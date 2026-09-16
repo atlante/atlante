@@ -9,6 +9,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { SCHEMA_URI } from "@atlante/schema";
 import {
   runPackInstall,
   runPackList,
@@ -18,6 +19,7 @@ import type {
   PackageManager,
   PackageManagerRunner,
 } from "../src/commands/package-manager.js";
+import { installStubPack } from "./stub-pack.js";
 
 const PACK = "@acme/review-pack";
 const created: string[] = [];
@@ -44,9 +46,18 @@ function packageRoot(directory: string, name = PACK): string {
 
 function writeInstalledPack(
   directory: string,
-  options: { name?: string; version?: string; format?: unknown } = {},
+  options: {
+    name?: string;
+    version?: string;
+    format?: unknown;
+    withResources?: boolean;
+  } = {},
 ): void {
   const name = options.name ?? PACK;
+  if (options.withResources) {
+    installStubPack(directory, { name });
+    return;
+  }
   const root = packageRoot(directory, name);
   mkdirSync(root, { recursive: true });
   writeFileSync(
@@ -71,7 +82,11 @@ type ManagerFixture = {
 
 function managerFixture(
   directory: string,
-  options: { invalidInstall?: boolean; failInstall?: boolean } = {},
+  options: {
+    invalidInstall?: boolean;
+    failInstall?: boolean;
+    withResources?: boolean;
+  } = {},
 ): ManagerFixture {
   const manager = (
     JSON.parse(readFileSync(join(directory, "package.json"), "utf8")) as {
@@ -102,6 +117,7 @@ function managerFixture(
       writeManifest(manifest);
       writeInstalledPack(directory, {
         format: options.invalidInstall ? 2 : 1,
+        withResources: options.withResources,
       });
       return { ok: true, status: 0 };
     }
@@ -110,6 +126,7 @@ function managerFixture(
       writeManifest(manifest);
       writeInstalledPack(directory, {
         format: options.invalidInstall ? 2 : 1,
+        withResources: options.withResources,
       });
       return { ok: true, status: 0 };
     }
@@ -216,6 +233,241 @@ describe("atlante pack install", () => {
       expect(existsSync(join(directory, ".opencode"))).toBe(false);
     },
   );
+
+  test("adds exact default agent entries for a referenced pack and is idempotent", async () => {
+    const directory = tempDir();
+    writeProject(directory, {
+      name: "pack-command-fixture",
+      version: "1.0.0",
+      packageManager: "npm@10.0.0",
+    });
+    writeFileSync(
+      join(directory, "atlante.jsonc"),
+      `{
+        "$schema": "${SCHEMA_URI}",
+        "extends": "${PACK}"
+      }
+      `,
+    );
+    const gitignore = join(directory, ".gitignore");
+    const original =
+      "# Keep handwritten OpenCode files visible\n.opencode/agents/handwritten.md\n";
+    writeFileSync(gitignore, original);
+    const fixture = managerFixture(directory, { withResources: true });
+
+    expect(
+      await runPackInstall(directory, PACK, {
+        runPackageManager: fixture.runner,
+      }),
+    ).toBe(0);
+    const afterFirst = readFileSync(gitignore, "utf8");
+    expect(afterFirst).toBe(`${original}\n.opencode/agents/atlante.md\n`);
+
+    expect(
+      await runPackInstall(directory, PACK, {
+        runPackageManager: fixture.runner,
+      }),
+    ).toBe(0);
+    expect(readFileSync(gitignore, "utf8")).toBe(afterFirst);
+    expect(afterFirst.match(/\.opencode\/agents\/atlante\.md/g)).toHaveLength(
+      1,
+    );
+    expect(fixture.runs).toHaveLength(1);
+  });
+
+  test("adds only the referenced pack agent entries", async () => {
+    const directory = tempDir();
+    writeProject(directory, {
+      name: "pack-command-fixture",
+      version: "1.0.0",
+      packageManager: "npm@10.0.0",
+    });
+    writeFileSync(
+      join(directory, "atlante.jsonc"),
+      `{
+        "$schema": "${SCHEMA_URI}",
+        "extends": "${PACK}",
+        "agents": {
+          "reviewer": {
+            "description": "Reviews changes.",
+            "identity": "You review.",
+            "mission": "Find defects."
+          }
+        }
+      }
+      `,
+    );
+    const gitignore = join(directory, ".gitignore");
+    writeFileSync(gitignore, "");
+    const fixture = managerFixture(directory, { withResources: true });
+
+    expect(
+      await runPackInstall(directory, PACK, {
+        runPackageManager: fixture.runner,
+      }),
+    ).toBe(0);
+    expect(readFileSync(gitignore, "utf8")).toBe(
+      ".opencode/agents/atlante.md\n",
+    );
+  });
+
+  test("adds only the agent entries from the selected pack preset", async () => {
+    const directory = tempDir();
+    writeProject(directory, {
+      name: "pack-command-fixture",
+      version: "1.0.0",
+      packageManager: "npm@10.0.0",
+      devDependencies: { [PACK]: "1.2.3" },
+    });
+    writeInstalledPack(directory, { withResources: true });
+    const strict = join(packageRoot(directory), "strict");
+    mkdirSync(strict, { recursive: true });
+    writeFileSync(
+      join(strict, "atlante.jsonc"),
+      JSON.stringify({
+        $schema: SCHEMA_URI,
+        values: { project: "{{sys.cwd.basename}}" },
+        agents: { strict: { $instance: `${PACK}/atlante` } },
+        skills: { plan: { $instance: `${PACK}/plan` } },
+      }),
+    );
+    writeFileSync(
+      join(directory, "atlante.jsonc"),
+      JSON.stringify({ $schema: SCHEMA_URI, extends: `${PACK}/strict` }),
+    );
+    const gitignore = join(directory, ".gitignore");
+    writeFileSync(gitignore, "");
+
+    expect(await runPackInstall(directory, PACK)).toBe(0);
+    expect(readFileSync(gitignore, "utf8")).toBe(
+      ".opencode/agents/strict.md\n",
+    );
+  });
+
+  test("includes agents inherited by the selected pack preset", async () => {
+    const directory = tempDir();
+    writeProject(directory, {
+      name: "pack-command-fixture",
+      version: "1.0.0",
+      packageManager: "npm@10.0.0",
+      devDependencies: { [PACK]: "1.2.3" },
+    });
+    writeInstalledPack(directory, { withResources: true });
+    const strict = join(packageRoot(directory), "strict");
+    mkdirSync(strict, { recursive: true });
+    writeFileSync(
+      join(strict, "atlante.jsonc"),
+      JSON.stringify({ $schema: SCHEMA_URI, extends: "../" }),
+    );
+    writeFileSync(
+      join(directory, "atlante.jsonc"),
+      JSON.stringify({ $schema: SCHEMA_URI, extends: `${PACK}/strict` }),
+    );
+    const gitignore = join(directory, ".gitignore");
+    writeFileSync(gitignore, "");
+
+    expect(await runPackInstall(directory, PACK)).toBe(0);
+    expect(readFileSync(gitignore, "utf8")).toBe(
+      ".opencode/agents/atlante.md\n",
+    );
+  });
+
+  test("adds the local agent path for a direct pack agent binding", async () => {
+    const directory = tempDir();
+    writeProject(directory, {
+      name: "pack-command-fixture",
+      version: "1.0.0",
+      packageManager: "npm@10.0.0",
+    });
+    writeFileSync(
+      join(directory, "atlante.jsonc"),
+      `{
+        "$schema": "${SCHEMA_URI}",
+        "values": { "project": "demo" },
+        "agents": {
+          "reviewer": { "$instance": "${PACK}/atlante" }
+        }
+      }
+      `,
+    );
+    const gitignore = join(directory, ".gitignore");
+    writeFileSync(gitignore, "");
+    const fixture = managerFixture(directory, { withResources: true });
+
+    expect(
+      await runPackInstall(directory, PACK, {
+        runPackageManager: fixture.runner,
+      }),
+    ).toBe(0);
+    expect(readFileSync(gitignore, "utf8")).toBe(
+      ".opencode/agents/reviewer.md\n",
+    );
+  });
+
+  test("does not add ignore entries for a pack using a custom agent directory", async () => {
+    const directory = tempDir();
+    writeProject(directory, {
+      name: "pack-command-fixture",
+      version: "1.0.0",
+      packageManager: "npm@10.0.0",
+    });
+    writeFileSync(
+      join(directory, "atlante.jsonc"),
+      `{
+        "$schema": "${SCHEMA_URI}",
+        "extends": "${PACK}",
+        "options": { "agents": { "outDir": "generated/agents" } }
+      }
+      `,
+    );
+    const gitignore = join(directory, ".gitignore");
+    const original = "# Keep this rule\n.atlante/\n";
+    writeFileSync(gitignore, original);
+    const fixture = managerFixture(directory, { withResources: true });
+
+    expect(
+      await runPackInstall(directory, PACK, {
+        runPackageManager: fixture.runner,
+      }),
+    ).toBe(0);
+    expect(readFileSync(gitignore, "utf8")).toBe(original);
+  });
+
+  test("uses the project's default agent directory when it overrides a pack directory", async () => {
+    const directory = tempDir();
+    writeProject(directory, {
+      name: "pack-command-fixture",
+      version: "1.0.0",
+      packageManager: "npm@10.0.0",
+      devDependencies: { [PACK]: "1.2.3" },
+    });
+    writeInstalledPack(directory, { withResources: true });
+    writeFileSync(
+      join(packageRoot(directory), "atlante.jsonc"),
+      JSON.stringify({
+        $schema: SCHEMA_URI,
+        values: { project: "{{sys.cwd.basename}}" },
+        options: { agents: { outDir: "generated/agents" } },
+        agents: { atlante: { $instance: `${PACK}/atlante` } },
+        skills: { plan: { $instance: `${PACK}/plan` } },
+      }),
+    );
+    writeFileSync(
+      join(directory, "atlante.jsonc"),
+      JSON.stringify({
+        $schema: SCHEMA_URI,
+        extends: PACK,
+        options: { agents: { outDir: ".opencode/agents" } },
+      }),
+    );
+    const gitignore = join(directory, ".gitignore");
+    writeFileSync(gitignore, "");
+
+    expect(await runPackInstall(directory, PACK)).toBe(0);
+    expect(readFileSync(gitignore, "utf8")).toBe(
+      ".opencode/agents/atlante.md\n",
+    );
+  });
 
   test("rolls back a failed or invalid installation", async () => {
     for (const options of [{ failInstall: true }, { invalidInstall: true }]) {
@@ -325,6 +577,51 @@ describe("atlante pack install", () => {
     expect(captured.result).toBe(1);
     expect(captured.errors.join("\n")).toContain("rollback-failed");
     expect(readFileSync(join(directory, "package.json"), "utf8")).toBe(before);
+  });
+
+  test("rolls back the ignore file when install reconciliation fails", async () => {
+    const directory = tempDir();
+    writeProject(directory, {
+      name: "pack-command-fixture",
+      version: "1.0.0",
+      packageManager: "npm@10.0.0",
+    });
+    writeFileSync(
+      join(directory, "atlante.jsonc"),
+      `{"$schema":"${SCHEMA_URI}","extends":"${PACK}"}\n`,
+    );
+    const gitignore = join(directory, ".gitignore");
+    const originalGitignore = "# user rule\n";
+    writeFileSync(gitignore, originalGitignore);
+    const originalManifest = readFileSync(
+      join(directory, "package.json"),
+      "utf8",
+    );
+    const fixture = managerFixture(directory, { withResources: true });
+    let failed = false;
+
+    const captured = await captureOutput(() =>
+      runPackInstall(directory, PACK, {
+        runPackageManager: fixture.runner,
+        writeFileSync: (path, contents) => {
+          if (path === gitignore && !failed) {
+            failed = true;
+            writeFileSync(path, "partially written ignore\n");
+            throw new Error("injected gitignore write failure");
+          }
+          writeFileSync(path, contents);
+        },
+      }),
+    );
+
+    expect(captured.result).toBe(1);
+    expect(captured.errors.join("\n")).toContain(
+      "injected gitignore write failure",
+    );
+    expect(readFileSync(gitignore, "utf8")).toBe(originalGitignore);
+    expect(readFileSync(join(directory, "package.json"), "utf8")).toBe(
+      originalManifest,
+    );
   });
 });
 
@@ -449,6 +746,197 @@ describe("atlante pack uninstall", () => {
     expect(fixture.runs[0]?.args).toEqual(["uninstall", PACK]);
   });
 
+  test("removes only stale pack agent entries and preserves remaining and user rules", async () => {
+    const directory = tempDir();
+    writeProject(directory, {
+      name: "pack-command-fixture",
+      version: "1.0.0",
+      packageManager: "npm@10.0.0",
+      devDependencies: { [PACK]: "1.2.3" },
+    });
+    writeInstalledPack(directory, { withResources: true });
+    writeFileSync(
+      join(directory, "atlante.jsonc"),
+      `{
+        "$schema": "${SCHEMA_URI}",
+        "agents": {
+          "reviewer": {
+            "description": "Reviews changes.",
+            "identity": "You review.",
+            "mission": "Find defects."
+          }
+        }
+      }
+      `,
+    );
+    const gitignore = join(directory, ".gitignore");
+    writeFileSync(
+      gitignore,
+      "# user rule\n.opencode/agents/atlante.md\n.opencode/agents/reviewer.md\n.opencode/agents/handwritten.md\n",
+    );
+    const fixture = managerFixture(directory, { withResources: true });
+
+    expect(
+      await runPackUninstall(directory, PACK, {
+        runPackageManager: fixture.runner,
+      }),
+    ).toBe(0);
+    expect(readFileSync(gitignore, "utf8")).toBe(
+      "# user rule\n.opencode/agents/reviewer.md\n.opencode/agents/handwritten.md\n",
+    );
+    expect(existsSync(packageRoot(directory))).toBe(false);
+  });
+
+  test("does not remove a user rule for an agent from a custom pack directory", async () => {
+    const directory = tempDir();
+    writeProject(directory, {
+      name: "pack-command-fixture",
+      version: "1.0.0",
+      packageManager: "npm@10.0.0",
+      devDependencies: { [PACK]: "1.2.3" },
+    });
+    writeInstalledPack(directory, { withResources: true });
+    writeFileSync(
+      join(packageRoot(directory), "atlante.jsonc"),
+      JSON.stringify({
+        $schema: SCHEMA_URI,
+        options: { agents: { outDir: "generated/agents" } },
+        agents: { atlante: { $instance: `${PACK}/atlante` } },
+      }),
+    );
+    writeFileSync(
+      join(directory, "atlante.jsonc"),
+      `{"$schema":"${SCHEMA_URI}"}\n`,
+    );
+    const gitignore = join(directory, ".gitignore");
+    const original = ".opencode/agents/atlante.md\n";
+    writeFileSync(gitignore, original);
+    const fixture = managerFixture(directory, { withResources: true });
+
+    expect(
+      await runPackUninstall(directory, PACK, {
+        runPackageManager: fixture.runner,
+      }),
+    ).toBe(0);
+    expect(readFileSync(gitignore, "utf8")).toBe(original);
+  });
+
+  test("does not remove a user rule for an agent from an unselected pack preset", async () => {
+    const directory = tempDir();
+    writeProject(directory, {
+      name: "pack-command-fixture",
+      version: "1.0.0",
+      packageManager: "npm@10.0.0",
+      devDependencies: { [PACK]: "1.2.3" },
+    });
+    writeInstalledPack(directory, { withResources: true });
+    const unselected = join(packageRoot(directory), "unselected");
+    mkdirSync(unselected, { recursive: true });
+    writeFileSync(
+      join(unselected, "atlante.jsonc"),
+      JSON.stringify({
+        $schema: SCHEMA_URI,
+        agents: {
+          unselected: {
+            description: "An unselected preset agent.",
+            identity: "You are unselected.",
+            mission: "Remain visible.",
+          },
+        },
+      }),
+    );
+    writeFileSync(
+      join(directory, "atlante.jsonc"),
+      `{"$schema":"${SCHEMA_URI}"}\n`,
+    );
+    const gitignore = join(directory, ".gitignore");
+    const original = ".opencode/agents/unselected.md\n";
+    writeFileSync(gitignore, original);
+
+    expect(await runPackUninstall(directory, PACK)).toBe(0);
+    expect(readFileSync(gitignore, "utf8")).toBe(original);
+  });
+
+  test("does not remove a user rule when a pack's default directory is inherited", async () => {
+    const directory = tempDir();
+    writeProject(directory, {
+      name: "pack-command-fixture",
+      version: "1.0.0",
+      packageManager: "npm@10.0.0",
+      devDependencies: { [PACK]: "1.2.3" },
+    });
+    writeInstalledPack(directory, { withResources: true });
+    const packRoot = packageRoot(directory);
+    const base = join(packRoot, "base");
+    mkdirSync(base, { recursive: true });
+    writeFileSync(
+      join(base, "atlante.jsonc"),
+      JSON.stringify({
+        $schema: SCHEMA_URI,
+        options: { agents: { outDir: "generated/agents" } },
+      }),
+    );
+    writeFileSync(
+      join(packRoot, "atlante.jsonc"),
+      JSON.stringify({
+        $schema: SCHEMA_URI,
+        extends: "./base",
+        agents: { atlante: { $instance: `${PACK}/atlante` } },
+      }),
+    );
+    writeFileSync(
+      join(directory, "atlante.jsonc"),
+      `{"$schema":"${SCHEMA_URI}"}\n`,
+    );
+    const gitignore = join(directory, ".gitignore");
+    const original = ".opencode/agents/atlante.md\n";
+    writeFileSync(gitignore, original);
+
+    const fixture = managerFixture(directory, { withResources: true });
+    expect(
+      await runPackUninstall(directory, PACK, {
+        runPackageManager: fixture.runner,
+      }),
+    ).toBe(0);
+    expect(readFileSync(gitignore, "utf8")).toBe(original);
+  });
+
+  test("removes stale manifest-owned agent entries when configuration is absent", async () => {
+    const directory = tempDir();
+    writeProject(directory, {
+      name: "pack-command-fixture",
+      version: "1.0.0",
+      packageManager: "npm@10.0.0",
+      devDependencies: { [PACK]: "1.2.3" },
+    });
+    writeInstalledPack(directory, { withResources: true });
+    mkdirSync(join(directory, ".atlante"), { recursive: true });
+    writeFileSync(
+      join(directory, ".atlante", "opencode-native.json"),
+      JSON.stringify({
+        format: "atlante-opencode-native",
+        version: 1,
+        files: [
+          {
+            kind: "agent",
+            id: "atlante",
+            path: ".opencode/agents/atlante.md",
+          },
+        ],
+      }),
+    );
+    const gitignore = join(directory, ".gitignore");
+    writeFileSync(gitignore, ".opencode/agents/atlante.md\n");
+
+    const fixture = managerFixture(directory, { withResources: true });
+    expect(
+      await runPackUninstall(directory, PACK, {
+        runPackageManager: fixture.runner,
+      }),
+    ).toBe(0);
+    expect(readFileSync(gitignore, "utf8")).toBe("");
+  });
+
   test("restores the dependency when uninstall throws after mutation", async () => {
     const directory = tempDir();
     writeProject(directory, {
@@ -482,6 +970,54 @@ describe("atlante pack uninstall", () => {
     expect(readFileSync(join(directory, "package.json"), "utf8")).toBe(before);
     expect(existsSync(packageRoot(directory))).toBe(true);
     expect(runs).toEqual(["uninstall", "install"]);
+  });
+
+  test("rolls back the ignore file when uninstall reconciliation fails", async () => {
+    const directory = tempDir();
+    writeProject(directory, {
+      name: "pack-command-fixture",
+      version: "1.0.0",
+      packageManager: "npm@10.0.0",
+      devDependencies: { [PACK]: "1.2.3" },
+    });
+    writeInstalledPack(directory, { withResources: true });
+    writeFileSync(
+      join(directory, "atlante.jsonc"),
+      `{"$schema":"${SCHEMA_URI}","agents":{"reviewer":{"description":"Reviews changes.","identity":"You review.","mission":"Find defects."}}}\n`,
+    );
+    const gitignore = join(directory, ".gitignore");
+    const originalGitignore = ".opencode/agents/atlante.md\n";
+    writeFileSync(gitignore, originalGitignore);
+    const originalManifest = readFileSync(
+      join(directory, "package.json"),
+      "utf8",
+    );
+    const fixture = managerFixture(directory, { withResources: true });
+    let failed = false;
+
+    const captured = await captureOutput(() =>
+      runPackUninstall(directory, PACK, {
+        runPackageManager: fixture.runner,
+        writeFileSync: (path, contents) => {
+          if (path === gitignore && !failed) {
+            failed = true;
+            writeFileSync(path, "partially written ignore\n");
+            throw new Error("injected gitignore write failure");
+          }
+          writeFileSync(path, contents);
+        },
+      }),
+    );
+
+    expect(captured.result).toBe(1);
+    expect(captured.errors.join("\n")).toContain(
+      "injected gitignore write failure",
+    );
+    expect(readFileSync(gitignore, "utf8")).toBe(originalGitignore);
+    expect(readFileSync(join(directory, "package.json"), "utf8")).toBe(
+      originalManifest,
+    );
+    expect(existsSync(packageRoot(directory))).toBe(true);
   });
 });
 

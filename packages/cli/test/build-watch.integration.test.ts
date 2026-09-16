@@ -376,9 +376,12 @@ describe("runBuildWatchWithDependencies", () => {
         "watch recovery after facet change",
       );
       expect(outcomes.at(-1)).toBe(0);
-      expect(errors).toHaveLength(invalidManifests.length);
+      const buildErrors = errors.filter(
+        (error) => !error.includes("missing-gitignore"),
+      );
+      expect(buildErrors).toHaveLength(invalidManifests.length);
       for (const [index, { message }] of invalidManifests.entries())
-        expect(errors[index]).toContain(message);
+        expect(buildErrors[index]).toContain(message);
     } finally {
       console.error = originalError;
       await handle.stop();
