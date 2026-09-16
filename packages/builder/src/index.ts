@@ -13,6 +13,7 @@ export { assertRealProjectRoot, buildProject } from "./build.js";
 export type {
   HostMaterializer,
   MaterializationOutcome,
+  MaterializeOptions,
 } from "./materializer.js";
 export type {
   AgentArtifact,

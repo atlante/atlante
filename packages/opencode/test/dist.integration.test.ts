@@ -156,6 +156,7 @@ test("the built single entry exposes exactly the materializer surface", async ()
     "OpenCodeMaterializationError",
     "materializeOpenCode",
     "openCodeMaterializer",
+    "planOpenCodeMaterialization",
     "readOpenCodeNative",
   ]);
   expect(typeof entry.materializeOpenCode).toBe("function");

@@ -14,10 +14,16 @@ export type MaterializationOutcome = {
  * package; hosts are selected through the document's `hosts` field and
  * materializers are injected by the composition root.
  */
+export type MaterializeOptions = Readonly<{
+  /** When true, compute the write/remove plan without publishing anything. */
+  dryRun?: boolean;
+}>;
+
 export type HostMaterializer = {
   readonly host: string;
   readonly materialize: (
     projectRoot: string,
     prepared: PreparedProject,
+    options?: MaterializeOptions,
   ) => MaterializationOutcome;
 };

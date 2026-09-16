@@ -162,4 +162,39 @@ describe("openCodeMaterializer", () => {
       "safe project-relative output directory",
     );
   });
+
+  test("plans without writing when dryRun is set", () => {
+    const root = project();
+
+    const outcome = openCodeMaterializer.materialize(root, prepared(), {
+      dryRun: true,
+    });
+
+    expect(outcome.diagnostics).toEqual([]);
+    expect(outcome.writtenPaths).toEqual([
+      ".opencode/agents/reviewer.md",
+      ".opencode/skills/atlante/testing/SKILL.md",
+    ]);
+    expect(outcome.removedPaths).toEqual([]);
+    expect(existsSync(join(root, ".opencode"))).toBe(false);
+    expect(existsSync(join(root, ".atlante"))).toBe(false);
+  });
+
+  test("reports collision in dryRun without writing", () => {
+    const root = project();
+    const agentDirectory = join(root, ".opencode", "agents");
+    mkdirSync(agentDirectory, { recursive: true });
+    writeFileSync(join(agentDirectory, "reviewer.md"), "user-authored\n");
+
+    const outcome = openCodeMaterializer.materialize(root, prepared(), {
+      dryRun: true,
+    });
+
+    expect(outcome.writtenPaths).toEqual([]);
+    expect(outcome.diagnostics).toHaveLength(1);
+    expect(outcome.diagnostics[0]?.code).toBe("materialization-collision");
+    expect(existsSync(join(root, ".atlante", "opencode-native.json"))).toBe(
+      false,
+    );
+  });
 });
