@@ -52,7 +52,7 @@ export type ResolvedResourceTarget = Readonly<{
   readonly cacheKey: string;
 }>;
 
-export type ResourceFailureContext = {
+export type ResourceTargetFailureContext = {
   readonly dependencies: readonly string[];
   readonly unresolvedParents: readonly string[];
   readonly trustedRoots?: readonly ResourceWatchRoot[];
@@ -60,8 +60,8 @@ export type ResourceFailureContext = {
 
 export function withPackTrust(
   pack: ResourcePack,
-  context: Omit<ResourceFailureContext, "trustedRoots">,
-): ResourceFailureContext {
+  context: Omit<ResourceTargetFailureContext, "trustedRoots">,
+): ResourceTargetFailureContext {
   return {
     ...context,
     ...(pack.kind === "package"
@@ -86,7 +86,7 @@ export function candidateContext(
   pack: ResourcePack,
   candidate: string,
   resolutionDependencies: readonly string[] = [],
-): ResourceFailureContext {
+): ResourceTargetFailureContext {
   const traversal = symlinkTraversal(pack, candidate);
   return withPackTrust(pack, {
     dependencies: targetResolutionDependencies(
@@ -104,7 +104,7 @@ export function candidateContext(
 export function targetContext(
   target: ResolvedResourceTarget,
   candidate = target.lexicalDirectory,
-): ResourceFailureContext {
+): ResourceTargetFailureContext {
   return withPackTrust(target.pack, {
     dependencies: targetResolutionDependencies(
       target.pack,

@@ -17,9 +17,9 @@ import { isWithin } from "./resource-paths.js";
 import {
   candidateContext,
   type ResolvedResourceTarget,
-  type ResourceFailureContext,
   type ResourceFile,
   type ResourceFileName,
+  type ResourceTargetFailureContext,
   targetContext,
   targetResolutionDependencies,
   withPackTrust,
@@ -34,7 +34,7 @@ import type { RawResourceLocator } from "./types.js";
 function fileContext(
   target: ResolvedResourceTarget,
   file: ResourceFile,
-): ResourceFailureContext {
+): ResourceTargetFailureContext {
   return withPackTrust(target.pack, {
     dependencies: targetResolutionDependencies(
       target.pack,
