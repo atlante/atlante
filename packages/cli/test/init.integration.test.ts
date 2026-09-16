@@ -1521,6 +1521,61 @@ describe("runInit", () => {
     }
   });
 
+  test("leaves Claude outputs alone on a default OpenCode-only init", async () => {
+    const dir = tempDir();
+    expect(await runInit(dir, {})).toBe(0);
+    expect(existsSync(join(dir, ".mcp.json"))).toBe(false);
+    expect(existsSync(join(dir, ".claude"))).toBe(false);
+  });
+
+  test("aborts before writing when .mcp.json has a conflicting atlante entry", async () => {
+    const dir = tempDir();
+    const path = join(dir, ".mcp.json");
+    const original = `${JSON.stringify({
+      mcpServers: { atlante: { command: "other Atlante fork" } },
+    })}\n`;
+    writeFileSync(path, original);
+
+    const { result, errors } = await captureErrors(() =>
+      runInitWithDependencies(
+        dir,
+        { hosts: "claude-code" },
+        {
+          buildProject: () => {
+            throw new Error("builder should not run");
+          },
+        },
+      ),
+    );
+
+    expect(result).toBe(1);
+    expect(errors.join("\n")).toContain("conflicts with Atlante's managed");
+    expect(readFileSync(path, "utf8")).toBe(original);
+    expect(existsSync(join(dir, "atlante.jsonc"))).toBe(false);
+  });
+
+  test("rolls back committed files when the .mcp.json write fails", async () => {
+    const dir = tempDir();
+    const mcpPath = join(dir, ".mcp.json");
+    const dependencies: InitDependencies = {
+      writeFileSync: (path, contents) => {
+        if (path === mcpPath) throw new Error("injected MCP write failure");
+        writeFileSync(path, contents);
+      },
+      buildProject: () => {
+        throw new Error("builder should not run");
+      },
+    };
+
+    const { result } = await captureErrors(() =>
+      runInitWithDependencies(dir, { hosts: "claude-code" }, dependencies),
+    );
+
+    expect(result).toBe(1);
+    expect(existsSync(join(dir, "atlante.jsonc"))).toBe(false);
+    expect(existsSync(mcpPath)).toBe(false);
+  });
+
   test("preserves an existing opencode.jsonc while registering MCP", async () => {
     const dir = tempDir();
     const path = join(dir, "opencode.jsonc");
