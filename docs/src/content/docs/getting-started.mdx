@@ -84,11 +84,12 @@ my-project/
 │   ├── agents/
 │   │   └── atlante.md
 │   └── skills/
-│       ├── brainstorm/SKILL.md
-│       ├── plan/SKILL.md
-│       ├── build/SKILL.md
-│       ├── review/SKILL.md
-│       └── harness/SKILL.md
+│       └── atlante/
+│           ├── brainstorm/SKILL.md
+│           ├── plan/SKILL.md
+│           ├── build/SKILL.md
+│           ├── review/SKILL.md
+│           └── harness/SKILL.md
 ├── opencode.jsonc                 # selected host config when root-level (or .json)
 └── .atlante/
     └── opencode-native.json
@@ -102,17 +103,19 @@ The files have different roles:
   OpenCode configuration exists. If an OpenCode configuration already exists,
   `init` updates the first file in its precedence order; the Atlante MCP entry
   for the detected host dialect is managed there alongside host settings.
-- `.opencode/agents/atlante.md` and the skill files are native output. Open
+- `.opencode/agents/atlante.md` and the skill files under
+  `.opencode/skills/atlante/` are native output. Open
   the agent file to inspect what the build produced, but make changes in the
   source configuration or its resources.
 - `.atlante/opencode-native.json` is the ownership manifest. It tells later
   builds which native files Atlante may update or remove without claiming
   unrelated OpenCode files.
 
-`init` adds `.opencode/agents/`, `.opencode/skills/`, and `.atlante/` to
-`.gitignore`. These directories hold generated native files and Atlante state;
-the authored configuration remains the versioned source. The OpenCode
-configuration is host configuration rather than generated native output.
+`init` adds `.atlante/`, `.opencode/skills/atlante/`, and the exact
+`.opencode/agents/atlante.md` entry to `.gitignore`. These entries cover
+default generated native files and Atlante state; the authored configuration
+remains the versioned source. The OpenCode configuration is host configuration
+rather than generated native output.
 
 See [Materialization](/reference/materialization) for output ownership and
 [Troubleshooting](/troubleshooting) when generated output must be versioned or

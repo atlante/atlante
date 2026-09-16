@@ -16,17 +16,26 @@ declared host without an injected materializer fails with `unsupported-host`.
 
 ## Native output paths
 
-For the OpenCode host the build materializes exactly:
+With default options the build materializes exactly:
 
 | Output | Path |
 | --- | --- |
 | Agent | `.opencode/agents/<id>.md` |
-| Skill | `.opencode/skills/<id>/SKILL.md` |
+| Skill | `.opencode/skills/atlante/<id>/SKILL.md` |
 | Ownership manifest | `.atlante/opencode-native.json` |
 
 IDs come from the document: lowercase kebab-case ASCII (`a-z`, `0-9`, hyphen
 separators), at most 64 characters. Atlante never renames an ID; a violating
 ID fails the build with `materialization-invalid-id`.
+
+## Custom output directories
+
+The document can override each output directory independently through
+`options.agents.outDir` and `options.skills.outDir`. A custom agent directory
+keeps the flat `<id>.md` layout, and a custom skill directory keeps the nested
+`<id>/SKILL.md` layout. Each override accepts a safe project-relative path.
+Custom directories receive no automatic Git-ignore entry and no automatic host
+discovery configuration.
 
 An agent file is a YAML frontmatter `description` followed by the rendered
 prompt. A skill file is a YAML frontmatter `name` and `description` followed

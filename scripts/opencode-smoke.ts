@@ -256,7 +256,7 @@ async function verifyV1Discovery(
   );
 
   // Native skill discovery: every first-party skill must be discovered
-  // from the project's .opencode/skills directory.
+  // from the project's default nested skill directory.
   const skills = await runHost(project, sandbox, "v1", [
     "debug",
     "skill",
@@ -269,7 +269,12 @@ async function verifyV1Discovery(
   const skillList = parseJson<unknown[]>(skills.stdout, "opencode debug skill");
   // The host reports resolved paths, so compare against the real project
   // location (on macOS /var/... is a symlink to /private/var/...).
-  const skillsDir = join(await realpath(project), ".opencode", "skills");
+  const skillsDir = join(
+    await realpath(project),
+    ".opencode",
+    "skills",
+    "atlante",
+  );
   for (const id of SKILL_IDS) {
     const found = skillList.find((entry) => record(entry) && entry.name === id);
     assert(
@@ -540,7 +545,7 @@ async function runPin(pin: HostPin): Promise<void> {
     for (const entry of manifest.files) {
       assert(
         entry.path.startsWith(".opencode/agents/") ||
-          entry.path.startsWith(".opencode/skills/"),
+          entry.path.startsWith(".opencode/skills/atlante/"),
         `unexpected native output path: ${entry.path}`,
       );
       const payload = await Bun.file(join(project, entry.path)).bytes();
@@ -556,7 +561,7 @@ async function runPin(pin: HostPin): Promise<void> {
     for (const id of SKILL_IDS) {
       assert(
         await Bun.file(
-          join(project, ".opencode", "skills", id, "SKILL.md"),
+          join(project, ".opencode", "skills", "atlante", id, "SKILL.md"),
         ).exists(),
         `native skill file is missing for ${id}`,
       );

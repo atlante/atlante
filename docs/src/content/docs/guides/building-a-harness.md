@@ -170,7 +170,7 @@ On the first build of these additions, the output includes lines such as:
 
 ```text title="Build output — excerpt"
 wrote opencode: .opencode/agents/reviewer.md
-wrote opencode: .opencode/skills/api-review/SKILL.md
+wrote opencode: .opencode/skills/atlante/api-review/SKILL.md
 built /Users/example/billing-api
 ```
 
@@ -190,7 +190,7 @@ Find defects before changes are merged.
 ```
 
 The remaining sections contain your review criteria and the instruction to
-use `api-review`. Open `.opencode/skills/api-review/SKILL.md` to inspect the
+use `api-review`. Open `.opencode/skills/atlante/api-review/SKILL.md` to inspect the
 separate procedure.
 
 Restart OpenCode from the project directory to discover the new agent and
