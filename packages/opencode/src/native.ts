@@ -208,6 +208,15 @@ function missing(cause: unknown): boolean {
   );
 }
 
+function directoryNotEmpty(cause: unknown): boolean {
+  return (
+    typeof cause === "object" &&
+    cause !== null &&
+    "code" in cause &&
+    cause.code === "ENOTEMPTY"
+  );
+}
+
 function invalidInput(
   message: string,
   path?: string,
@@ -1116,6 +1125,37 @@ function publishStaleFiles(
   }
 }
 
+/**
+ * Removes the per-skill directory a stale skill file leaves behind when
+ * nothing else remains in it. Only the immediate parent of a removed
+ * `SKILL.md` is attempted, and only an empty directory goes away: agent
+ * output roots, non-empty directories, and unrelated files are preserved.
+ * This runs after a successful publication, outside rollback scope, so an
+ * unexpected failure surfaces without resurrecting already-removed files.
+ */
+function pruneEmptyStaleSkillDirectories(
+  plan: MaterializationPlan,
+  dependencies: OpenCodeMaterializerDependencies,
+): void {
+  for (const file of plan.stale) {
+    const segments = file.relativePath.split("/");
+    if (segments[segments.length - 1] !== "SKILL.md") continue;
+    const directory = join(plan.root, ...segments.slice(0, -1));
+    trigger(dependencies, "cleanup-directory", directory);
+    try {
+      rmdirSync(directory);
+    } catch (cause) {
+      if (missing(cause) || directoryNotEmpty(cause)) continue;
+      throw new OpenCodeMaterializationError(
+        `cannot prune emptied OpenCode skill directory: ${file.relativePath}`,
+        "filesystem",
+        directory,
+        cause,
+      );
+    }
+  }
+}
+
 function publishManifest(
   plan: MaterializationPlan,
   stage: Stage,
@@ -1192,13 +1232,14 @@ function publishPlan(
   const state: PublicationState = { createdDirectories: [] };
   const touched = touchedPaths(plan);
   const expected = expectedAfter(plan);
+  let result: OpenCodeMaterializationResult;
   try {
     const stage = createStage(plan, state, dependencies);
     publishDesiredFiles(plan, stage, state, dependencies);
     publishStaleFiles(plan, dependencies);
     publishManifest(plan, stage, dependencies);
     cleanupStage(state, dependencies);
-    return {
+    result = {
       manifestPath: plan.manifestPath,
       manifest: plan.manifest,
       writtenPaths: plan.writes.map((file) => file.relativePath),
@@ -1232,6 +1273,8 @@ function publishPlan(
       cause,
     );
   }
+  pruneEmptyStaleSkillDirectories(plan, dependencies);
+  return result;
 }
 
 /**

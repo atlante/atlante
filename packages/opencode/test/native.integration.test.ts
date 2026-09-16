@@ -263,6 +263,45 @@ describe("materializeOpenCode", () => {
     ).toBe(false);
   });
 
+  test("removes the emptied skill directory when its skill is removed", () => {
+    const root = project();
+    materializeOpenCode(root, preparedWithSkill());
+
+    const result = materializeOpenCode(root, prepared());
+
+    expect(result.removedPaths).toEqual([
+      ".opencode/skills/atlante/testing/SKILL.md",
+    ]);
+    expect(
+      existsSync(join(root, ".opencode", "skills", "atlante", "testing")),
+    ).toBe(false);
+    expect(existsSync(join(root, ".opencode", "agents"))).toBe(true);
+  });
+
+  test("preserves a stale skill directory that holds unrelated files", () => {
+    const root = project();
+    materializeOpenCode(root, preparedWithSkill());
+    const notes = join(
+      root,
+      ".opencode",
+      "skills",
+      "atlante",
+      "testing",
+      "notes.md",
+    );
+    writeFileSync(notes, "user notes\n");
+
+    const result = materializeOpenCode(root, prepared());
+
+    expect(result.removedPaths).toEqual([
+      ".opencode/skills/atlante/testing/SKILL.md",
+    ]);
+    expect(readFileSync(notes, "utf8")).toBe("user notes\n");
+    expect(
+      existsSync(join(root, ".opencode", "skills", "atlante", "testing")),
+    ).toBe(true);
+  });
+
   test("refuses an unowned native target before writing it", () => {
     const root = project();
     const agentDirectory = join(root, ".opencode", "agents");
