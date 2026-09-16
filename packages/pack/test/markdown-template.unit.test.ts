@@ -249,6 +249,135 @@ describe("canonical Markdown template", () => {
     expect(mismatchedTable).toBe("| a |\n| :-- |\n| b |");
   });
 
+  test("preserves inline continuation and syntax-sensitive prose", () => {
+    expect(
+      renderMarkdown([
+        {
+          type: "paragraph",
+          children: [
+            { type: "strong", children: [text("fully drafted")] },
+            text(" issue with js + e2e, a=b~c"),
+          ],
+        },
+        {
+          type: "heading",
+          depth: 2,
+          children: [text("1. Prepare the draft")],
+        },
+        {
+          type: "paragraph",
+          children: [text("before"), { type: "break" }, text(">after")],
+        },
+        {
+          type: "paragraph",
+          children: [
+            text("line\n= "),
+            { type: "strong", children: [text("equals")] },
+          ],
+        },
+        {
+          type: "paragraph",
+          children: [
+            text("line\n-- "),
+            { type: "strong", children: [text("dashes")] },
+          ],
+        },
+      ]),
+    ).toBe(
+      "**fully drafted** issue with js + e2e, a=b~c\n\n## 1. Prepare the draft\n\nbefore  \n\\>after\n\nline\n= **equals**\n\nline\n-- **dashes**",
+    );
+  });
+
+  test("preserves whitespace at inline wrapper boundaries", () => {
+    const rendered = renderMarkdown([
+      {
+        type: "paragraph",
+        children: [
+          {
+            type: "emphasis",
+            children: [text("  emphasis"), text(" text ")],
+          },
+        ],
+      },
+      {
+        type: "paragraph",
+        children: [
+          { type: "link", url: "/link", children: [text("  linked  ")] },
+        ],
+      },
+      {
+        type: "paragraph",
+        children: [
+          { type: "link", url: "/link", children: [text("link\n")] },
+          text(" + x"),
+        ],
+      },
+    ]);
+
+    expect(rendered).toContain("*&#32;&#32;emphasis text&#32;*");
+    expect(rendered).toContain("[  linked  ](/link)");
+    expect(rendered).toContain("[link\n](/link) + x");
+  });
+
+  test("protects syntax that spans inline siblings", () => {
+    const rendered = renderMarkdown([
+      {
+        type: "paragraph",
+        children: [
+          text("!"),
+          { type: "link", url: "/issue", children: [text("issue")] },
+          text(" "),
+          text("~~"),
+          { type: "strong", children: [text("draft")] },
+          text("~~"),
+          text(" &"),
+          text("#65;"),
+        ],
+      },
+    ]);
+
+    expect(rendered).toBe("\\![issue](/issue) \\~\\~**draft**\\~\\~ \\&#65;");
+  });
+
+  test("protects line-start syntax across inline siblings", () => {
+    expect(
+      renderMarkdown([
+        {
+          type: "paragraph",
+          children: [text("1"), text(". item")],
+        },
+        {
+          type: "paragraph",
+          children: [text("-"), text("-"), text("-")],
+        },
+        {
+          type: "paragraph",
+          children: [text("before\n"), text("=")],
+        },
+        {
+          type: "paragraph",
+          children: [text("~"), text("~"), text("~")],
+        },
+      ]),
+    ).toBe("&#49;. item\n\n\\---\n\nbefore\n\\=\n\n\\~~~");
+  });
+
+  test("preserves single-tilde text and trailing whitespace", () => {
+    expect(
+      renderMarkdown([
+        {
+          type: "paragraph",
+          children: [text("a~b~c and a~~~b~~~c")],
+        },
+        {
+          type: "paragraph",
+          children: [text("a  "), text("\nb")],
+        },
+        { type: "paragraph", children: [text("at end ")] },
+      ]),
+    ).toBe("a\\~b\\~c and a~~~b~~~c\n\na&#32;&#32;\nb\n\nat end&#32;");
+  });
+
   test("rejects unknown nodes and parser-only fields, while defaulting ordered starts", () => {
     expect(
       validateMarkdownInput([
@@ -332,6 +461,6 @@ describe("canonical Markdown template", () => {
 
     expect(rendered).toContain("&#32;&#32;indented");
     expect(rendered).toContain("`  padded  `");
-    expect(rendered).toContain("~~~\na\n```\nb\n\n~~~");
+    expect(rendered).toContain("````\na\n```\nb\n\n````");
   });
 });

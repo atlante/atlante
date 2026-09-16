@@ -48,14 +48,20 @@ describe("escapeProse", () => {
     expect(escapeProse("a\\*b")).toBe("a\\\\\\*b");
   });
 
-  test("escapes ! everywhere to protect image syntax", () => {
-    expect(escapeProse("Hi!")).toBe("Hi\\!");
+  test("escapes image syntax but keeps ordinary punctuation literal", () => {
+    expect(escapeProse("Hi!")).toBe("Hi!");
+    expect(escapeProse("![alt]")).toBe("\\!\\[alt\\]");
   });
 
-  test("escapes quotes and strikethrough delimiters", () => {
+  test("escapes only syntax-sensitive strikethrough delimiters", () => {
     expect(escapeProse('say "hi" ~~not strike~~')).toBe(
-      'say \\"hi\\" \\~\\~not strike\\~\\~',
+      'say "hi" \\~\\~not strike\\~\\~',
     );
+    expect(escapeProse('say "hi"', { quoted: true })).toBe('say \\"hi\\"');
+  });
+
+  test("keeps ordinary plus, equals, and tilde punctuation literal", () => {
+    expect(escapeProse("js + e2e, a=b~c")).toBe("js + e2e, a=b~c");
   });
 
   test("escapes entity-like ampersands only", () => {
@@ -66,9 +72,20 @@ describe("escapeProse", () => {
   test("escapes line-start-sensitive characters at line starts only", () => {
     expect(escapeProse("a\n- b\n+ c")).toBe("a\n\\- b\n\\+ c");
     expect(escapeProse("a - b")).toBe("a - b");
-    expect(escapeProse("#x\n#y")).toBe("\\#x\n\\#y");
+    expect(escapeProse("#x\n#y")).toBe("#x\n#y");
+    expect(escapeProse("# x\n## y")).toBe("\\# x\n\\## y");
     expect(escapeProse("a\n> quote")).toBe("a\n\\> quote");
-    expect(escapeProse("a\n= b")).toBe("a\n\\= b");
+    expect(escapeProse("a\n>x")).toBe("a\n\\>x");
+    expect(escapeProse("#\nnext")).toBe("\\#\nnext");
+    expect(escapeProse("+\nnext")).toBe("\\+\nnext");
+    expect(escapeProse("-\r\nnext")).toBe("\\-\r\nnext");
+    expect(escapeProse("a\n= b")).toBe("a\n= b");
+    expect(escapeProse("a\n===")).toBe("a\n\\===");
+    expect(escapeProse("===")).toBe("===");
+    expect(escapeProse("--")).toBe("--");
+    expect(escapeProse("----")).toBe("\\----");
+    expect(escapeProse("~~~")).toBe("\\~~~");
+    expect(escapeProse("1234567890. x")).toBe("1234567890. x");
   });
 
   test("escapes ordered-list markers at line starts", () => {
@@ -82,6 +99,7 @@ describe("escapeProse", () => {
     expect(escapeProse("\ttext")).toBe("&#9;text");
     expect(escapeProse("a\n  - b")).toBe("a\n&#32;&#32;\\- b");
     expect(escapeProse("a - b")).toBe("a - b");
+    expect(escapeProse(" issue", { lineStart: false })).toBe(" issue");
   });
 
   test("escapes table-delimiter pipes at line starts", () => {
@@ -181,9 +199,9 @@ describe("fencedCode", () => {
     expect(fencedCode("")).toBe("```\n\n```");
   });
 
-  test("switches to a tilde fence past long backtick runs", () => {
-    expect(fencedCode("```\ninner")).toBe("~~~\n```\ninner\n~~~");
-    expect(fencedCode("x````y")).toBe("~~~\nx````y\n~~~");
+  test("widens backtick fences past long backtick runs", () => {
+    expect(fencedCode("```\ninner")).toBe("````\n```\ninner\n````");
+    expect(fencedCode("x````y")).toBe("`````\nx````y\n`````");
   });
 
   test("uses a tilde fence when the info string contains backticks", () => {
