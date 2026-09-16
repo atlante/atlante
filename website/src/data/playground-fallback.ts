@@ -1,4 +1,4 @@
-export type PlaygroundFallbackFile = {
+type PlaygroundFallbackFile = {
   path: string;
   content: string;
 };
