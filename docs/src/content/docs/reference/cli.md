@@ -32,6 +32,7 @@ and build the initial native files.
 npx atlante init [path]
 npx atlante init [path] --pack <pack-locator>
 npx atlante init [path] --pack <pack>/<preset>
+npx atlante init [path] --hosts <hosts>
 npx atlante init [path] --opencode-version <version>
 npx atlante init [path] --force
 npx atlante init [path] --no-mcp
@@ -39,20 +40,25 @@ npx atlante init [path] --no-mcp
 
 - `path` is a project directory and defaults to the current directory.
 - `--pack <locator>` selects a package pack instead of the bundled default `@atlante/pack`. An optional subpath names a preset, such as `@acme/review-pack/strict`. Local filesystem paths are not accepted by this option.
-- `--opencode-version <version>` registers against an explicit OpenCode version, such as `1.18.29` for an offline V1 project. Without it, `init` detects the installed host with one `--version` probe and defaults to V2 when no binary is available. Supported ranges are V1 (`>=1.18.29 <2.0.0`) and V2 (`>=2.0.0 <3.0.0`).
+- `--hosts <hosts>` selects the scaffolded materialization targets as a comma-separated subset of `opencode,claude-code`, such as `--hosts claude-code` or `--hosts opencode,claude-code`. It defaults to `opencode`. Selecting Claude Code writes a v0.2 configuration with the `hosts` field; an OpenCode-only selection keeps the v0.1 shape. Only the selected hosts' integrations are registered.
+- `--opencode-version <version>` registers against an explicit OpenCode version, such as `1.18.29` for an offline V1 project. Without it, `init` detects the installed host with one `--version` probe and defaults to V2 when no binary is available. Supported ranges are V1 (`>=1.18.29 <2.0.0`) and V2 (`>=2.0.0 <3.0.0`). The option applies only when OpenCode is among the selected hosts.
 - `--force` overwrites an existing `atlante.jsonc` and removes the alternate `atlante.json`.
 - `--no-mcp` skips registration of the local Atlante MCP server in the OpenCode configuration.
 
 `init` validates the selected preset before writing the configuration. It adds
-`.atlante/`, `.opencode/skills/atlante/` for default skills, and the exact
-default agent path `.opencode/agents/<id>.md` for each default agent to
+`.atlante/`, `.opencode/skills/atlante/` for default OpenCode skills, the exact
+default agent path `.opencode/agents/<id>.md` for each default OpenCode agent,
+the exact agent path `.claude/agents/<id>.md` for each agent when Claude Code
+is selected, and the exact skill directory `.claude/skills/<id>/` for each
+skill when Claude Code is selected to
 `.gitignore` without reordering existing content. Pre-existing entries stay
 untouched: init preserves unrelated
 rules, and removes only stale Atlante-managed agent entries. Custom output
 directories receive no automatic entry. Then it runs a build. By default,
-it also registers the version-pinned local MCP server in the target directory's
-OpenCode configuration, in the native shape of the selected dialect
-(`mcp.servers.atlante` for V2, `mcp.atlante` for V1). It selects the first
+it also registers the version-pinned local MCP server for each selected host:
+the OpenCode configuration in the native shape of the selected dialect
+(`mcp.servers.atlante` for V2, `mcp.atlante` for V1), and the project-scoped
+`.mcp.json` entry for Claude Code. It selects the first
 existing file in this order: `.opencode/opencode.jsonc`, `.opencode/opencode.json`,
 `opencode.jsonc`, and `opencode.json`. When none exists, it creates root
 `opencode.jsonc`. All existing candidates are parsed before initialization
@@ -248,7 +254,8 @@ npx atlante build [path] --dry-run
 ```
 
 A successful one-shot command lists written agent and skill paths, then removed
-agent and skill paths, for each host. It does not list ownership-manifest
+agent and skill paths, for each host, labeled with the host id (`opencode` or
+`claude-code`). It does not list ownership-manifest
 publication. The final line reports the resolved project path:
 
 ```text
@@ -256,6 +263,10 @@ wrote opencode: .opencode/agents/atlante.md
 removed opencode: .opencode/skills/atlante/obsolete/SKILL.md
 built /Users/example/project
 ```
+
+A mixed-host build reports one `wrote`/`removed` group per host and fails
+when any host fails; each host keeps its own publication safety, with no
+cross-host atomicity.
 
 Unchanged files are not rewritten, so an idempotent rebuild prints no `wrote`
 or `removed` lines.
@@ -296,8 +307,8 @@ the watcher stays active and retries after a later change. Stop it with
 
 ## `atlante eval`
 
-Run scenario documents against the project's verified native OpenCode outputs.
-Each trial runs the host in a disposable sandbox and grades the result with
+Run scenario documents against the project's verified native outputs for the
+selected `eval.host`. Each trial runs that host in a disposable sandbox and grades the result with
 deterministic checks. Eval never builds; run `atlante build` first. See
 [Eval](/reference/eval) for the configuration, scenario syntax, checks,
 containment rules, and exit statuses.

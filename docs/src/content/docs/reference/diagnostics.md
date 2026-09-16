@@ -90,7 +90,8 @@ and publication failures can produce additional stable codes.
 | `conflicting-selectors` | A source uses `$template` and `$instance` together |
 | `build-failed` | The CLI caught an unexpected exception from the build operation; ordinary failures retain their specific code |
 | `unsupported-host` | The document declares a host with no registered materializer |
-| `materialization-*` | An OpenCode materialization failure; see [Materialization](/reference/materialization) for the code list |
+| `materialization-*` | A host materialization failure; see [Materialization](/reference/materialization) for the code list |
+| `eval-pack-host-incompatible` | An included pack suite declares a `host` that differs from the project `eval.host` |
 | `watch-build-failed` | The watch wrapper's build function threw unexpectedly; ordinary failed rebuilds retain their underlying code |
 | `watch-inputs-failed` | Watch mode caught an exception while resolving or reconciling watched inputs |
 

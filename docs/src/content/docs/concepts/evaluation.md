@@ -32,12 +32,12 @@ the prompt sounds well written.
 ## What a trial evaluates
 
 Each trial starts with a fresh copy of the fixture and the native outputs
-from a prior build. OpenCode runs the task using that harness, and Atlante
+from a prior build. The selected host runs the task using that harness, and Atlante
 grades the resulting sandbox against the scenario's checks.
 
 ```text
 built harness + fixture + task
-    -> OpenCode trial
+    -> host trial
     -> resulting sandbox state
     -> checks
     -> trial verdict

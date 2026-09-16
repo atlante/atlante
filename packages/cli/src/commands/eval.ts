@@ -35,6 +35,7 @@ import {
   EVAL_MAX_TRIALS,
   evalPackConfigSchema,
   evalPackConfigV02Schema,
+  isPackHostCompatible,
 } from "@atlante/schema";
 import {
   type Diagnostic,
@@ -319,7 +320,7 @@ function prepareEval(
   printDiagnostics(discoveryDiagnostics);
   if (hasErrors(discoveryDiagnostics)) return 2;
 
-  const allScenarios = [
+  const allScenarios: (DiscoveredEvalScenario & { packHost?: string })[] = [
     ...localDiscovery.scenarios,
     ...packDiscovery.scenarios,
   ];
@@ -356,6 +357,37 @@ function prepareEval(
     return selected;
   });
 
+  // Pack `host` is compatibility metadata, project `host` is execution
+  // policy: an included suite with a declared host runs only under the
+  // matching project host. Host-neutral suites (no declared host) run under
+  // either host. Mismatches fail here, before native verification or any
+  // host run, instead of silently running or silently skipping.
+  const incompatible = included.filter(
+    (scenario) =>
+      scenario.origin.kind === "package" &&
+      !isPackHostCompatible(scenario.packHost, evalConfig.host),
+  );
+  if (incompatible.length > 0) {
+    printDiagnostics(
+      incompatible.map((scenario) => {
+        if (scenario.origin.kind !== "package")
+          throw new Error(
+            "unreachable: incompatible scenario is not a pack scenario",
+          );
+        return error(
+          "eval-pack-host-incompatible",
+          `pack suite "${scenario.origin.packageName}@${scenario.origin.packageVersion}" declares host "${scenario.packHost}" which is incompatible with project eval.host "${evalConfig.host}"`,
+          {
+            source: `${scenario.origin.packageName}@${scenario.origin.packageVersion}/${scenario.source}`,
+            expected: `a pack suite compatible with eval.host "${evalConfig.host}", or a host-neutral suite`,
+            next: `remove ${scenario.origin.packageName} from eval.include or run eval with a compatible host`,
+          },
+        );
+      }),
+    );
+    return 2;
+  }
+
   try {
     verifyHostNativeOutputs(loaded.projectRoot, evalConfig.host);
   } catch (cause) {
@@ -386,7 +418,7 @@ function prepareEval(
 }
 
 type PackScenarioDiscovery = {
-  scenarios: DiscoveredEvalScenario[];
+  scenarios: (DiscoveredEvalScenario & { packHost?: string })[];
   diagnostics: Diagnostic[];
 };
 
@@ -394,7 +426,7 @@ type PackScenarioDiscovery = {
 function discoverPackSuites(
   packages: readonly ResolvedResourcePackage[],
 ): PackScenarioDiscovery {
-  const scenarios: DiscoveredEvalScenario[] = [];
+  const scenarios: (DiscoveredEvalScenario & { packHost?: string })[] = [];
   const diagnostics: Diagnostic[] = [];
   for (const selected of packages) {
     const identity = selected.pack.package;
@@ -455,13 +487,18 @@ function discoverPackSuites(
       packageVersion: identity.version,
       locator: identity.name,
     };
+    const packHost = parsed.data.host;
     const discovery = discoverEvalScenarios(
       selected.pack.root,
       parsed.data.scenarios,
       { origin },
     );
     diagnostics.push(...discovery.diagnostics);
-    scenarios.push(...discovery.scenarios);
+    for (const scenario of discovery.scenarios) {
+      scenarios.push(
+        packHost === undefined ? scenario : { ...scenario, packHost },
+      );
+    }
   }
   return { scenarios, diagnostics };
 }

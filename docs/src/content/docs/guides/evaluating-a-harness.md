@@ -17,18 +17,19 @@ You need:
   [project-local CLI](/getting-started#use-a-project-local-cli).
 - A `reviewer` agent, such as the one in
   [Customize your harness](/guides/building-a-harness).
-- [OpenCode](https://opencode.ai/v2/docs/) installed and available as `opencode`
-  in your terminal, with stored provider credentials. Versions `>=1.18.29 <2.0.0`
-  and `>=2.0.0 <3.0.0` are supported. The trial sandbox has no global OpenCode
-  configuration, so set `model` in the `eval` section when the host default is
-  not a provider you are authenticated with.
+- [OpenCode](https://opencode.ai/v2/docs/) or [Claude Code](https://code.claude.com/docs) installed with stored provider credentials. OpenCode supports versions `>=1.18.29 <2.0.0`
+  and `>=2.0.0 <3.0.0`; Claude Code supports versions `>=2.0.0 <3.0.0`.
+  Set `host` in the `eval` section to the runner you want, and set `model`
+  when the host default is not a provider you are authenticated with. For
+  Claude Code, authenticate once with `claude auth login`, set
+  `ANTHROPIC_API_KEY`, or generate a token with `claude setup-token`.
 - Git available in your terminal so Atlante can establish each trial's
   starting filesystem state.
 
 Run commands from the root of the project containing `atlante.jsonc`.
 
 :::caution
-Evaluation launches OpenCode, so trials can incur model usage costs even though
+Evaluation launches the selected host, so trials can incur model usage costs even though
 the checks grade their results without another model acting as judge.
 Review the [sandbox containment boundary](/reference/eval#sandbox-containment)
 before running fixtures or instructions from other sources.
@@ -191,7 +192,7 @@ and usage limits through the [budget settings](/reference/eval) before running
 larger tasks.
 
 Atlante creates a fresh sandbox from the fixture, adds the built harness, asks
-OpenCode to run the task, and grades the resulting files against the scenario's
+the selected host to run the task, and grades the resulting files against the scenario's
 checks.
 
 ## Inspect the result

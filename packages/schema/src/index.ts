@@ -84,6 +84,7 @@ export {
   evalPackConfigSchema,
   evalPackConfigV02Schema,
   evalScenarioSchema,
+  isPackHostCompatible,
 } from "./eval.js";
 export type {
   MarkdownBlockContent,

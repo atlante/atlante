@@ -14,7 +14,9 @@ files their host discovers, and provides `atlante eval` to test the resulting
 harness, so it can be developed like code.
 
 > [!NOTE]
-> [OpenCode](https://opencode.ai/) is the only supported host today. Read the
+> Atlante supports [OpenCode](https://opencode.ai/) and
+> [Claude Code](https://code.claude.com/docs) as hosts, with OpenCode as the
+> default. Read the
 > [documentation](https://docs.atlante.sh) for concepts, guides, and reference.
 
 ## Quick start
@@ -27,8 +29,8 @@ npx atlante init
 ```
 
 `init` writes an `atlante.jsonc` that extends the bundled first-party preset,
-builds the native files OpenCode discovers, and registers the read-only Atlante
-MCP server. Restart OpenCode and the `atlante` agent is available, with the
+builds the native files the selected host discovers, and registers the read-only Atlante
+MCP server. Restart the host and the `atlante` agent is available, with the
 default brainstorm, plan, build, and review skills, and `harness` for
 maintaining the harness itself.
 
@@ -69,8 +71,8 @@ flag.
 flowchart LR
   source["atlante.jsonc<br/>versioned source"] --> validate["validate<br/>(checks only)"]
   source --> build["build<br/>(validates, then materializes)"]
-  build --> native[".opencode/ + manifest<br/>native outputs"]
-  native --> host["OpenCode"]
+  build --> native[".opencode/ + .claude/ + manifests<br/>native outputs"]
+  native --> host["OpenCode / Claude Code"]
   host -.-> eval["eval"]
 ```
 
@@ -115,7 +117,7 @@ conventions, and test tiers.
 
 ## Status
 
-[`SPECIFICATION.md`](SPECIFICATION.md) defines the normative `v0.1` contract.
+[`SPECIFICATION.md`](SPECIFICATION.md) defines the normative `v0.1` and `v0.2` contracts.
 
 ## License
 

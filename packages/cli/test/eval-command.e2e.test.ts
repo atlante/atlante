@@ -66,7 +66,10 @@ function scenarioDocument(): string {
   })}\n`;
 }
 
-function writePackEvalSuite(project: string): void {
+function writePackEvalSuite(
+  project: string,
+  options: { host?: string } = {},
+): void {
   const packRoot = join(project, "node_modules", ...FIXTURE_PACK.split("/"));
   const packConfigPath = join(packRoot, "atlante.jsonc");
   const packConfig = JSON.parse(readFileSync(packConfigPath, "utf8")) as Record<
@@ -74,6 +77,7 @@ function writePackEvalSuite(project: string): void {
     unknown
   >;
   packConfig.eval = {
+    ...(options.host === undefined ? {} : { host: options.host }),
     scenarios: "eval/scenarios/*.eval.json",
     fixtures: "eval/fixtures",
   };
@@ -376,6 +380,120 @@ describe("runEvalCommand", () => {
     } finally {
       errorSpy.mockRestore();
     }
+  });
+
+  test("exits 2 before execution when an included pack suite declares an incompatible host", async () => {
+    const project = evalProject({
+      schemaUri: SCHEMA_URI_V02,
+      hosts: ["opencode", "claude-code"],
+      evalSection: { host: "opencode", include: [FIXTURE_PACK] },
+    });
+    writePackEvalSuite(project, { host: "claude-code" });
+    await buildFixtureOutputs(project);
+    let runnerCalled = false;
+    const runner: HostRunner = {
+      name: "never",
+      prepareHostIntegration() {},
+      async runTrial(): Promise<TrialRun> {
+        runnerCalled = true;
+        throw new Error("must not run");
+      },
+    };
+    const errors: string[] = [];
+    const errorSpy = spyOn(console, "error").mockImplementation(
+      (...parts: unknown[]) => {
+        errors.push(parts.join(" "));
+      },
+    );
+    try {
+      const exit = await runEvalCommand(project, {}, undefined, runner);
+      expect(exit).toBe(2);
+    } finally {
+      errorSpy.mockRestore();
+    }
+    expect(runnerCalled).toBe(false);
+    expect(errors.join("\n")).toContain("eval-pack-host-incompatible");
+    expect(existsSync(join(project, ".atlante", "eval"))).toBe(false);
+  });
+
+  test("exits 2 when a claude-code run includes an opencode-only pack suite", async () => {
+    const project = evalProject({
+      schemaUri: SCHEMA_URI_V02,
+      hosts: ["claude-code"],
+      evalSection: { host: "claude-code", include: [FIXTURE_PACK] },
+    });
+    writePackEvalSuite(project, { host: "opencode" });
+    await buildFixtureOutputs(project);
+    const errors: string[] = [];
+    const errorSpy = spyOn(console, "error").mockImplementation(
+      (...parts: unknown[]) => {
+        errors.push(parts.join(" "));
+      },
+    );
+    try {
+      const exit = await runEvalCommand(
+        project,
+        {},
+        undefined,
+        fakeRunner(false),
+      );
+      expect(exit).toBe(2);
+    } finally {
+      errorSpy.mockRestore();
+    }
+    expect(errors.join("\n")).toContain("eval-pack-host-incompatible");
+  });
+
+  test("runs an included pack suite whose declared host matches the project host", async () => {
+    const project = evalProject({
+      schemaUri: SCHEMA_URI_V02,
+      hosts: ["claude-code"],
+      evalSection: { host: "claude-code", include: [FIXTURE_PACK] },
+    });
+    writePackEvalSuite(project, { host: "claude-code" });
+    await buildFixtureOutputs(project);
+    let calls = 0;
+    const exit = await runEvalCommand(project, {}, undefined, {
+      name: "fake",
+      prepareHostIntegration() {},
+      async runTrial(input) {
+        calls += 1;
+        expect(existsSync(join(input.sandbox.root, "pack-only.txt"))).toBe(
+          true,
+        );
+        return {
+          outcome: "completed",
+          durationMs: 5,
+          model: "test/model",
+          modelVersion: "model-x",
+        };
+      },
+    });
+    expect(exit).toBe(0);
+    expect(calls).toBe(3);
+    const { file } = reportPaths(project);
+    const report = JSON.parse(readFileSync(file, "utf8"));
+    expect(report.scenarios["pack-happy"].passRate).toBe(1);
+  });
+
+  test("runs a host-neutral pack suite under a claude-code project host", async () => {
+    const project = evalProject({
+      schemaUri: SCHEMA_URI_V02,
+      hosts: ["claude-code"],
+      evalSection: { host: "claude-code", include: [FIXTURE_PACK] },
+    });
+    writePackEvalSuite(project);
+    await buildFixtureOutputs(project);
+    const exit = await runEvalCommand(
+      project,
+      {},
+      undefined,
+      fakeRunner(false),
+    );
+    expect(exit).toBe(0);
+    const { file } = reportPaths(project);
+    const report = JSON.parse(readFileSync(file, "utf8"));
+    expect(report.scenarios["pack-happy"].passRate).toBe(1);
   });
 
   test("exits 1 when a check fails", async () => {

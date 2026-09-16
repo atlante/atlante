@@ -179,6 +179,19 @@ export const evalPackConfigV02Schema = z.strictObject({
 export type EvalPackConfigV02 = z.infer<typeof evalPackConfigV02Schema>;
 export type AuthoredEvalPackConfigV02 = z.input<typeof evalPackConfigV02Schema>;
 
+/**
+ * Pack suite host compatibility: the pack `host` is compatibility metadata,
+ * the project `host` is execution policy. A suite without a declared host
+ * is host-neutral and runs under either host; a suite with a declared host
+ * runs only under the matching project host, never by silent fallback.
+ */
+export function isPackHostCompatible(
+  packHost: string | undefined,
+  projectHost: string,
+): boolean {
+  return packHost === undefined || packHost === projectHost;
+}
+
 const commandCheckSchema = z.strictObject({
   type: z.literal("command"),
   /** argv executed in the sandbox root; never routed through a shell. */

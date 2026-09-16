@@ -1,6 +1,6 @@
 ---
 title: Schema
-description: Exact fields and version boundaries for the v0.1 document contract.
+description: Exact fields and version boundaries for the v0.1 and v0.2 document contracts.
 ---
 
 Atlante v0.1 documents use this exact, immutable schema URI:
@@ -9,7 +9,13 @@ Atlante v0.1 documents use this exact, immutable schema URI:
 https://atlante.sh/schema/v0.1/schema.json
 ```
 
-The minimal valid document adds it to `atlante.jsonc` or `atlante.json`:
+Atlante v0.2 documents use this exact schema URI:
+
+```text
+https://atlante.sh/schema/v0.2/schema.json
+```
+
+The minimal valid document adds one of them to `atlante.jsonc` or `atlante.json`:
 
 ```jsonc
 {
@@ -39,8 +45,8 @@ The document contract accepts these fields:
 | `options` | object | Native output directories by kind; each kind accepts an `outDir` override |
 | `agents` | object | Map from non-empty host-agent IDs to bindings or `null` tombstones |
 | `skills` | object | Map from non-empty skill IDs to bindings or `null` tombstones |
-| `eval` | object | Optional `atlante eval` configuration: OpenCode host, scenario-document glob, model, and budget |
-| `hosts` | non-empty string array | Host materialization targets; v0.1 admits only `"opencode"` |
+| `eval` | object | Optional `atlante eval` configuration: host runner, scenario-document glob, model, and budget |
+| `hosts` | non-empty string array | Host materialization targets; v0.1 admits only `"opencode"`, v0.2 additionally admits `"claude-code"` |
 
 Unknown top-level fields are rejected. Missing `agents` and `skills` maps become
 empty maps in the canonical document. `hosts` must not contain duplicates, and
@@ -100,7 +106,9 @@ not part of the document contract.
 - Missing `options` normalizes to default output directories. The defaults are
   `.opencode/agents` for agents and `.opencode/skills/atlante` for skills.
   Each kind accepts an independent `outDir` override with a safe
-  project-relative path.
+  project-relative path. These directories are OpenCode-scoped: the Claude
+  Code materializer publishes fixed `.claude/` locations described in
+  [Materialization](/reference/materialization).
 - Presets resolve from left to right, then the local document overlays them.
   Objects merge recursively, arrays and scalars replace, and `null` removes an
   inherited field.
@@ -124,10 +132,11 @@ codes and recovery actions emitted by these stages.
 
 ## Hosted and repository sources
 
-Use the [hosted v0.1 schema](https://atlante.sh/schema/v0.1/schema.json) in editor
+Use the [hosted v0.1 schema](https://atlante.sh/schema/v0.1/schema.json) or
+the [hosted v0.2 schema](https://atlante.sh/schema/v0.2/schema.json) in editor
 and tooling configuration. For repository inspection, use the committed
-[generated schema file](https://github.com/atlante/atlante/blob/main/packages/schema/schema/v0.1/schema.json)
-and its [schema source definitions](https://github.com/atlante/atlante/blob/main/packages/schema/src/document.ts).
+[generated schema files](https://github.com/atlante/atlante/tree/main/packages/schema/schema)
+and their [schema source definitions](https://github.com/atlante/atlante/blob/main/packages/schema/src/document.ts).
 The private `@atlante/schema` package also exposes the generated file as
 `@atlante/schema/schema.json`.
 
@@ -145,6 +154,11 @@ The document schema version, ownership-manifest format version, template input
 schema, and package version evolve independently. The CLI rejects an
 unsupported document schema URI, and a materializer rejects an unsupported
 manifest format, instead of inferring a compatible version.
+
+Version 0.2 adds the `"claude-code"` host target to `hosts` and `eval.host`,
+the `atlante-claude-code-native` manifest format, and pack suite
+host-compatibility enforcement. Released v0.1 URIs stay immutable, and v0.1
+documents keep identical behavior.
 
 ## Next steps
 

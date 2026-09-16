@@ -70,7 +70,7 @@ format and code index, read [Diagnostics](/reference/diagnostics).
 Fix the reported source error; the watcher retries on a later change. See the
 [CLI](/reference/cli) for watch behavior and exit status.
 
-## The OpenCode agent is not updated
+## The host agent is not updated
 
 Run a successful build first:
 
@@ -79,7 +79,7 @@ npx atlante validate
 npx atlante build
 ```
 
-Then restart OpenCode to pick up changed native files. See
+Then restart the host to pick up changed native files. See
 [Materialization](/reference/materialization) for output paths and discovery.
 
 ## The build reports `materialization-*`
@@ -94,7 +94,7 @@ Common repairs are:
 - `materialization-invalid-id`: rename the invalid agent or skill ID in
   `atlante.jsonc`, then build again.
 - `materialization-invalid-manifest`: delete the corrupt
-  `.atlante/opencode-native.json`, then build again.
+  `.atlante/opencode-native.json` or `.atlante/claude-code-native.json`, then build again.
 - `materialization-unsafe-path`: replace the symlink or blocking path with a
   real directory, then build again.
 - `materialization-publication-failed`: fix the reported filesystem condition
@@ -102,8 +102,23 @@ Common repairs are:
 
 ## The build reports `unsupported-host`
 
-In v0.1 the only admitted `hosts` value is `"opencode"`. Remove the unknown
+In v0.1 the only admitted `hosts` value is `"opencode"`; v0.2 additionally
+admits `"claude-code"`. Remove the unknown
 entry, then validate again.
+
+## The eval run reports `eval-pack-host-incompatible`
+
+An included pack suite declares a `host` that differs from the project
+`eval.host`. A pack `host` is compatibility metadata while the project `host`
+is execution policy, so the run stops before any trial instead of running the
+suite under the other host. Remove the pack from `eval.include`, or run eval
+with a matching host.
+
+## The eval run reports `eval-host-not-materialized`
+
+The project `eval.host` is not among the materialized document `hosts`. Add
+the eval host to `hosts` and rebuild, or point `eval.host` at a materialized
+host.
 
 ## `init` touched my OpenCode config or `.gitignore`
 
