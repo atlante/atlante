@@ -1278,6 +1278,24 @@ function publishPlan(
 }
 
 /**
+ * Plans OpenCode-native materialization without writing anything. It runs the
+ * same validation, rendering, and collision/drift checks as a real build and
+ * reports the paths a build would write or remove.
+ */
+export function planOpenCodeMaterialization(
+  projectRoot: string,
+  preparedProject: OpenCodePreparedProject,
+): OpenCodeMaterializationResult {
+  const plan = planMaterialization(projectRoot, preparedProject);
+  return {
+    manifestPath: plan.manifestPath,
+    manifest: plan.manifest,
+    writtenPaths: plan.writes.map((file) => file.relativePath),
+    removedPaths: plan.stale.map((file) => file.relativePath),
+  };
+}
+
+/**
  * Materializes a prepared-project-shaped value into OpenCode-native files.
  *
  * This is an experimental build-time prototype. It deliberately does not load

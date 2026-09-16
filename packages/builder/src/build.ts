@@ -10,6 +10,8 @@ import { prepareResolvedDocument } from "./resource-prepare.js";
 export type BuildDependencies = {
   /** Materializers available for the hosts a document declares. */
   materializers?: readonly HostMaterializer[];
+  /** When true, plan materialization without publishing any files. */
+  dryRun?: boolean;
 };
 
 export type MaterializationSummary = {
@@ -75,7 +77,7 @@ function failed(
   };
 }
 
-/** Prepares and materializes the complete project through selected hosts. */
+/** Prepares the project and either materializes or, with dryRun, plans it. */
 export function buildProject(
   target: string,
   context: ProjectContext = {},
@@ -106,8 +108,14 @@ export function buildProject(
 
   const diagnostics: Diagnostic[] = [];
   const materializations: MaterializationSummary[] = [];
+  const materializeOptions =
+    dependencies.dryRun === true ? { dryRun: true as const } : undefined;
   for (const materializer of selection.selected) {
-    const outcome = materializer.materialize(projectRoot, prepared);
+    const outcome = materializer.materialize(
+      projectRoot,
+      prepared,
+      materializeOptions,
+    );
     diagnostics.push(...outcome.diagnostics);
     materializations.push({
       host: materializer.host,

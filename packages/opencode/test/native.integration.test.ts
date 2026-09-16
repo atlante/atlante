@@ -17,6 +17,7 @@ import {
   OpenCodeMaterializationError,
   type OpenCodeOwnershipManifest,
   type OpenCodePreparedProject,
+  planOpenCodeMaterialization,
   readOpenCodeNative,
 } from "../src/native.js";
 
@@ -542,5 +543,42 @@ describe("materializeOpenCode", () => {
         "publication-failed",
       );
     }
+  });
+});
+
+describe("planOpenCodeMaterialization", () => {
+  test("reports planned paths without writing anything", () => {
+    const root = project();
+
+    const planned = planOpenCodeMaterialization(root, preparedWithSkill());
+
+    expect(planned.writtenPaths).toEqual([
+      ".opencode/agents/reviewer.md",
+      ".opencode/skills/atlante/testing/SKILL.md",
+    ]);
+    expect(planned.removedPaths).toEqual([]);
+    expect(existsSync(join(root, ".opencode"))).toBe(false);
+    expect(existsSync(join(root, ".atlante"))).toBe(false);
+
+    const built = materializeOpenCode(root, preparedWithSkill());
+
+    expect(built.writtenPaths).toEqual(planned.writtenPaths);
+    expect(built.removedPaths).toEqual(planned.removedPaths);
+  });
+
+  test("reports an empty plan for up-to-date outputs without rewriting", () => {
+    const root = project();
+    materializeOpenCode(root, preparedWithSkill());
+    const before = readFileSync(
+      join(root, ".opencode", "agents", "reviewer.md"),
+    );
+
+    const planned = planOpenCodeMaterialization(root, preparedWithSkill());
+
+    expect(planned.writtenPaths).toEqual([]);
+    expect(planned.removedPaths).toEqual([]);
+    expect(
+      readFileSync(join(root, ".opencode", "agents", "reviewer.md")),
+    ).toEqual(before);
   });
 });

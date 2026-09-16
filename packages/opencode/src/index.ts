@@ -1,6 +1,7 @@
 export type {
   HostMaterializationOutcome,
   MaterializationDiagnostic,
+  OpenCodeMaterializeOptions,
   OpenCodeMaterializerPrepared,
 } from "./materialize.js";
 export {
@@ -22,5 +23,6 @@ export type {
 export {
   materializeOpenCode,
   OpenCodeMaterializationError,
+  planOpenCodeMaterialization,
   readOpenCodeNative,
 } from "./native.js";

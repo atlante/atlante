@@ -244,6 +244,7 @@ document's `hosts` field.
 ```sh
 npx atlante build [path]
 npx atlante build [path] --watch
+npx atlante build [path] --dry-run
 ```
 
 A successful one-shot command lists written agent and skill paths, then removed
@@ -262,6 +263,24 @@ or `removed` lines.
 A successful build also reports default outputs missing from `.gitignore`
 with a `missing-gitignore` warning. The warning lists the missing entries and
 never edits `.gitignore`. Custom output directories are not diagnosed.
+
+### Dry-run preview
+
+`--dry-run` runs validation, rendering, and publication planning without
+writing, removing, or otherwise changing any file. It prints the paths a
+one-shot build would write or remove, with a preview marker, then the planned
+project path:
+
+```text
+would write opencode: .opencode/agents/atlante.md
+would remove opencode: .opencode/skills/atlante/obsolete/SKILL.md
+would build /Users/example/project
+```
+
+Would-be collision and drift failures print the same diagnostics as a
+one-shot build. The command exits with status `0` when the build would
+succeed and `1` when it would fail, in both cases without side effects.
+`--dry-run` cannot be used with `--watch`.
 
 ### Watch behavior
 

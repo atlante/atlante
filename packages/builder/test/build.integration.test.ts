@@ -1245,6 +1245,92 @@ describe("buildProject", () => {
       false,
     );
   });
+
+  test("plans without writing when dryRun is set", () => {
+    const { root } = project(oneAgent("reviewer", "Review the change."));
+    const materializers = [openCodeMaterializer];
+
+    const planned = buildProject(root, {}, { materializers, dryRun: true });
+
+    expect(planned.diagnostics).toEqual([]);
+    expect(planned.materializations).toEqual([
+      {
+        host: "opencode",
+        writtenPaths: [".opencode/agents/reviewer.md"],
+        removedPaths: [],
+      },
+    ]);
+    expect(existsSync(join(root, ".opencode"))).toBe(false);
+    expect(existsSync(join(root, ".atlante"))).toBe(false);
+
+    const built = buildProject(root, {}, { materializers });
+
+    expect(built.materializations).toEqual(planned.materializations);
+  });
+
+  test("reports collision in dryRun without writing", () => {
+    const { root } = project(oneAgent("reviewer", "Review the change."));
+    const agentDirectory = join(root, ".opencode", "agents");
+    mkdirSync(agentDirectory, { recursive: true });
+    writeFileSync(join(agentDirectory, "reviewer.md"), "user-authored\n");
+
+    const result = buildProject(
+      root,
+      {},
+      { materializers: [openCodeMaterializer], dryRun: true },
+    );
+
+    expect(result.diagnostics).toHaveLength(1);
+    expect(result.diagnostics[0]).toMatchObject({
+      severity: "error",
+      code: "materialization-collision",
+    });
+    expect(result.materializations).toEqual([
+      { host: "opencode", writtenPaths: [], removedPaths: [] },
+    ]);
+    expect(readFileSync(join(agentDirectory, "reviewer.md"), "utf8")).toBe(
+      "user-authored\n",
+    );
+    expect(existsSync(join(root, ".atlante", "opencode-native.json"))).toBe(
+      false,
+    );
+  });
+
+  test("reports stale removals in dryRun without deleting anything", () => {
+    const { root } = project(oneAgent("old", "Old prompt."));
+    const materializers = [openCodeMaterializer];
+    buildProject(root, {}, { materializers });
+    expect(readdirSync(join(root, ".opencode", "agents"))).toEqual(["old.md"]);
+
+    writeFileSync(join(root, "atlante.jsonc"), oneAgent("new", "New prompt."));
+    const planned = buildProject(root, {}, { materializers, dryRun: true });
+
+    expect(planned.diagnostics).toEqual([]);
+    expect(planned.materializations[0]?.writtenPaths).toEqual([
+      ".opencode/agents/new.md",
+    ]);
+    expect(planned.materializations[0]?.removedPaths).toEqual([
+      ".opencode/agents/old.md",
+    ]);
+    expect(readdirSync(join(root, ".opencode", "agents"))).toEqual(["old.md"]);
+    expect(existsSync(join(root, ".opencode", "agents", "new.md"))).toBe(false);
+  });
+
+  test("returns an empty plan for up-to-date outputs in dryRun", () => {
+    const { root } = project(oneAgent("reviewer", "Review the change."));
+    const materializers = [openCodeMaterializer];
+    buildProject(root, {}, { materializers });
+    const agentPath = join(root, ".opencode", "agents", "reviewer.md");
+    const before = readFileSync(agentPath);
+
+    const planned = buildProject(root, {}, { materializers, dryRun: true });
+
+    expect(planned.diagnostics).toEqual([]);
+    expect(planned.materializations).toEqual([
+      { host: "opencode", writtenPaths: [], removedPaths: [] },
+    ]);
+    expect(readFileSync(agentPath)).toEqual(before);
+  });
 });
 
 // The BuildResult shape the CLI reports on.

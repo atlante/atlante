@@ -4,6 +4,7 @@ import {
   type OpenCodeMaterializationErrorCode,
   type OpenCodeOutputOptions,
   type OpenCodePreparedProject,
+  planOpenCodeMaterialization,
 } from "./native.js";
 
 /**
@@ -84,6 +85,11 @@ function diagnosticFor(
   };
 }
 
+export type OpenCodeMaterializeOptions = Readonly<{
+  /** When true, plan without publishing any files. */
+  dryRun?: boolean;
+}>;
+
 /**
  * The builder-facing OpenCode host materializer. It owns only host-native
  * publication semantics; source loading, validation, resolution, and rendering
@@ -94,17 +100,21 @@ export const openCodeMaterializer: {
   readonly materialize: (
     projectRoot: string,
     prepared: OpenCodeMaterializerPrepared,
+    options?: OpenCodeMaterializeOptions,
   ) => HostMaterializationOutcome;
 } = {
   host: OPENCODE_HOST_TARGET,
-  materialize(projectRoot, prepared): HostMaterializationOutcome {
+  materialize(projectRoot, prepared, options): HostMaterializationOutcome {
     const input: OpenCodePreparedProject = {
       ...(prepared.options ? { options: prepared.options } : {}),
       agents: prepared.agents.map((agent) => ({ ...agent })),
       skills: prepared.skills.map((skill) => ({ ...skill })),
     };
     try {
-      const result = materializeOpenCode(projectRoot, input);
+      const result =
+        options?.dryRun === true
+          ? planOpenCodeMaterialization(projectRoot, input)
+          : materializeOpenCode(projectRoot, input);
       return {
         diagnostics: [],
         writtenPaths: result.writtenPaths,

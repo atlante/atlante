@@ -55,13 +55,24 @@ export function createProgram(): Command {
     .command("build")
     .argument("[path]", "config file or project directory", process.cwd())
     .option("--watch", "rebuild on changes to config and selected resources")
+    .option("--dry-run", "preview planned writes without writing anything")
     .description("build host-native Atlante outputs")
-    .action((path: string, options: { watch?: boolean }) => {
+    .action((path: string, options: { watch?: boolean; dryRun?: boolean }) => {
+      if (options.watch === true && options.dryRun === true) {
+        console.error(
+          "error [invalid-options]: --dry-run cannot be used with --watch",
+        );
+        process.exitCode = 1;
+        return;
+      }
       if (options.watch) {
         // Fire-and-forget: watch manages its own lifetime via SIGINT.
         void runBuildWatch(path);
       } else {
-        process.exitCode = runBuild(path);
+        process.exitCode = runBuild(
+          path,
+          options.dryRun === true ? { dryRun: true } : undefined,
+        );
       }
     });
 
