@@ -4,7 +4,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const DOCUMENTATION_CATALOG_VERSION = "atlante-docs/v1" as const;
+const DOCUMENTATION_CATALOG_VERSION = "atlante-docs/v1" as const;
 export const DOCUMENTATION_MAX_RESPONSE_BYTES = 64 * 1024;
 
 export type DocumentationSourceKind = "documentation" | "specification";
@@ -684,11 +684,4 @@ export function loadDocumentationCatalog(
       message: "the bundled documentation catalog is unavailable",
     },
   };
-}
-
-/** Validates a generated catalog without exposing parser internals. */
-export function isDocumentationCatalog(
-  value: unknown,
-): value is DocumentationCatalog {
-  return parseCatalog(value) !== undefined;
 }
