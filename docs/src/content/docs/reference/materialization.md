@@ -96,7 +96,8 @@ previously generated file, the materializer captures a byte snapshot, then:
 - **Drift** — an owned file whose bytes no longer match its recorded digest is
   never replaced or removed. The build fails with `materialization-drift`.
 - **Stale cleanup** — a generated file the source no longer declares is
-  removed only when its bytes still match the manifest digest.
+  removed only when its bytes still match the manifest digest. Removing a
+  skill also removes its `<id>/` directory when nothing else remains in it.
 - **Unrelated files** — files outside the desired and manifest-owned paths are
   not publication targets and remain untouched.
 - **Unsafe paths** — a symlinked project root, parent directory, or target
