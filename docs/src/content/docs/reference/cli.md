@@ -43,9 +43,13 @@ npx atlante init [path] --no-mcp
 - `--force` overwrites an existing `atlante.jsonc` and removes the alternate `atlante.json`.
 - `--no-mcp` skips registration of the local Atlante MCP server in the OpenCode configuration.
 
-`init` validates the selected preset before writing the configuration. It ensures
-`.gitignore` contains `.opencode/agents/`, `.opencode/skills/`, and
-`.atlante/` without reordering existing content, then runs a build. By default,
+`init` validates the selected preset before writing the configuration. It adds
+`.atlante/`, `.opencode/skills/atlante/` for default skills, and the exact
+default agent path `.opencode/agents/<id>.md` for each default agent to
+`.gitignore` without reordering existing content. Pre-existing entries stay
+untouched: init preserves unrelated
+rules, and removes only stale Atlante-managed agent entries. Custom output
+directories receive no automatic entry. Then it runs a build. By default,
 it also registers the version-pinned local MCP server in the target directory's
 OpenCode configuration, in the native shape of the selected dialect
 (`mcp.servers.atlante` for V2, `mcp.atlante` for V1). It selects the first
@@ -182,19 +186,23 @@ npx atlante pack list [path]
   lockfile, and validates the installed package name, strict semver version, and
   numeric `atlante.format: 1` metadata. A failed package-manager run or pack
   validation restores the manifest and lockfile and reconciles the installation.
+  A successful install also adds exact default agent entries attributable to the
+  installed pack.
 - The bundled `@atlante/pack` is supplied by the CLI and is not installed as a
   project dependency by this command.
 - `pack uninstall` removes a direct dependency through the detected package
   manager. It checks `dependencies`, `optionalDependencies`, and
   `devDependencies`, and stops before mutation when the package is referenced
   by `extends`, `$template`, or `$instance` in `atlante.jsonc` or `atlante.json`.
+  A successful uninstall removes only stale exact agent entries and preserves
+  remaining entries and unrelated user rules.
 - `pack list` reads direct dependency declarations and their installed package
   manifests. Each row reports the declared range, installed version, Atlante
   pack validity, and whether the package is referenced by the current
   configuration. It does not run a package manager.
 
-The commands leave `atlante.jsonc`, `atlante.json`, `.gitignore`, and generated
-native files untouched. Package-manager install scripts remain under the
+The commands leave `atlante.jsonc`, `atlante.json`, and generated
+native files untouched apart from exact `.gitignore` reconciliation. Package-manager install scripts remain under the
 package manager's control.
 
 ## `atlante mcp`
@@ -244,12 +252,16 @@ publication. The final line reports the resolved project path:
 
 ```text
 wrote opencode: .opencode/agents/atlante.md
-removed opencode: .opencode/skills/obsolete/SKILL.md
+removed opencode: .opencode/skills/atlante/obsolete/SKILL.md
 built /Users/example/project
 ```
 
 Unchanged files are not rewritten, so an idempotent rebuild prints no `wrote`
 or `removed` lines.
+
+A successful build also reports default outputs missing from `.gitignore`
+with a `missing-gitignore` warning. The warning lists the missing entries and
+never edits `.gitignore`. Custom output directories are not diagnosed.
 
 ### Watch behavior
 

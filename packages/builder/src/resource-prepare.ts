@@ -11,6 +11,10 @@ import {
 import type { ValuesMap } from "@atlante/schema";
 import type { Diagnostic } from "@atlante/validator";
 import { error, escapeJsonPointerSegment, hasErrors } from "@atlante/validator";
+import {
+  defaultOutputOptions,
+  normalizeOutputOptions,
+} from "./output-options.js";
 import type {
   AgentArtifact,
   PreparedProject,
@@ -19,7 +23,12 @@ import type {
 import { mergeValues } from "./values.js";
 
 function failedPreparation(diagnostics: Diagnostic[]): PreparedProject {
-  return { agents: [], skills: [], diagnostics };
+  return {
+    options: defaultOutputOptions(),
+    agents: [],
+    skills: [],
+    diagnostics,
+  };
 }
 
 function renderDiagnostic(
@@ -109,5 +118,6 @@ export function prepareResolvedDocument(
     }
   }
 
-  return { agents, skills, diagnostics: initialDiagnostics };
+  const options = normalizeOutputOptions(resources.document.options);
+  return { options, agents, skills, diagnostics: initialDiagnostics };
 }

@@ -2,6 +2,7 @@ import {
   materializeOpenCode,
   OpenCodeMaterializationError,
   type OpenCodeMaterializationErrorCode,
+  type OpenCodeOutputOptions,
   type OpenCodePreparedProject,
 } from "./native.js";
 
@@ -14,7 +15,7 @@ export type MaterializationDiagnostic = {
   severity: "error" | "warning";
   code: string;
   message: string;
-  /** Absolute path the condition applies to, when the failure has one. */
+  /** Path the condition applies to, when the failure has one. */
   source?: string;
   /** One deterministic recovery action, when available. */
   next?: string;
@@ -28,6 +29,7 @@ export type MaterializationDiagnostic = {
  * its richer prepared value without the adapter importing the builder.
  */
 export type OpenCodeMaterializerPrepared = Readonly<{
+  options?: OpenCodeOutputOptions;
   agents: ReadonlyArray<{
     hostAgentId: string;
     description: string;
@@ -59,7 +61,7 @@ function repairFor(code: OpenCodeMaterializationErrorCode): string {
     case "invalid-manifest":
       return "delete the corrupt ownership manifest to discard Atlante's ownership state, then run `atlante build` again";
     case "unsafe-path":
-      return "replace the symlink or non-directory with a real directory, then run `atlante build` again";
+      return "use a safe project-relative output directory and replace any symlink or non-directory in the reported path, then run `atlante build` again";
     case "filesystem":
     case "publication-failed":
       return "fix the reported filesystem condition, then run `atlante build` again; a failed publication preserves the previous generated set";
@@ -97,6 +99,7 @@ export const openCodeMaterializer: {
   host: OPENCODE_HOST_TARGET,
   materialize(projectRoot, prepared): HostMaterializationOutcome {
     const input: OpenCodePreparedProject = {
+      ...(prepared.options ? { options: prepared.options } : {}),
       agents: prepared.agents.map((agent) => ({ ...agent })),
       skills: prepared.skills.map((skill) => ({ ...skill })),
     };

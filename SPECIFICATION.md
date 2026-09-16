@@ -220,7 +220,7 @@ same canonical model. If both files exist and no explicit path was supplied,
 the CLI MUST report an ambiguity rather than choose silently.
 
 The document MUST contain `$schema` and MAY contain `extends`, `values`,
-`agents`, `skills`, and `eval`. The `eval` section configures the optional
+`options`, `agents`, `skills`, `hosts`, and `eval`. The `eval` section configures the optional
 eval command and is validated against its own schema (section 12). Unknown
 top-level fields MUST be rejected. `extends`
 MUST be one non-empty string or a non-empty ordered array of non-empty strings.
@@ -230,6 +230,13 @@ Each agent and skill binding MUST have a non-empty `description` after
 resolution. `$template`, `$instance`, `description`, and `values` are reserved
 binding metadata. All other binding fields MUST be validated as input for the
 effective template.
+
+The document MAY declare `options` with `agents.outDir` and `skills.outDir`.
+Each `outDir` MUST be a safe project-relative path when present: a non-empty
+string without a leading slash, backslash, NUL, drive prefix, empty segment,
+or `.`/`..` segment. The canonical document defaults to
+`options.agents.outDir` `.opencode/agents` and `options.skills.outDir`
+`.opencode/skills/atlante`, and each kind is configured independently.
 
 ### Examples
 
@@ -537,13 +544,22 @@ materializer receives the prepared project as data and MUST NOT load source
 configuration, resolve resources, or import the builder.
 
 Materialization MUST be deterministic and planned completely before any
-filesystem mutation. For the OpenCode host it MUST publish exactly:
+filesystem mutation. For the OpenCode host it MUST publish exactly the
+configured native paths plus the ownership manifest. With default options
+those paths are:
 
 ```text
 .opencode/agents/<id>.md
-.opencode/skills/<id>/SKILL.md
+.opencode/skills/atlante/<id>/SKILL.md
 .atlante/opencode-native.json
 ```
+
+A custom `options.agents.outDir` replaces the agent directory while keeping
+the flat `<id>.md` layout, and a custom `options.skills.outDir` replaces the
+skill directory while keeping the nested `<id>/SKILL.md` layout. Custom
+directories MUST satisfy the safe project-relative path rules, receive no
+automatic Git-ignore entry, and receive no automatic host discovery
+configuration.
 
 Agent IDs and skill IDs MUST be lowercase kebab-case ASCII of at most 64
 characters. Materialization MUST NOT rename an ID; an ID that violates this
@@ -604,9 +620,11 @@ the ownership manifest only when its bytes would change. A document with empty
 ### Edge cases
 
 Materialization MUST reject a symlinked project root, symlinked parent
-directories, and symlinked targets. Rendered values MAY be sensitive and
-SHOULD remain local; the ignore-by-default policy of `atlante init` keeps
-generated native files and the manifest out of version control.
+directories, and symlinked targets. Atlante MUST NOT create symlinks.
+Rendered values MAY be sensitive and
+SHOULD remain local; the ownership-scoped ignore policy of `atlante init`
+keeps default generated native files and the manifest out of version control,
+while custom output directories remain the author's responsibility.
 
 ### Rationale
 
@@ -687,10 +705,12 @@ resources or packs, or depend on the builder.
 
 The materializer MUST publish the native output set defined in section 9:
 
-- `.opencode/agents/<id>.md` for each agent binding, keyed by the binding's
-  host-agent ID;
-- `.opencode/skills/<id>/SKILL.md` for each skill binding, keyed by the
-  binding's `skillId`; and
+- `.opencode/agents/<id>.md` for each agent binding by default, keyed by the binding's
+  host-agent ID, or `<options.agents.outDir>/<id>.md` when a custom agent
+  directory is configured;
+- `.opencode/skills/atlante/<id>/SKILL.md` for each skill binding by default, keyed by the
+  binding's `skillId`, or `<options.skills.outDir>/<id>/SKILL.md` when a custom
+  skill directory is configured; and
 - `.atlante/opencode-native.json`, the ownership manifest with format
   `atlante-opencode-native`, version `1`, and one `files` entry of `kind`,
   `id`, `path`, and `sha256` per generated file.
@@ -712,9 +732,18 @@ one deterministic recovery action.
 `atlante init` MUST NOT register a runtime integration for the materializer.
 The read-only MCP context registration described in section 13 is separate from
 materialization and MUST NOT change the native output contract. Init MUST also
-enforce the ignore-by-default git policy: `.gitignore` MUST gain
-`.opencode/agents/`, `.opencode/skills/`, and `.atlante/` when missing, and
-existing `.gitignore` content MUST NOT be reordered.
+enforce the ownership-scoped git policy from the validated canonical
+configuration before mutating the project: `.gitignore` MUST gain `.atlante/`,
+`.opencode/skills/atlante/` when default skills are configured, and the exact
+default agent path `.opencode/agents/<id>.md` per default agent binding when
+missing, MUST preserve unrelated lines and order, and MUST remove
+only stale Atlante-managed agent entries. A normal `atlante build` MUST report
+missing default coverage with a stable `missing-gitignore` warning without
+editing `.gitignore`. Pack install and uninstall MUST reconcile only exact
+agent entries attributable to the operation and MUST preserve unrelated user
+rules. Host configuration remains host-owned, Git remains responsible for
+ignore semantics, and existing filesystem symlink checks remain authoritative
+for custom paths.
 
 ### Examples
 
@@ -1031,7 +1060,7 @@ A conforming implementation MUST be able to:
 8. fail closed on collisions, drift, stale-output digest mismatches, invalid
    IDs, and unsafe paths;
 9. scaffold from the first-party `@atlante/pack` default preset through
-   `atlante init`, enforce the ignore-by-default git policy, and rebuild
+   `atlante init`, enforce the ownership-scoped git policy, and rebuild
    through `atlante build`;
 10. remove stale generated outputs and preserve host-owned files;
 11. preserve the previous valid generated set whenever validation or

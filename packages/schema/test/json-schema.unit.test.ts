@@ -99,6 +99,29 @@ describe("document JSON Schema", () => {
     });
   });
 
+  test("publishes independent native output directory options", () => {
+    const properties = buildDocumentJsonSchema().properties as Record<
+      string,
+      unknown
+    >;
+    expect(properties.options).toEqual({
+      type: "object",
+      properties: {
+        agents: {
+          type: "object",
+          properties: { outDir: { type: "string", minLength: 1 } },
+          additionalProperties: false,
+        },
+        skills: {
+          type: "object",
+          properties: { outDir: { type: "string", minLength: 1 } },
+          additionalProperties: false,
+        },
+      },
+      additionalProperties: false,
+    });
+  });
+
   test("publishes pack eval metadata and unique pack includes", () => {
     const properties = buildDocumentJsonSchema().properties as Record<
       string,

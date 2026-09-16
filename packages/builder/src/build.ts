@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import type { Diagnostic, ResourceWatchContext } from "@atlante/validator";
 import { error, hasErrors } from "@atlante/validator";
 import type { HostMaterializer } from "./materializer.js";
+import { defaultOutputOptions } from "./output-options.js";
 import { loadProject, type ProjectContext } from "./project.js";
 import { prepareResolvedDocument } from "./resource-prepare.js";
 
@@ -86,7 +87,12 @@ export function buildProject(
   const prepared =
     loaded.resources && !hasErrors(loaded.diagnostics)
       ? prepareResolvedDocument(loaded.resources, loaded.diagnostics)
-      : { agents: [], skills: [], diagnostics: loaded.diagnostics };
+      : {
+          options: defaultOutputOptions(),
+          agents: [],
+          skills: [],
+          diagnostics: loaded.diagnostics,
+        };
   if (hasErrors(prepared.diagnostics)) {
     return failed(projectRoot, loaded.resourceWatch, prepared.diagnostics);
   }

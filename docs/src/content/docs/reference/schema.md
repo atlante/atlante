@@ -36,6 +36,7 @@ The document contract accepts these fields:
 | `$schema` | string | Required v0.1 schema URI |
 | `extends` | string or non-empty string array | Preset locator or ordered preset layers |
 | `values` | object | Named string values; source overlays may use `null` to remove inherited values |
+| `options` | object | Native output directories by kind; each kind accepts an `outDir` override |
 | `agents` | object | Map from non-empty host-agent IDs to bindings or `null` tombstones |
 | `skills` | object | Map from non-empty skill IDs to bindings or `null` tombstones |
 | `eval` | object | Optional `atlante eval` configuration: OpenCode host, scenario-document glob, model, and budget |
@@ -44,6 +45,8 @@ The document contract accepts these fields:
 Unknown top-level fields are rejected. Missing `agents` and `skills` maps become
 empty maps in the canonical document. `hosts` must not contain duplicates, and
 an absent `hosts` field defaults to `["opencode"]` in the canonical document.
+An absent `options` field defaults to default output directories in the
+canonical document.
 
 ## Binding fields
 
@@ -94,6 +97,10 @@ not part of the document contract.
   `ambiguous-config`.
 - Missing `agents` and `skills` maps normalize to empty maps. Missing `hosts`
   normalizes to `["opencode"]`; host targets cannot repeat.
+- Missing `options` normalizes to default output directories. The defaults are
+  `.opencode/agents` for agents and `.opencode/skills/atlante` for skills.
+  Each kind accepts an independent `outDir` override with a safe
+  project-relative path.
 - Presets resolve from left to right, then the local document overlays them.
   Objects merge recursively, arrays and scalars replace, and `null` removes an
   inherited field.
@@ -103,7 +110,7 @@ not part of the document contract.
 ## Canonical form
 
 After resolution, the canonical document contains the schema URI, merged values,
-agent bindings, skill bindings, host targets, and optional eval configuration.
+agent bindings, skill bindings, output options, host targets, and optional eval configuration.
 Merged values can still contain the supported system reference until rendering.
 The canonical document has no `extends`, `$template`, `$instance`, or unresolved
 `null` removals.

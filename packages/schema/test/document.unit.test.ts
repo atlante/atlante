@@ -123,6 +123,65 @@ describe("atlanteDocumentSchema", () => {
     expect(result.data.hosts).toEqual(["opencode"]);
   });
 
+  test("defaults native output directories independently", () => {
+    const result = atlanteDocumentSchema.safeParse({ $schema: SCHEMA_URI });
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.options).toEqual({
+      agents: { outDir: ".opencode/agents" },
+      skills: { outDir: ".opencode/skills/atlante" },
+    });
+  });
+
+  test("accepts independent native output directories", () => {
+    const result = atlanteDocumentSchema.safeParse({
+      $schema: SCHEMA_URI,
+      options: {
+        agents: { outDir: ".agents" },
+        skills: { outDir: ".claude/skills" },
+      },
+    });
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.options).toEqual({
+      agents: { outDir: ".agents" },
+      skills: { outDir: ".claude/skills" },
+    });
+  });
+
+  test("keeps native output options optional in the authored overlay", () => {
+    const result = atlanteDocumentOverlaySchema.safeParse({
+      $schema: SCHEMA_URI,
+      options: { skills: { outDir: ".agents/skills" } },
+    });
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(result.data.options).toEqual({
+      skills: { outDir: ".agents/skills" },
+    });
+  });
+
+  test("rejects unknown or empty native output options", () => {
+    for (const options of [
+      { agents: { outDir: "" } },
+      { output: { outDir: ".agents" } },
+    ]) {
+      const result = atlanteDocumentOverlaySchema.safeParse({
+        $schema: SCHEMA_URI,
+        options,
+      });
+      expect(result.success).toBe(false);
+    }
+  });
+
+  test("leaves relative path safety to materialization", () => {
+    const result = atlanteDocumentOverlaySchema.safeParse({
+      $schema: SCHEMA_URI,
+      options: { skills: { outDir: "./skills" } },
+    });
+    expect(result.success).toBe(true);
+  });
+
   test("preserves an authored hosts selection", () => {
     const result = atlanteDocumentSchema.safeParse({
       ...valid,

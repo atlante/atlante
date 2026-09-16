@@ -114,14 +114,20 @@ directory's first existing OpenCode configuration in this order:
 to leave the OpenCode configuration unchanged. Existing settings and JSONC
 comments remain in place, while initialization appends only the missing
 generated-output entries to `.gitignore`. See the [MCP reference](/reference/mcp)
-for registration conflicts and server diagnostics.
+for registration conflicts and server diagnostics, and
+[`atlante init`](/reference/cli#atlante-init) for the exact ignore entries.
 
-The generated-output ignore policy appends `.opencode/agents/`,
-`.opencode/skills/`, and `.atlante/` to `.gitignore` when missing. Because a
-git negation cannot re-include content of an ignored directory, a user
-negation such as `!.opencode/agents/` cannot override an appended Atlante
-entry; remove the Atlante entries yourself if you intentionally want generated
-outputs under version control.
+The ignore policy covers `.atlante/`, `.opencode/skills/atlante/` for default
+skills, and exact `.opencode/agents/<id>.md` paths for default agents. Because
+a git negation cannot re-include content of an ignored directory, a user
+negation such as `!.opencode/skills/atlante/` cannot override an appended
+Atlante entry; remove the Atlante entries yourself if you intentionally want
+generated outputs under version control. Custom output directories receive no
+automatic entry.
+
+## The build reports `missing-gitignore`
+
+Add the listed entries to `.gitignore`. A normal build never edits that file.
 
 ## The output is stale after an edit
 

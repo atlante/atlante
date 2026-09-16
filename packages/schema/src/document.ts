@@ -28,6 +28,37 @@ export const hostsSchema = z
 
 export type Hosts = z.infer<typeof hostsSchema>;
 
+/** Default project-relative directories for OpenCode native outputs. */
+export const DEFAULT_AGENT_OUTPUT_DIR = ".opencode/agents";
+export const DEFAULT_SKILL_OUTPUT_DIR = ".opencode/skills/atlante";
+
+const outputDirectoryOverlaySchema = z.strictObject({
+  outDir: z.string().min(1).optional(),
+});
+
+const outputDirectorySchema = (defaultValue: string) =>
+  z.strictObject({ outDir: z.string().min(1).default(defaultValue) });
+
+/** Authored native-output options; each output kind can be configured alone. */
+export const outputOptionsOverlaySchema = z.strictObject({
+  agents: outputDirectoryOverlaySchema.optional(),
+  skills: outputDirectoryOverlaySchema.optional(),
+});
+
+/** Canonical native-output options with the default directory for each kind. */
+export const outputOptionsSchema = z.strictObject({
+  agents: outputDirectorySchema(DEFAULT_AGENT_OUTPUT_DIR).default({
+    outDir: DEFAULT_AGENT_OUTPUT_DIR,
+  }),
+  skills: outputDirectorySchema(DEFAULT_SKILL_OUTPUT_DIR).default({
+    outDir: DEFAULT_SKILL_OUTPUT_DIR,
+  }),
+});
+
+export type OutputDirectory = { outDir: string };
+export type OutputOptionsOverlay = z.infer<typeof outputOptionsOverlaySchema>;
+export type OutputOptions = z.infer<typeof outputOptionsSchema>;
+
 /** Authored locators are structurally strings; resource grammar is semantic. */
 export const rawResourceLocatorSchema = z.string().min(1);
 
@@ -256,6 +287,7 @@ export const atlanteDocumentOverlaySchema = z.strictObject({
   extends: authoredExtendsSchema.optional(),
   hosts: hostsSchema.optional(),
   values: valuesMapOverlaySchema.optional(),
+  options: outputOptionsOverlaySchema.optional(),
   agents: agentsOverlaySchema.optional(),
   skills: skillsOverlaySchema.optional(),
   /** Project settings or pack-bundled eval metadata before resolution. */
@@ -271,6 +303,10 @@ export const atlanteDocumentSchema = z.strictObject({
   $schema: z.literal(SCHEMA_URI),
   hosts: hostsSchema.default(["opencode"]),
   values: valuesMapSchema.optional(),
+  options: outputOptionsSchema.default({
+    agents: { outDir: DEFAULT_AGENT_OUTPUT_DIR },
+    skills: { outDir: DEFAULT_SKILL_OUTPUT_DIR },
+  }),
   agents: safeRecord(z.string().min(1), agentBindingSchema).default({}),
   skills: safeRecord(z.string().min(1), skillBindingSchema).default({}),
   eval: evalConfigSchema.optional(),

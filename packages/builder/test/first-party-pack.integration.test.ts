@@ -76,11 +76,11 @@ describe("first-party pack integration", () => {
       ),
     ).toEqual([
       ".opencode/agents/atlante.md",
-      ".opencode/skills/brainstorm/SKILL.md",
-      ".opencode/skills/build/SKILL.md",
-      ".opencode/skills/harness/SKILL.md",
-      ".opencode/skills/plan/SKILL.md",
-      ".opencode/skills/review/SKILL.md",
+      ".opencode/skills/atlante/brainstorm/SKILL.md",
+      ".opencode/skills/atlante/build/SKILL.md",
+      ".opencode/skills/atlante/harness/SKILL.md",
+      ".opencode/skills/atlante/plan/SKILL.md",
+      ".opencode/skills/atlante/review/SKILL.md",
     ]);
     expect(built.materializations[0]?.removedPaths).toEqual([]);
 
@@ -97,7 +97,7 @@ describe("first-party pack integration", () => {
 
     for (const [skillId, title] of Object.entries(phaseSkillTitles)) {
       const content = readFileSync(
-        join(root, ".opencode", "skills", skillId, "SKILL.md"),
+        join(root, ".opencode", "skills", "atlante", skillId, "SKILL.md"),
         "utf8",
       );
       expect(content, skillId).toContain(title);

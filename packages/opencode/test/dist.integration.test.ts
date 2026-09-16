@@ -81,7 +81,7 @@ function expectedOwnedFiles() {
     {
       kind: "skill",
       id: PREPARED.skills[0].skillId,
-      path: `.opencode/skills/${PREPARED.skills[0].skillId}/SKILL.md`,
+      path: `.opencode/skills/atlante/${PREPARED.skills[0].skillId}/SKILL.md`,
       sha256: sha256(skillBytes(PREPARED.skills[0])),
     },
   ] as const;
@@ -182,12 +182,19 @@ test("the built entry materializes native files and the ownership manifest", asy
 
     expect(result.writtenPaths).toEqual([
       ".opencode/agents/reviewer.md",
-      ".opencode/skills/testing/SKILL.md",
+      ".opencode/skills/atlante/testing/SKILL.md",
     ]);
     expect(result.removedPaths).toEqual([]);
 
     const agentPath = join(root, ".opencode", "agents", "reviewer.md");
-    const skillPath = join(root, ".opencode", "skills", "testing", "SKILL.md");
+    const skillPath = join(
+      root,
+      ".opencode",
+      "skills",
+      "atlante",
+      "testing",
+      "SKILL.md",
+    );
     expect(new TextDecoder().decode(readFileSync(agentPath))).toBe(
       new TextDecoder().decode(agentBytes(PREPARED.agents[0])),
     );
@@ -211,7 +218,7 @@ test("the built entry materializes native files and the ownership manifest", asy
     expect(native.manifest).toEqual(result.manifest);
     expect(native.files.map(({ path }) => path)).toEqual([
       ".opencode/agents/reviewer.md",
-      ".opencode/skills/testing/SKILL.md",
+      ".opencode/skills/atlante/testing/SKILL.md",
     ]);
     expect(new TextDecoder().decode(native.files[0]?.bytes)).toBe(
       new TextDecoder().decode(agentBytes(PREPARED.agents[0])),

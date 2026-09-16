@@ -42,6 +42,14 @@ The map keys, `reviewer` and `code-review`, identify the resulting agent and
 skill in the host. Their content can change without changing those names or
 the places that refer to them.
 
+## Output directories
+
+Output options select where native files land. Agents default to
+`.opencode/agents`, and skills default to `.opencode/skills/atlante`. Each
+kind accepts an independent `outDir` override. A custom directory keeps the
+same file layout and remains your responsibility for version control and host
+discovery.
+
 ## Presets as a starting point
 
 A preset is a reusable configuration document that can supply agents,

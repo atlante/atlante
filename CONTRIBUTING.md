@@ -149,7 +149,8 @@ These constraints are reviewed in every change:
    `docs/readme-refresh`. Open the pull request with
    [`PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) and explain
    the behavior changed, the verification performed, and any compatibility
-   impact.
+   impact. Pull request titles follow Conventional Commits, like commit
+   messages, as in `feat(cli): ...`.
 
 Keep source changes and their tests together. Documentation changes should
 include the affected page paths and successful `astro check` and docs build

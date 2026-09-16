@@ -1,5 +1,7 @@
+import type { OutputOptions } from "@atlante/schema";
 import type { Diagnostic } from "@atlante/validator";
 import { hasErrors } from "@atlante/validator";
+import { defaultOutputOptions } from "./output-options.js";
 import { loadProject, type ProjectContext } from "./project.js";
 import { prepareResolvedDocument } from "./resource-prepare.js";
 
@@ -18,13 +20,19 @@ export type SkillArtifact = {
 };
 
 export type PreparedProject = {
+  options: OutputOptions;
   agents: AgentArtifact[];
   skills: SkillArtifact[];
   diagnostics: Diagnostic[];
 };
 
 function failedPreparation(diagnostics: Diagnostic[]): PreparedProject {
-  return { agents: [], skills: [], diagnostics };
+  return {
+    options: defaultOutputOptions(),
+    agents: [],
+    skills: [],
+    diagnostics,
+  };
 }
 
 /** Prepares the exact resource context already returned by project loading. */

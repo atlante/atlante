@@ -275,7 +275,7 @@ Review the diff and report findings.
     expect(first.materializations[0]?.writtenPaths.length).toBeGreaterThan(0);
 
     const native = readFileSync(
-      join(root, ".opencode", "skills", "create-issue", "SKILL.md"),
+      join(root, ".opencode", "skills", "atlante", "create-issue", "SKILL.md"),
       "utf8",
     );
     const generated = parseMarkdownSource(native, "generated.md");
@@ -442,10 +442,14 @@ Review the diff and report findings.
     expect(hasErrors(built.diagnostics)).toBe(false);
     expect(built.diagnostics).toEqual([]);
     expect(
-      existsSync(join(root, ".opencode", "skills", "doc-skill", "SKILL.md")),
+      existsSync(
+        join(root, ".opencode", "skills", "atlante", "doc-skill", "SKILL.md"),
+      ),
     ).toBe(true);
     expect(
-      existsSync(join(root, ".opencode", "skills", "other-skill", "SKILL.md")),
+      existsSync(
+        join(root, ".opencode", "skills", "atlante", "other-skill", "SKILL.md"),
+      ),
     ).toBe(true);
   });
 

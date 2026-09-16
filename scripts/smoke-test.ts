@@ -117,7 +117,7 @@ try {
   for (const entry of manifest.files) {
     assert(
       entry.path.startsWith(".opencode/agents/") ||
-        entry.path.startsWith(".opencode/skills/"),
+        entry.path.startsWith(".opencode/skills/atlante/"),
       `unexpected native output path: ${entry.path}`,
     );
     const payload = await Bun.file(join(project, entry.path)).bytes();
@@ -194,7 +194,7 @@ try {
   );
   assert(
     await Bun.file(
-      join(ROOT, ".opencode", "skills", "plan", "SKILL.md"),
+      join(ROOT, ".opencode", "skills", "atlante", "plan", "SKILL.md"),
     ).exists(),
     "root native skill file is missing",
   );
