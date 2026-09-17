@@ -606,7 +606,6 @@ describe("runChecks", () => {
       expect(result?.verdict).toBe("error");
       expect(JSON.stringify(result?.evidence)).toContain(
         "must resolve inside the sandbox",
-        ".opencode/",
       );
     }
   });

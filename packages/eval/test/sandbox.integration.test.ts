@@ -365,9 +365,11 @@ describe("assembleSandbox", () => {
       // with identical bytes would have graded as unchanged.
       expect(sandbox.snapshot[0]?.hash).toBeNull();
       // Grading refuses the symlink outright instead of following it.
-      const [result] = await runChecks(sandbox, [
-        { type: "file-unchanged", path: "planted-link.ts" },
-      ]);
+      const [result] = await runChecks(
+        sandbox,
+        [{ type: "file-unchanged", path: "planted-link.ts" }],
+        ".opencode/",
+      );
       expect(result?.verdict).toBe("error");
     } finally {
       destroySandbox(sandbox);
