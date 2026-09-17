@@ -8,3 +8,9 @@ dist/
 .opencode/agents/
 .opencode/skills/
 .opencode/models.json
+.claude/agents/atlante.md
+.claude/skills/brainstorm/
+.claude/skills/build/
+.claude/skills/harness/
+.claude/skills/plan/
+.claude/skills/review/
