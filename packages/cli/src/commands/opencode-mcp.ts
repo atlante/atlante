@@ -16,7 +16,7 @@ import packageJson from "../../package.json" with { type: "json" };
 import { formatInitError } from "./init-error.js";
 
 const ATLANTE_MCP_SERVER_ID = "atlante" as const;
-const ATLANTE_MCP_COMMAND = [
+export const ATLANTE_MCP_COMMAND = [
   "npx",
   "--yes",
   `atlante@${packageJson.version}`,

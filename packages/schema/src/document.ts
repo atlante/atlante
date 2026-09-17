@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { evalConfigSchema, evalPackConfigSchema } from "./eval.js";
+import {
+  evalConfigSchema,
+  evalConfigV02Schema,
+  evalPackConfigSchema,
+  evalPackConfigV02Schema,
+} from "./eval.js";
 import type { ValuesMap, ValuesMapOverlay } from "./values.js";
 import {
   safeRecord,
@@ -8,6 +13,9 @@ import {
 } from "./values.js";
 
 export const SCHEMA_URI = "https://atlante.sh/schema/v0.1/schema.json";
+
+/** Versioned document contract URI for v0.2 (adds the claude-code host). */
+export const SCHEMA_URI_V02 = "https://atlante.sh/schema/v0.2/schema.json";
 
 /** Host materialization targets admitted by document schema v0.1. */
 export const hostTargetSchema = z.literal("opencode");
@@ -27,6 +35,26 @@ export const hostsSchema = z
   );
 
 export type Hosts = z.infer<typeof hostsSchema>;
+
+/** Host materialization targets admitted by document schema v0.2. */
+export const hostTargetV02Schema = z.enum(["opencode", "claude-code"]);
+
+export type HostTargetV02 = z.infer<typeof hostTargetV02Schema>;
+
+/**
+ * Authored host selection for v0.2: at least one target, no duplicates. The
+ * canonical document defaults to the OpenCode host when the field is absent,
+ * preserving the v0.1 default.
+ */
+export const hostsV02Schema = z
+  .array(hostTargetV02Schema)
+  .min(1)
+  .refine(
+    (hosts) => new Set(hosts).size === hosts.length,
+    "hosts must not contain duplicate entries",
+  );
+
+export type HostsV02 = z.infer<typeof hostsV02Schema>;
 
 /** Default project-relative directories for OpenCode native outputs. */
 export const DEFAULT_AGENT_OUTPUT_DIR = ".opencode/agents";
@@ -313,6 +341,57 @@ export const atlanteDocumentSchema = z.strictObject({
 });
 
 type AtlanteDocumentOutput = z.infer<typeof atlanteDocumentSchema>;
+
+/** Authored v0.2 document overlay, before resource and tombstone resolution. */
+export const atlanteDocumentOverlayV02Schema = z.strictObject({
+  $schema: z.literal(SCHEMA_URI_V02),
+  extends: authoredExtendsSchema.optional(),
+  hosts: hostsV02Schema.optional(),
+  values: valuesMapOverlaySchema.optional(),
+  options: outputOptionsOverlaySchema.optional(),
+  agents: agentsOverlaySchema.optional(),
+  skills: skillsOverlaySchema.optional(),
+  /** Project settings or pack-bundled eval metadata before resolution. */
+  eval: z.union([evalConfigV02Schema, evalPackConfigV02Schema]).optional(),
+});
+
+export type AtlanteDocumentOverlayV02 = z.infer<
+  typeof atlanteDocumentOverlayV02Schema
+>;
+
+/** Canonical v0.2 document after expansion: no extends, selectors, or tombstones. */
+export const atlanteDocumentV02Schema = z.strictObject({
+  $schema: z.literal(SCHEMA_URI_V02),
+  hosts: hostsV02Schema.default(["opencode"]),
+  values: valuesMapSchema.optional(),
+  options: outputOptionsSchema.default({
+    agents: { outDir: DEFAULT_AGENT_OUTPUT_DIR },
+    skills: { outDir: DEFAULT_SKILL_OUTPUT_DIR },
+  }),
+  agents: safeRecord(z.string().min(1), agentBindingSchema).default({}),
+  skills: safeRecord(z.string().min(1), skillBindingSchema).default({}),
+  eval: evalConfigV02Schema.optional(),
+});
+
+type AtlanteDocumentV02Output = z.infer<typeof atlanteDocumentV02Schema>;
+
+export type AtlanteDocumentV02 = Omit<
+  AtlanteDocumentV02Output,
+  "agents" | "skills"
+> & {
+  agents?: AtlanteDocumentV02Output["agents"];
+  skills?: AtlanteDocumentV02Output["skills"];
+};
+
+/**
+ * Either supported configuration version. Generic tooling that reads only
+ * version-agnostic fields (hosts, options, agents, skills, eval) accepts this
+ * union; version-specific logic dispatches on `$schema`.
+ */
+export type AnyAtlanteDocument = AtlanteDocument | AtlanteDocumentV02;
+export type AnyAtlanteDocumentOverlay =
+  | AtlanteDocumentOverlay
+  | AtlanteDocumentOverlayV02;
 
 export type AtlanteDocument = Omit<
   AtlanteDocumentOutput,

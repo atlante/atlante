@@ -2,7 +2,7 @@
 
 Private workspace. The versioned document contract for Atlante: TypeScript
 types, Zod schemas, and the generated JSON Schema documents (including the
-committed `schema/v0.1/schema.json` and the eval-scenario schema).
+committed `schema/v0.1/schema.json`, `schema/v0.2/schema.json`, and the eval-scenario schema).
 
 ## Boundaries
 
@@ -14,4 +14,4 @@ committed `schema/v0.1/schema.json` and the eval-scenario schema).
 ## Context
 
 See [`AGENTS.md`](../../AGENTS.md) for the workspace architecture and
-[`SPECIFICATION.md`](../../SPECIFICATION.md) for the normative v0.1 contract.
+[`SPECIFICATION.md`](../../SPECIFICATION.md) for the normative contract.

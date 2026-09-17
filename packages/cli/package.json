@@ -55,6 +55,7 @@
   },
   "devDependencies": {
     "@atlante/builder": "workspace:*",
+    "@atlante/claude-code": "workspace:*",
     "@atlante/eval": "workspace:*",
     "@atlante/opencode": "workspace:*",
     "@atlante/resources": "workspace:*",

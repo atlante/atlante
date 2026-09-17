@@ -8,7 +8,7 @@ import {
   resolveResourceDocument,
 } from "@atlante/resources";
 import {
-  type AtlanteDocument,
+  type AnyAtlanteDocument,
   DEFAULT_AGENT_OUTPUT_DIR,
 } from "@atlante/schema";
 import { hasErrors, validateDocumentText } from "@atlante/validator";
@@ -239,7 +239,7 @@ function configurationReference(
 function canonicalConfiguration(
   directory: string,
   fileSystem: PackFileSystem,
-): AtlanteDocument | undefined {
+): AnyAtlanteDocument | undefined {
   const candidates = [
     join(directory, "atlante.jsonc"),
     join(directory, "atlante.json"),

@@ -2,7 +2,11 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { EVAL_SCENARIO_SCHEMA_URI, SCHEMA_URI } from "@atlante/schema";
+import {
+  EVAL_SCENARIO_SCHEMA_URI,
+  SCHEMA_URI,
+  SCHEMA_URI_V02,
+} from "@atlante/schema";
 import {
   generateDocumentationCatalog,
   loadDocumentationCatalog,
@@ -150,6 +154,10 @@ describe("bundled schemas", () => {
     expect(getBundledSchema(SCHEMA_URI)).toMatchObject({
       status: "ok",
       uri: SCHEMA_URI,
+    });
+    expect(getBundledSchema(SCHEMA_URI_V02)).toMatchObject({
+      status: "ok",
+      uri: SCHEMA_URI_V02,
     });
     expect(
       getBundledSchema("https://atlante.sh/schema/v9/schema.json"),

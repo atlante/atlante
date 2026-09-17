@@ -24,6 +24,24 @@ if (!existsSync(join(plugin, "dist", "index.js"))) {
   throw new Error("@atlante/opencode: bundle missing dist/index.js");
 }
 
+// 1b) Claude Code adapter: same bundle + declarations shape as OpenCode.
+const claudePlugin = join(ROOT, "packages", "claude-code");
+await rm(join(claudePlugin, "dist"), { force: true, recursive: true });
+const claudePluginResult = await Bun.build({
+  entrypoints: [join(claudePlugin, "src", "index.ts")],
+  target: "bun",
+  outdir: join(claudePlugin, "dist"), // dist/index.js
+});
+if (!claudePluginResult.success)
+  throw new Error(claudePluginResult.logs.join("\n"));
+// Declarations: d.ts for every src module (consumer types resolve ./native.js → ./native.d.ts).
+await Bun.$`${TSC} --project tsconfig.build.json --emitDeclarationOnly`.cwd(
+  claudePlugin,
+);
+if (!existsSync(join(claudePlugin, "dist", "index.js"))) {
+  throw new Error("@atlante/claude-code: bundle missing dist/index.js");
+}
+
 // 2) CLI: Bun target=node bundle + guards (publishable artifact).
 const cli = join(ROOT, "packages", "cli");
 await rm(join(cli, "dist"), { force: true, recursive: true });

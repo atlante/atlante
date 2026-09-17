@@ -10,19 +10,35 @@ formats, ownership records, and publication rules.
 ## Host selection
 
 The document's `hosts` field selects the materialization targets. Version 0.1
-admits only `"opencode"`, and `["opencode"]` is the canonical default. Schema
+admits only `"opencode"`; version 0.2 additionally admits `"claude-code"`.
+`["opencode"]` is the canonical default. Schema
 validation rejects another value with `invalid-document`. After validation, a
 declared host without an injected materializer fails with `unsupported-host`.
 
+Each host keeps its own native paths and ownership manifest. A mixed-host
+build materializes every selected host, verifies each against its own
+manifest, and fails when any host fails, with no cross-host atomicity.
+
 ## Native output paths
 
-With default options the build materializes exactly:
+With default options the OpenCode build materializes exactly:
 
 | Output | Path |
 | --- | --- |
 | Agent | `.opencode/agents/<id>.md` |
 | Skill | `.opencode/skills/atlante/<id>/SKILL.md` |
 | Ownership manifest | `.atlante/opencode-native.json` |
+
+With `hosts: ["claude-code"]` the build materializes exactly:
+
+| Output | Path |
+| --- | --- |
+| Agent | `.claude/agents/<id>.md` |
+| Skill | `.claude/skills/<id>/SKILL.md` |
+| Ownership manifest | `.atlante/claude-code-native.json` |
+
+Claude Code locations are fixed: document `options` outDirs are
+OpenCode-scoped and do not change them.
 
 IDs come from the document: lowercase kebab-case ASCII (`a-z`, `0-9`, hyphen
 separators), at most 64 characters. Atlante never renames an ID; a violating
@@ -44,8 +60,10 @@ Atlante appends rendered content verbatim and does not add a trailing newline.
 
 ## Ownership manifest
 
-`.atlante/opencode-native.json` is UTF-8 JSON with exactly `format`,
-`version`, and `files`. This example shows one agent entry; `sha256` is a
+`.atlante/opencode-native.json` and `.atlante/claude-code-native.json` are UTF-8 JSON with exactly `format`,
+`version`, and `files`. The OpenCode manifest uses format
+`atlante-opencode-native`, the Claude Code manifest uses
+`atlante-claude-code-native`; both are at version `1`. This example shows one agent entry; `sha256` is a
 placeholder for the digest produced by the build:
 
 ```json
@@ -78,6 +96,11 @@ OpenCode discovers native agents and skills from the paths above when it starts.
 Host-owned settings in `opencode.jsonc` or `opencode.json`, such as model, mode,
 permissions, and tools, remain under OpenCode's control. Restart OpenCode to
 pick up new or changed native files.
+
+Claude Code discovers native agents and skills from `.claude/agents/` and
+`.claude/skills/` when it starts. Host-owned settings in
+`.claude/settings.json`, such as model, permissions, and tools, remain under
+Claude Code's control and are never written by the build.
 
 ## Publication contract
 

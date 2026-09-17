@@ -29,6 +29,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@atlante/claude-code": "workspace:*",
     "@atlante/opencode": "workspace:*",
     "@atlante/schema": "workspace:*",
     "@atlante/validator": "workspace:*"

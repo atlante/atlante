@@ -1,6 +1,6 @@
 ---
 title: Introduction
-description: A structured, versioned source for coding agents and skills, with native OpenCode builds and scenario-based evaluation.
+description: A structured, versioned source for coding agents and skills, with native host builds and scenario-based evaluation.
 ---
 
 Atlante is the configuration and build layer for a coding-agent harness. It
@@ -17,8 +17,9 @@ an agent uses them. Even a small change to that context can alter how the
 agent writes code.
 
 Atlante keeps configuration, builds, and evaluation together in the
-repository. The [OpenCode](https://opencode.ai/) host adapter materializes
-reusable context as native files, while evaluation checks the resulting
+repository. The host adapters materialize
+reusable context as native files for [OpenCode](https://opencode.ai/) and
+[Claude Code](https://code.claude.com/docs), while evaluation checks the resulting
 harness against explicit expectations.
 
 ## How Atlante works
@@ -32,7 +33,7 @@ through [templates](/concepts/templates), and supply project-specific
 are the source of the harness, which can evolve alongside the code it guides.
 Atlante validates that source before writing any files, then a successful
 build produces reproducible [native output](/reference/materialization) for
-OpenCode (currently the only supported host). The host discovers the generated
+the selected hosts. Each host discovers the generated
 agents and skills when it starts, and [`atlante eval`](/reference/eval) uses
 them to run defined scenarios in disposable sandboxes.
 
@@ -56,7 +57,7 @@ them to run defined scenarios in disposable sandboxes.
     <span class="atlante-flow-arrow" aria-hidden="true"></span>
     <div class="atlante-flow-node">
       <span>Use / evaluate</span>
-      <strong>OpenCode / <code>atlante eval</code></strong>
+      <strong>Host / <code>atlante eval</code></strong>
     </div>
   </div>
 </figure>

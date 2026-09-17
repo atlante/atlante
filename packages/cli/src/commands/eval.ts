@@ -8,6 +8,9 @@ import {
 import { basename, dirname, join, resolve } from "node:path";
 import { loadProject, type ProjectContext } from "@atlante/builder";
 import {
+  type ClaudeHostRunner,
+  ClaudeVersionError,
+  createClaudeRunner,
   createOpenCodeRunner,
   type EvalProgress,
   EvalRunError,
@@ -18,7 +21,7 @@ import {
   resolveBudget,
   runEval,
   runExitCode,
-  verifyNativeOutputs,
+  verifyHostNativeOutputs,
 } from "@atlante/eval";
 import { OpenCodeVersionError } from "@atlante/opencode/dialect";
 import {
@@ -28,9 +31,11 @@ import {
   ResourceResolutionError,
 } from "@atlante/resources";
 import {
+  type AnyEvalConfig,
   EVAL_MAX_TRIALS,
-  type EvalConfig,
   evalPackConfigSchema,
+  evalPackConfigV02Schema,
+  isPackHostCompatible,
 } from "@atlante/schema";
 import {
   type Diagnostic,
@@ -78,28 +83,47 @@ export async function runEvalCommand(
 
   let host: HostRunner;
   let opencodeHost: OpenCodeHostRunner | undefined;
+  let claudeHost: ClaudeHostRunner | undefined;
+  let hostLabel = "OpenCode";
   try {
     if (runner === undefined) {
-      opencodeHost = createOpenCodeRunner({
-        projectRoot: prepared.projectRoot,
-      });
-      host = opencodeHost;
+      if (prepared.evalConfig.host === "claude-code") {
+        hostLabel = "Claude Code";
+        claudeHost = createClaudeRunner({
+          projectRoot: prepared.projectRoot,
+        });
+        host = claudeHost;
+      } else {
+        opencodeHost = createOpenCodeRunner({
+          projectRoot: prepared.projectRoot,
+        });
+        host = opencodeHost;
+      }
     } else {
       host = runner;
     }
   } catch (cause) {
     const versionError =
-      cause instanceof OpenCodeVersionError ? cause : undefined;
+      cause instanceof OpenCodeVersionError ||
+      cause instanceof ClaudeVersionError
+        ? cause
+        : undefined;
+    const claudeSelected =
+      hostLabel === "Claude Code" || prepared.evalConfig.host === "claude-code";
     printDiagnostics([
       error(
         versionError?.code === "unsupported-version"
           ? "eval-host-unsupported-version"
           : "eval-host-unavailable",
         versionError?.message ??
-          `could not prepare the OpenCode host: ${cause instanceof Error ? cause.message : String(cause)}`,
+          `could not prepare the ${claudeSelected ? "Claude Code" : "OpenCode"} host: ${cause instanceof Error ? cause.message : String(cause)}`,
         {
-          expected: "OpenCode V1 >=1.18.29 <2.0.0 or V2 >=2.0.0 <3.0.0",
-          next: "install a supported OpenCode version and re-run `atlante eval`",
+          expected: claudeSelected
+            ? "Claude Code >=2.0.0 <3.0.0"
+            : "OpenCode V1 >=1.18.29 <2.0.0 or V2 >=2.0.0 <3.0.0",
+          next: claudeSelected
+            ? "install a supported Claude Code version and re-run `atlante eval`"
+            : "install a supported OpenCode version and re-run `atlante eval`",
         },
       ),
     ]);
@@ -107,6 +131,22 @@ export async function runEvalCommand(
   }
   // The default runner needs stored credentials; without them every trial
   // would fail individually. Missing auth is run-preventing infrastructure.
+  // Injected runners skip the preflight entirely.
+  if (claudeHost !== undefined && !claudeHost.auth.authenticated) {
+    printDiagnostics([
+      error(
+        "eval-host-unauthenticated",
+        "claude-code authentication not found",
+        {
+          source: diagnosticPath(prepared.source),
+          expected:
+            "host credentials (ANTHROPIC_API_KEY, CLAUDE_CODE_OAUTH_TOKEN, or a `claude auth login` session)",
+          next: "set ANTHROPIC_API_KEY, generate a token with `claude setup-token`, or run `claude auth login` once, then re-run this command",
+        },
+      ),
+    ]);
+    return 3;
+  }
   if (opencodeHost !== undefined && !opencodeHost.auth.authenticated) {
     const auth = opencodeHost.auth;
     const authSource =
@@ -141,6 +181,7 @@ export async function runEvalCommand(
       atlanteVersion: packageJson.version,
       ...(options.keep ? { keep: true } : {}),
       runner: host,
+      host: prepared.evalConfig.host,
       // Live progress goes to stderr in both output modes; stdout stays
       // reserved for the summary (or the pure JSON report with `--json`).
       onProgress: (progress) => {
@@ -205,7 +246,7 @@ function hasUnmonitoredBudget(report: RunReport): boolean {
 type PreparedEval = {
   projectRoot: string;
   source: string;
-  evalConfig: EvalConfig;
+  evalConfig: AnyEvalConfig;
   scenarios: DiscoveredEvalScenario[];
   trialsOverride: number | undefined;
 };
@@ -244,6 +285,24 @@ function prepareEval(
   const trialsOverride = parseTrialsOverride(options.trials);
   if (trialsOverride === null) return 2;
 
+  const materializedHosts: readonly string[] = loaded.document.hosts ?? [
+    "opencode",
+  ];
+  if (!materializedHosts.includes(evalConfig.host)) {
+    printDiagnostics([
+      error(
+        "eval-host-not-materialized",
+        `eval.host "${evalConfig.host}" is not among the materialized hosts (${materializedHosts.join(", ")})`,
+        {
+          source: diagnosticPath(loaded.configPath ?? target),
+          expected: "an eval host selected through the document hosts field",
+          next: `add "${evalConfig.host}" to hosts or set eval.host to one of: ${materializedHosts.join(", ")}`,
+        },
+      ),
+    ]);
+    return 2;
+  }
+
   const localDiscovery = evalConfig.scenarios
     ? discoverEvalScenarios(loaded.projectRoot, evalConfig.scenarios)
     : { scenarios: [], diagnostics: [] };
@@ -261,7 +320,7 @@ function prepareEval(
   printDiagnostics(discoveryDiagnostics);
   if (hasErrors(discoveryDiagnostics)) return 2;
 
-  const allScenarios = [
+  const allScenarios: (DiscoveredEvalScenario & { packHost?: string })[] = [
     ...localDiscovery.scenarios,
     ...packDiscovery.scenarios,
   ];
@@ -298,16 +357,50 @@ function prepareEval(
     return selected;
   });
 
+  // Pack `host` is compatibility metadata, project `host` is execution
+  // policy: an included suite with a declared host runs only under the
+  // matching project host. Host-neutral suites (no declared host) run under
+  // either host. Mismatches fail here, before native verification or any
+  // host run, instead of silently running or silently skipping.
+  const incompatible = included.filter(
+    (scenario) =>
+      scenario.origin.kind === "package" &&
+      !isPackHostCompatible(scenario.packHost, evalConfig.host),
+  );
+  if (incompatible.length > 0) {
+    printDiagnostics(
+      incompatible.map((scenario) => {
+        if (scenario.origin.kind !== "package")
+          throw new Error(
+            "unreachable: incompatible scenario is not a pack scenario",
+          );
+        return error(
+          "eval-pack-host-incompatible",
+          `pack suite "${scenario.origin.packageName}@${scenario.origin.packageVersion}" declares host "${scenario.packHost}" which is incompatible with project eval.host "${evalConfig.host}"`,
+          {
+            source: `${scenario.origin.packageName}@${scenario.origin.packageVersion}/${scenario.source}`,
+            expected: `a pack suite compatible with eval.host "${evalConfig.host}", or a host-neutral suite`,
+            next: `remove ${scenario.origin.packageName} from eval.include or run eval with a compatible host`,
+          },
+        );
+      }),
+    );
+    return 2;
+  }
+
   try {
-    verifyNativeOutputs(loaded.projectRoot);
+    verifyHostNativeOutputs(loaded.projectRoot, evalConfig.host);
   } catch (cause) {
+    const claudeSelected = evalConfig.host === "claude-code";
     printDiagnostics([
       error(
         "native-outputs-not-verified",
         cause instanceof Error ? cause.message : String(cause),
         {
           source: diagnosticPath(join(loaded.projectRoot, ".atlante")),
-          expected: "verified native OpenCode outputs",
+          expected: claudeSelected
+            ? "verified native Claude Code outputs"
+            : "verified native OpenCode outputs",
           next: "run `atlante build` and try again",
         },
       ),
@@ -325,7 +418,7 @@ function prepareEval(
 }
 
 type PackScenarioDiscovery = {
-  scenarios: DiscoveredEvalScenario[];
+  scenarios: (DiscoveredEvalScenario & { packHost?: string })[];
   diagnostics: Diagnostic[];
 };
 
@@ -333,7 +426,7 @@ type PackScenarioDiscovery = {
 function discoverPackSuites(
   packages: readonly ResolvedResourcePackage[],
 ): PackScenarioDiscovery {
-  const scenarios: DiscoveredEvalScenario[] = [];
+  const scenarios: (DiscoveredEvalScenario & { packHost?: string })[] = [];
   const diagnostics: Diagnostic[] = [];
   for (const selected of packages) {
     const identity = selected.pack.package;
@@ -368,7 +461,10 @@ function discoverPackSuites(
     }
 
     if (rawEval === undefined) continue;
-    const parsed = evalPackConfigSchema.safeParse(rawEval);
+    const parsedV01 = evalPackConfigSchema.safeParse(rawEval);
+    const parsed = parsedV01.success
+      ? parsedV01
+      : evalPackConfigV02Schema.safeParse(rawEval);
     if (!parsed.success) {
       diagnostics.push(
         error(
@@ -391,13 +487,18 @@ function discoverPackSuites(
       packageVersion: identity.version,
       locator: identity.name,
     };
+    const packHost = parsed.data.host;
     const discovery = discoverEvalScenarios(
       selected.pack.root,
       parsed.data.scenarios,
       { origin },
     );
     diagnostics.push(...discovery.diagnostics);
-    scenarios.push(...discovery.scenarios);
+    for (const scenario of discovery.scenarios) {
+      scenarios.push(
+        packHost === undefined ? scenario : { ...scenario, packHost },
+      );
+    }
   }
   return { scenarios, diagnostics };
 }

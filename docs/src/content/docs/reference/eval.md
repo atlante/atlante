@@ -4,7 +4,8 @@ description: The eval configuration, scenario documents, checks, budgets, and re
 ---
 
 `atlante eval` runs a built harness through
-[OpenCode](https://opencode.ai/) in disposable sandboxes. Each trial starts
+[OpenCode](https://opencode.ai/) or
+[Claude Code](https://code.claude.com/docs) in disposable sandboxes. Each trial starts
 with a copy of the scenario fixture and the native agent and skill files,
 then checks the resulting files and command results against explicit assertions.
 Scenario suites can be authored by the project or shipped as opt-in metadata in
@@ -28,9 +29,9 @@ A run needs all of the following:
 | --- | --- |
 | An `eval` section | `atlante.jsonc` |
 | Scenario documents | The files matched by the local `scenarios` glob and any explicitly included pack suites |
-| Verified native outputs | A prior `atlante build` |
-| OpenCode on `PATH` | The installed `opencode` executable |
-| Stored provider credentials | OpenCode's stored authentication — `auth.json`, plus the credentials database on V2 hosts; shell API-key variables alone are insufficient |
+| Verified native outputs | A prior `atlante build`, for the selected `eval.host` |
+| The selected host on `PATH` | The installed `opencode` or `claude` executable |
+| Stored provider credentials | The host's stored authentication — see [Host versions](#host-versions); shell API-key variables alone are insufficient for OpenCode |
 | Git on `PATH` | Used to establish the trial's baseline snapshot |
 | Setup and check executables | Tools invoked by the scenario, such as Bun for `bun test` |
 
@@ -55,7 +56,7 @@ A run needs all of the following:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `host` | `"opencode"` | The host runner; the only admitted value in v0.1 |
+| `host` | `"opencode"` or `"claude-code"` | The host runner; v0.1 documents admit only `"opencode"`, v0.2 documents admit both |
 | `scenarios` | string | Glob of scenario documents, relative to the project root |
 | `include` | string[] | Package or selected package-preset locators whose pack suites are allowed to run |
 | `model` | string | Optional model passed through to the host run; omitted uses the host default |
@@ -104,6 +105,42 @@ The trial's OpenCode configuration is authored fresh for every trial, so
 `eval.model` plus the host's stored authentication is the supported provider
 path. An isolated sandbox has no global OpenCode configuration, which also
 means a V2 host has no default model to fall back to.
+
+### Claude Code
+
+Eval probes `claude --version` once per run and supports Claude Code
+(`>=2.0.0 <3.0.0`); any other version fails with a diagnostic before any
+trial. The runner verifies the project's Claude Code native outputs, then
+authors a fresh `.claude/settings.json` sandbox configuration carrying only
+the tool containment policy. It never merges project MCP servers, settings,
+or hooks. A fixture that provides `.mcp.json`, `.claude/settings.json`, or
+`.claude/settings.local.json` fails before the trial, because Claude Code
+would load or merge those files alongside the generated configuration.
+
+Credentials come from the host's own stored authentication: an
+`ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` value, a
+`CLAUDE_CODE_OAUTH_TOKEN` value generated with `claude setup-token`, a
+cloud-provider credential mode, or a `claude auth login` session. Only the
+credentials file is copied into the sandbox; session history and unrelated
+user configuration never reach the trial. The runner pre-accepts workspace
+trust for the ephemeral sandbox directory only, so the host honors the
+generated allow policy; without it the host ignores the policy and the trial
+cannot start.
+
+Trials run headless as `claude -p --output-format stream-json --verbose
+--setting-sources project` from the sandbox working directory, with the
+optional `--agent` and `--model` selections. Usage, cost, and model identity
+come from the structured event stream, and the per-trial token and timeout
+budgets are enforced while the stream flows. Without stored credentials the
+run fails with `eval-host-unauthenticated` before any trial.
+
+### Pack suite compatibility
+
+A pack suite without a declared `host` is host-neutral and runs under either
+project host. A suite with a declared `host` runs only under the matching
+project `host`: including an incompatible suite fails with
+`eval-pack-host-incompatible` before execution, instead of running under the
+other host or being skipped silently.
 
 ### Pack-owned suites
 
@@ -246,6 +283,12 @@ or developer environment. A fixture file that collides with a verified native
 output fails the trial with a rename-or-remove diagnostic. Other noncolliding
 `.opencode` files are copied.
 
+For Claude Code trials, a fixture must not provide `.mcp.json`,
+`.claude/settings.json`, or `.claude/settings.local.json`: Claude Code would
+load or merge those files alongside the generated sandbox configuration, so
+the runner rejects them before the trial. Other noncolliding `.claude` files
+are copied.
+
 <a id="containment"></a>
 
 ## Sandbox containment
@@ -253,7 +296,9 @@ output fails the trial with a rename-or-remove diagnostic. Other noncolliding
 Containment is tool-level policy, not OS-level isolation. Host permission
 rules deny web and search tools and selected destructive shell commands.
 The host's shell tool still has ordinary user access to the network and
-machine.
+machine. The policy is identical for every compared variant: OpenCode trials
+carry it in the fresh dialect-native configuration, Claude Code trials in
+the fresh `.claude/settings.json` sandbox configuration.
 
 The host trial and command checks receive an allowlisted environment.
 Scenario setup commands run before the baseline snapshot and inherit the

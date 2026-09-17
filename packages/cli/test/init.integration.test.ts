@@ -1435,6 +1435,147 @@ describe("runInit", () => {
     );
   });
 
+  test("scaffolds a Claude-only project without touching OpenCode", async () => {
+    const dir = tempDir();
+    const exit = await runInitWithDependencies(
+      dir,
+      { hosts: "claude-code" },
+      {
+        opencodeVersionProbe: () => {
+          throw new Error("OpenCode detection must not run");
+        },
+      },
+    );
+    expect(exit).toBe(0);
+    const config = readFileSync(join(dir, "atlante.jsonc"), "utf8");
+    expect(config).toContain("https://atlante.sh/schema/v0.2/schema.json");
+    expect(config).toContain('"hosts": ["claude-code"]');
+    expect(existsSync(join(dir, ".claude", "agents", "atlante.md"))).toBe(true);
+    expect(existsSync(join(dir, ".claude", "skills", "plan", "SKILL.md"))).toBe(
+      true,
+    );
+    expect(existsSync(join(dir, ".atlante", "claude-code-native.json"))).toBe(
+      true,
+    );
+    expect(existsSync(join(dir, ".opencode"))).toBe(false);
+    expect(existsSync(join(dir, "opencode.jsonc"))).toBe(false);
+    expect(existsSync(join(dir, "opencode.json"))).toBe(false);
+    const mcp = JSON.parse(readFileSync(join(dir, ".mcp.json"), "utf8")) as {
+      mcpServers: { atlante: { command: string; args: string[] } };
+    };
+    expect(mcp.mcpServers.atlante).toEqual({
+      command: "npx",
+      args: ["--yes", `atlante@${packageJson.version}`, "mcp"],
+    });
+    expect(readFileSync(join(dir, ".gitignore"), "utf8")).toBe(
+      ".atlante/\n.claude/agents/atlante.md\n.claude/skills/plan/\n",
+    );
+    expect(await runValidate(dir)).toBe(0);
+  });
+
+  test("scaffolds a mixed-host project with both integrations", async () => {
+    const dir = tempDir();
+    const exit = await runInit(dir, { hosts: "opencode,claude-code" });
+    expect(exit).toBe(0);
+    expect(existsSync(join(dir, ".opencode", "agents", "atlante.md"))).toBe(
+      true,
+    );
+    expect(existsSync(join(dir, ".claude", "agents", "atlante.md"))).toBe(true);
+    expect(existsSync(join(dir, ".mcp.json"))).toBe(true);
+    expect(existsSync(join(dir, "opencode.jsonc"))).toBe(true);
+    // runInit resolves the bundled first-party pack (agent atlante; skills
+    // brainstorm, build, harness, plan, review), unlike the stub pack used
+    // with runInitWithDependencies.
+    expect(readFileSync(join(dir, ".gitignore"), "utf8")).toBe(
+      ".atlante/\n.opencode/skills/atlante/\n.opencode/agents/atlante.md\n.claude/agents/atlante.md\n.claude/skills/brainstorm/\n.claude/skills/build/\n.claude/skills/harness/\n.claude/skills/plan/\n.claude/skills/review/\n",
+    );
+    expect(await runValidate(dir)).toBe(0);
+  });
+
+  test("honors --no-mcp for Claude-only init", async () => {
+    const dir = tempDir();
+    const exit = await runInit(dir, { hosts: "claude-code", noMcp: true });
+    expect(exit).toBe(0);
+    expect(existsSync(join(dir, ".mcp.json"))).toBe(false);
+    expect(existsSync(join(dir, "opencode.jsonc"))).toBe(false);
+    expect(existsSync(join(dir, ".claude", "agents", "atlante.md"))).toBe(true);
+  });
+
+  test("rejects an invalid --hosts selection before touching the project", async () => {
+    for (const hosts of ["cursor", "opencode,opencode", ""]) {
+      const dir = tempDir();
+      const { result, errors } = await captureErrors(() =>
+        runInitWithDependencies(
+          dir,
+          { hosts },
+          {
+            buildProject: () => {
+              throw new Error("builder should not run");
+            },
+          },
+        ),
+      );
+      expect(result).toBe(1);
+      expect(errors.join("\n")).toContain("invalid --hosts selection");
+      expect(existsSync(join(dir, "atlante.jsonc"))).toBe(false);
+    }
+  });
+
+  test("leaves Claude outputs alone on a default OpenCode-only init", async () => {
+    const dir = tempDir();
+    expect(await runInit(dir, {})).toBe(0);
+    expect(existsSync(join(dir, ".mcp.json"))).toBe(false);
+    expect(existsSync(join(dir, ".claude"))).toBe(false);
+  });
+
+  test("aborts before writing when .mcp.json has a conflicting atlante entry", async () => {
+    const dir = tempDir();
+    const path = join(dir, ".mcp.json");
+    const original = `${JSON.stringify({
+      mcpServers: { atlante: { command: "other Atlante fork" } },
+    })}\n`;
+    writeFileSync(path, original);
+
+    const { result, errors } = await captureErrors(() =>
+      runInitWithDependencies(
+        dir,
+        { hosts: "claude-code" },
+        {
+          buildProject: () => {
+            throw new Error("builder should not run");
+          },
+        },
+      ),
+    );
+
+    expect(result).toBe(1);
+    expect(errors.join("\n")).toContain("conflicts with Atlante's managed");
+    expect(readFileSync(path, "utf8")).toBe(original);
+    expect(existsSync(join(dir, "atlante.jsonc"))).toBe(false);
+  });
+
+  test("rolls back committed files when the .mcp.json write fails", async () => {
+    const dir = tempDir();
+    const mcpPath = join(dir, ".mcp.json");
+    const dependencies: InitDependencies = {
+      writeFileSync: (path, contents) => {
+        if (path === mcpPath) throw new Error("injected MCP write failure");
+        writeFileSync(path, contents);
+      },
+      buildProject: () => {
+        throw new Error("builder should not run");
+      },
+    };
+
+    const { result } = await captureErrors(() =>
+      runInitWithDependencies(dir, { hosts: "claude-code" }, dependencies),
+    );
+
+    expect(result).toBe(1);
+    expect(existsSync(join(dir, "atlante.jsonc"))).toBe(false);
+    expect(existsSync(mcpPath)).toBe(false);
+  });
+
   test("preserves an existing opencode.jsonc while registering MCP", async () => {
     const dir = tempDir();
     const path = join(dir, "opencode.jsonc");

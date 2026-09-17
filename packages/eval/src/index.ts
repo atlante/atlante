@@ -6,6 +6,24 @@ export {
   scenarioTimeoutMs,
 } from "./config.js";
 export type {
+  ClaudeAuthMethod,
+  ClaudeAuthStatus,
+  ClaudeAuthStatusProbe,
+  ClaudeHostRunner,
+  ClaudeRunnerOptions,
+  ClaudeVersion,
+  ClaudeVersionErrorCode,
+  ClaudeVersionProbe,
+} from "./host/claude.js";
+export {
+  CLAUDE_BINARY,
+  ClaudeVersionError,
+  checkClaudeAuth,
+  createClaudeRunner,
+  normalizeClaudeUsage,
+  parseClaudeVersion,
+} from "./host/claude.js";
+export type {
   OpenCodeAuthStatus,
   OpenCodeDatabasePathProbe,
   OpenCodeHostRunner,
@@ -36,7 +54,10 @@ export {
   createRunRoot,
   destroyRunRoot,
   destroySandbox,
+  type EvalHostName,
   NativeOutputsNotVerifiedError,
+  verifyClaudeCodeNativeOutputs,
+  verifyHostNativeOutputs,
   verifyNativeOutputs,
 } from "./sandbox.js";
 export type { CommandOutcome } from "./spawn.js";

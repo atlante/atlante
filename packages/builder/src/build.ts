@@ -110,6 +110,10 @@ export function buildProject(
   const materializations: MaterializationSummary[] = [];
   const materializeOptions =
     dependencies.dryRun === true ? { dryRun: true as const } : undefined;
+  // Mixed-host builds have no cross-host atomicity: each materializer runs in
+  // `hosts` order with its own publication safety, per-host outcomes are
+  // recorded independently, and every diagnostic is aggregated. Any error
+  // fails the build, but one host never rolls back another host's output.
   for (const materializer of selection.selected) {
     const outcome = materializer.materialize(
       projectRoot,

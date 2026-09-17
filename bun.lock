@@ -32,8 +32,13 @@
         "@atlante/validator": "workspace:*",
       },
       "devDependencies": {
+        "@atlante/claude-code": "workspace:*",
         "@atlante/opencode": "workspace:*",
       },
+    },
+    "packages/claude-code": {
+      "name": "@atlante/claude-code",
+      "version": "0.8.1",
     },
     "packages/cli": {
       "name": "atlante",
@@ -47,6 +52,7 @@
       },
       "devDependencies": {
         "@atlante/builder": "workspace:*",
+        "@atlante/claude-code": "workspace:*",
         "@atlante/eval": "workspace:*",
         "@atlante/opencode": "workspace:*",
         "@atlante/resources": "workspace:*",
@@ -67,6 +73,7 @@
       "name": "@atlante/eval",
       "version": "0.8.1",
       "dependencies": {
+        "@atlante/claude-code": "workspace:*",
         "@atlante/opencode": "workspace:*",
         "@atlante/schema": "workspace:*",
         "@atlante/validator": "workspace:*",
@@ -155,6 +162,10 @@
     "@astrojs/yaml2ts": ["@astrojs/yaml2ts@0.2.4", "", { "dependencies": { "yaml": "^2.8.3" } }, "sha512-8oddpOae35pJsXPQXhTkM0ypfKPskVsh2bCxRtbf7e+/Epw2nReakFYpLKjZMEr75CsoF203PMnCocpfz0s69A=="],
 
     "@atlante/builder": ["@atlante/builder@workspace:packages/builder"],
+
+    "@atlante/claude-code": [
+      "@atlante/claude-code@workspace:packages/claude-code",
+    ],
 
     "@atlante/docs": ["@atlante/docs@workspace:docs"],
 

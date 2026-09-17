@@ -1,6 +1,6 @@
 import {
+  type AnyEvalConfig,
   EVAL_CHECK_TIMEOUT_DEFAULT_MS,
-  type EvalConfig,
 } from "@atlante/schema";
 import type { DiscoveredEvalScenario } from "@atlante/validator";
 import { runChecks } from "./checks.js";
@@ -23,9 +23,9 @@ import {
 
 /**
  * The host-specific surface (spawn invocation, event parsing, permission
- * merge, sandbox config authoring) lives behind this interface. It is NOT
- * pre-abstracted for future hosts: the interface gets extracted from the
- * opencode implementation only when a second host lands.
+ * merge, sandbox config authoring) lives behind this interface. The second
+ * host (Claude Code) is implemented against it; shared behavior moves down
+ * only when genuinely generic to both runners.
  */
 export interface HostRunner {
   readonly name: string;
@@ -89,12 +89,18 @@ export type EvalProgress =
 
 export type RunEvalInput = {
   projectRoot: string;
-  evalConfig: EvalConfig;
+  evalConfig: AnyEvalConfig;
   budget: ResolvedBudget;
   scenarios: readonly DiscoveredEvalScenario[];
   atlanteVersion: string;
   keep?: boolean;
   runner: HostRunner;
+  /**
+   * Selects the native publication the sandbox verifies. The CLI sets it
+   * from the validated `eval.host`; absent defaults to opencode (legacy
+   * direct callers and injected fake runners).
+   */
+  host?: string;
   onProgress?: (progress: EvalProgress) => void;
 };
 
@@ -335,6 +341,7 @@ async function assembleTrial(
         trialIndex,
         budget: input.budget,
         keep: Boolean(input.keep),
+        ...(input.host !== undefined ? { host: input.host } : {}),
       },
       (assembled) =>
         input.runner.prepareHostIntegration(assembled, {

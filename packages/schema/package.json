@@ -28,6 +28,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./schema.json": "./schema/v0.1/schema.json",
+    "./schema.v0.2.json": "./schema/v0.2/schema.json",
     "./eval-scenario.json": "./schema/v0.1/eval-scenario.json"
   },
   "scripts": {

@@ -79,6 +79,31 @@ const evalConfigWithModel: EvalConfig = {
 };
 
 describe("runEval", () => {
+  test("verifies the selected host publication, failing closed on mismatch", async () => {
+    // The fixture project is opencode-materialized only: selecting the
+    // claude-code publication fails every trial before any host spawn.
+    let calls = 0;
+    const report = await runEval({
+      projectRoot,
+      evalConfig,
+      budget: resolveBudget({ evalConfig, trialsOverride: 1 }),
+      scenarios,
+      atlanteVersion: "0.0.0-test",
+      runner: fakeRunner(() => {
+        calls += 1;
+        return completedRun();
+      }),
+      host: "claude-code",
+    });
+    expect(calls).toBe(0);
+    const result = report.scenarios["happy-scenario"];
+    if (!result) throw new Error("missing scenario result");
+    expect(result.trials[0]?.verdict).toBe("infra-error");
+    expect(result.trials[0]?.error).toContain(
+      "native output verification failed",
+    );
+  });
+
   // Full report assembly and check evaluation can approach bun's 5s default
   // timeout when the complete suite is running concurrently.
   test("runs trials per scenario and computes statistics", {

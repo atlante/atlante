@@ -1,9 +1,9 @@
 # Atlante Specification
 
 **Status:** Draft
-**Version:** 0.1
+**Version:** 0.2
 
-This document defines the version 0.1 contract for Atlante configuration,
+This document defines the version 0.1 and 0.2 contracts for Atlante configuration,
 static content, deterministic rendering, and host-native materialization.
 
 Each section follows the same review shape:
@@ -44,6 +44,16 @@ Version 0.1 defines:
   versioned scenario documents, delegates scenario execution to the declared
   host runner in a disposable sandbox, and grades deterministic zero-LLM
   checks (section 12).
+
+Version 0.2 adds, without changing any version 0.1 contract:
+
+- `"claude-code"` as a second host target for the document `hosts` field;
+- a Claude Code materializer profile with its own native paths and ownership
+  manifest (section 11);
+- a Claude Code eval runner selected through the project `eval.host` field
+  (section 12); and
+- pack suite host-compatibility enforcement between a pack's declared `host`
+  metadata and the project's `eval.host` (section 12).
 
 Version 0.1 MUST NOT define or imply:
 
@@ -220,11 +230,19 @@ same canonical model. If both files exist and no explicit path was supplied,
 the CLI MUST report an ambiguity rather than choose silently.
 
 The document MUST contain `$schema` and MAY contain `extends`, `values`,
-`options`, `agents`, `skills`, `hosts`, and `eval`. The `eval` section configures the optional
+`options`, `agents`, `skills`, `hosts`, and `eval`. The `$schema` value
+selects the contract version: `https://atlante.sh/schema/v0.1/schema.json`
+for version 0.1 and `https://atlante.sh/schema/v0.2/schema.json` for version
+0.2. Released schema URIs are immutable (section 10). The `eval` section configures the optional
 eval command and is validated against its own schema (section 12). Unknown
 top-level fields MUST be rejected. `extends`
 MUST be one non-empty string or a non-empty ordered array of non-empty strings.
 Missing `agents` and `skills` maps MUST normalize to empty collections.
+
+The `hosts` array MUST be non-empty and MUST NOT contain duplicates, and the
+canonical document defaults to `["opencode"]` when the field is absent.
+Version 0.1 admits only `"opencode"` as a host target; version 0.2
+additionally admits `"claude-code"` (sections 9 and 11).
 
 Each agent and skill binding MUST have a non-empty `description` after
 resolution. `$template`, `$instance`, `description`, and `values` are reserved
@@ -237,6 +255,9 @@ string without a leading slash, backslash, NUL, drive prefix, empty segment,
 or `.`/`..` segment. The canonical document defaults to
 `options.agents.outDir` `.opencode/agents` and `options.skills.outDir`
 `.opencode/skills/atlante`, and each kind is configured independently.
+These output directories are OpenCode-scoped: the Claude Code materializer
+publishes fixed `.claude/` locations and does not read `options`
+(section 11).
 
 ### Examples
 
@@ -535,16 +556,25 @@ MUST render deterministic Markdown into an in-memory prepared project, MUST
 NOT execute agents, commands, or arbitrary project code, and MUST materialize
 no partial result.
 
-The document MAY declare a `hosts` field. Version 0.1 admits only `"opencode"`
-as a host target; a `hosts` array MUST be non-empty and MUST NOT contain
-duplicates, and the canonical document defaults to `["opencode"]` when the
-field is absent. For each declared host, the build MUST select a registered
+The document MAY declare a `hosts` field. A `hosts` array MUST be non-empty
+and MUST NOT contain duplicates, and the canonical document defaults to
+`["opencode"]` when the field is absent. Version 0.1 admits only
+`"opencode"` as a host target; version 0.2 additionally admits
+`"claude-code"`. For each declared host, the build MUST select a registered
 host materializer or fail with an `unsupported-host` diagnostic. The
 materializer receives the prepared project as data and MUST NOT load source
 configuration, resolve resources, or import the builder.
 
 Materialization MUST be deterministic and planned completely before any
-filesystem mutation. For the OpenCode host it MUST publish exactly the
+filesystem mutation. Each declared host keeps its own native paths and its
+own ownership manifest; one host MUST NOT reconcile, verify, or delete
+another host's outputs. A build over several hosts runs each materializer in
+`hosts` order with that materializer's own publication safety, aggregates
+every per-host diagnostic, and fails when any host fails. No cross-host
+atomicity is claimed: one host's outputs may be published while another
+host's fail.
+
+For the OpenCode host it MUST publish exactly the
 configured native paths plus the ownership manifest. With default options
 those paths are:
 
@@ -561,16 +591,28 @@ directories MUST satisfy the safe project-relative path rules, receive no
 automatic Git-ignore entry, and receive no automatic host discovery
 configuration.
 
+For the Claude Code host it MUST publish exactly the fixed native paths
+plus the ownership manifest; document `options` outDirs do not apply:
+
+```text
+.claude/agents/<id>.md
+.claude/skills/<id>/SKILL.md
+.atlante/claude-code-native.json
+```
+
 Agent IDs and skill IDs MUST be lowercase kebab-case ASCII of at most 64
 characters. Materialization MUST NOT rename an ID; an ID that violates this
 grammar MUST fail the build.
 
 Each agent file MUST contain a YAML frontmatter description followed by the
 rendered prompt. Each skill file MUST contain YAML frontmatter name and
-description followed by the rendered skill content.
+description followed by the rendered skill content. The OpenCode and Claude
+Code materializers use the same frontmatter keys.
 
-The ownership manifest MUST be UTF-8 JSON containing only `format`, `version`,
-and `files`:
+Each host's ownership manifest MUST be UTF-8 JSON containing only `format`,
+`version`, and `files`. The OpenCode manifest uses format
+`atlante-opencode-native`, version `1`; the Claude Code manifest uses format
+`atlante-claude-code-native`, version `1`:
 
 ```json
 {
@@ -592,6 +634,8 @@ path derived from that kind and ID, and a lowercase SHA-256 digest of the
 exact UTF-8 bytes of the file it describes. IDs and paths MUST be unique
 within the manifest. The manifest is bookkeeping state: it MUST NOT contain
 prompt or skill payload content, and materialization MUST write it last.
+A materializer MUST reject ownership manifests whose `format` or `version`
+it does not support, rather than guessing.
 
 Publication MUST satisfy these invariants:
 
@@ -660,6 +704,14 @@ and the CLI MUST reject unsupported document schema URIs, rather than guessing.
 Package versions are installation metadata and MUST NOT become part of authored
 resource locators.
 
+Version 0.2 adds the `"claude-code"` host target to the document `hosts`
+field and the project `eval.host` field, the `atlante-claude-code-native`
+ownership-manifest format and its fixed `.claude/` native paths, and pack
+suite host-compatibility enforcement. It changes no version 0.1 contract:
+released version 0.1 schema URIs, native paths, and manifest formats remain
+valid, and an implementation that supports version 0.2 MUST accept version
+0.1 documents with identical behavior.
+
 Local resource edits MAY take effect on the next build without changing the
 document schema URI. A versioned or immutable resource distribution MUST define
 its own version or digest mechanism.
@@ -688,22 +740,24 @@ specification version is one of those domains, not the master clock for package
 releases; the only coupling is the major version a tool owes when it drops a
 contract version.
 
-## 11. OpenCode Materializer Profile
+## 11. Host Materializer Profiles
 
 ### Goal
 
-Define the first host materializer without making host behavior part of the
-document.
+Define one materializer per supported host without making host behavior part
+of the document.
 
 ### Contract
 
-Version 0.1 admits `"opencode"` as the only host target, and `["opencode"]` is
-the canonical default of the document's `hosts` field. The OpenCode
-materializer MUST be selected only through that field and MUST receive the
-prepared project as data. It MUST NOT load source configuration, resolve
+The document's `hosts` field selects the materializers, and
+`["opencode"]` is the canonical default. Version 0.1 admits `"opencode"`
+as the only host target; version 0.2 additionally admits `"claude-code"`.
+Each materializer MUST be selected only through that field and MUST receive
+the prepared project as data. It MUST NOT load source configuration, resolve
 resources or packs, or depend on the builder.
 
-The materializer MUST publish the native output set defined in section 9:
+The OpenCode materializer MUST publish the native output set defined in
+section 9:
 
 - `.opencode/agents/<id>.md` for each agent binding by default, keyed by the binding's
   host-agent ID, or `<options.agents.outDir>/<id>.md` when a custom agent
@@ -715,14 +769,29 @@ The materializer MUST publish the native output set defined in section 9:
   `atlante-opencode-native`, version `1`, and one `files` entry of `kind`,
   `id`, `path`, and `sha256` per generated file.
 
+The Claude Code materializer MUST publish the native output set defined in
+section 9:
+
+- `.claude/agents/<id>.md` for each agent binding, keyed by the binding's
+  host-agent ID;
+- `.claude/skills/<id>/SKILL.md` for each skill binding, keyed by the
+  binding's `skillId`; and
+- `.atlante/claude-code-native.json`, the ownership manifest with format
+  `atlante-claude-code-native`, version `1`, and one `files` entry of
+  `kind`, `id`, `path`, and `sha256` per generated file.
+
+Claude Code agent and skill locations are fixed: document `options` outDirs
+are OpenCode-scoped and MUST NOT change Claude Code outputs.
+
 Native IDs MUST follow the grammar of section 9 and are never renamed. Host
 configuration remains host-owned: model, effort, permission, tool, and mode
 settings live in the host configuration and are never written by the
 materializer. The host composes its own configuration with the native files
 when it starts. OpenCode reads native agents and skills at startup, so a
-restart is required to pick up new or changed native files.
+restart is required to pick up new or changed native files. Claude Code
+reads native agents and skills from its `.claude/` directories likewise.
 
-Materialization MUST fail closed with a stable diagnostic for collisions,
+Each materializer MUST fail closed with a stable diagnostic for collisions,
 drift, stale-output digest mismatches, invalid IDs, unsafe paths, and
 filesystem failures. Diagnostics carry the `materialization-` prefix over the
 failure code (`invalid-input`, `invalid-id`, `invalid-manifest`,
@@ -731,11 +800,20 @@ one deterministic recovery action.
 
 `atlante init` MUST NOT register a runtime integration for the materializer.
 The read-only MCP context registration described in section 13 is separate from
-materialization and MUST NOT change the native output contract. Init MUST also
+materialization and MUST NOT change the native output contract. Init selects
+scaffold hosts from `--hosts` (default `["opencode"]`, invalid selections
+fail with `invalid-hosts`) and writes only the selected hosts'
+configuration: the OpenCode MCP registration when OpenCode is selected, the
+project-scoped `.mcp.json` registration when Claude Code is selected, and
+nothing for an unselected host. `--no-mcp` skips every host registration.
+Init MUST also
 enforce the ownership-scoped git policy from the validated canonical
 configuration before mutating the project: `.gitignore` MUST gain `.atlante/`,
-`.opencode/skills/atlante/` when default skills are configured, and the exact
-default agent path `.opencode/agents/<id>.md` per default agent binding when
+`.opencode/skills/atlante/` when default OpenCode skills are configured, the exact
+default agent path `.opencode/agents/<id>.md` per default OpenCode agent binding,
+the exact agent path `.claude/agents/<id>.md` per agent binding when
+Claude Code is selected, and the exact skill directory `.claude/skills/<id>/`
+per skill binding when Claude Code is selected, when
 missing, MUST preserve unrelated lines and order, and MUST remove
 only stale Atlante-managed agent entries. A normal `atlante build` MUST report
 missing default coverage with a stable `missing-gitignore` warning without
@@ -747,9 +825,11 @@ for custom paths.
 
 ### Examples
 
-The CLI is the composition root: it passes the OpenCode materializer to the
+The CLI is the composition root: it passes the selected materializers to the
 builder, and a build of a document without a `hosts` field materializes the
-OpenCode native output set.
+OpenCode native output set. A build of a version 0.2 document with
+`hosts: ["opencode", "claude-code"]` materializes both native output sets,
+each verified against its own ownership manifest.
 
 ### Edge cases
 
@@ -774,10 +854,13 @@ runtime.
 ### Contract
 
 The document MAY declare an `eval` section. It MUST match the eval schema: a
-`host` field admitting only `"opencode"` in version 0.1, an optional
+`host` field admitting only `"opencode"` in version 0.1 and `"opencode"` or
+`"claude-code"` in version 0.2, an optional
 `scenarios` glob relative to the project root, an optional `model` passed
 through to the host run, and an optional `budget` of `trials`, `timeoutMs`,
-`maxSessions`, and `maxTokens`. Absent budget fields MUST inherit the defaults
+`maxSessions`, and `maxTokens`. The project `eval.host` MUST be one of the
+materialized document `hosts`; any other value MUST fail with an
+`eval-host-not-materialized` diagnostic before execution. Absent budget fields MUST inherit the defaults
 of 3 trials,
 600000 ms per run, 15 sessions, and 400000 tokens, with at most 50 trials per
 run, and a run MUST stop when its budget is exhausted. A trial whose host
@@ -798,6 +881,36 @@ working directory, and receives a copy of the credential and migration-journal
 tables of its SQLite database, while V1 receives `auth.json`; session history
 MUST NOT be copied in either dialect.
 
+The Claude Code runner MUST resolve the host version once per run by probing
+`claude --version`. It supports Claude Code (`>=2.0.0 <3.0.0`); any other
+version MUST fail with a stable diagnostic. The runner MUST verify the
+project's Claude Code native outputs before any host run and MUST author a
+fresh `.claude/settings.json` sandbox configuration carrying only the tool
+containment policy; it MUST NOT merge or read project MCP servers, settings,
+or hooks. Provider access is the host's own stored authentication — an API
+key or bearer token, an OAuth token, a cloud-provider credential mode, or a
+`claude auth login` session — plus the `model` passed through with `--model`.
+Only the host credentials file is copied into the sandbox; session history
+and unrelated user configuration MUST NOT be copied. The runner MUST
+pre-accept workspace trust scoped to the ephemeral sandbox directory, so the
+host honors the generated allow policy; the acceptance MUST NOT trust any
+other directory. Trials run headless as
+`claude -p --output-format stream-json --verbose --setting-sources project`
+with direct argv, never through a shell, from the sandbox working directory
+under an allowlisted child environment. The runner MUST parse the structured
+event stream for usage, cost, and model identity, enforce the per-trial token
+and wall-clock budgets in flight, and report bounded diagnostics.
+
+Containment is host tool-level policy, NOT OS-level isolation, and it is
+identical for every compared variant. Each runner MUST deny the host's own
+web and search tools, interactive questions, and the most destructive shell
+prefixes, while keeping file and shell work usable non-interactively. The
+child environment MUST be allowlisted: credentials travel only through the
+isolated host state directory and explicit auth additions, and everything
+else stays with the host. Fixture content is the prompt-injection surface
+eval grades; scenario setup commands run before the baseline snapshot and
+inherit the full environment of the Atlante process.
+
 The project `eval` section MAY also declare a non-empty `include` array of
 package or selected package-preset locators. The project MUST declare either a
 local `scenarios` glob or `include`. An included package or preset MUST be
@@ -814,7 +927,12 @@ metadata has a `scenarios` glob relative to the pack root and MAY provide
 relative to the pack root, while `source` optionally locates the pack's eval
 sources relative to its repository root so published reports can be deep-linked
 at the release tag. Its optional
-`host` value is compatibility metadata, not project execution policy. Pack eval
+`host` value is compatibility metadata, not project execution policy. A pack
+suite without a declared `host` is host-neutral and runs under either project
+host. An included pack suite whose declared `host` differs from the project
+`eval.host` MUST fail with an `eval-pack-host-incompatible` diagnostic before
+execution; it MUST NOT run silently under the other host nor be silently
+skipped. Pack eval
 metadata is not inherited into the effective project document. Scenario
 documents discovered from a pack retain the pack root as their fixture root;
 project-local scenarios retain the project root as their fixture root. Resource
@@ -908,7 +1026,12 @@ usable and MUST NOT produce an evaluation claim.
 ### Edge cases
 
 Duplicate scenario names MUST fail at discovery. An unsupported eval host MUST
-fail with a stable diagnostic instead of being ignored. A scenario-level
+fail with a stable diagnostic instead of being ignored. An `eval.host` that
+is not among the materialized document `hosts` MUST fail before execution,
+as MUST an included pack suite whose declared `host` differs from the project
+`eval.host`. Eval MUST verify the native outputs of the selected host — never
+another host's — and missing or stale outputs MUST fail before any host run
+or model call. A scenario-level
 timeout override replaces the configured budget timeout for that scenario.
 Check regular expressions MUST compile before any model call. An unsafe or
 malformed pack report MUST be ignored or rejected at the consuming boundary,

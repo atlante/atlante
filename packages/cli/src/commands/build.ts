@@ -1,5 +1,6 @@
 import type { ProjectContext } from "@atlante/builder";
 import { buildProject } from "@atlante/builder";
+import { claudeCodeMaterializer } from "@atlante/claude-code";
 import { openCodeMaterializer } from "@atlante/opencode";
 import type { ResourceWatchContext } from "@atlante/validator";
 import { firstPartyProjectContext } from "../first-party-pack.js";
@@ -32,7 +33,7 @@ export function runBuildWithContext(
   try {
     const dryRun = options?.dryRun === true;
     const built = buildProject(target, context, {
-      materializers: [openCodeMaterializer],
+      materializers: [openCodeMaterializer, claudeCodeMaterializer],
       ...(dryRun ? { dryRun: true as const } : {}),
     });
     if (

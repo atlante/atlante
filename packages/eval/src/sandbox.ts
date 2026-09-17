@@ -11,7 +11,8 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, sep } from "node:path";
-import { type OpenCodeNativeFile, readOpenCodeNative } from "@atlante/opencode";
+import { readClaudeCodeNative } from "@atlante/claude-code";
+import { readOpenCodeNative } from "@atlante/opencode";
 import type { DiscoveredEvalScenario } from "@atlante/validator";
 import type { ResolvedBudget } from "./config.js";
 import { runCommand } from "./spawn.js";
@@ -41,6 +42,42 @@ export function verifyNativeOutputs(
   }
 }
 
+/**
+ * Verifies the project's native Claude Code publication through the
+ * adapter's manifest-backed reader. Same never-build contract as OpenCode.
+ */
+export function verifyClaudeCodeNativeOutputs(
+  projectRoot: string,
+): ReturnType<typeof readClaudeCodeNative> {
+  try {
+    return readClaudeCodeNative(projectRoot);
+  } catch (cause) {
+    throw new NativeOutputsNotVerifiedError(
+      `native output verification failed: ${cause instanceof Error ? cause.message : String(cause)}`,
+    );
+  }
+}
+
+export type EvalHostName = "opencode" | "claude-code";
+
+/**
+ * Verifies the native publication for the selected eval host. Each host
+ * keeps its own ownership manifest; one host never verifies the other's
+ * outputs.
+ */
+export function verifyHostNativeOutputs(
+  projectRoot: string,
+  host: string = "opencode",
+): {
+  files: readonly { path: string; bytes: Uint8Array }[];
+} {
+  if (host === "claude-code") return verifyClaudeCodeNativeOutputs(projectRoot);
+  if (host === "opencode") return verifyNativeOutputs(projectRoot);
+  throw new NativeOutputsNotVerifiedError(
+    `native output verification failed: unsupported eval host "${host}"`,
+  );
+}
+
 export type SnapshotEntry = { path: string; hash: string | null };
 
 export type Sandbox = {
@@ -63,6 +100,8 @@ export type AssembleSandboxInput = {
   trialIndex: number;
   budget: ResolvedBudget;
   keep: boolean;
+  /** Eval host selecting which native publication to verify; default opencode. */
+  host?: string;
 };
 
 /** Creates the per-run root under the OS temp directory. */
@@ -112,7 +151,10 @@ export async function assembleSandbox(
   // (b) Verified native outputs, copied from manifest-backed bytes. The
   // manifest itself stays in the source project; the host only needs the
   // generated files in the disposable sandbox.
-  const native = verifyNativeOutputs(input.projectRoot);
+  const native = verifyHostNativeOutputs(
+    input.projectRoot,
+    input.host ?? "opencode",
+  );
   copyNativeFiles(root, native.files);
 
   const sandbox: Sandbox = {
@@ -277,7 +319,7 @@ function assertNoSymlinkPath(
 /** Copies verified native files without following links or overwriting fixtures. */
 function copyNativeFiles(
   root: string,
-  files: readonly OpenCodeNativeFile[],
+  files: readonly { path: string; bytes: Uint8Array }[],
 ): void {
   for (const file of files) {
     const target = join(root, ...file.path.split("/"));

@@ -23,7 +23,11 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { HostRunner, RunTrialInput, TrialRun } from "@atlante/eval";
-import { EVAL_SCENARIO_SCHEMA_URI, SCHEMA_URI } from "@atlante/schema";
+import {
+  EVAL_SCENARIO_SCHEMA_URI,
+  SCHEMA_URI,
+  SCHEMA_URI_V02,
+} from "@atlante/schema";
 import { createProgressStyler, runEvalCommand } from "../src/commands/eval.js";
 import { runBuild } from "../src/main.js";
 import { installStubPack } from "./stub-pack.js";
@@ -62,7 +66,10 @@ function scenarioDocument(): string {
   })}\n`;
 }
 
-function writePackEvalSuite(project: string): void {
+function writePackEvalSuite(
+  project: string,
+  options: { host?: string } = {},
+): void {
   const packRoot = join(project, "node_modules", ...FIXTURE_PACK.split("/"));
   const packConfigPath = join(packRoot, "atlante.jsonc");
   const packConfig = JSON.parse(readFileSync(packConfigPath, "utf8")) as Record<
@@ -70,6 +77,7 @@ function writePackEvalSuite(project: string): void {
     unknown
   >;
   packConfig.eval = {
+    ...(options.host === undefined ? {} : { host: options.host }),
     scenarios: "eval/scenarios/*.eval.json",
     fixtures: "eval/fixtures",
   };
@@ -95,14 +103,18 @@ function writePackEvalSuite(project: string): void {
 }
 
 /** Authors a full eval-enabled project; native outputs stay unbuilt by default. */
-function evalProject(options: { evalSection?: object } = {}): string {
+function evalProject(
+  options: { evalSection?: object; schemaUri?: string; hosts?: string[] } = {},
+): string {
   const project = writeEvalProject(options);
   created.push(project);
   return project;
 }
 
 /** Same layout as `evalProject`, but outside the per-test cleanup list. */
-function writeEvalProject(options: { evalSection?: object } = {}): string {
+function writeEvalProject(
+  options: { evalSection?: object; schemaUri?: string; hosts?: string[] } = {},
+): string {
   const project = mkdtempSync(join(tmpdir(), "atlante-eval-command-"));
   const evalSection =
     options.evalSection === undefined
@@ -111,9 +123,10 @@ function writeEvalProject(options: { evalSection?: object } = {}): string {
   writeFileSync(
     join(project, "atlante.jsonc"),
     `${JSON.stringify({
-      $schema: SCHEMA_URI,
+      $schema: options.schemaUri ?? SCHEMA_URI,
       extends: "@fixture/pack",
       values: { project: "demo" },
+      ...(options.hosts === undefined ? {} : { hosts: options.hosts }),
       agents: {
         reviewer: {
           description: "Reviews changes.",
@@ -162,12 +175,22 @@ async function buildFixtureOutputs(project: string): Promise<void> {
 // each test mutates only its own copy.
 const templateDirs: string[] = [];
 let builtTemplate: string | undefined;
+let builtClaudeTemplate: string | undefined;
 
 /** A cheap copy of the built template project, registered for per-test cleanup. */
 function builtProject(): string {
   if (builtTemplate === undefined) throw new Error("template not built");
   const project = tempDir();
   cpSync(builtTemplate, project, { recursive: true });
+  return project;
+}
+
+/** A cheap copy of the built Claude-only template project. */
+function builtClaudeProject(): string {
+  if (builtClaudeTemplate === undefined)
+    throw new Error("claude template not built");
+  const project = tempDir();
+  cpSync(builtClaudeTemplate, project, { recursive: true });
   return project;
 }
 
@@ -232,6 +255,17 @@ describe("runEvalCommand", () => {
     templateDirs.push(template);
     await buildFixtureOutputs(template);
     builtTemplate = template;
+    const claudeTemplate = writeEvalProject({
+      schemaUri: SCHEMA_URI_V02,
+      hosts: ["claude-code"],
+      evalSection: {
+        host: "claude-code",
+        scenarios: "eval/scenarios/*.eval.json",
+      },
+    });
+    templateDirs.push(claudeTemplate);
+    await buildFixtureOutputs(claudeTemplate);
+    builtClaudeTemplate = claudeTemplate;
   });
   afterAll(() => {
     for (const dir of templateDirs.splice(0))
@@ -348,6 +382,120 @@ describe("runEvalCommand", () => {
     }
   });
 
+  test("exits 2 before execution when an included pack suite declares an incompatible host", async () => {
+    const project = evalProject({
+      schemaUri: SCHEMA_URI_V02,
+      hosts: ["opencode", "claude-code"],
+      evalSection: { host: "opencode", include: [FIXTURE_PACK] },
+    });
+    writePackEvalSuite(project, { host: "claude-code" });
+    await buildFixtureOutputs(project);
+    let runnerCalled = false;
+    const runner: HostRunner = {
+      name: "never",
+      prepareHostIntegration() {},
+      async runTrial(): Promise<TrialRun> {
+        runnerCalled = true;
+        throw new Error("must not run");
+      },
+    };
+    const errors: string[] = [];
+    const errorSpy = spyOn(console, "error").mockImplementation(
+      (...parts: unknown[]) => {
+        errors.push(parts.join(" "));
+      },
+    );
+    try {
+      const exit = await runEvalCommand(project, {}, undefined, runner);
+      expect(exit).toBe(2);
+    } finally {
+      errorSpy.mockRestore();
+    }
+    expect(runnerCalled).toBe(false);
+    expect(errors.join("\n")).toContain("eval-pack-host-incompatible");
+    expect(existsSync(join(project, ".atlante", "eval"))).toBe(false);
+  });
+
+  test("exits 2 when a claude-code run includes an opencode-only pack suite", async () => {
+    const project = evalProject({
+      schemaUri: SCHEMA_URI_V02,
+      hosts: ["claude-code"],
+      evalSection: { host: "claude-code", include: [FIXTURE_PACK] },
+    });
+    writePackEvalSuite(project, { host: "opencode" });
+    await buildFixtureOutputs(project);
+    const errors: string[] = [];
+    const errorSpy = spyOn(console, "error").mockImplementation(
+      (...parts: unknown[]) => {
+        errors.push(parts.join(" "));
+      },
+    );
+    try {
+      const exit = await runEvalCommand(
+        project,
+        {},
+        undefined,
+        fakeRunner(false),
+      );
+      expect(exit).toBe(2);
+    } finally {
+      errorSpy.mockRestore();
+    }
+    expect(errors.join("\n")).toContain("eval-pack-host-incompatible");
+  });
+
+  test("runs an included pack suite whose declared host matches the project host", async () => {
+    const project = evalProject({
+      schemaUri: SCHEMA_URI_V02,
+      hosts: ["claude-code"],
+      evalSection: { host: "claude-code", include: [FIXTURE_PACK] },
+    });
+    writePackEvalSuite(project, { host: "claude-code" });
+    await buildFixtureOutputs(project);
+    let calls = 0;
+    const exit = await runEvalCommand(project, {}, undefined, {
+      name: "fake",
+      prepareHostIntegration() {},
+      async runTrial(input) {
+        calls += 1;
+        expect(existsSync(join(input.sandbox.root, "pack-only.txt"))).toBe(
+          true,
+        );
+        return {
+          outcome: "completed",
+          durationMs: 5,
+          model: "test/model",
+          modelVersion: "model-x",
+        };
+      },
+    });
+    expect(exit).toBe(0);
+    expect(calls).toBe(3);
+    const { file } = reportPaths(project);
+    const report = JSON.parse(readFileSync(file, "utf8"));
+    expect(report.scenarios["pack-happy"].passRate).toBe(1);
+  });
+
+  test("runs a host-neutral pack suite under a claude-code project host", async () => {
+    const project = evalProject({
+      schemaUri: SCHEMA_URI_V02,
+      hosts: ["claude-code"],
+      evalSection: { host: "claude-code", include: [FIXTURE_PACK] },
+    });
+    writePackEvalSuite(project);
+    await buildFixtureOutputs(project);
+    const exit = await runEvalCommand(
+      project,
+      {},
+      undefined,
+      fakeRunner(false),
+    );
+    expect(exit).toBe(0);
+    const { file } = reportPaths(project);
+    const report = JSON.parse(readFileSync(file, "utf8"));
+    expect(report.scenarios["pack-happy"].passRate).toBe(1);
+  });
+
   test("exits 1 when a check fails", async () => {
     const project = builtProject();
     const exit = await runEvalCommand(
@@ -391,6 +539,169 @@ describe("runEvalCommand", () => {
     const project = evalProject();
     const exit = await runEvalCommand(project, {}, undefined, fakeRunner(true));
     expect(exit).toBe(2);
+  });
+
+  test("exits 2 before execution when eval.host is not materialized", async () => {
+    const project = evalProject({
+      schemaUri: SCHEMA_URI_V02,
+      hosts: ["opencode"],
+      evalSection: {
+        host: "claude-code",
+        scenarios: "eval/scenarios/*.eval.json",
+      },
+    });
+    let runnerCalled = false;
+    const runner: HostRunner = {
+      name: "never",
+      prepareHostIntegration() {},
+      async runTrial(): Promise<TrialRun> {
+        runnerCalled = true;
+        throw new Error("must not run");
+      },
+    };
+    const errors: string[] = [];
+    const errorSpy = spyOn(console, "error").mockImplementation(
+      (...parts: unknown[]) => {
+        errors.push(parts.join(" "));
+      },
+    );
+    try {
+      const exit = await runEvalCommand(project, {}, undefined, runner);
+      expect(exit).toBe(2);
+    } finally {
+      errorSpy.mockRestore();
+    }
+    expect(runnerCalled).toBe(false);
+    expect(errors.join("\n")).toContain("eval-host-not-materialized");
+  });
+
+  test("passes the materialization gate when eval.host is selected", async () => {
+    const project = evalProject({
+      schemaUri: SCHEMA_URI_V02,
+      hosts: ["opencode", "claude-code"],
+      evalSection: {
+        host: "claude-code",
+        scenarios: "eval/scenarios/*.eval.json",
+      },
+    });
+    const errors: string[] = [];
+    const errorSpy = spyOn(console, "error").mockImplementation(
+      (...parts: unknown[]) => {
+        errors.push(parts.join(" "));
+      },
+    );
+    try {
+      // Unbuilt outputs still fail, but past the host gate.
+      const exit = await runEvalCommand(
+        project,
+        {},
+        undefined,
+        fakeRunner(true),
+      );
+      expect(exit).toBe(2);
+    } finally {
+      errorSpy.mockRestore();
+    }
+    const output = errors.join("\n");
+    expect(output).not.toContain("eval-host-not-materialized");
+    expect(output).toContain("native-outputs-not-verified");
+  });
+
+  test("verifies Claude native outputs for eval.host claude-code", async () => {
+    // Unbuilt Claude outputs fail before any host spawn, naming the host.
+    const project = evalProject({
+      schemaUri: SCHEMA_URI_V02,
+      hosts: ["claude-code"],
+      evalSection: {
+        host: "claude-code",
+        scenarios: "eval/scenarios/*.eval.json",
+      },
+    });
+    const errors: string[] = [];
+    const errorSpy = spyOn(console, "error").mockImplementation(
+      (...parts: unknown[]) => {
+        errors.push(parts.join(" "));
+      },
+    );
+    try {
+      const exit = await runEvalCommand(
+        project,
+        {},
+        undefined,
+        fakeRunner(true),
+      );
+      expect(exit).toBe(2);
+    } finally {
+      errorSpy.mockRestore();
+    }
+    expect(errors.join("\n")).toContain("Claude Code");
+  });
+
+  test("exits 3 with a diagnostic when the Claude host has no auth", async () => {
+    const project = builtClaudeProject();
+    // Pin a stub host so this test exercises the auth preflight rather
+    // than depending on the machine's Claude installation or login state.
+    // Injected runners skip the preflight entirely.
+    const binDir = tempDir();
+    const binary = join(binDir, "claude");
+    writeFileSync(
+      binary,
+      '#!/bin/sh\nif [ "$1" = "--version" ]; then printf \'%s\\n\' \'2.1.218 (Claude Code)\'; exit 0; fi\nif [ "$1" = "auth" ]; then printf \'%s\\n\' \'{"loggedIn":false}\'; exit 1; fi\nexit 1\n',
+    );
+    chmodSync(binary, 0o755);
+    const previousPath = process.env.PATH;
+    const previousApiKey = process.env.ANTHROPIC_API_KEY;
+    const previousAuthToken = process.env.ANTHROPIC_AUTH_TOKEN;
+    const previousOAuth = process.env.CLAUDE_CODE_OAUTH_TOKEN;
+    const previousBedrock = process.env.CLAUDE_CODE_USE_BEDROCK;
+    const previousVertex = process.env.CLAUDE_CODE_USE_VERTEX;
+    const previousFoundry = process.env.CLAUDE_CODE_USE_FOUNDRY;
+    const previousConfigDir = process.env.CLAUDE_CONFIG_DIR;
+    process.env.PATH = `${binDir}:${previousPath ?? ""}`;
+    delete process.env.ANTHROPIC_API_KEY;
+    delete process.env.ANTHROPIC_AUTH_TOKEN;
+    delete process.env.CLAUDE_CODE_OAUTH_TOKEN;
+    delete process.env.CLAUDE_CODE_USE_BEDROCK;
+    delete process.env.CLAUDE_CODE_USE_VERTEX;
+    delete process.env.CLAUDE_CODE_USE_FOUNDRY;
+    delete process.env.CLAUDE_CONFIG_DIR;
+    const errors: string[] = [];
+    const errorSpy = spyOn(console, "error").mockImplementation(
+      (...parts: unknown[]) => {
+        errors.push(parts.join(" "));
+      },
+    );
+    try {
+      const exit = await runEvalCommand(project, {}, undefined);
+      expect(exit).toBe(3);
+      expect(errors.join("\n")).toContain("eval-host-unauthenticated");
+      expect(errors.join("\n")).toContain("claude setup-token");
+      // No report was published: the run never started.
+      expect(existsSync(join(project, ".atlante", "eval"))).toBe(false);
+    } finally {
+      errorSpy.mockRestore();
+      if (previousPath === undefined) delete process.env.PATH;
+      else process.env.PATH = previousPath;
+      if (previousApiKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+      else process.env.ANTHROPIC_API_KEY = previousApiKey;
+      if (previousAuthToken === undefined)
+        delete process.env.ANTHROPIC_AUTH_TOKEN;
+      else process.env.ANTHROPIC_AUTH_TOKEN = previousAuthToken;
+      if (previousOAuth === undefined)
+        delete process.env.CLAUDE_CODE_OAUTH_TOKEN;
+      else process.env.CLAUDE_CODE_OAUTH_TOKEN = previousOAuth;
+      if (previousBedrock === undefined)
+        delete process.env.CLAUDE_CODE_USE_BEDROCK;
+      else process.env.CLAUDE_CODE_USE_BEDROCK = previousBedrock;
+      if (previousVertex === undefined)
+        delete process.env.CLAUDE_CODE_USE_VERTEX;
+      else process.env.CLAUDE_CODE_USE_VERTEX = previousVertex;
+      if (previousFoundry === undefined)
+        delete process.env.CLAUDE_CODE_USE_FOUNDRY;
+      else process.env.CLAUDE_CODE_USE_FOUNDRY = previousFoundry;
+      if (previousConfigDir === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+      else process.env.CLAUDE_CONFIG_DIR = previousConfigDir;
+    }
   });
 
   test("exits 2 for an unknown --scenario filter", async () => {

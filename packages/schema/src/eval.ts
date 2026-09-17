@@ -10,6 +10,11 @@ export const EVAL_SCENARIO_SCHEMA_URI =
 /** The only host runner in v1; the HostRunner seam stays internal to eval. */
 export const EVAL_HOST = "opencode" as const;
 
+/** Project eval hosts admitted from document schema v0.2 on. */
+export const EVAL_HOSTS_V02 = ["opencode", "claude-code"] as const;
+
+export type EvalHostV02 = (typeof EVAL_HOSTS_V02)[number];
+
 /** Authored eval budget; absent fields inherit these defaults at run time. */
 export const EVAL_BUDGET_DEFAULTS = {
   trials: 3,
@@ -98,6 +103,39 @@ export const evalConfigSchema = z.union([
 export type EvalConfig = z.infer<typeof evalConfigSchema>;
 export type AuthoredEvalConfig = z.input<typeof evalConfigSchema>;
 
+const evalProjectFieldsV02 = {
+  ...evalProjectFields,
+  host: z.enum(EVAL_HOSTS_V02),
+};
+
+const evalProjectWithScenariosV02Schema = z.strictObject({
+  ...evalProjectFieldsV02,
+  scenarios: z.string().min(1),
+});
+
+const evalProjectWithIncludesV02Schema = z.strictObject({
+  ...evalProjectFieldsV02,
+  include: evalIncludeSchema,
+});
+
+/**
+ * Optional project `eval` section for v0.2 documents. Shape-identical to
+ * v0.1 except `host` also admits `claude-code`.
+ */
+export const evalConfigV02Schema = z.union([
+  evalProjectWithScenariosV02Schema,
+  evalProjectWithIncludesV02Schema,
+]);
+
+export type EvalConfigV02 = z.infer<typeof evalConfigV02Schema>;
+export type AuthoredEvalConfigV02 = z.input<typeof evalConfigV02Schema>;
+
+/**
+ * Either supported project eval configuration. Host selection differs by
+ * document version; budget, model, and scenario location are identical.
+ */
+export type AnyEvalConfig = EvalConfig | EvalConfigV02;
+
 /** Metadata for an eval suite bundled by a resource pack. */
 export const evalPackConfigSchema = z.strictObject({
   /** Host metadata is retained for pack compatibility, never execution policy. */
@@ -117,6 +155,42 @@ export const evalPackConfigSchema = z.strictObject({
 
 export type EvalPackConfig = z.infer<typeof evalPackConfigSchema>;
 export type AuthoredEvalPackConfig = z.input<typeof evalPackConfigSchema>;
+
+/**
+ * Eval suite metadata for packs consumed by v0.2 documents. Shape-identical
+ * to v0.1 except `host` also admits `claude-code`.
+ */
+export const evalPackConfigV02Schema = z.strictObject({
+  /** Host metadata is retained for pack compatibility, never execution policy. */
+  host: z.enum(EVAL_HOSTS_V02).optional(),
+  /** Glob of scenario documents, relative to the pack root. */
+  scenarios: z.string().min(1),
+  /** Optional documentation path for the pack's fixture tree. */
+  fixtures: sandboxRelativePathSchema.optional(),
+  /** Optional report path relative to the pack root. */
+  report: sandboxRelativePathSchema.optional(),
+  /**
+   * Optional repo-relative path of the eval sources; registries deep-link it
+   * at the release tag (`v<version>`) of the pack's repository.
+   */
+  source: sandboxRelativePathSchema.optional(),
+});
+
+export type EvalPackConfigV02 = z.infer<typeof evalPackConfigV02Schema>;
+export type AuthoredEvalPackConfigV02 = z.input<typeof evalPackConfigV02Schema>;
+
+/**
+ * Pack suite host compatibility: the pack `host` is compatibility metadata,
+ * the project `host` is execution policy. A suite without a declared host
+ * is host-neutral and runs under either host; a suite with a declared host
+ * runs only under the matching project host, never by silent fallback.
+ */
+export function isPackHostCompatible(
+  packHost: string | undefined,
+  projectHost: string,
+): boolean {
+  return packHost === undefined || packHost === projectHost;
+}
 
 const commandCheckSchema = z.strictObject({
   type: z.literal("command"),

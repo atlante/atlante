@@ -6,6 +6,7 @@ import {
   buildProject as buildProjectDefault,
   type ProjectContext,
 } from "@atlante/builder";
+import { claudeCodeMaterializer } from "@atlante/claude-code";
 import { openCodeMaterializer } from "@atlante/opencode";
 import {
   detectOpenCode,
@@ -15,7 +16,13 @@ import {
   parseOpenCodeVersion,
   resolveOpenCodeDialect,
 } from "@atlante/opencode/dialect";
-import { type AtlanteDocument, SCHEMA_URI } from "@atlante/schema";
+import {
+  type AnyAtlanteDocument,
+  type HostsV02,
+  hostsV02Schema,
+  SCHEMA_URI,
+  SCHEMA_URI_V02,
+} from "@atlante/schema";
 import { hasErrors, validateDocumentText } from "@atlante/validator";
 import {
   FIRST_PARTY_PACKAGE,
@@ -23,6 +30,7 @@ import {
 } from "../first-party-pack.js";
 import { printDiagnostics, reportBuildResult } from "../report.js";
 import { createStyler } from "../style.js";
+import { type ClaudeMcpPlan, prepareClaudeMcp } from "./claude-mcp.js";
 import { type GitignorePlan, prepareInitGitignore } from "./gitignore.js";
 import { formatInitError } from "./init-error.js";
 import { type OpenCodeMcpPlan, prepareOpenCodeMcp } from "./opencode-mcp.js";
@@ -55,6 +63,11 @@ export type InitOptions = {
   force?: boolean;
   noMcp?: boolean;
   opencodeVersion?: string;
+  /**
+   * Comma-separated host selection to scaffold (subset of the v0.2 contract:
+   * opencode, claude-code). Absent scaffolds the default OpenCode document.
+   */
+  hosts?: string;
 };
 
 type InitFileSystem = PackFileSystem;
@@ -63,7 +76,7 @@ type BuildFunction = (target: string, context: ProjectContext) => BuildResult;
 
 const defaultBuildProject: BuildFunction = (target, context) =>
   buildProjectDefault(target, context, {
-    materializers: [openCodeMaterializer],
+    materializers: [openCodeMaterializer, claudeCodeMaterializer],
   });
 
 export type InitDependencies = Partial<InitFileSystem> & {
@@ -141,15 +154,53 @@ async function defaultPrompt(query: string): Promise<string> {
   }
 }
 
-function bareConfig(preset: string, firstParty = true): string {
+/**
+ * Parses the `--hosts` scaffold selection against the v0.2 contract. Absent
+ * scaffolds the default OpenCode document; the resolved document stays
+ * authoritative for MCP and ignore decisions downstream.
+ */
+function parseScaffoldHosts(
+  options: InitOptions,
+): HostsV02 | { error: string } {
+  if (options.hosts === undefined) return ["opencode"];
+  const parsed = hostsV02Schema.safeParse(
+    options.hosts
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0),
+  );
+  if (parsed.success) return parsed.data;
+  return {
+    error: formatInitError(
+      "invalid-hosts",
+      `invalid --hosts selection: ${options.hosts}`,
+      {
+        expected: "a comma-separated subset of opencode,claude-code",
+        next: "pass e.g. `--hosts claude-code` or `--hosts opencode,claude-code`",
+        cause: parsed.error.issues[0]?.message,
+      },
+    ),
+  };
+}
+
+function bareConfig(
+  preset: string,
+  firstParty = true,
+  hosts?: HostsV02,
+): string {
   const comment = firstParty
     ? `// Extend the first-party package preset. You can override any value or agent
   // below; your local configuration takes precedence over the inherited one.`
     : `// Extend the selected pack preset. You can override any value or agent below;
   // your local configuration takes precedence over the inherited one.`;
+  const claudeSelected = hosts?.includes("claude-code") ?? false;
+  const schemaLine = `"$schema": "${claudeSelected ? SCHEMA_URI_V02 : SCHEMA_URI}",`;
+  const hostsLine = claudeSelected
+    ? `\n  "hosts": ${JSON.stringify(hosts)},`
+    : "";
   return `{
-  "$schema": "${SCHEMA_URI}",
-
+  ${schemaLine}
+${hostsLine}
   ${comment}
   "extends": ${JSON.stringify(preset)},
 }
@@ -167,7 +218,12 @@ function commitInitFiles(
   flow: InitFlow,
   contents: string,
   before: { target: Snapshot; alternate: Snapshot },
-  mcp: OpenCodeMcpPlan | undefined,
+  mcps: readonly {
+    path: string;
+    previous: Snapshot;
+    contents: string;
+    write: boolean;
+  }[],
   gitignore: GitignorePlan,
 ): { error?: string } {
   const { changes } = flow.state;
@@ -175,7 +231,8 @@ function commitInitFiles(
     changes.push({ path: flow.target, before: before.target });
     flow.fileSystem.writeFileSync(flow.target, contents);
 
-    if (mcp?.write) {
+    for (const mcp of mcps) {
+      if (!mcp.write) continue;
       changes.push({ path: mcp.path, before: mcp.previous });
       flow.fileSystem.writeFileSync(mcp.path, mcp.contents);
     }
@@ -222,7 +279,7 @@ function preflightPreset(
   target: string,
   contents: string,
   context: ProjectContext,
-): AtlanteDocument | undefined {
+): AnyAtlanteDocument | undefined {
   const validated = validateDocumentText(contents, target, {
     resourceContext: context,
   });
@@ -396,7 +453,8 @@ type InitFlow = Readonly<{
   target: string;
   alternate: string;
   gitignore: string;
-  dialect: OpenCodeDialect;
+  /** OpenCode dialect for MCP registration; undefined when OpenCode is not scaffolded. */
+  dialect: OpenCodeDialect | undefined;
   fileSystem: InitFileSystem;
   context: ProjectContext;
   runPackageManager: PackageManagerRunner;
@@ -415,8 +473,9 @@ type Abort = (mainError?: string) => number;
 async function prepareConfiguration(
   flow: InitFlow,
   options: InitOptions,
+  scaffoldHosts: HostsV02,
   abort: Abort,
-): Promise<number | { contents: string; document: AtlanteDocument }> {
+): Promise<number | { contents: string; document: AnyAtlanteDocument }> {
   assertRealProjectRoot(flow.directory);
 
   let pack: SelectedPack | undefined;
@@ -455,7 +514,11 @@ async function prepareConfiguration(
     console.log(`selected ${presetLocator}`);
   }
 
-  const contents = bareConfig(presetLocator, !pack);
+  const contents = bareConfig(
+    presetLocator,
+    !pack,
+    scaffoldHosts.includes("claude-code") ? scaffoldHosts : undefined,
+  );
   const document = preflightPreset(flow.target, contents, flow.context);
   if (!document) return abort();
   return { contents, document };
@@ -464,28 +527,41 @@ async function prepareConfiguration(
 /**
  * Snapshots the configuration targets, prepares the ignore-policy edit, and
  * commits the configuration files. Every snapshotted file is recorded in the
- * shared state, so a later failure restores the whole pre-init state.
+ * shared state, so a later failure restores the whole pre-init state. MCP
+ * registration follows the resolved document's hosts: hosts that are not
+ * selected get no configuration writes.
  */
 function commitConfiguration(
   flow: InitFlow,
   contents: string,
-  document: AtlanteDocument,
+  document: AnyAtlanteDocument,
   options: InitOptions,
   abort: Abort,
-): number | { mcp?: OpenCodeMcpPlan } {
+): number | { mcps: { host: string; path: string; registered: boolean }[] } {
   const before = {
     target: snapshot(flow.target, flow.fileSystem),
     alternate: snapshot(flow.alternate, flow.fileSystem),
   };
-  let mcp: OpenCodeMcpPlan | undefined;
+  const selectedHosts: readonly string[] = document.hosts ?? ["opencode"];
+  const plans: {
+    host: string;
+    plan: OpenCodeMcpPlan | ClaudeMcpPlan;
+  }[] = [];
   if (!options.noMcp) {
-    const prepared = prepareOpenCodeMcp(
-      flow.directory,
-      flow.fileSystem,
-      flow.dialect,
-    );
-    if ("error" in prepared) return abort(prepared.error);
-    mcp = prepared;
+    if (selectedHosts.includes("opencode")) {
+      const prepared = prepareOpenCodeMcp(
+        flow.directory,
+        flow.fileSystem,
+        flow.dialect ?? "v2",
+      );
+      if ("error" in prepared) return abort(prepared.error);
+      plans.push({ host: "OpenCode", plan: prepared });
+    }
+    if (selectedHosts.includes("claude-code")) {
+      const prepared = prepareClaudeMcp(flow.directory, flow.fileSystem);
+      if ("error" in prepared) return abort(prepared.error);
+      plans.push({ host: "Claude Code", plan: prepared });
+    }
   }
   const gitignore = prepareInitGitignore(
     flow.directory,
@@ -493,9 +569,21 @@ function commitConfiguration(
     flow.fileSystem,
   );
 
-  const committed = commitInitFiles(flow, contents, before, mcp, gitignore);
+  const committed = commitInitFiles(
+    flow,
+    contents,
+    before,
+    plans.map(({ plan }) => plan),
+    gitignore,
+  );
   if (committed.error) return abort(committed.error);
-  return { mcp };
+  return {
+    mcps: plans.map(({ host, plan }) => ({
+      host,
+      path: plan.path,
+      registered: plan.registered,
+    })),
+  };
 }
 
 export async function runInitWithDependencies(
@@ -503,10 +591,20 @@ export async function runInitWithDependencies(
   options: InitOptions,
   dependencies: InitDependencies = {},
 ): Promise<number> {
-  const selectedDialect = selectOpenCodeDialect(options, dependencies);
-  if (typeof selectedDialect !== "string") {
-    console.error(selectedDialect.error);
+  const scaffoldHosts = parseScaffoldHosts(options);
+  if (!Array.isArray(scaffoldHosts)) {
+    console.error(scaffoldHosts.error);
     return 1;
+  }
+
+  let dialect: OpenCodeDialect | undefined;
+  if (scaffoldHosts.includes("opencode")) {
+    const selectedDialect = selectOpenCodeDialect(options, dependencies);
+    if (typeof selectedDialect !== "string") {
+      console.error(selectedDialect.error);
+      return 1;
+    }
+    dialect = selectedDialect;
   }
 
   const fileSystem: InitFileSystem = {
@@ -518,7 +616,7 @@ export async function runInitWithDependencies(
     target: join(directory, "atlante.jsonc"),
     alternate: join(directory, "atlante.json"),
     gitignore: join(directory, ".gitignore"),
-    dialect: selectedDialect,
+    dialect,
     fileSystem,
     context: dependencies.context ?? {},
     runPackageManager:
@@ -534,7 +632,12 @@ export async function runInitWithDependencies(
     abortWithRestore(flow.state, fileSystem, flow.runPackageManager, mainError);
 
   try {
-    const prepared = await prepareConfiguration(flow, options, abort);
+    const prepared = await prepareConfiguration(
+      flow,
+      options,
+      scaffoldHosts,
+      abort,
+    );
     if (typeof prepared === "number") return prepared;
 
     const committed = commitConfiguration(
@@ -557,13 +660,25 @@ export async function runInitWithDependencies(
     );
     if (result !== 0) return result;
     if (options.noMcp) {
-      console.log("skipped OpenCode MCP registration (--no-mcp)");
-    } else if (committed.mcp?.registered) {
-      console.log(`registered Atlante MCP server in ${committed.mcp.path}`);
-    } else if (committed.mcp) {
-      console.log(
-        `Atlante MCP server is already registered in ${committed.mcp.path}`,
-      );
+      const skippedHosts: readonly string[] = prepared.document.hosts ?? [
+        "opencode",
+      ];
+      if (skippedHosts.includes("opencode")) {
+        console.log("skipped OpenCode MCP registration (--no-mcp)");
+      }
+      if (skippedHosts.includes("claude-code")) {
+        console.log("skipped Claude Code MCP registration (--no-mcp)");
+      }
+    } else {
+      for (const mcp of committed.mcps) {
+        if (mcp.registered) {
+          console.log(`registered Atlante MCP server in ${mcp.path}`);
+        } else {
+          console.log(
+            `Atlante MCP server is already registered in ${mcp.path}`,
+          );
+        }
+      }
     }
     return 0;
   } catch (cause) {
