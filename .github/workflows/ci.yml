@@ -15,21 +15,21 @@ concurrency:
 
 jobs:
   # The single full gate, and the required `check` status: build, type,
-  # lint, every test tier, and the CLI smoke, plus the OpenCode host smoke.
+  # lint, every test tier, the CLI smoke, and both host smokes.
   # It runs on every pull request and on every push to main, always and
   # without path gating, because the main ruleset requires the `check`
   # status to be reported on every pull request. There is no separate
   # light tier: the parallel runner inside full:check aborts on the first
   # failing lane, so cheap failures still surface fast.
   #
-  # Both smoke tests exist because every other test calls the command
+  # The smoke tests exist because every other test calls the command
   # handlers as functions: a broken shebang, a mis-wired Commander option,
   # or an import that only fails at process start would pass the suite and
   # still ship a CLI that does not run. The CLI smoke exercises the binary
-  # as a user does, and the OpenCode host smoke boots the real pinned host
-  # against a built project and asserts the native agent and skills are
-  # discovered — the only automated check of the full pack → build →
-  # materialize → host discovery flow.
+  # as a user does, and the host smokes boot the real pinned hosts against
+  # built projects and assert the native agents and skills are discovered —
+  # the only automated checks of the full pack → build → materialize →
+  # host discovery flow.
   check:
     runs-on: ubuntu-latest
     steps:

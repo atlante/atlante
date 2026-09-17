@@ -126,8 +126,9 @@ These constraints are reviewed in every change:
   The builder never imports host packages; the CLI is the composition root
   that injects the materializers selected by the document's `hosts` field.
 - TypeScript sources, static pack content, authored configuration, and
-  schema-generator inputs are authoritative. The committed JSON Schema
-  (`packages/schema/schema/v0.1/schema.json`), `dist/`, and the generated
+  schema-generator inputs are authoritative. The committed JSON Schemas
+  (`packages/schema/schema/v0.1/schema.json`,
+  `packages/schema/schema/v0.2/schema.json`), `dist/`, and the generated
   native outputs are regenerated from their sources and are never edited
   directly.
 
