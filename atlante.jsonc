@@ -1,5 +1,6 @@
 {
-  "$schema": "https://atlante.sh/schema/v0.1/schema.json",
+  "$schema": "https://atlante.sh/schema/v0.2/schema.json",
+  "hosts": ["opencode", "claude-code"],
   "extends": "@atlante/pack",
   "values": {
     "project": "Atlante"
