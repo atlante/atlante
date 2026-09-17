@@ -122,7 +122,10 @@ Credentials come from the host's own stored authentication: an
 `CLAUDE_CODE_OAUTH_TOKEN` value generated with `claude setup-token`, a
 cloud-provider credential mode, or a `claude auth login` session. Only the
 credentials file is copied into the sandbox; session history and unrelated
-user configuration never reach the trial.
+user configuration never reach the trial. The runner pre-accepts workspace
+trust for the ephemeral sandbox directory only, so the host honors the
+generated allow policy; without it the host ignores the policy and the trial
+cannot start.
 
 Trials run headless as `claude -p --output-format stream-json --verbose
 --setting-sources project` from the sandbox working directory, with the

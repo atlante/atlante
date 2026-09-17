@@ -4,6 +4,7 @@ import {
   copyFileSync,
   existsSync,
   mkdirSync,
+  realpathSync,
   writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
@@ -391,6 +392,25 @@ export function createClaudeRunner(
       const target = join(sandbox.root, ".claude", "settings.json");
       mkdirSync(dirname(target), { recursive: true });
       writeFileSync(target, `${JSON.stringify(settings, null, 2)}\n`);
+
+      // Workspace trust: the host ignores allow entries from settings files
+      // in an untrusted workspace and exits before any model call. The
+      // acceptance is pre-authored in the redirected config dir and trusts
+      // only the ephemeral sandbox root — never the real project or home.
+      // The host resolves symlinks before the lookup (e.g. macOS
+      // /var→/private/var), so the key must be the real path.
+      const trust = {
+        projects: {
+          [realpathSync(sandbox.root)]: { hasTrustDialogAccepted: true },
+        },
+      };
+      const trustTarget = join(
+        sandbox.stateDir,
+        "claude-config",
+        ".claude.json",
+      );
+      mkdirSync(dirname(trustTarget), { recursive: true });
+      writeFileSync(trustTarget, `${JSON.stringify(trust, null, 2)}\n`);
     },
 
     async runTrial(input: RunTrialInput): Promise<TrialRun> {

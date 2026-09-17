@@ -891,7 +891,10 @@ or hooks. Provider access is the host's own stored authentication — an API
 key or bearer token, an OAuth token, a cloud-provider credential mode, or a
 `claude auth login` session — plus the `model` passed through with `--model`.
 Only the host credentials file is copied into the sandbox; session history
-and unrelated user configuration MUST NOT be copied. Trials run headless as
+and unrelated user configuration MUST NOT be copied. The runner MUST
+pre-accept workspace trust scoped to the ephemeral sandbox directory, so the
+host honors the generated allow policy; the acceptance MUST NOT trust any
+other directory. Trials run headless as
 `claude -p --output-format stream-json --verbose --setting-sources project`
 with direct argv, never through a shell, from the sandbox working directory
 under an allowlisted child environment. The runner MUST parse the structured

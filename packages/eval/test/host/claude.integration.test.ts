@@ -6,6 +6,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -255,15 +256,36 @@ describe("prepareHostIntegration", () => {
 
   test("fails closed when host auth is missing", () => {
     const host = makeRunner();
+    const project = tempDir("eval-claude-sandbox-noauth-");
+    const state = tempDir("eval-claude-state-noauth-");
     expect(() =>
-      host.prepareHostIntegration(
-        sandboxFor(
-          tempDir("eval-claude-sandbox-noauth-"),
-          tempDir("eval-claude-state-noauth-"),
-        ),
-        {},
-      ),
+      host.prepareHostIntegration(sandboxFor(project, state), {}),
     ).toThrow(/authentication not found/);
+    // The auth gate precedes all writes: no trust acceptance is authored
+    // for a run that will never start.
+    expect(existsSync(join(state, "claude-config", ".claude.json"))).toBe(
+      false,
+    );
+  });
+
+  test("pre-accepts workspace trust scoped to the sandbox root", () => {
+    const host = makeRunner({
+      authStatusProbe: () => ({ loggedIn: true }),
+    });
+    const project = tempDir("eval-claude-sandbox-trust-");
+    const state = tempDir("eval-claude-state-trust-");
+    host.prepareHostIntegration(sandboxFor(project, state), {});
+
+    // Without this the host ignores the generated allow policy and exits 1:
+    // "this workspace has not been trusted". The acceptance lives in the
+    // redirected config dir and trusts only the ephemeral sandbox.
+    const trust = JSON.parse(
+      readFileSync(join(state, "claude-config", ".claude.json"), "utf8"),
+    ) as { projects?: Record<string, { hasTrustDialogAccepted?: unknown }> };
+    expect(trust.projects?.[realpathSync(project)]).toEqual({
+      hasTrustDialogAccepted: true,
+    });
+    expect(Object.keys(trust.projects ?? {})).toHaveLength(1);
   });
 
   test("copies file-based credentials without session history", () => {
