@@ -49,14 +49,18 @@ describe("runChecks", () => {
     process.env[marker] = "must-not-reach-check";
     try {
       const sandbox = sandboxOf({});
-      const [result] = await runChecks(sandbox, [
-        {
-          type: "command",
-          run: ["sh", "-c", `test -z "$${marker}"`],
-          expectExit: 0,
-          timeoutMs: 5000,
-        },
-      ]);
+      const [result] = await runChecks(
+        sandbox,
+        [
+          {
+            type: "command",
+            run: ["sh", "-c", `test -z "$${marker}"`],
+            expectExit: 0,
+            timeoutMs: 5000,
+          },
+        ],
+        ".opencode/",
+      );
       expect(result?.verdict).toBe("pass");
     } finally {
       if (previous === undefined) delete process.env[marker];
@@ -92,6 +96,7 @@ describe("runChecks", () => {
     const [result] = await runChecks(
       { root, snapshot: [], baseline, keep: false },
       [{ type: "diff-allowlist", allow: ["allowed.ts"] }],
+      ".opencode/",
     );
     expect(result?.verdict).toBe("pass");
     expect(existsSync(canary)).toBe(false);
@@ -99,25 +104,29 @@ describe("runChecks", () => {
 
   test("command check: exit code and output match", async () => {
     const sandbox = sandboxOf({});
-    const results = await runChecks(sandbox, [
-      { type: "command", run: ["true"], expectExit: 0, timeoutMs: 5000 },
-      { type: "command", run: ["false"], expectExit: 0, timeoutMs: 5000 },
-      {
-        type: "command",
-        run: ["echo", "hello-world"],
-        expectExit: 0,
-        outputMatches: "hello-wo?rld",
-        timeoutMs: 5000,
-      },
-      {
-        type: "command",
-        run: ["echo", "other"],
-        expectExit: 0,
-        outputMatches: "expected-text",
-        timeoutMs: 5000,
-      },
-      { type: "command", run: ["sleep", "5"], expectExit: 0, timeoutMs: 250 },
-    ]);
+    const results = await runChecks(
+      sandbox,
+      [
+        { type: "command", run: ["true"], expectExit: 0, timeoutMs: 5000 },
+        { type: "command", run: ["false"], expectExit: 0, timeoutMs: 5000 },
+        {
+          type: "command",
+          run: ["echo", "hello-world"],
+          expectExit: 0,
+          outputMatches: "hello-wo?rld",
+          timeoutMs: 5000,
+        },
+        {
+          type: "command",
+          run: ["echo", "other"],
+          expectExit: 0,
+          outputMatches: "expected-text",
+          timeoutMs: 5000,
+        },
+        { type: "command", run: ["sleep", "5"], expectExit: 0, timeoutMs: 250 },
+      ],
+      ".opencode/",
+    );
     expect(results.map((result) => result.verdict)).toEqual([
       "pass",
       "fail",
@@ -130,14 +139,18 @@ describe("runChecks", () => {
 
   test("a command that exits cleanly after timeout still fails", async () => {
     const sandbox = sandboxOf({});
-    const [result] = await runChecks(sandbox, [
-      {
-        type: "command",
-        run: ["sh", "-c", "trap 'exit 0' TERM; while :; do sleep 1; done"],
-        expectExit: 0,
-        timeoutMs: 100,
-      },
-    ]);
+    const [result] = await runChecks(
+      sandbox,
+      [
+        {
+          type: "command",
+          run: ["sh", "-c", "trap 'exit 0' TERM; while :; do sleep 1; done"],
+          expectExit: 0,
+          timeoutMs: 100,
+        },
+      ],
+      ".opencode/",
+    );
     expect(result?.verdict).toBe("fail");
     expect(result?.evidence.timedOut).toBe(true);
   });
@@ -148,11 +161,15 @@ describe("runChecks", () => {
     writeFileSync(join(outside, "secret.txt"), "secret\n");
     symlinkSync(outside, join(sandbox.root, "link"), "dir");
     try {
-      const results = await runChecks(sandbox, [
-        { type: "file-exists", path: "link/secret.txt" },
-        { type: "file-contains", path: "link/secret.txt", pattern: "secret" },
-        { type: "file-unchanged", path: "link/secret.txt" },
-      ]);
+      const results = await runChecks(
+        sandbox,
+        [
+          { type: "file-exists", path: "link/secret.txt" },
+          { type: "file-contains", path: "link/secret.txt", pattern: "secret" },
+          { type: "file-unchanged", path: "link/secret.txt" },
+        ],
+        ".opencode/",
+      );
       expect(results.map((result) => result.verdict)).toEqual([
         "error",
         "error",
@@ -166,25 +183,33 @@ describe("runChecks", () => {
 
   test("command check: spawn failure is an error verdict", async () => {
     const sandbox = sandboxOf({});
-    const [result] = await runChecks(sandbox, [
-      {
-        type: "command",
-        run: ["definitely-not-a-binary-xyz"],
-        expectExit: 0,
-        timeoutMs: 5000,
-      },
-    ]);
+    const [result] = await runChecks(
+      sandbox,
+      [
+        {
+          type: "command",
+          run: ["definitely-not-a-binary-xyz"],
+          expectExit: 0,
+          timeoutMs: 5000,
+        },
+      ],
+      ".opencode/",
+    );
     expect(result?.verdict).toBe("error");
   });
 
   test("file-exists and file-absent", async () => {
     const sandbox = sandboxOf({ "src/keep.ts": "export {};\n" });
-    const results = await runChecks(sandbox, [
-      { type: "file-exists", path: "src/keep.ts" },
-      { type: "file-exists", path: "src/gone.ts" },
-      { type: "file-absent", path: "src/gone.ts" },
-      { type: "file-absent", path: "src/keep.ts" },
-    ]);
+    const results = await runChecks(
+      sandbox,
+      [
+        { type: "file-exists", path: "src/keep.ts" },
+        { type: "file-exists", path: "src/gone.ts" },
+        { type: "file-absent", path: "src/gone.ts" },
+        { type: "file-absent", path: "src/keep.ts" },
+      ],
+      ".opencode/",
+    );
     expect(results.map((result) => result.verdict)).toEqual([
       "pass",
       "fail",
@@ -195,17 +220,21 @@ describe("runChecks", () => {
 
   test("file-contains: literal by default, regex opt-in", async () => {
     const sandbox = sandboxOf({ "src/a.ts": "const requireAdmin = true;\n" });
-    const results = await runChecks(sandbox, [
-      { type: "file-contains", path: "src/a.ts", pattern: "requireAdmin" },
-      {
-        type: "file-contains",
-        path: "src/a.ts",
-        pattern: "require.dmin",
-        regex: true,
-      },
-      { type: "file-contains", path: "src/a.ts", pattern: "nope" },
-      { type: "file-contains", path: "src/gone.ts", pattern: "x" },
-    ]);
+    const results = await runChecks(
+      sandbox,
+      [
+        { type: "file-contains", path: "src/a.ts", pattern: "requireAdmin" },
+        {
+          type: "file-contains",
+          path: "src/a.ts",
+          pattern: "require.dmin",
+          regex: true,
+        },
+        { type: "file-contains", path: "src/a.ts", pattern: "nope" },
+        { type: "file-contains", path: "src/gone.ts", pattern: "x" },
+      ],
+      ".opencode/",
+    );
     expect(results.map((result) => result.verdict)).toEqual([
       "pass",
       "pass",
@@ -219,9 +248,11 @@ describe("runChecks", () => {
       "src/policy.ts": "export const policy = 1;\n",
     });
     // Baseline recorded as "baseline"; content changed since -> hash differs.
-    const [violated] = await runChecks(sandbox, [
-      { type: "file-unchanged", path: "src/policy.ts" },
-    ]);
+    const [violated] = await runChecks(
+      sandbox,
+      [{ type: "file-unchanged", path: "src/policy.ts" }],
+      ".opencode/",
+    );
     expect(violated?.verdict).toBe("fail");
 
     // Recompute the baseline to the current content: now unchanged.
@@ -237,19 +268,25 @@ describe("runChecks", () => {
       { path: "src/absent.ts", hash: null },
       { path: "src/created-later.ts", hash: null },
     ];
-    const [unchanged, stillAbsent, _absentNow] = await runChecks(sandbox, [
-      { type: "file-unchanged", path: "src/policy.ts" },
-      { type: "file-unchanged", path: "src/absent.ts" },
-      { type: "file-unchanged", path: "src/created-later.ts" },
-    ]);
+    const [unchanged, stillAbsent, _absentNow] = await runChecks(
+      sandbox,
+      [
+        { type: "file-unchanged", path: "src/policy.ts" },
+        { type: "file-unchanged", path: "src/absent.ts" },
+        { type: "file-unchanged", path: "src/created-later.ts" },
+      ],
+      ".opencode/",
+    );
     expect(unchanged?.verdict).toBe("pass");
     expect(stillAbsent?.verdict).toBe("pass");
     // Created after the baseline (hash was null) -> violation. The write must
     // precede the check run: the check reads current state only.
     writeFileSync(join(sandbox.root, "src/created-later.ts"), "new\n");
-    const [createdAfterBaseline] = await runChecks(sandbox, [
-      { type: "file-unchanged", path: "src/created-later.ts" },
-    ]);
+    const [createdAfterBaseline] = await runChecks(
+      sandbox,
+      [{ type: "file-unchanged", path: "src/created-later.ts" }],
+      ".opencode/",
+    );
     expect(createdAfterBaseline?.verdict).toBe("fail");
   });
 
@@ -258,10 +295,14 @@ describe("runChecks", () => {
     const path = join(sandbox.root, "secret.txt");
     chmodSync(path, 0o000);
     try {
-      const results = await runChecks(sandbox, [
-        { type: "file-unchanged", path: "secret.txt" },
-        { type: "file-exists", path: "secret.txt" },
-      ]);
+      const results = await runChecks(
+        sandbox,
+        [
+          { type: "file-unchanged", path: "secret.txt" },
+          { type: "file-exists", path: "secret.txt" },
+        ],
+        ".opencode/",
+      );
       expect(results.map((result) => result.verdict)).toEqual([
         "error",
         "pass",
@@ -294,10 +335,14 @@ describe("runChecks", () => {
     const baseline = (await Bun.$`git rev-parse HEAD`.cwd(root).text()).trim();
     const sandbox: Sandbox = { root, snapshot: [], baseline, keep: false };
 
-    const [tooNarrow, wellScoped] = await runChecks(sandbox, [
-      { type: "diff-allowlist", allow: ["allowed.ts"] },
-      { type: "diff-allowlist", allow: ["allowed.ts", "sneaky.ts"] },
-    ]);
+    const [tooNarrow, wellScoped] = await runChecks(
+      sandbox,
+      [
+        { type: "diff-allowlist", allow: ["allowed.ts"] },
+        { type: "diff-allowlist", allow: ["allowed.ts", "sneaky.ts"] },
+      ],
+      ".opencode/",
+    );
     expect(tooNarrow?.verdict).toBe("fail");
     expect(tooNarrow?.evidence.unexpected).toEqual(["sneaky.ts"]);
     expect(wellScoped?.verdict).toBe("pass");
@@ -329,6 +374,7 @@ describe("runChecks", () => {
     const [result] = await runChecks(
       { root, snapshot: [], baseline, keep: false },
       [{ type: "diff-allowlist", allow: ["allowed.ts"] }],
+      ".opencode/",
     );
     expect(result?.verdict).toBe("fail");
     expect(result?.evidence.unexpected).toContain("ignored-after.ts");
@@ -336,6 +382,52 @@ describe("runChecks", () => {
 
   test("diff-allowlist: ignores host-owned .opencode artifacts", async () => {
     const root = mkdtempSync(join(tmpdir(), "eval-diff-host-"));
+    cleanup.push(root);
+    const git = async (argv: string[]) => {
+      await Bun.$`git ${argv}`.cwd(root).quiet();
+    };
+    await git(["init"]);
+    await git(["-c", "user.name=t", "-c", "user.email=t@t", "add", "--all"]);
+    await git(
+      [
+        "-c",
+        "user.name=t",
+        "-c",
+        "user.email=t@t",
+        "commit",
+        "--allow-empty",
+        "-m",
+        "base",
+      ],
+      ".opencode/",
+    );
+    // OpenCode installs plugin node_modules and its own .gitignore into the
+    // project's .opencode dir during the session; none of that is an edit.
+    mkdirSync(join(root, ".opencode", "node_modules"), { recursive: true });
+    writeFileSync(join(root, ".opencode", ".gitignore"), "node_modules\n");
+    writeFileSync(join(root, ".opencode", "node_modules", "pkg.js"), "x\n");
+    const baseline = (await Bun.$`git rev-parse HEAD`.cwd(root).text()).trim();
+
+    const [hostOnly] = await runChecks(
+      { root, snapshot: [], baseline, keep: false },
+      [{ type: "diff-allowlist", allow: ["allowed.ts"] }],
+      ".opencode/",
+    );
+    expect(hostOnly?.verdict).toBe("pass");
+
+    // A real out-of-scope edit next to the host noise is still flagged.
+    writeFileSync(join(root, "sneaky.ts"), "scope creep\n");
+    const [withCreep] = await runChecks(
+      { root, snapshot: [], baseline, keep: false },
+      [{ type: "diff-allowlist", allow: ["allowed.ts"] }],
+      ".opencode/",
+    );
+    expect(withCreep?.verdict).toBe("fail");
+    expect(withCreep?.evidence.unexpected).toEqual(["sneaky.ts"]);
+  });
+
+  test("diff-allowlist: ignores host-owned .claude artifacts for Claude Code trials", async () => {
+    const root = mkdtempSync(join(tmpdir(), "eval-diff-claude-"));
     cleanup.push(root);
     const git = async (argv: string[]) => {
       await Bun.$`git ${argv}`.cwd(root).quiet();
@@ -352,27 +444,30 @@ describe("runChecks", () => {
       "-m",
       "base",
     ]);
-    // OpenCode installs plugin node_modules and its own .gitignore into the
-    // project's .opencode dir during the session; none of that is an edit.
-    mkdirSync(join(root, ".opencode", "node_modules"), { recursive: true });
-    writeFileSync(join(root, ".opencode", ".gitignore"), "node_modules\n");
-    writeFileSync(join(root, ".opencode", "node_modules", "pkg.js"), "x\n");
+    // Claude Code merges session configuration into the project's .claude
+    // dir during the session; none of that is an agent edit.
+    mkdirSync(join(root, ".claude"), { recursive: true });
+    writeFileSync(join(root, ".claude", "settings.local.json"), "{}\n");
     const baseline = (await Bun.$`git rev-parse HEAD`.cwd(root).text()).trim();
 
     const [hostOnly] = await runChecks(
       { root, snapshot: [], baseline, keep: false },
       [{ type: "diff-allowlist", allow: ["allowed.ts"] }],
+      ".claude/",
     );
     expect(hostOnly?.verdict).toBe("pass");
 
-    // A real out-of-scope edit next to the host noise is still flagged.
-    writeFileSync(join(root, "sneaky.ts"), "scope creep\n");
-    const [withCreep] = await runChecks(
+    // The OpenCode output directory is not owned by the Claude Code host,
+    // so changes there are still flagged.
+    mkdirSync(join(root, ".opencode"), { recursive: true });
+    writeFileSync(join(root, ".opencode", "stray.md"), "not owned\n");
+    const [withStray] = await runChecks(
       { root, snapshot: [], baseline, keep: false },
       [{ type: "diff-allowlist", allow: ["allowed.ts"] }],
+      ".claude/",
     );
-    expect(withCreep?.verdict).toBe("fail");
-    expect(withCreep?.evidence.unexpected).toEqual(["sneaky.ts"]);
+    expect(withStray?.verdict).toBe("fail");
+    expect(withStray?.evidence.unexpected).toEqual([".opencode/stray.md"]);
   });
 
   test("diff-allowlist: preserves special-character paths", async () => {
@@ -382,16 +477,19 @@ describe("runChecks", () => {
       await Bun.$`git ${argv}`.cwd(root).quiet();
     };
     await git(["init"]);
-    await git([
-      "-c",
-      "user.name=t",
-      "-c",
-      "user.email=t@t",
-      "commit",
-      "--allow-empty",
-      "-m",
-      "base",
-    ]);
+    await git(
+      [
+        "-c",
+        "user.name=t",
+        "-c",
+        "user.email=t@t",
+        "commit",
+        "--allow-empty",
+        "-m",
+        "base",
+      ],
+      ".opencode/",
+    );
     const paths = ['quote"name.ts', "tab\tname.ts", "space name.ts"];
     for (const path of paths) writeFileSync(join(root, path), "scope\n");
     const baseline = (await Bun.$`git rev-parse HEAD`.cwd(root).text()).trim();
@@ -399,6 +497,7 @@ describe("runChecks", () => {
     const [result] = await runChecks(
       { root, snapshot: [], baseline, keep: false },
       [{ type: "diff-allowlist", allow: paths }],
+      ".opencode/",
     );
     expect(result?.verdict).toBe("pass");
   });
@@ -413,16 +512,19 @@ describe("runChecks", () => {
     };
     await git(["init"]);
     await git(["add", "--all"]);
-    await git([
-      "-c",
-      "user.name=t",
-      "-c",
-      "user.email=t@t",
-      "commit",
-      "--allow-empty",
-      "-m",
-      "base",
-    ]);
+    await git(
+      [
+        "-c",
+        "user.name=t",
+        "-c",
+        "user.email=t@t",
+        "commit",
+        "--allow-empty",
+        "-m",
+        "base",
+      ],
+      ".opencode/",
+    );
     const baseline = (await Bun.$`git rev-parse HEAD`.cwd(root).text()).trim();
 
     for (const flag of ["--assume-unchanged", "--skip-worktree"]) {
@@ -431,16 +533,20 @@ describe("runChecks", () => {
       const [result] = await runChecks(
         { root, snapshot: [], baseline, keep: false },
         [{ type: "diff-allowlist", allow: ["allowed.ts"] }],
+        ".opencode/",
       );
       expect(result?.verdict).toBe("fail");
       expect(result?.evidence.unexpected).toContain(trackedPath);
-      await git([
-        "update-index",
-        "--no-assume-unchanged",
-        "--no-skip-worktree",
-        "--",
-        trackedPath,
-      ]);
+      await git(
+        [
+          "update-index",
+          "--no-assume-unchanged",
+          "--no-skip-worktree",
+          "--",
+          trackedPath,
+        ],
+        ".opencode/",
+      );
     }
   });
 
@@ -469,6 +575,7 @@ describe("runChecks", () => {
     const [result] = await runChecks(
       { root, snapshot: [], baseline, keep: false },
       [{ type: "diff-allowlist", allow: ["allowed.ts", "案результат.txt"] }],
+      ".opencode/",
     );
     // Passes only if the literal (unquoted) path matched the allowlist.
     expect(result?.verdict).toBe("pass");
@@ -476,10 +583,14 @@ describe("runChecks", () => {
 
   test("all checks run even after one fails", async () => {
     const sandbox = sandboxOf({});
-    const results = await runChecks(sandbox, [
-      { type: "file-exists", path: "missing.ts" },
-      { type: "file-exists", path: "also-missing.ts" },
-    ]);
+    const results = await runChecks(
+      sandbox,
+      [
+        { type: "file-exists", path: "missing.ts" },
+        { type: "file-exists", path: "also-missing.ts" },
+      ],
+      ".opencode/",
+    );
     expect(results).toHaveLength(2);
     expect(results.every((result) => result.verdict === "fail")).toBe(true);
   });
@@ -487,9 +598,11 @@ describe("runChecks", () => {
   test("check paths cannot traverse out of the sandbox", async () => {
     const sandbox = sandboxOf({});
     for (const path of ["../escape.ts", "/etc/passwd", "ok/../../escape.ts"]) {
-      const [result] = await runChecks(sandbox, [
-        { type: "file-exists", path },
-      ]);
+      const [result] = await runChecks(
+        sandbox,
+        [{ type: "file-exists", path }],
+        ".opencode/",
+      );
       expect(result?.verdict).toBe("error");
       expect(JSON.stringify(result?.evidence)).toContain(
         "must resolve inside the sandbox",
@@ -499,15 +612,19 @@ describe("runChecks", () => {
 
   test("an invalid outputMatches pattern is an error, not a throw", async () => {
     const sandbox = sandboxOf({});
-    const [result] = await runChecks(sandbox, [
-      {
-        type: "command",
-        run: ["true"],
-        expectExit: 0,
-        outputMatches: "([unclosed",
-        timeoutMs: 5000,
-      },
-    ]);
+    const [result] = await runChecks(
+      sandbox,
+      [
+        {
+          type: "command",
+          run: ["true"],
+          expectExit: 0,
+          outputMatches: "([unclosed",
+          timeoutMs: 5000,
+        },
+      ],
+      ".opencode/",
+    );
     expect(result?.verdict).toBe("error");
     expect(JSON.stringify(result?.evidence)).toContain("outputMatches");
   });

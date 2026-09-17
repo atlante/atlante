@@ -55,6 +55,7 @@ function fakeRunner(script: (call: number) => TrialRun): HostRunner {
   let calls = 0;
   return {
     name: "fake",
+    ownedDirectory: ".opencode/",
     prepareHostIntegration() {},
     async runTrial() {
       calls += 1;
@@ -312,6 +313,7 @@ describe("runEval", () => {
       atlanteVersion: "0.0.0-test",
       runner: {
         name: "fake",
+        ownedDirectory: ".opencode/",
         prepareHostIntegration() {},
         async runTrial() {
           calls += 1;
@@ -346,6 +348,7 @@ describe("runEval", () => {
       atlanteVersion: "0.0.0-test",
       runner: {
         name: "fake",
+        ownedDirectory: ".opencode/",
         prepareHostIntegration() {},
         async runTrial() {
           throw new Error("host exploded");
@@ -376,6 +379,7 @@ describe("runEval", () => {
       atlanteVersion: "0.0.0-test",
       runner: {
         name: "fake",
+        ownedDirectory: ".opencode/",
         prepareHostIntegration() {},
         async runTrial(input) {
           rmSync(join(input.sandbox.root, ".git"), {
@@ -411,6 +415,7 @@ describe("runEval", () => {
       atlanteVersion: "0.0.0-test",
       runner: {
         name: "fake",
+        ownedDirectory: ".opencode/",
         prepareHostIntegration() {},
         async runTrial(input) {
           writeFileSync(join(input.sandbox.root, "sneaky.ts"), "scope creep\n");
@@ -464,6 +469,7 @@ describe("runEval", () => {
       atlanteVersion: "0.0.0-test",
       runner: {
         name: "fake",
+        ownedDirectory: ".opencode/",
         prepareHostIntegration() {},
         async runTrial(input) {
           const flags = await runCommand(

@@ -14,15 +14,17 @@ packages/
   validator/       — document discovery/parsing, raw and resolved validation, template-input validation, diagnostics
   builder/         — private host-neutral preparation and build orchestration; keeps the prepared project in memory and runs injected host materializers
   opencode/        — OpenCode host materializer: deterministic native agent/skill files plus the ownership manifest
+  claude-code/     — Claude Code host materializer: deterministic native agent/skill files plus the ownership manifest
   eval/            — private host-runner orchestration and deterministic evaluation checks
   cli/             — user-facing command orchestration (validate, build, init, eval), initialization defaults, host registration
 website/           — private Astro landing site workspace (@atlante/website, not published)
 packs/             — private Astro pack explorer workspace (@atlante/packs, not published)
 ```
 
-The eight workspaces are `schema`, `resources`, `validator`, `builder`,
-`pack`, `opencode`, `eval`, and `cli`. The publishable packages are `pack` and
-the CLI; `resources`, `builder`, `opencode`, and `eval` remain private. The
+The nine workspaces are `schema`, `resources`, `validator`, `builder`,
+`pack`, `opencode`, `claude-code`, `eval`, and `cli`. The publishable packages
+are `pack` and the CLI; `resources`, `builder`, `opencode`, `claude-code`, and
+`eval` remain private. The
 separate `website` workspace hosts the Astro landing site for
 [atlante.sh](https://atlante.sh), and the separate `packs` workspace hosts the
 Astro pack explorer for [packs.atlante.sh](https://packs.atlante.sh); they stay
@@ -38,7 +40,7 @@ Prioritize tests for structural contracts and meaningful observable behavior; ex
 - First-party static semantics belong in `pack`; concrete host semantics belong in the corresponding materializer. Generic infrastructure MUST NOT import from or encode semantics for one concrete pack or host unless that knowledge is part of its declared responsibility.
 - Host materializers receive the prepared project as data and MUST NOT load source configuration, resolve packs or resources, or import `@atlante/builder`. The builder MUST NOT import host packages; the CLI is the composition root that injects materializers selected by the document's `hosts` field.
 - Shared behavior MAY move to a lower layer only when genuinely generic to its consumers. An existing cross-layer shortcut MUST be surfaced rather than copied or expanded.
-- TypeScript sources, static pack content, authored configuration, and schema-generator inputs are authoritative. The committed JSON Schema (`packages/schema/schema/v0.1/schema.json`), `dist/`, and the generated native outputs (`.opencode/agents/`, `.opencode/skills/`, `.atlante/opencode-native.json`) MUST be regenerated from their sources and MUST NOT be edited directly.
+- TypeScript sources, static pack content, authored configuration, and schema-generator inputs are authoritative. The committed JSON Schemas (`packages/schema/schema/v0.1/schema.json`, `packages/schema/schema/v0.2/schema.json`), `dist/`, and the generated native outputs (`.opencode/agents/`, `.opencode/skills/`, `.atlante/opencode-native.json`, `.claude/agents/`, `.claude/skills/`, `.atlante/claude-code-native.json`) MUST be regenerated from their sources and MUST NOT be edited directly.
 
 ## Common commands
 
@@ -51,7 +53,7 @@ bun run type:check              # type-check all packages
 bun run lint:check              # lint + format check
 bun run build                   # build publishable CLI + internal adapter artifacts (pack is static)
 bun run quick:check             # type:check + lint:check + test:unit (fast inner loop)
-bun run core:check              # toolchain lane: build + type + lint + all tests + both smokes
+bun run core:check              # toolchain lane: build + type + lint + all tests + the host smokes
 bun run docs:check              # docs lane: site build + docs test suite
 bun run website:check           # website lane: site build + website test suite
 bun run packs:check             # packs lane: site build + packs test suite
@@ -75,13 +77,13 @@ for fast iteration. The lanes are additive: `full:check` is exactly
 `core:check` plus the three site lanes, so once `core:check` has passed,
 verify the remaining lanes individually instead of re-running it. Reserve
 `bun run full:check` for work with no lane coverage yet or release-level
-verification. The OpenCode host smoke inside `core:check`
-(`bun scripts/opencode-smoke.ts`) is load-bearing — it downloads both pinned
-hosts (V1 and V2) and is the slowest part of the lane — and unit tests cover
-the materializer against synthetic fixtures, so the smoke is the only
-automated check of the real pack → build → materialize → host
-discovery flow (pinned OpenCode in a sandbox) and must never be downgraded to
-a manual step.
+verification. The host smokes inside `core:check`
+(`bun scripts/opencode-smoke.ts`, `bun scripts/claude-smoke.ts`) are
+load-bearing — they download the pinned hosts and are the slowest part of the
+lane — and unit tests cover the materializers against synthetic fixtures, so
+the smokes are the only automated checks of the real pack → build →
+materialize → host discovery flow (pinned hosts in a sandbox) and must never
+be downgraded to a manual step.
 
 ## Repository conventions
 

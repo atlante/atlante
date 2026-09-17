@@ -450,6 +450,7 @@ export function createOpenCodeRunner(
 
   return {
     name: "opencode",
+    ownedDirectory: ".opencode/",
     dialect: host.dialect,
     auth,
 

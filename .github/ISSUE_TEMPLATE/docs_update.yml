@@ -1,0 +1,35 @@
+name: Docs update
+description: Report inaccurate, outdated, or missing documentation
+type: Docs
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Which page or guide is inaccurate, outdated, or missing coverage, and what does it currently say?
+    validations:
+      required: true
+
+  - type: textarea
+    id: correction
+    attributes:
+      label: Proposed correction
+      description: What should the documentation say instead, and what source makes that the correct statement?
+    validations:
+      required: true
+
+  - type: textarea
+    id: affected
+    attributes:
+      label: Affected pages
+      description: Paths under docs/, website/, README, or package guides.
+    validations:
+      required: true
+
+  - type: textarea
+    id: details
+    attributes:
+      label: Additional details
+      description: Related issues, behavior changes that caused the drift, or anything else relevant.
+    validations:
+      required: false

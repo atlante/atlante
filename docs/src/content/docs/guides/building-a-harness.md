@@ -19,8 +19,10 @@ here.
 
 ## Configure the OpenCode context server
 
-`atlante init` registers a version-pinned local Atlante MCP server in the
-OpenCode configuration for the directory it initializes. It selects the first
+`atlante init` registers a version-pinned local Atlante MCP server for each
+selected host — in the OpenCode configuration for OpenCode, and in a
+project-scoped `.mcp.json` for Claude Code. This guide uses the default
+OpenCode project, where `init` selects the first
 existing file in this order: `.opencode/opencode.jsonc`,
 `.opencode/opencode.json`, `opencode.jsonc`, and `opencode.json`. When none
 exists, it creates root `opencode.jsonc`.

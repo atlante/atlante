@@ -340,6 +340,7 @@ export function createClaudeRunner(
 
   return {
     name: "claude-code",
+    ownedDirectory: ".claude/",
     version,
     auth,
 

@@ -201,6 +201,7 @@ function fakeRunner(
 ): HostRunner {
   return {
     name: "fake",
+    ownedDirectory: ".opencode/",
     prepareHostIntegration() {},
     async runTrial(input: RunTrialInput): Promise<TrialRun> {
       if (createsFile) {
@@ -225,6 +226,7 @@ function fakeRunner(
 function throwingRunner(): HostRunner {
   return {
     name: "fake",
+    ownedDirectory: ".opencode/",
     prepareHostIntegration() {},
     async runTrial(): Promise<TrialRun> {
       throw new Error("host exploded");
@@ -393,6 +395,7 @@ describe("runEvalCommand", () => {
     let runnerCalled = false;
     const runner: HostRunner = {
       name: "never",
+      ownedDirectory: ".opencode/",
       prepareHostIntegration() {},
       async runTrial(): Promise<TrialRun> {
         runnerCalled = true;
@@ -553,6 +556,7 @@ describe("runEvalCommand", () => {
     let runnerCalled = false;
     const runner: HostRunner = {
       name: "never",
+      ownedDirectory: ".opencode/",
       prepareHostIntegration() {},
       async runTrial(): Promise<TrialRun> {
         runnerCalled = true;

@@ -249,7 +249,7 @@ the program it invokes.
 | `file-absent` | `path` | No non-symlink path exists |
 | `file-unchanged` | `path` | The regular-file digest matches its pre-trial state; missing and non-file paths are represented as `null` |
 | `file-contains` | `path`, `pattern`, `regex` (default `false`) | The file contains the pattern; literal text by default, regular expression when `regex` is `true` |
-| `diff-allowlist` | `allow` | No changed paths fall outside the allowlist. The scan ignores the host-owned `.opencode/` directory |
+| `diff-allowlist` | `allow` | No changed paths fall outside the allowlist. The scan ignores the host-owned output directory: `.opencode/` for OpenCode trials, `.claude/` for Claude Code trials |
 
 `outputMatches` is compiled as a regular expression and matched against
 combined stdout and stderr. It and `file-contains` patterns with `regex: true`

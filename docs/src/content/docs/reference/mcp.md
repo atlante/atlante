@@ -34,8 +34,9 @@ in the command registered by `atlante init`.
 
 ## OpenCode registration
 
-By default, `atlante init` registers the local server in the OpenCode
-configuration for the initialized directory. It first detects the installed
+When OpenCode is among the selected hosts, `atlante init` registers the local
+server in the OpenCode configuration for the initialized directory. It first
+detects the installed
 host dialect with one `opencode --version` probe: OpenCode V1 (`>=1.18.29
 <2.0.0`) and V2 (`>=2.0.0 <3.0.0`) are supported, and any other version fails with a
 diagnostic. When the binary is unavailable, `init` defaults to V2;
@@ -77,6 +78,30 @@ V1 registers the equivalent entry at `mcp.atlante` with `"enabled": true`.
 Registration preserves unrelated settings and JSONC comments, is idempotent,
 and participates in `init`'s rollback transaction. See the [CLI reference](/reference/cli#atlante-init)
 for initialization and package-installation behavior.
+
+## Claude Code registration
+
+When Claude Code is among the selected hosts, `atlante init` registers the
+same version-pinned server in the project-scoped `.mcp.json` file for the
+initialized directory, in Claude Code's native shape:
+
+```json
+{
+  "mcpServers": {
+    "atlante": {
+      "command": "npx",
+      "args": ["--yes", "atlante@<version>", "mcp"]
+    }
+  }
+}
+```
+
+The file is parsed before initialization continues; malformed JSON and
+invalid `mcpServers` shapes fail closed. An existing `atlante` entry that
+already matches the managed command is left untouched, and a conflicting
+entry fails closed instead of being replaced. Registration preserves
+unrelated settings, is idempotent, and participates in `init`'s rollback
+transaction. Use `--no-mcp` to skip registration for every selected host.
 
 ## Tool result envelope
 
@@ -213,6 +238,7 @@ Supported URIs are:
 | URI | Schema |
 | --- | --- |
 | `https://atlante.sh/schema/v0.1/schema.json` | Atlante configuration document |
+| `https://atlante.sh/schema/v0.2/schema.json` | Atlante v0.2 configuration document |
 | `https://atlante.sh/schema/v0.1/eval-scenario.json` | Eval scenario document |
 
 Other URIs return the `schema-not-supported` diagnostic. The server does not
