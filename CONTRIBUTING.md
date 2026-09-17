@@ -17,7 +17,7 @@ bun install
 
 ## Repository layout
 
-Eight toolchain workspaces live under `packages/`:
+Nine toolchain workspaces live under `packages/`:
 
 - `schema` — versioned document contract, TypeScript types, Zod schemas,
   generated JSON Schema.
@@ -28,6 +28,7 @@ Eight toolchain workspaces live under `packages/`:
 - `builder` — private host-neutral preparation and build orchestration.
 - `pack` — first-party static presets, templates, and instances.
 - `opencode` — OpenCode host materializer and the ownership manifest.
+- `claude-code` — Claude Code host materializer and the ownership manifest.
 - `eval` — private host-runner orchestration for `atlante eval`.
 - `cli` — user-facing command orchestration, initialization defaults, host
   registration.
@@ -72,7 +73,7 @@ verify the remaining lanes individually instead of re-running it; reserve
 
 ```sh
 bun run quick:check    # type:check + lint:check + test:unit; fast inner loop
-bun run core:check     # toolchain lane: build, type, lint, all test tiers, both smokes
+bun run core:check     # toolchain lane: build, type, lint, all test tiers, the host smokes
 bun run docs:check     # docs lane: site build + docs test suite
 bun run website:check  # website lane: site build + website test suite
 bun run packs:check    # packs lane: site build + packs test suite
@@ -87,7 +88,7 @@ bun run --cwd packs dev:local -- ../packages/pack
 ```
 
 CI runs one gate everywhere: `ci.yml` executes the full `full:check` (the
-required `check` status, including the CLI and OpenCode host smokes) on
+required `check` status, including the CLI and both host smokes) on
 every pull request and on every push to `main`.
 
 Tests run on `bun:test` and live next to the code they test:
@@ -101,12 +102,12 @@ Tests run on `bun:test` and live next to the code they test:
   `packs/` own their tests internally. Do not add tests in ad-hoc locations
   outside these trees.
 
-The OpenCode host smoke inside `core:check` (`bun scripts/opencode-smoke.ts`)
-is load-bearing — it downloads both pinned hosts (V1 and V2) and is the
-slowest part of the lane — and unit tests cover the materializer against
-synthetic fixtures, so the smoke is the only automated check of the real
-pack → build → materialize → host discovery flow and must never be downgraded
-to a manual
+The host smokes inside `core:check` (`bun scripts/opencode-smoke.ts`,
+`bun scripts/claude-smoke.ts`) are load-bearing — they download the pinned
+hosts and are the slowest part of the lane — and unit tests cover the
+materializers against synthetic fixtures, so the smokes are the only
+automated checks of the real pack → build → materialize → host discovery flow
+and must never be downgraded to a manual
 step.
 
 ## Architecture constraints
