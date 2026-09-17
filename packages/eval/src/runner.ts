@@ -29,6 +29,12 @@ import {
  */
 export interface HostRunner {
   readonly name: string;
+  /**
+   * Output directory the host owns inside the sandbox (`.opencode/` for
+   * OpenCode, `.claude/` for Claude Code). The diff-allowlist check
+   * excludes it when grading a trial.
+   */
+  readonly ownedDirectory: string;
   /** Writes the host integration into the assembled sandbox project. */
   prepareHostIntegration(
     sandbox: Sandbox,
@@ -317,6 +323,7 @@ async function executeTrial(
     scenario,
     trialIndex,
     run,
+    ownedDirectory: input.runner.ownedDirectory,
   });
   return {
     trial,
@@ -399,6 +406,7 @@ async function gradeTrial(input: {
   scenario: DiscoveredEvalScenario;
   trialIndex: number;
   run: TrialRun;
+  ownedDirectory: string;
 }): Promise<TrialResult> {
   const { sandbox, scenario, trialIndex, run } = input;
   const trial: TrialResult = {
@@ -413,7 +421,11 @@ async function gradeTrial(input: {
   };
   try {
     if (run.outcome === "completed") {
-      const checks = await runChecks(sandbox, scenario.scenario.checks);
+      const checks = await runChecks(
+        sandbox,
+        scenario.scenario.checks,
+        input.ownedDirectory,
+      );
       trial.verdict = checks.some((check) => check.verdict === "error")
         ? "infra-error"
         : checks.every((check) => check.verdict === "pass")

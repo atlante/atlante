@@ -211,6 +211,7 @@ function fileUnchangedCheck(sandbox: Sandbox, path: string): RawCheckResult {
 async function diffAllowlistCheck(
   sandbox: Sandbox,
   allow: readonly string[],
+  ownedDirectory: string,
 ): Promise<RawCheckResult> {
   const indexError = await clearIndexFlags(sandbox);
   if (indexError) return errorVerdict({ cause: indexError });
@@ -246,19 +247,20 @@ async function diffAllowlistCheck(
       stderr: outputTail(untracked.stderr),
     });
   }
-  // The host owns `.opencode/` inside the sandbox: verified native outputs
-  // are committed at baseline, and the host installs runtime artifacts
-  // (plugin node_modules, its own .gitignore) into the directory during the
-  // session. Those artifacts are not agent edits, so the diff scan ignores
-  // the directory; tampering with native outputs is a separate concern
-  // covered by verifyNativeOutputs at assembly time.
+  // The host owns its output directory inside the sandbox: verified native
+  // outputs are committed at baseline, and the host installs runtime
+  // artifacts (plugin node_modules, its own .gitignore, session settings)
+  // into the directory during the session. Those artifacts are not agent
+  // edits, so the diff scan ignores the directory; tampering with native
+  // outputs is a separate concern covered by verifyNativeOutputs at
+  // assembly time.
   const changed = [
     ...new Set([
       ...parseGitNameList(committedOrModified.stdout),
       ...parseGitNameList(untracked.stdout),
     ]),
   ]
-    .filter((path) => !path.startsWith(".opencode/"))
+    .filter((path) => !path.startsWith(ownedDirectory))
     .sort();
   const allowSet = new Set(allow);
   const unexpected = changed.filter((path) => !allowSet.has(path));
@@ -271,10 +273,15 @@ async function diffAllowlistCheck(
  * Runs every check against the sandbox state and returns complete evidence:
  * all checks run even after one fails, so the report always carries the full
  * picture. The trial verdict is the AND of all check verdicts.
+ *
+ * `ownedDirectory` is the output directory the trial's host owns inside the
+ * sandbox (`.opencode/` for OpenCode, `.claude/` for Claude Code); the
+ * diff-allowlist scan excludes it.
  */
 export async function runChecks(
   sandbox: Sandbox,
   checks: readonly EvalCheck[],
+  ownedDirectory: string,
 ): Promise<CheckResult[]> {
   const results: CheckResult[] = [];
   for (const [index, check] of checks.entries()) {
@@ -298,7 +305,7 @@ export async function runChecks(
         result = fileUnchangedCheck(sandbox, check.path);
         break;
       case "diff-allowlist":
-        result = await diffAllowlistCheck(sandbox, check.allow);
+        result = await diffAllowlistCheck(sandbox, check.allow, ownedDirectory);
         break;
     }
     results.push({
