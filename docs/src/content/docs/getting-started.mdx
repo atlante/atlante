@@ -55,6 +55,11 @@ this order: `.opencode/opencode.jsonc`, `.opencode/opencode.json`,
 that registration. See the [MCP reference](/reference/mcp) for the server
 contract.
 
+OpenCode is the default materialization target. The `--hosts` option
+additionally supports Claude Code, with its own native output directories and
+MCP registration; the [CLI reference](/reference/cli#atlante-init) documents
+the host selection.
+
 ## Inspect the configuration and output
 
 Open `atlante.jsonc`. Its configuration selects the preset through `extends`:

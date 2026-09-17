@@ -44,11 +44,13 @@ the places that refer to them.
 
 ## Output directories
 
-Output options select where native files land. Agents default to
+Output options select where OpenCode's native files land. Agents default to
 `.opencode/agents`, and skills default to `.opencode/skills/atlante`. Each
 kind accepts an independent `outDir` override. A custom directory keeps the
 same file layout and remains your responsibility for version control and host
-discovery.
+discovery. Claude Code paths are fixed: `.claude/agents/<id>.md` for agents
+and `.claude/skills/<id>/SKILL.md` for skills.
+[Materialization](/reference/materialization) lists the per-host defaults.
 
 ## Presets as a starting point
 
@@ -64,7 +66,8 @@ that your local configuration can customize.
 ## Source and native output
 
 The configuration and selected resources form the source of the harness. Each
-build turns that source into native agent and skill files for the host.
+build turns that source into native agent and skill files for the selected
+hosts.
 
 ```text
 configuration + selected resources
@@ -73,8 +76,8 @@ configuration + selected resources
     -> native agent and skill files
 ```
 
-OpenCode discovers the generated files when it starts, while the ownership
-manifest tells later builds which files Atlante manages.
+Each selected host discovers the generated files when it starts, while the
+ownership manifests tell later builds which files Atlante manages.
 [Evaluation](/concepts/evaluation) uses the built harness to run defined tasks
 and check their results.
 

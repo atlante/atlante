@@ -43,7 +43,8 @@ npx atlante init [path] --no-mcp
 - `--hosts <hosts>` selects the scaffolded materialization targets as a comma-separated subset of `opencode,claude-code`, such as `--hosts claude-code` or `--hosts opencode,claude-code`. It defaults to `opencode`. Selecting Claude Code writes a v0.2 configuration with the `hosts` field; an OpenCode-only selection keeps the v0.1 shape. Only the selected hosts' integrations are registered.
 - `--opencode-version <version>` registers against an explicit OpenCode version, such as `1.18.29` for an offline V1 project. Without it, `init` detects the installed host with one `--version` probe and defaults to V2 when no binary is available. Supported ranges are V1 (`>=1.18.29 <2.0.0`) and V2 (`>=2.0.0 <3.0.0`). The option applies only when OpenCode is among the selected hosts.
 - `--force` overwrites an existing `atlante.jsonc` and removes the alternate `atlante.json`.
-- `--no-mcp` skips registration of the local Atlante MCP server in the OpenCode configuration.
+- `--no-mcp` skips registration of the local Atlante MCP server for every
+selected host.
 
 `init` validates the selected preset before writing the configuration. It adds
 `.atlante/`, `.opencode/skills/atlante/` for default OpenCode skills, the exact
@@ -66,8 +67,7 @@ continues; unrelated settings and JSONC comments remain in place. A conflicting
 managed entry for the selected dialect fails closed instead of being replaced,
 while a legacy entry of the other dialect is left untouched. Use `--no-mcp`
 when the host configuration must remain unchanged. See
-[MCP](/reference/mcp#opencode-registration) for the managed entry and server
-contract.
+[MCP](/reference/mcp) for the managed entry and server contract.
 
 ### Pack installation
 
